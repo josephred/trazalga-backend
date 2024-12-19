@@ -3,12 +3,14 @@ package com.trazalga.api.controllers;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.services.DeclaracionComercializadorService;
 
 import java.util.ArrayList;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,7 +33,17 @@ public class DeclaracionComercializadorController {
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializador() {
         return this.declaracionComercializadorService.getDeclaracionesComercializador();
     }
-    
+        
+    @GetMapping(path = "/usuario/{usuarioId}")
+    public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorIdUsuario(@PathVariable("usuarioId") Long usuarioId){
+        return this.declaracionComercializadorService.getDeclaracionesComercializadorIdUsuario(usuarioId);
+    }
+        
+    @GetMapping(path = "/usuariodesc/{usuarioId}")
+    public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorUsuarioIdDesc(@PathVariable("usuarioId") Long usuarioId){
+        return this.declaracionComercializadorService.getDeclaracionesComercializadorUsuarioIdDesc(usuarioId);
+    }
+
     @PostMapping
     public DeclaracionComercializadorModel saveDeclaracionRecoleccion(@RequestBody DeclaracionComercializadorModel declaracionComercializador) {
         return this.declaracionComercializadorService.saveDeclaracionComercializador(declaracionComercializador);
@@ -55,5 +67,17 @@ public class DeclaracionComercializadorController {
         } else {
             return " ERROR al eliminar ";
         }
+    }
+    
+    @GetMapping(path = "/lastfolioorigen")
+    public ResponseEntity<String> getLastFolioOrigen() {
+        String lastFolioOrigen = declaracionComercializadorService.getLastFolioOrigen();
+        return ResponseEntity.ok(lastFolioOrigen);
+    }
+
+    @GetMapping(path = "/lastfoliodesembarqueac")
+    public ResponseEntity<String> getLastFolioDesembarqueRo() {
+        String lastFolioDesembarqueAc = declaracionComercializadorService.getLastFolioDesembarqueAc();
+        return ResponseEntity.ok(lastFolioDesembarqueAc);
     }
 }

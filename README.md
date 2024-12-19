@@ -20,6 +20,13 @@ git branch -M main
 git push -uf origin main
 ```
 
+
+Para crear certificado autofirmado
+keytool -genkeypair -alias myserver -keyalg RSA -keysize 2048 -validity 365 -keystore keystore.p12 -storetype PKCS12
+
+
+
+
 ## Integrate with your tools
 
 - [ ] [Set up project integrations](https://gitlab.com/aaron.josephred/trazalga_backend_03/-/settings/integrations)
