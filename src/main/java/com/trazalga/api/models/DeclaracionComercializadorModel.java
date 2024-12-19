@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
@@ -18,12 +20,16 @@ public class DeclaracionComercializadorModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_id")
+    private UsuarioModel usuario;
     
     @Column(nullable = true)
     private String folioOrigen;
     
     @Column(nullable = true)
-    private String folioDeclaracionAC;
+    private String folioDesembarqueAc;
 
     @Temporal(TemporalType.DATE)
     @Column(nullable = true)
@@ -53,11 +59,25 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = true)
     private String cantidad;
 
-    @Column(nullable = true)
-    private String documentoTributarioOrigen;
+    @Column
+    private String documentoTributarioOrigenTipo;
+    
+    @Column
+    private String documentoTributarioOrigenNumero;
+    
+    @Temporal(TemporalType.DATE)
+    @Column
+    private Date documentoTributarioOrigenFecha;
 
-    @Column(nullable = true)
-    private String documentoTributarioDestino;
+    @Column
+    private String documentoTributarioDestinoTipo;
+    
+    @Column
+    private String documentoTributarioDestinoNumero;
+    
+    @Temporal(TemporalType.DATE)
+    @Column
+    private Date documentoTributarioDestinoFecha;
 
     @Column(nullable = true)
     private String vehiculoTransporte;
@@ -75,12 +95,36 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = true)
     private String patente;
 
+    @ManyToOne
+    @JoinColumn(name = "usuario_destinatario_id")
+    private UsuarioModel usuarioDestinatario;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true )
+    private Long declaracionDestinatario;
+    
+
+    public Long getDeclaracionDestinatario() {
+        return declaracionDestinatario;
+    }
+
+    public void setDeclaracionDestinatario(Long declaracionDestinatario) {
+        this.declaracionDestinatario = declaracionDestinatario;
+    }
+
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public UsuarioModel getUsuario() {
+        return usuario;
+    }
+
+    public void setUsuario(UsuarioModel usuario) {
+        this.usuario = usuario;
     }
 
     public String getFolioOrigen() {
@@ -91,12 +135,12 @@ public class DeclaracionComercializadorModel {
         this.folioOrigen = folioOrigen;
     }
 
-    public String getFolioDeclaracionAC() {
-        return folioDeclaracionAC;
+    public String getFolioDesembarqueAc() {
+        return folioDesembarqueAc;
     }
 
-    public void setFolioDeclaracionAC(String folioDeclaracionAC) {
-        this.folioDeclaracionAC = folioDeclaracionAC;
+    public void setFolioDesembarqueAc(String folioDesembarqueAc) {
+        this.folioDesembarqueAc = folioDesembarqueAc;
     }
 
     public Date getFechaDeclaracion() {
@@ -171,20 +215,52 @@ public class DeclaracionComercializadorModel {
         this.cantidad = cantidad;
     }
 
-    public String getDocumentoTributarioOrigen() {
-        return documentoTributarioOrigen;
+    public String getDocumentoTributarioOrigenTipo() {
+        return documentoTributarioOrigenTipo;
     }
 
-    public void setDocumentoTributarioOrigen(String documentoTributarioOrigen) {
-        this.documentoTributarioOrigen = documentoTributarioOrigen;
+    public void setDocumentoTributarioOrigenTipo(String documentoTributarioOrigenTipo) {
+        this.documentoTributarioOrigenTipo = documentoTributarioOrigenTipo;
     }
 
-    public String getDocumentoTributarioDestino() {
-        return documentoTributarioDestino;
+    public String getDocumentoTributarioOrigenNumero() {
+        return documentoTributarioOrigenNumero;
     }
 
-    public void setDocumentoTributarioDestino(String documentoTributarioDestino) {
-        this.documentoTributarioDestino = documentoTributarioDestino;
+    public void setDocumentoTributarioOrigenNumero(String documentoTributarioOrigenNumero) {
+        this.documentoTributarioOrigenNumero = documentoTributarioOrigenNumero;
+    }
+
+    public Date getDocumentoTributarioOrigenFecha() {
+        return documentoTributarioOrigenFecha;
+    }
+
+    public void setDocumentoTributarioOrigenFecha(Date documentoTributarioOrigenFecha) {
+        this.documentoTributarioOrigenFecha = documentoTributarioOrigenFecha;
+    }
+
+    public String getDocumentoTributarioDestinoTipo() {
+        return documentoTributarioDestinoTipo;
+    }
+
+    public void setDocumentoTributarioDestinoTipo(String documentoTributarioDestinoTipo) {
+        this.documentoTributarioDestinoTipo = documentoTributarioDestinoTipo;
+    }
+
+    public String getDocumentoTributarioDestinoNumero() {
+        return documentoTributarioDestinoNumero;
+    }
+
+    public void setDocumentoTributarioDestinoNumero(String documentoTributarioDestinoNumero) {
+        this.documentoTributarioDestinoNumero = documentoTributarioDestinoNumero;
+    }
+
+    public Date getDocumentoTributarioDestinoFecha() {
+        return documentoTributarioDestinoFecha;
+    }
+
+    public void setDocumentoTributarioDestinoFecha(Date documentoTributarioDestinoFecha) {
+        this.documentoTributarioDestinoFecha = documentoTributarioDestinoFecha;
     }
 
     public String getVehiculoTransporte() {
@@ -227,5 +303,13 @@ public class DeclaracionComercializadorModel {
         this.patente = patente;
     }
 
-    
+    public UsuarioModel getUsuarioDestinatario() {
+        return usuarioDestinatario;
+    }
+
+    public void setUsuarioDestinatario(UsuarioModel usuarioDestinatario) {
+        this.usuarioDestinatario = usuarioDestinatario;
+    }
+
+        
 }

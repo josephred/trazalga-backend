@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,14 @@ public class DeclaracionComercializadorService {
         // return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAllOrderByCampoEspecificoDesc();
     }
 
+    public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorIdUsuario(Long id){
+        return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAllByUsuarioId(id);
+    }
+
+    public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorUsuarioIdDesc(Long id){
+        return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAllByUsuarioIdOrderByFechaDeclaracionDesc(id);
+    }
+
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
         return declaracionComercializadorRepository.save(declaracionComercializadorModel);
     }
@@ -31,7 +40,7 @@ public class DeclaracionComercializadorService {
     public DeclaracionComercializadorModel updateById(DeclaracionComercializadorModel request, Long id){
         DeclaracionComercializadorModel declaracionComercializadorModel = declaracionComercializadorRepository.findById(id).get();
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());
-        declaracionComercializadorModel.setFolioDeclaracionAC(request.getFolioDeclaracionAC());
+        declaracionComercializadorModel.setFolioDesembarqueAc(request.getFolioDesembarqueAc());
         declaracionComercializadorModel.setFechaDeclaracion(request.getFechaDeclaracion());
         declaracionComercializadorModel.setHora(request.getHora());
         declaracionComercializadorModel.setCodigoSernapesca(request.getCodigoSernapesca());
@@ -41,8 +50,12 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setComposicion(request.getComposicion());
         declaracionComercializadorModel.setEstadoHumedad(request.getEstadoHumedad());
         declaracionComercializadorModel.setCantidad(request.getCantidad());
-        declaracionComercializadorModel.setDocumentoTributarioOrigen(request.getDocumentoTributarioOrigen());
-        declaracionComercializadorModel.setDocumentoTributarioDestino(request.getDocumentoTributarioDestino());
+        declaracionComercializadorModel.setDocumentoTributarioOrigenTipo(request.getDocumentoTributarioOrigenTipo());
+        declaracionComercializadorModel.setDocumentoTributarioOrigenNumero(request.getDocumentoTributarioOrigenNumero());
+        declaracionComercializadorModel.setDocumentoTributarioOrigenFecha(request.getDocumentoTributarioOrigenFecha());
+        declaracionComercializadorModel.setDocumentoTributarioDestinoTipo(request.getDocumentoTributarioDestinoTipo());
+        declaracionComercializadorModel.setDocumentoTributarioDestinoNumero(request.getDocumentoTributarioDestinoNumero());
+        declaracionComercializadorModel.setDocumentoTributarioDestinoFecha(request.getDocumentoTributarioDestinoFecha());
         declaracionComercializadorModel.setVehiculoTransporte(request.getVehiculoTransporte());
         declaracionComercializadorModel.setChoferTransporte(request.getChoferTransporte());
         declaracionComercializadorModel.setCodigoDestinatario(request.getCodigoDestinatario());
@@ -59,4 +72,15 @@ public class DeclaracionComercializadorService {
             return true;
         } catch( Exception e){return false;}
     }
+    
+    public String getLastFolioOrigen() {
+        List<String> folios = declaracionComercializadorRepository.findLastFolioOrigen();
+        return folios.isEmpty() ? null : folios.get(0);
+    }
+
+    public String getLastFolioDesembarqueAc() {
+        List<String> folios = declaracionComercializadorRepository.findLastFolioDesembarqueAc();
+        return folios.isEmpty() ? null : folios.get(0);
+    }
+
 }

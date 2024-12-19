@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
@@ -18,15 +20,16 @@ public class DeclaracionRecolectorModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column
-    private String codigoLote;
     
+    @ManyToOne
+    @JoinColumn(name = "usuario_id")
+    private UsuarioModel usuario;
+ 
     @Column(nullable = true)
     private String folioOrigen;
     
     @Column(nullable = true)
-    private String folioDesembarqueRO;
+    private String folioDesembarqueRo;
     
     @Temporal(TemporalType.DATE)
     @Column(nullable = true)
@@ -48,38 +51,51 @@ public class DeclaracionRecolectorModel {
     @Column(nullable = true)
     private String varadero;
     
-    @Column(nullable = true)
-    private String caleta;
+    @ManyToOne
+    @JoinColumn(name = "caleta_id")
+    private CaletaModel caleta;
     
     @Column(nullable = true)
     private String georreferencia;
     
+    @ManyToOne
+    @JoinColumn(name = "especie_id")
+    private EspecieModel especie;
+    
+    @ManyToOne
+    @JoinColumn(name = "comuna_id")
+    private ComunaModel comuna;
+    
+    @ManyToOne
+    @JoinColumn(name = "extraccion_tipo_id")
+    private ExtraccionTipoModel extraccionTipo;
+    
+    @ManyToOne
+    @JoinColumn(name = "composicion_id")
+    private ComposicionModel composicion;
+    
+    @ManyToOne
+    @JoinColumn(name = "humedad_estado_id")
+    private HumedadEstadoModel humedadEstado;
+
     @Column(nullable = true)
-    private String especie;
+    private String humedad;
     
     @Column(nullable = true)
-    private String comuna;
+    private Double desembarque;
     
     @Column(nullable = true)
-    private String tipoExtraccion;
-    
-    @Column(nullable = true)
-    private String composicion;
-    
-    @Column(nullable = true)
-    private String estadoHumedad;
-    
-    @Column(nullable = true)
-    private double desembarque;
-    
-    @Column(nullable = true)
-    private double captura;
+    private Double captura;
     
     @Column(nullable = true)
     private String codigoDestinatario;
     
-    @Column(nullable = true)
-    private String nombreDestinatario;
+    @ManyToOne
+    @JoinColumn(name = "usuario_destinatario_id")
+    private UsuarioModel usuarioDestinatario;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true )
+    private Long declaracionDestinatario;
 
     public Long getId() {
         return id;
@@ -89,12 +105,12 @@ public class DeclaracionRecolectorModel {
         this.id = id;
     }
 
-    public String getCodigoLote() {
-        return codigoLote;
+    public UsuarioModel getUsuario() {
+        return usuario;
     }
 
-    public void setCodigoLote(String codigoLote) {
-        this.codigoLote = codigoLote;
+    public void setUsuario(UsuarioModel usuario) {
+        this.usuario = usuario;
     }
 
     public String getFolioOrigen() {
@@ -105,12 +121,12 @@ public class DeclaracionRecolectorModel {
         this.folioOrigen = folioOrigen;
     }
 
-    public String getFolioDesembarqueRO() {
-        return folioDesembarqueRO;
+    public String getFolioDesembarqueRo() {
+        return folioDesembarqueRo;
     }
 
-    public void setFolioDesembarqueRO(String folioDesembarqueRO) {
-        this.folioDesembarqueRO = folioDesembarqueRO;
+    public void setFolioDesembarqueRo(String folioDesembarqueRo) {
+        this.folioDesembarqueRo = folioDesembarqueRo;
     }
 
     public Date getFechaExtraccion() {
@@ -161,11 +177,11 @@ public class DeclaracionRecolectorModel {
         this.varadero = varadero;
     }
 
-    public String getCaleta() {
+    public CaletaModel getCaleta() {
         return caleta;
     }
 
-    public void setCaleta(String caleta) {
+    public void setCaleta(CaletaModel caleta) {
         this.caleta = caleta;
     }
 
@@ -177,59 +193,67 @@ public class DeclaracionRecolectorModel {
         this.georreferencia = georreferencia;
     }
 
-    public String getEspecie() {
+    public EspecieModel getEspecie() {
         return especie;
     }
 
-    public void setEspecie(String especie) {
+    public void setEspecie(EspecieModel especie) {
         this.especie = especie;
     }
 
-    public String getComuna() {
+    public ComunaModel getComuna() {
         return comuna;
     }
 
-    public void setComuna(String comuna) {
+    public void setComuna(ComunaModel comuna) {
         this.comuna = comuna;
     }
 
-    public String getTipoExtraccion() {
-        return tipoExtraccion;
+    public ExtraccionTipoModel getExtraccionTipo() {
+        return extraccionTipo;
     }
 
-    public void setTipoExtraccion(String tipoExtraccion) {
-        this.tipoExtraccion = tipoExtraccion;
+    public void setExtraccionTipo(ExtraccionTipoModel extraccionTipo) {
+        this.extraccionTipo = extraccionTipo;
     }
 
-    public String getComposicion() {
+    public ComposicionModel getComposicion() {
         return composicion;
     }
 
-    public void setComposicion(String composicion) {
+    public void setComposicion(ComposicionModel composicion) {
         this.composicion = composicion;
     }
 
-    public String getEstadoHumedad() {
-        return estadoHumedad;
+    public HumedadEstadoModel getHumedadEstado() {
+        return humedadEstado;
     }
 
-    public void setEstadoHumedad(String estadoHumedad) {
-        this.estadoHumedad = estadoHumedad;
+    public void setHumedadEstado(HumedadEstadoModel humedadEstado) {
+        this.humedadEstado = humedadEstado;
     }
 
-    public double getDesembarque() {
+    public String getHumedad() {
+        return humedad;
+    }
+
+    public void setHumedad(String humedad) {
+        this.humedad = humedad;
+    }
+
+    public Double getDesembarque() {
         return desembarque;
     }
 
-    public void setDesembarque(double desembarque) {
+    public void setDesembarque(Double desembarque) {
         this.desembarque = desembarque;
     }
 
-    public double getCaptura() {
+    public Double getCaptura() {
         return captura;
     }
 
-    public void setCaptura(double captura) {
+    public void setCaptura(Double captura) {
         this.captura = captura;
     }
 
@@ -241,12 +265,22 @@ public class DeclaracionRecolectorModel {
         this.codigoDestinatario = codigoDestinatario;
     }
 
-    public String getNombreDestinatario() {
-        return nombreDestinatario;
+    public UsuarioModel getUsuarioDestinatario() {
+        return usuarioDestinatario;
     }
 
-    public void setNombreDestinatario(String nombreDestinatario) {
-        this.nombreDestinatario = nombreDestinatario;
+    public void setUsuarioDestinatario(UsuarioModel usuarioDestinatario) {
+        this.usuarioDestinatario = usuarioDestinatario;
     }
+
+    public Long getDeclaracionDestinatario() {
+        return declaracionDestinatario;
+    }
+
+    public void setDeclaracionDestinatario(Long declaracionDestinatario) {
+        this.declaracionDestinatario = declaracionDestinatario;
+    }
+
+
 
 }
