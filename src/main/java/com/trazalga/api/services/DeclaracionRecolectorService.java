@@ -55,6 +55,7 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setExtraccionTipo(request.getExtraccionTipo());
         declaracionRecolectorModel.setComposicion(request.getComposicion());
         declaracionRecolectorModel.setHumedadEstado(request.getHumedadEstado());
+        declaracionRecolectorModel.setHumedad(request.getHumedad());
         declaracionRecolectorModel.setDesembarque(request.getDesembarque());
         declaracionRecolectorModel.setCaptura(request.getCaptura());
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());

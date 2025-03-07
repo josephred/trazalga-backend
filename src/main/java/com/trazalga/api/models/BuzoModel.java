@@ -4,21 +4,21 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "perfil")
+@Table(name = "buzo")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PerfilModel {
+public class BuzoModel {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = true)
+    @Column(nullable = false, length = 100, unique = true)
     private String nombre;
-    
-    @Column(nullable = true)
-    private String descripcion;
+
+    @Column(nullable = false, length = 50, unique = true)
+    private String codigo;
 }

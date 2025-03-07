@@ -47,14 +47,17 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = true)
     private String georreferencia;
 
-    @Column(nullable = true)
-    private String especie;
+    @ManyToOne
+    @JoinColumn(name = "especie_id")
+    private EspecieModel especie;
 
-    @Column(nullable = true)
-    private String composicion;
+    @ManyToOne
+    @JoinColumn(name = "composicion_id")
+    private ComposicionModel composicion;
 
-    @Column(nullable = true)
-    private String estadoHumedad;
+    @ManyToOne
+    @JoinColumn(name = "humedad_estado_id")
+    private HumedadEstadoModel humedadEstado;
 
     @Column(nullable = true)
     private String cantidad;
@@ -89,9 +92,14 @@ public class DeclaracionComercializadorModel {
     private String codigoDestinatario;
  
     
-    @Column(nullable = true)
-    private String nombreDestinatario;
+    // @Column(nullable = true)
+    // private String nombreDestinatario;
  
+    // @ManyToOne
+    // @JoinColumn(name = "usuario_destinatario_id")
+    // private UsuarioModel nombreDestinatario;
+
+
     @Column(nullable = true)
     private String patente;
 
@@ -183,28 +191,28 @@ public class DeclaracionComercializadorModel {
         this.georreferencia = georreferencia;
     }
 
-    public String getEspecie() {
+    public EspecieModel getEspecie() {
         return especie;
     }
 
-    public void setEspecie(String especie) {
+    public void setEspecie(EspecieModel especie) {
         this.especie = especie;
     }
 
-    public String getComposicion() {
+    public ComposicionModel getComposicion() {
         return composicion;
     }
 
-    public void setComposicion(String composicion) {
+    public void setComposicion(ComposicionModel composicion) {
         this.composicion = composicion;
     }
 
-    public String getEstadoHumedad() {
-        return estadoHumedad;
+    public HumedadEstadoModel getHumedadEstado() {
+        return humedadEstado;
     }
 
-    public void setEstadoHumedad(String estadoHumedad) {
-        this.estadoHumedad = estadoHumedad;
+    public void setHumedadEstado(HumedadEstadoModel humedadEstado) {
+        this.humedadEstado = humedadEstado;
     }
 
     public String getCantidad() {
@@ -287,16 +295,17 @@ public class DeclaracionComercializadorModel {
         this.codigoDestinatario = codigoDestinatario;
     }
 
-    public String getNombreDestinatario() {
-        return nombreDestinatario;
-    }
+    // public UsuarioModel getNombreDestinatario() {
+    //     return nombreDestinatario;
+    // }
 
-    public void setNombreDestinatario(String nombreDestinatario) {
-        this.nombreDestinatario = nombreDestinatario;
-    }
+    // public void setNombreDestinatario(UsuarioModel nombreDestinatario) {
+    //     this.nombreDestinatario = nombreDestinatario;
+    // }
 
     public String getPatente() {
         return patente;
+        
     }
 
     public void setPatente(String patente) {
