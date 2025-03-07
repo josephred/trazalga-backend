@@ -48,7 +48,7 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setGeorreferencia(request.getGeorreferencia());
         declaracionComercializadorModel.setEspecie(request.getEspecie());
         declaracionComercializadorModel.setComposicion(request.getComposicion());
-        declaracionComercializadorModel.setEstadoHumedad(request.getEstadoHumedad());
+        declaracionComercializadorModel.setHumedadEstado(request.getHumedadEstado());
         declaracionComercializadorModel.setCantidad(request.getCantidad());
         declaracionComercializadorModel.setDocumentoTributarioOrigenTipo(request.getDocumentoTributarioOrigenTipo());
         declaracionComercializadorModel.setDocumentoTributarioOrigenNumero(request.getDocumentoTributarioOrigenNumero());
@@ -59,7 +59,8 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setVehiculoTransporte(request.getVehiculoTransporte());
         declaracionComercializadorModel.setChoferTransporte(request.getChoferTransporte());
         declaracionComercializadorModel.setCodigoDestinatario(request.getCodigoDestinatario());
-        declaracionComercializadorModel.setNombreDestinatario(request.getNombreDestinatario());
+        // declaracionComercializadorModel.setNombreDestinatario(request.getNombreDestinatario());
+        declaracionComercializadorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracionComercializadorModel.setPatente(request.getPatente());
 
         declaracionComercializadorRepository.save(declaracionComercializadorModel);

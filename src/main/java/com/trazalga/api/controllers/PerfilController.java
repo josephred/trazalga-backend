@@ -1,55 +1,48 @@
 package com.trazalga.api.controllers;
 
-import java.util.ArrayList;
-import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import com.trazalga.api.models.PerfilModel;
 import com.trazalga.api.services.PerfilService;
+import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/perfil")
 public class PerfilController {
 
-    @Autowired
-    private PerfilService perfilService;
+    private final PerfilService perfilService;
+
+    public PerfilController(PerfilService perfilService) {
+        this.perfilService = perfilService;
+    }
 
     @GetMapping
-    public ArrayList<PerfilModel> getPerfiles() {
-        return this.perfilService.getPerfiles();
-    }
-    
-    @PostMapping
-    public PerfilModel savePerfil(@RequestBody PerfilModel perfil) {
-        return this.perfilService.savePerfil(perfil);
-    }
-    
-    @GetMapping(path = "/{id}")
-    public Optional<PerfilModel> getPerfilById(@PathVariable("id") Long id) {
-        return this.perfilService.getById(id);
-    }
-    
-    @PutMapping(path = "{id}")
-    public PerfilModel updatePerfilById(@RequestBody PerfilModel request, @PathVariable("id") Long id) {
-        return this.perfilService.updateById(request, id);
+    public ResponseEntity<List<PerfilModel>> getPerfiles() {
+        return ResponseEntity.ok(perfilService.getPerfiles());
     }
 
-    @DeleteMapping(path = "/{id}")
-    public String deleteById(@PathVariable("id") Long id ){
-        boolean ok = this.perfilService.deletePerfil(id);
-        if(ok){
-            return " Perfil " + id + " eliminado ";
-        } else {
-            return " ERROR al eliminar el perfil ";
-        }
+    @PostMapping
+    public ResponseEntity<PerfilModel> savePerfil(@RequestBody PerfilModel perfil) {
+        return ResponseEntity.ok(perfilService.savePerfil(perfil));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PerfilModel> getPerfilById(@PathVariable Long id) {
+        return perfilService.getById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<PerfilModel> updatePerfilById(@RequestBody PerfilModel request, @PathVariable Long id) {
+        return ResponseEntity.ok(perfilService.updateById(request, id));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteById(@PathVariable Long id) {
+        return perfilService.deletePerfil(id)
+                ? ResponseEntity.ok("Perfil " + id + " eliminado.")
+                : ResponseEntity.badRequest().body("ERROR al eliminar el perfil.");
     }
 }
