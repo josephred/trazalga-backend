@@ -110,6 +110,16 @@ public class DeclaracionComercializadorModel {
     @Column(name = "declaracion_destinatario_id", nullable = true )
     private Long declaracionDestinatario;
     
+    @Column(nullable = true)
+    private String declaracionesSeleccionadas;
+
+    public String getDeclaracionesSeleccionadas() {
+        return declaracionesSeleccionadas;
+    }
+
+    public void setDeclaracionesSeleccionadas(String declaracionesSeleccionadas) {
+        this.declaracionesSeleccionadas = declaracionesSeleccionadas;
+    }
 
     public Long getDeclaracionDestinatario() {
         return declaracionDestinatario;
