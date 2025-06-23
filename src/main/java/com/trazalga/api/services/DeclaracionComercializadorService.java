@@ -62,7 +62,7 @@ public class DeclaracionComercializadorService {
         // declaracionComercializadorModel.setNombreDestinatario(request.getNombreDestinatario());
         declaracionComercializadorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracionComercializadorModel.setPatente(request.getPatente());
-        declaracionComercializadorModel.setDeclaracionesSeleeccionadas(request.getDeclaracionesSeleeccionadas());
+        declaracionComercializadorModel.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
         declaracionComercializadorRepository.save(declaracionComercializadorModel);
         return declaracionComercializadorModel;
