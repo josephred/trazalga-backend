@@ -31,3 +31,12 @@ build/
 
 ### VS Code ###
 #.vscode/
+
+# Build artifacts
+/target/
+*.jar
+*.war
+*.ear
+
+# Log files
+*.log

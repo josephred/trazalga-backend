@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import com.trazalga.api.models.DeclaracionAreaModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 
 @Repository
 public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAreaModel, Long> {
@@ -22,4 +23,8 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
     // Obtener el último folioDesembarqueAmerb registrado
     @Query("SELECT d.folioDesembarqueAmerb FROM DeclaracionAreaModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueAmerb();
+
+    List<DeclaracionAreaModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
+
+
 }

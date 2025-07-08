@@ -34,4 +34,6 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
     // Método para obtener el último folioDesembarqueRO
     @Query("SELECT d.folioDesembarqueRo FROM DeclaracionRecolectorModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueRo();
+
+    List<DeclaracionRecolectorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
 }

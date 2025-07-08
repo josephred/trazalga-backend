@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionArmadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 
 @Repository
 public interface IDeclaracionArmadorRepository extends JpaRepository<DeclaracionArmadorModel, Long> {
@@ -28,4 +29,6 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
     // Método para obtener el último folioDesembarqueDA
     @Query("SELECT d.folioDesembarqueDa FROM DeclaracionArmadorModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueDa();
+
+    List<DeclaracionArmadorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
 }

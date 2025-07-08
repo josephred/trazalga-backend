@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 
 @Repository
 public interface IDeclaracionComercializadorRepository extends JpaRepository<DeclaracionComercializadorModel, Long> {
@@ -24,4 +25,5 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
     @Query("SELECT d.folioDesembarqueAc FROM DeclaracionComercializadorModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueAc();
 
+    List<DeclaracionComercializadorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
 }
