@@ -60,7 +60,7 @@ public class DeclaracionComercializadorModel {
     private HumedadEstadoModel humedadEstado;
 
     @Column(nullable = true)
-    private String cantidad;
+    private Double cantidad;
 
     @Column
     private String documentoTributarioOrigenTipo;
@@ -225,11 +225,11 @@ public class DeclaracionComercializadorModel {
         this.humedadEstado = humedadEstado;
     }
 
-    public String getCantidad() {
+    public Double getCantidad() {
         return cantidad;
     }
 
-    public void setCantidad(String cantidad) {
+    public void setCantidad(Double cantidad) {
         this.cantidad = cantidad;
     }
 
