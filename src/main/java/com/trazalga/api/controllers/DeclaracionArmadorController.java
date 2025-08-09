@@ -10,6 +10,9 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -57,8 +60,12 @@ public class DeclaracionArmadorController {
     /**
      * Obtener declaraciones de armador donde usuarioDestinatario es NULL
      */
+    @Operation(summary = "Obtener declaraciones pendientes para un destinatario",
+               description = "Devuelve una lista de declaraciones de armador que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
+    @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
-    public ResponseEntity<List<DeclaracionArmadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
+    public ResponseEntity<List<DeclaracionArmadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId) {
         List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
         return ResponseEntity.ok(declaraciones);
     }

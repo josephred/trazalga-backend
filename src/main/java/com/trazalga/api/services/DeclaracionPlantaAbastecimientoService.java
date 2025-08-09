@@ -27,18 +27,20 @@ public class DeclaracionPlantaAbastecimientoService {
 
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
-            declaracion.setFolioDeclaracionAPla(generarFolioAPla());
+            declaracion.setFolioDeclaracionAPla(generarFolio());
         }
-
         if (declaracion.getFechaIngresoPlanta() == null) {
             declaracion.setFechaIngresoPlanta(new Date());
         }
-
         return repository.save(declaracion);
     }
 
-    private String generarFolioAPla() {
-        String prefijo = "A-PLA";
+    public List<DeclaracionPlantaAbastecimientoModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
+        return repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    }
+
+    private String generarFolio() {
+        String prefijo = "DAPLA"; // Declaracion Abastecimiento Planta
         String anio = new SimpleDateFormat("yyyy").format(Calendar.getInstance().getTime());
         String ultimoFolio = repository.findLastFolioDeclaracionAPla().stream().findFirst().orElse(null);
 
@@ -49,4 +51,5 @@ public class DeclaracionPlantaAbastecimientoService {
         }
         return String.format("%s-%s-%06d", prefijo, anio, correlativo);
     }
+
 }

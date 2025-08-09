@@ -67,4 +67,11 @@ public class DeclaracionPlantaDestinoModel {
     private String rutDestino;
 
     private String codigoSernapescaDestino;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_destinatario_id", nullable = true)
+    private UsuarioModel usuarioDestinatario;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true)
+    private Long declaracionDestinatario;
 }

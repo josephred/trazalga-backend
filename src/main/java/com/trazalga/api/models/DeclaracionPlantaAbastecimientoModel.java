@@ -60,4 +60,11 @@ public class DeclaracionPlantaAbastecimientoModel {
     private String documentoTributarioNumero;
     private Date documentoTributarioFecha;
     private String patente;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_destinatario_id", nullable = true)
+    private UsuarioModel usuarioDestinatario;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true)
+    private Long declaracionDestinatario;
 }

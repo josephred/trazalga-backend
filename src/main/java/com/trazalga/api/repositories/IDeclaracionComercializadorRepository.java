@@ -26,4 +26,7 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
     List<String> findLastFolioDesembarqueAc();
 
     List<DeclaracionComercializadorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
+
+    // Método personalizado para encontrar registros donde declaracion_destinatario_id es null para un usuario destinatario específico
+    List<DeclaracionComercializadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 }

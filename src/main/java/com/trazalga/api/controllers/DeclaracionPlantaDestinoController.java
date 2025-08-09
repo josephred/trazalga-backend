@@ -40,7 +40,7 @@ public class DeclaracionPlantaDestinoController {
     public ResponseEntity<List<DeclaracionPlantaDestinoModel>> getDeclaracionesPorUsuario(
             @Parameter(description = "ID del usuario (planta) para buscar sus declaraciones") @PathVariable("usuarioId") Long usuarioId) {
         List<DeclaracionPlantaDestinoModel> declaraciones = service.getAllByUsuarioId(usuarioId);
-        return new ResponseEntity<>(declaraciones, HttpStatus.OK);
+        return ResponseEntity.ok(declaraciones);
     }
 
     @GetMapping("/{id}")
@@ -50,7 +50,17 @@ public class DeclaracionPlantaDestinoController {
     @ApiResponse(responseCode = "404", description = "Declaración no encontrada", content = @Content)
     public ResponseEntity<DeclaracionPlantaDestinoModel> getDeclaracionPorId(@Parameter(description = "ID de la declaración a buscar") @PathVariable("id") Long id) {
         return service.getById(id)
-                .map(declaracion -> new ResponseEntity<>(declaracion, HttpStatus.OK))
-                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
+    @Operation(summary = "Obtener declaraciones de destino pendientes para un destinatario",
+               description = "Devuelve una lista de declaraciones de destino de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
+    @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
+    public ResponseEntity<List<DeclaracionPlantaDestinoModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId) {
+        List<DeclaracionPlantaDestinoModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        return ResponseEntity.ok(declaraciones);
     }
 }

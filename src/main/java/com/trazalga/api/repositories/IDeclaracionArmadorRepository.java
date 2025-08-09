@@ -13,8 +13,8 @@ import com.trazalga.api.models.DeclaracionRecolectorModel;
 @Repository
 public interface IDeclaracionArmadorRepository extends JpaRepository<DeclaracionArmadorModel, Long> {
 
-    // Método para obtener todas las declaraciones del armador donde destinatario es NULL para un usuario específico
-    List<DeclaracionArmadorModel> findByUsuarioDestinatarioIdAndUsuarioDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Método para obtener todas las declaraciones del armador donde la declaración de destino es nula
+    List<DeclaracionArmadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 
     // Método para obtener todas las declaraciones del armador por ID de usuario
     ArrayList<DeclaracionArmadorModel> findAllByUsuarioId(Long usuarioId);

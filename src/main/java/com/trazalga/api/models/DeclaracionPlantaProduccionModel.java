@@ -58,4 +58,11 @@ public class DeclaracionPlantaProduccionModel {
 
     @Column(nullable = false)
     private Double cantidadProducto;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_destinatario_id", nullable = true)
+    private UsuarioModel usuarioDestinatario;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true)
+    private Long declaracionDestinatario;
 }

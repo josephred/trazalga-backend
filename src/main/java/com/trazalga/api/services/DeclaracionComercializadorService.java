@@ -37,6 +37,10 @@ public class DeclaracionComercializadorService {
         return declaracionComercializadorRepository.findById(id);
     }
 
+    public List<DeclaracionComercializadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
+        return declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    }
+
     public DeclaracionComercializadorModel updateById(DeclaracionComercializadorModel request, Long id){
         DeclaracionComercializadorModel declaracionComercializadorModel = declaracionComercializadorRepository.findById(id).get();
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());

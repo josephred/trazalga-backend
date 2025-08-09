@@ -16,4 +16,7 @@ public interface IDeclaracionPlantaAbastecimientoRepository extends JpaRepositor
     // Obtener el último folioDeclaracionAPla registrado para generar el correlativo
     @Query("SELECT d.folioDeclaracionAPla FROM DeclaracionPlantaAbastecimientoModel d ORDER BY d.id DESC")
     List<String> findLastFolioDeclaracionAPla();
+
+    // Método para obtener declaraciones pendientes para un destinatario
+    List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 }

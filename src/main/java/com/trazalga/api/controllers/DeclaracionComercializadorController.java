@@ -3,11 +3,11 @@ package com.trazalga.api.controllers;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
-import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.services.DeclaracionComercializadorService;
 
 import java.util.ArrayList;
 import java.util.Optional;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -54,6 +54,12 @@ public class DeclaracionComercializadorController {
         return this.declaracionComercializadorService.getById(id);
     }
     
+    @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
+    public ResponseEntity<List<DeclaracionComercializadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
+        List<DeclaracionComercializadorModel> declaraciones = declaracionComercializadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        return ResponseEntity.ok(declaraciones);
+    }
+
     @PutMapping(path = "{id}")
     public DeclaracionComercializadorModel updateDeclaracionComercializadorById(@RequestBody DeclaracionComercializadorModel request, @PathVariable("id") Long id) {
         return this.declaracionComercializadorService.updateById(request, id);

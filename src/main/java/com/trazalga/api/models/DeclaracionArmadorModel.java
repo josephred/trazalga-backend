@@ -94,4 +94,7 @@ public class DeclaracionArmadorModel {
 
     @Column(nullable = true)
     private Double longitud;
+
+    @Column(name = "declaracion_destinatario_id", nullable = true)
+    private Long declaracionDestinatario;
 }

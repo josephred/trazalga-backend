@@ -37,6 +37,10 @@ public class DeclaracionPlantaProduccionService {
         return repository.save(declaracion);
     }
 
+    public List<DeclaracionPlantaProduccionModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
+        return repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    }
+
     private String generarFolioPpla() {
         String prefijo = "PPLA";
         String anio = new SimpleDateFormat("yyyy").format(Calendar.getInstance().getTime());

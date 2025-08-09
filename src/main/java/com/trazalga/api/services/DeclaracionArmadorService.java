@@ -34,7 +34,7 @@ public class DeclaracionArmadorService {
      * Obtiene declaraciones donde usuarioDestinatario es NULL
      */
     public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        return declaracionArmadorRepository.findByUsuarioDestinatarioIdAndUsuarioDestinatarioIsNull(usuarioDestinatarioId);
+        return declaracionArmadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
     }
 
     /**
