@@ -83,4 +83,8 @@ public class DeclaracionAreaModel {
 
     @Column(nullable = true)
     private Double longitud;
+    
+    // NUEVO CAMPO AÑADIDO
+    @Column(name = "declaracion_destinatario_id", nullable = true)
+    private Long declaracionDestinatario;
 }

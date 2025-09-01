@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import com.trazalga.api.models.DeclaracionAreaModel;
-import com.trazalga.api.models.DeclaracionRecolectorModel;
 
 @Repository
 public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAreaModel, Long> {
@@ -26,5 +25,7 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
 
     List<DeclaracionAreaModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
 
-
+    // NUEVO MÉTODO AÑADIDO
+    // Busca declaraciones por usuario destinatario donde aún no se ha creado una declaración de destino.
+    List<DeclaracionAreaModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 }

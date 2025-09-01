@@ -1,0 +1,133 @@
+{
+	"info": {
+		"_postman_id": "e1f2a3b4-c5d6-7890-1234-567890abcdef",
+		"name": "Trazalga | Planta - Destino",
+		"description": "Operaciones para las declaraciones de destino de la planta, generada a partir de `DeclaracionPlantaDestinoController.java`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Crear una nueva declaración de destino",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"usuario\": {\n        \"id\": 1\n    },\n    \"usuarioDestinatario\": {\n        \"id\": 5\n    },\n    \"especie\": {\n        \"id\": 3\n    },\n    \"cantidad\": 95.0,\n    \"observaciones\": \"Producto destinado a la venta.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-destino",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-destino"
+					]
+				},
+				"description": "Registra una nueva declaración sobre el destino de un producto procesado por la planta. El folio y la fecha se generan automáticamente en el backend si no se proporcionan."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de destino por ID de usuario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-destino/usuario/:usuarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-destino",
+						"usuario",
+						":usuarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioId",
+							"value": "1",
+							"description": "ID del usuario (planta) para buscar sus declaraciones."
+						}
+					]
+				},
+				"description": "Devuelve una lista de todas las declaraciones de destino realizadas por un usuario (planta)."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener una declaración de destino por su ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-destino/:id",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-destino",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "1",
+							"description": "ID de la declaración a buscar."
+						}
+					]
+				},
+				"description": "Busca y devuelve una declaración específica usando su ID único."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de destino pendientes para un destinatario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-destino/usuariosdestinatarios/:usuarioDestinatarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-destino",
+						"usuariosdestinatarios",
+						":usuarioDestinatarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioDestinatarioId",
+							"value": "5",
+							"description": "ID del usuario destinatario para buscar declaraciones pendientes."
+						}
+					]
+				},
+				"description": "Devuelve una lista de declaraciones de destino de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (es decir, `declaracion_destinatario_id` es nulo)."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://apps.procesac.com",
+			"type": "string"
+		}
+	]
+}

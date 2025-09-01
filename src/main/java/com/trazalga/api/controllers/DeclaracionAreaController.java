@@ -35,6 +35,13 @@ public class DeclaracionAreaController {
         Optional<DeclaracionAreaModel> declaracion = declaracionAreaService.getById(id);
         return declaracion.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
+    
+    // NUEVO ENDPOINT AÑADIDO
+    @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
+    public ResponseEntity<List<DeclaracionAreaModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
+        List<DeclaracionAreaModel> declaraciones = declaracionAreaService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        return ResponseEntity.ok(declaraciones);
+    }
 
     @PutMapping("/{id}")
     public DeclaracionAreaModel updateDeclaracion(@PathVariable Long id, @RequestBody DeclaracionAreaModel request) {

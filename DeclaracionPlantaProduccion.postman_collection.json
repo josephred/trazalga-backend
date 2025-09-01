@@ -1,0 +1,133 @@
+{
+	"info": {
+		"_postman_id": "d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f89",
+		"name": "Trazalga | Planta - Producción",
+		"description": "Operaciones para las declaraciones de producción de la planta, generada a partir de `DeclaracionPlantaProduccionController.java`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Crear una nueva declaración de producción",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"usuario\": {\n        \"id\": 1\n    },\n    \"usuarioDestinatario\": {\n        \"id\": 2\n    },\n    \"especie\": {\n        \"id\": 3\n    },\n    \"cantidad\": 150.5,\n    \"lote\": \"LOTE-PROD-2023-12-A\",\n    \"observaciones\": \"Producción de harina de pescado.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-produccion",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-produccion"
+					]
+				},
+				"description": "Crea una nueva declaración de producción para la planta."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de producción por ID de usuario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-produccion/usuario/:usuarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-produccion",
+						"usuario",
+						":usuarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioId",
+							"value": "1",
+							"description": "ID del usuario (planta) que realizó las declaraciones."
+						}
+					]
+				},
+				"description": "Devuelve una lista de todas las declaraciones de producción realizadas por un usuario específico."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener una declaración de producción por su ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-produccion/:id",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-produccion",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "1",
+							"description": "ID único de la declaración de producción."
+						}
+					]
+				},
+				"description": "Busca y devuelve una declaración de producción específica por su ID."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de producción pendientes para un destinatario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-produccion/usuariosdestinatarios/:usuarioDestinatarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-produccion",
+						"usuariosdestinatarios",
+						":usuarioDestinatarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioDestinatarioId",
+							"value": "2",
+							"description": "ID del usuario destinatario para buscar declaraciones pendientes."
+						}
+					]
+				},
+				"description": "Devuelve una lista de declaraciones de producción de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (es decir, `declaracion_destinatario_id` es nulo)."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://apps.procesac.com",
+			"type": "string"
+		}
+	]
+}

@@ -1,0 +1,133 @@
+{
+	"info": {
+		"_postman_id": "a8f5b1c2-9e3d-4f6a-8b7c-1d2e3f4a5b6c",
+		"name": "Trazalga | Planta - Abastecimiento",
+		"description": "Operaciones para las declaraciones de abastecimiento de la planta, generada a partir de `DeclaracionPlantaAbastecimientoController.java`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Crear una nueva declaración de abastecimiento",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"usuario\": {\n        \"id\": 1\n    },\n    \"usuarioDestinatario\": {\n        \"id\": 2\n    },\n    \"especie\": {\n        \"id\": 3\n    },\n    \"cantidad\": 250.75,\n    \"observaciones\": \"Producto recibido para abastecimiento de planta.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-abastecimiento",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-abastecimiento"
+					]
+				},
+				"description": "Crea una nueva declaración de abastecimiento para la planta. El folio y la fecha de ingreso se pueden generar automáticamente en el backend si no se proporcionan."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de abastecimiento por ID de usuario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-abastecimiento/usuario/:usuarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-abastecimiento",
+						"usuario",
+						":usuarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioId",
+							"value": "1",
+							"description": "ID del usuario (planta) que realizó las declaraciones."
+						}
+					]
+				},
+				"description": "Devuelve una lista de todas las declaraciones de abastecimiento realizadas por un usuario específico."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener una declaración de abastecimiento por su ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-abastecimiento/:id",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-abastecimiento",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "1",
+							"description": "ID único de la declaración de abastecimiento."
+						}
+					]
+				},
+				"description": "Busca y devuelve una declaración de abastecimiento específica por su ID."
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener declaraciones de abastecimiento pendientes para un destinatario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/declaracion-planta-abastecimiento/usuariosdestinatarios/:usuarioDestinatarioId",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"declaracion-planta-abastecimiento",
+						"usuariosdestinatarios",
+						":usuarioDestinatarioId"
+					],
+					"variable": [
+						{
+							"key": "usuarioDestinatarioId",
+							"value": "2",
+							"description": "ID del usuario destinatario para buscar declaraciones pendientes."
+						}
+					]
+				},
+				"description": "Devuelve una lista de declaraciones de abastecimiento de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (es decir, `declaracion_destinatario_id` es nulo)."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://apps.procesac.com",
+			"type": "string"
+		}
+	]
+}
