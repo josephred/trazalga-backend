@@ -60,7 +60,8 @@ public class DeclaracionComercializadorModel {
     private HumedadEstadoModel humedadEstado;
 
     @Column(nullable = true)
-    private Double cantidad;
+    private java.math.BigDecimal cantidad;
+    // private Double cantidad;
 
     @Column
     private String documentoTributarioOrigenTipo;
