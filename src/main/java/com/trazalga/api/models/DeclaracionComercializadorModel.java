@@ -226,11 +226,11 @@ public class DeclaracionComercializadorModel {
         this.humedadEstado = humedadEstado;
     }
 
-    public Double getCantidad() {
+    public java.math.BigDecimal getCantidad() {
         return cantidad;
     }
 
-    public void setCantidad(Double cantidad) {
+    public void setCantidad(java.math.BigDecimal cantidad) {
         this.cantidad = cantidad;
     }
 
