@@ -1,0 +1,76 @@
+package com.trazalga.api.controllers;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.trazalga.api.models.CuotaExtraccionModel;
+import com.trazalga.api.services.CuotaExtraccionService;
+
+@RestController
+@RequestMapping("/cuotas")
+public class CuotaExtraccionController {
+
+    @Autowired
+    CuotaExtraccionService cuotaService;
+
+    @GetMapping
+    public ArrayList<CuotaExtraccionModel> getAll() {
+        return (ArrayList<CuotaExtraccionModel>) cuotaService.getAll();
+    }
+
+    @PostMapping
+    public CuotaExtraccionModel create(@RequestBody CuotaExtraccionModel cuota) {
+        return cuotaService.save(cuota);
+    }
+
+    @GetMapping(path = "/{id}")
+    public Optional<CuotaExtraccionModel> getById(@PathVariable("id") Long id) {
+        return cuotaService.getById(id);
+    }
+
+    @PutMapping(path = "/{id}")
+    public CuotaExtraccionModel update(@RequestBody CuotaExtraccionModel request, @PathVariable("id") Long id) {
+        // Para simplificar, delegamos a save (requiere cliente enviar id)
+        request.setId(id);
+        return cuotaService.save(request);
+    }
+
+    @DeleteMapping(path = "/{id}")
+    public String delete(@PathVariable("id") Long id) {
+        boolean ok = cuotaService.delete(id);
+        if (ok) return "Cuota id " + id + " eliminada";
+        return "ERROR al eliminar cuota";
+    }
+
+    // DTO simple para validación de declaración
+    public static class ValidateDeclarationRequest {
+        public Long usuarioId;
+        public String perfil; // "RECOLECTOR" o "ARMADOR"
+        public Long especieId;
+        public Date fechaDeclaracion;
+        public Double cantidadKg;
+    }
+
+    @PostMapping(path = "/validate-declaration")
+    public Map<String, Object> validateDeclaration(@RequestBody ValidateDeclarationRequest req) {
+        Map<String, Object> out = new HashMap<>();
+        CuotaExtraccionService.QuotaCheckResult res = cuotaService.checkDeclarationQuota(req.usuarioId, req.perfil, req.especieId, req.fechaDeclaracion, req.cantidadKg);
+        out.put("allowed", res.isAllowed());
+        out.put("message", res.getMessage());
+        return out;
+    }
+
+}
