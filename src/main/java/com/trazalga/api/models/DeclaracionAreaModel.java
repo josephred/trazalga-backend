@@ -18,7 +18,6 @@ public class DeclaracionAreaModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relación con el usuario que realiza la declaración
     @ManyToOne
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
@@ -40,10 +39,17 @@ public class DeclaracionAreaModel {
     @Column(nullable = false)
     private String hora;
 
+    @Column(name = "codigo_sernapesca_amerb", nullable = true, length = 50)
+    private String codigoSernapescaAmerb;
+
     // Relación con la AMERB (Área de Manejo y Explotación de Recursos Bentónicos)
     @ManyToOne
     @JoinColumn(name = "amerb_id", nullable = false)
     private AmerbModel amerb;
+
+    @ManyToOne
+    @JoinColumn(name = "caleta_id", nullable = false)
+    private CaletaModel caleta;
 
     // Relación con la especie declarada
     @ManyToOne
@@ -61,6 +67,9 @@ public class DeclaracionAreaModel {
     // Tipo de destinatario ("comercializador" o "planta")
     @Column(nullable = false, length = 20)
     private String tipoDestinatario;
+
+    @Column(name = "codigo_destinatario", nullable = true, length = 20)
+    private String codigoDestinatario;
 
     // Relación con el destinatario de la declaración
     @ManyToOne

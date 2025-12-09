@@ -1,7 +1,6 @@
 package com.trazalga.api.models;
 
 import java.util.Date;
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,7 +17,6 @@ public class DeclaracionArmadorModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relación con el usuario que realiza la declaración
     @ManyToOne
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
@@ -37,58 +35,64 @@ public class DeclaracionArmadorModel {
     @Column(nullable = false)
     private Date fechaDeclaracion;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 8)
     private String hora;
 
-    // Relación con la embarcación seleccionada
+    // CAMPO FALTANTE AÑADIDO (para el RPA de la embarcación)
+    @Column(name = "codigo_sernapesca_embarcacion", nullable = false, length = 50)
+    private String codigoSernapescaEmbarcacion;
+
     @ManyToOne
     @JoinColumn(name = "embarcacion_id", nullable = false)
     private EmbarcacionModel embarcacion;
 
-    // Relación con el buzo seleccionado
+    // CAMPO FALTANTE AÑADIDO (para el RPA del buzo)
+    @Column(name = "codigo_sernapesca_buzo", nullable = false, length = 50)
+    private String codigoSernapescaBuzo;
+
     @ManyToOne
     @JoinColumn(name = "buzo_id", nullable = false)
     private BuzoModel buzo;
 
-    // Cantidad desembarcada en KG
     @Column(nullable = false)
     private Double desembarque;
 
-    // Cantidad capturada en KG
     @Column(nullable = false)
     private Double captura;
 
-    // Tipo de destinatario ("comercializador" o "planta")
     @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String tipoDestinatario = "comercializador";
+    
+    // CAMPO FALTANTE AÑADIDO (para el RUT del destinatario)
+    @Column(name = "codigo_destinatario", nullable = false, length = 20)
+    private String codigoDestinatario;
 
-    // Relación con el destinatario
     @ManyToOne
     @JoinColumn(name = "usuario_destinatario_id", nullable = false)
     private UsuarioModel usuarioDestinatario;
 
-    // Relación con la caleta
     @ManyToOne
     @JoinColumn(name = "caleta_id", nullable = false)
     private CaletaModel caleta;
 
-    // Relación con la especie
+    // CAMPO FALTANTE AÑADIDO (para la comuna, derivada de la caleta)
+    @ManyToOne
+    @JoinColumn(name = "comuna_id", nullable = false)
+    private ComunaModel comuna;
+
     @ManyToOne
     @JoinColumn(name = "especie_id", nullable = false)
     private EspecieModel especie;
 
-    // Relación con la composición de fronda
     @ManyToOne
     @JoinColumn(name = "composicion_id", nullable = false)
     private ComposicionModel composicion;
 
-    // Relación con ells -l estado de humedad
     @ManyToOne
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
-    // Georreferencia (latitud y longitud)
     @Column(nullable = true)
     private Double latitud;
 
