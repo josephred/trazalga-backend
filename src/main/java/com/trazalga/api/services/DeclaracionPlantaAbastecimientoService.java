@@ -49,7 +49,7 @@ public class DeclaracionPlantaAbastecimientoService {
             String[] partes = ultimoFolio.split("-");
             correlativo = Integer.parseInt(partes[2]) + 1;
         }
-        return String.format("%s-%s-%06d", prefijo, anio, correlativo);
+        return "%s-%s-%06d".formatted(prefijo, anio, correlativo);
     }
 
 }

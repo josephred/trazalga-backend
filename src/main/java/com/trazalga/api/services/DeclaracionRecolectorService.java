@@ -76,12 +76,12 @@ public class DeclaracionRecolectorService {
 
     public String getLastFolioOrigen() {
         List<String> folios = declaracionRecolectorRepository.findLastFolioOrigen();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
     public String getLastFolioDesembarqueRo() {
         List<String> folios = declaracionRecolectorRepository.findLastFolioDesembarqueRo();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
 

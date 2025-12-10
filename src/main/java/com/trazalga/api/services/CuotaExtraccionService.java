@@ -110,8 +110,8 @@ public class CuotaExtraccionService {
 
             // 7. Comparar
             if (total.compareTo(limiteCuota) > 0) {
-                String msg = String.format("La cuota diaria de %.2f kg para perfil %s y especie ha sido excedida. Total acumulado: %.2f kg (intentando agregar %.2f kg).", 
-                                           limiteCuota, perfil, total, nuevaCantidad);
+                String msg = "La cuota diaria de %.2f kg para perfil %s y especie ha sido excedida. Total acumulado: %.2f kg (intentando agregar %.2f kg).".formatted(
+                        limiteCuota, perfil, total, nuevaCantidad);
                 return new QuotaCheckResult(false, msg);
             }
         }

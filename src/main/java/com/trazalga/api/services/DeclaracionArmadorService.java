@@ -98,7 +98,7 @@ public class DeclaracionArmadorService {
      */
     public String getLastFolioOrigen() {
         List<String> folios = declaracionArmadorRepository.findLastFolioOrigen();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
     /**
@@ -106,6 +106,6 @@ public class DeclaracionArmadorService {
      */
     public String getLastFolioDesembarqueDa() {
         List<String> folios = declaracionArmadorRepository.findLastFolioDesembarqueDa();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 }
