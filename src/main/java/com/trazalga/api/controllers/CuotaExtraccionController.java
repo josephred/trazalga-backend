@@ -1,5 +1,6 @@
 package com.trazalga.api.controllers;
 
+import java.math.BigDecimal; // Importante: Importar BigDecimal
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -43,7 +44,6 @@ public class CuotaExtraccionController {
 
     @PutMapping(path = "/{id}")
     public CuotaExtraccionModel update(@RequestBody CuotaExtraccionModel request, @PathVariable("id") Long id) {
-        // Para simplificar, delegamos a save (requiere cliente enviar id)
         request.setId(id);
         return cuotaService.save(request);
     }
@@ -61,13 +61,26 @@ public class CuotaExtraccionController {
         public String perfil; // "RECOLECTOR" o "ARMADOR"
         public Long especieId;
         public Date fechaDeclaracion;
-        public Double cantidadKg;
+        public Double cantidadKg; // JSON envía números como Double por defecto
     }
 
     @PostMapping(path = "/validate-declaration")
     public Map<String, Object> validateDeclaration(@RequestBody ValidateDeclarationRequest req) {
         Map<String, Object> out = new HashMap<>();
-        CuotaExtraccionService.QuotaCheckResult res = cuotaService.checkDeclarationQuota(req.usuarioId, req.perfil, req.especieId, req.fechaDeclaracion, req.cantidadKg);
+        
+        // CORRECCIÓN: Convertir el Double del request a BigDecimal para el servicio
+        BigDecimal cantidadParaValidar = (req.cantidadKg != null) 
+            ? BigDecimal.valueOf(req.cantidadKg) 
+            : BigDecimal.ZERO;
+
+        CuotaExtraccionService.QuotaCheckResult res = cuotaService.checkDeclarationQuota(
+            req.usuarioId, 
+            req.perfil, 
+            req.especieId, 
+            req.fechaDeclaracion, 
+            cantidadParaValidar // Ahora pasamos un BigDecimal
+        );
+        
         out.put("allowed", res.isAllowed());
         out.put("message", res.getMessage());
         return out;

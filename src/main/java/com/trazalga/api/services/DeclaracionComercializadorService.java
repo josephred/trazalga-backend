@@ -49,7 +49,9 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setHora(request.getHora());
         declaracionComercializadorModel.setCodigoSernapesca(request.getCodigoSernapesca());
         declaracionComercializadorModel.setNombreComercializador(request.getNombreComercializador());
-        declaracionComercializadorModel.setGeorreferencia(request.getGeorreferencia());
+        //declaracionComercializadorModel.setGeorreferencia(request.getGeorreferencia());
+        declaracionComercializadorModel.setLatitud(request.getLatitud());
+        declaracionComercializadorModel.setLongitud(request.getLongitud()); 
         declaracionComercializadorModel.setEspecie(request.getEspecie());
         declaracionComercializadorModel.setComposicion(request.getComposicion());
         declaracionComercializadorModel.setHumedadEstado(request.getHumedadEstado());

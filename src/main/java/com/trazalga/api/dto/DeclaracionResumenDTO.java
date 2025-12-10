@@ -1,5 +1,6 @@
 package com.trazalga.api.dto; // Puedes crear un paquete para los DTOs
 
+import java.math.BigDecimal;
 import java.util.Date;
 import lombok.Data; // Lombok es ideal para esto
 
@@ -17,7 +18,7 @@ public class DeclaracionResumenDTO {
     private Date fechaDeclaracion;
     private String nombreOriginador; // Nombre de quien hizo la declaración (Recolector, Armador, etc.)
     private String perfilOriginador; // "Recolector", "Armador", etc.
-    private Double cantidad; // Cantidad en Kg (usaremos 'desembarque' o 'captura')
+    private BigDecimal cantidad; // Cantidad en Kg (usaremos 'desembarque' o 'captura')
     private String nombreEspecie;
     private boolean isEditable; // Lógica para determinar si se puede editar
 

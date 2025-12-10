@@ -1,5 +1,6 @@
 package com.trazalga.api.models;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
@@ -55,7 +56,7 @@ public class DeclaracionArmadorModel {
     private BuzoModel buzo;
 
     @Column(nullable = false)
-    private Double desembarque;
+    private BigDecimal desembarque;
 
     @Column(nullable = false)
     private Double captura;

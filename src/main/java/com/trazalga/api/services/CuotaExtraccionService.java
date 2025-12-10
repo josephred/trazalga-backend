@@ -1,5 +1,6 @@
 package com.trazalga.api.services;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -22,13 +23,13 @@ import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 public class CuotaExtraccionService {
 
     @Autowired
-    ICuotaExtraccionRepository cuotaRepository;
+    private ICuotaExtraccionRepository cuotaRepository;
 
     @Autowired
-    IDeclaracionRecolectorRepository declaracionRecolectorRepository;
+    private IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
     @Autowired
-    IDeclaracionArmadorRepository declaracionArmadorRepository;
+    private IDeclaracionArmadorRepository declaracionArmadorRepository;
 
     public List<CuotaExtraccionModel> getAll() {
         return cuotaRepository.findAll();
@@ -51,68 +52,66 @@ public class CuotaExtraccionService {
         }
     }
 
-    public QuotaCheckResult checkDeclarationQuota(Long usuarioId, String perfil, Long especieId, Date fechaDeclaracion, Double nuevaCantidadKg) {
-        // Buscar cuotas activas para perfil y especie
+    public QuotaCheckResult checkDeclarationQuota(Long usuarioId, String perfil, Long especieId, Date fechaDeclaracion, BigDecimal nuevaCantidadKg) {
+        // 1. Buscar cuotas activas
         List<CuotaExtraccionModel> cuotas = new ArrayList<>();
         if (especieId != null) {
             cuotas = cuotaRepository.findByPerfilAndEspecieIdAndActivoTrue(perfil, especieId);
         }
         if (cuotas.isEmpty()) {
-            // fallback: buscar cuotas por perfil sin especificar especie
             cuotas = cuotaRepository.findByPerfilAndActivoTrue(perfil);
         }
 
         if (cuotas.isEmpty()) {
-            // No hay cuota aplicable -> permitido
             return new QuotaCheckResult(true, "No hay cuota definida para este perfil/especie.");
         }
 
-        // Convertir fecha a LocalDate para comparación de día
-        LocalDate targetDate = null;
-        if (fechaDeclaracion != null) {
-            targetDate = Instant.ofEpochMilli(fechaDeclaracion.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+        // 2. Validar fecha
+        if (fechaDeclaracion == null) {
+            return new QuotaCheckResult(false, "La fecha de declaración es requerida para validar la cuota.");
         }
 
-        // Revisar cada cuota aplicable
+        // 3. Revisar cada cuota aplicable
         for (CuotaExtraccionModel cuota : cuotas) {
             if (!"DIARIO".equalsIgnoreCase(cuota.getPeriodo())) {
-                // Por ahora solo cobramos la lógica diaria; mensual se puede agregar más adelante
                 continue;
             }
 
-            Double sumCaptura = 0.0;
+            BigDecimal sumCaptura = BigDecimal.ZERO;
 
+            // 4. Sumar capturas del día
             if ("RECOLECTOR".equalsIgnoreCase(perfil)) {
-                // Obtener declaraciones del recolector y filtrar por fecha y especie
-                List<DeclaracionRecolectorModel> decls = declaracionRecolectorRepository.findAllByUsuarioId(usuarioId);
+                List<DeclaracionRecolectorModel> decls = declaracionRecolectorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaDeclaracion);
                 for (DeclaracionRecolectorModel d : decls) {
-                    if (d.getFechaDeclaracion() == null || d.getEspecie() == null) continue;
-                    if (d.getEspecie().getId() == null) continue;
-                    if (!d.getEspecie().getId().equals(especieId)) continue;
-                    LocalDate dDate = Instant.ofEpochMilli(d.getFechaDeclaracion().getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
-                    if (targetDate != null && dDate.equals(targetDate)) {
-                        if (d.getCaptura() != null) sumCaptura += d.getCaptura();
+                    if (d.getCaptura() != null) {
+                        // Seguridad: Convertimos a BigDecimal por si el modelo sigue siendo Double
+                        sumCaptura = sumCaptura.add(new BigDecimal(d.getCaptura().toString()));
                     }
                 }
             } else if ("ARMADOR".equalsIgnoreCase(perfil)) {
-                List<DeclaracionArmadorModel> decls = declaracionArmadorRepository.findAllByUsuarioId(usuarioId);
+                List<DeclaracionArmadorModel> decls = declaracionArmadorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaDeclaracion);
                 for (DeclaracionArmadorModel d : decls) {
-                    if (d.getFechaDeclaracion() == null || d.getEspecie() == null) continue;
-                    if (d.getEspecie().getId() == null) continue;
-                    if (!d.getEspecie().getId().equals(especieId)) continue;
-                    LocalDate dDate = Instant.ofEpochMilli(d.getFechaDeclaracion().getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
-                    if (targetDate != null && dDate.equals(targetDate)) {
-                        if (d.getCaptura() != null) sumCaptura += d.getCaptura();
+                    if (d.getCaptura() != null) {
+                        // Seguridad: Convertimos a BigDecimal por si el modelo sigue siendo Double
+                        sumCaptura = sumCaptura.add(new BigDecimal(d.getCaptura().toString()));
                     }
                 }
             } else {
-                // perfiles no controlados por cuota
-                return new QuotaCheckResult(true, "Perfil no tiene cuota definida o no aplica.");
+                return new QuotaCheckResult(true, "Perfil no tiene cuota de extracción definida.");
             }
 
-            Double total = sumCaptura + (nuevaCantidadKg != null ? nuevaCantidadKg : 0.0);
-            if (total > cuota.getLimiteKg()) {
-                String msg = String.format("La cuota diaria de %.3f kg para perfil %s y especie excedida: %.3f kg (incluyendo %.3f kg nuevo).", cuota.getLimiteKg(), perfil, total, (nuevaCantidadKg != null ? nuevaCantidadKg : 0.0));
+            // 5. Calcular Total
+            BigDecimal nuevaCantidad = (nuevaCantidadKg != null) ? nuevaCantidadKg : BigDecimal.ZERO;
+            BigDecimal total = sumCaptura.add(nuevaCantidad);
+            
+            // 6. SOLUCIÓN DEL ERROR (Línea ~98):
+            // Convertimos el Double (limiteKg) a BigDecimal antes de comparar.
+            BigDecimal limiteCuota = BigDecimal.valueOf(cuota.getLimiteKg());
+
+            // 7. Comparar
+            if (total.compareTo(limiteCuota) > 0) {
+                String msg = String.format("La cuota diaria de %.2f kg para perfil %s y especie ha sido excedida. Total acumulado: %.2f kg (intentando agregar %.2f kg).", 
+                                           limiteCuota, perfil, total, nuevaCantidad);
                 return new QuotaCheckResult(false, msg);
             }
         }
@@ -137,5 +136,4 @@ public class CuotaExtraccionService {
             return message;
         }
     }
-
 }

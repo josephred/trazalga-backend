@@ -1,6 +1,7 @@
 package com.trazalga.api.repositories;
 
 import java.util.ArrayList;
+import java.util.Date; // Importante para el nuevo método
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,7 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionArmadorModel;
-import com.trazalga.api.models.DeclaracionRecolectorModel;
 
 @Repository
 public interface IDeclaracionArmadorRepository extends JpaRepository<DeclaracionArmadorModel, Long> {
@@ -30,5 +30,10 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
     @Query("SELECT d.folioDesembarqueDa FROM DeclaracionArmadorModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueDa();
 
+    // Método para la bandeja de entrada unificada
     List<DeclaracionArmadorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
+
+    // --- NUEVO MÉTODO PARA EL SERVICIO DE CUOTAS ---
+    // Filtra directamente en la BD por usuario, especie y fecha exacta.
+    List<DeclaracionArmadorModel> findByUsuarioIdAndEspecieIdAndFechaDeclaracion(Long usuarioId, Long especieId, Date fechaDeclaracion);
 }

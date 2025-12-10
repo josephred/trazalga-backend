@@ -26,8 +26,8 @@ public class DeclaracionPlantaDestinoService {
     }
 
     public DeclaracionPlantaDestinoModel save(DeclaracionPlantaDestinoModel declaracion) {
-        if (declaracion.getFolioDeclaracionAbastecimientoPlanta() == null || declaracion.getFolioDeclaracionAbastecimientoPlanta().isEmpty()) {
-            declaracion.setFolioDeclaracionAbastecimientoPlanta(generarFolioAbastecimientoPlanta());
+        if (declaracion.getFolioDeclaracionDestino() == null || declaracion.getFolioDeclaracionDestino().isEmpty()) {
+            declaracion.setFolioDeclaracionDestino(generarFolioAbastecimientoPlanta());
         }
 
         if (declaracion.getFechaDeclaracionDestino() == null) {

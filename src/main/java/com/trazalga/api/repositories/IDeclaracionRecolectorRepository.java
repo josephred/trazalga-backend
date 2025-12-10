@@ -1,7 +1,7 @@
 package com.trazalga.api.repositories;
 
-
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,11 +13,6 @@ import com.trazalga.api.models.DeclaracionRecolectorModel;
 @Repository
 public interface IDeclaracionRecolectorRepository extends JpaRepository<DeclaracionRecolectorModel, Long> {
     
-    // Método para obtener todas las declaraciones del recolector en orden descendente por el campo especificado
-    // @Query("SELECT d FROM DeclaracionRecolectorModel d ORDER BY d.campoEspecifico DESC")
-    // public ArrayList<DeclaracionRecolectorModel> findAllOrderByCampoEspecificoDesc();
-    // ArrayList<DeclaracionRecolectorModel> findAllByUsuarioId(Long usuarioId);
-
     // Método personalizado para encontrar registros donde declaracion_destinatario_id es null para un usuario destinatario específico
     List<DeclaracionRecolectorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 
@@ -35,5 +30,11 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
     @Query("SELECT d.folioDesembarqueRo FROM DeclaracionRecolectorModel d ORDER BY d.id DESC")
     List<String> findLastFolioDesembarqueRo();
 
+    // Método para la bandeja de entrada unificada
     List<DeclaracionRecolectorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
+
+    // --- NUEVO MÉTODO PARA EL SERVICIO DE CUOTAS (OPTIMIZADO) ---
+    // Este método permite filtrar en la base de datos por Usuario, Especie y Fecha exacta.
+    List<DeclaracionRecolectorModel> findByUsuarioIdAndEspecieIdAndFechaDeclaracion(Long usuarioId, Long especieId, Date fechaDeclaracion);
+
 }

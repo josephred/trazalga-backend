@@ -49,7 +49,9 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCodigoSernapesca(request.getCodigoSernapesca());
         declaracionRecolectorModel.setVaradero(request.getVaradero());        
         declaracionRecolectorModel.setCaleta(request.getCaleta());
-        declaracionRecolectorModel.setGeorreferencia(request.getGeorreferencia());
+        //declaracionRecolectorModel.setGeorreferencia(request.getGeorreferencia());
+        declaracionRecolectorModel.setLatitud(request.getLatitud());
+        declaracionRecolectorModel.setLongitud(request.getLongitud());
         declaracionRecolectorModel.setEspecie(request.getEspecie());
         declaracionRecolectorModel.setComuna(request.getComuna());
         declaracionRecolectorModel.setExtraccionTipo(request.getExtraccionTipo());
