@@ -37,14 +37,15 @@ public class DeclaracionPlantaDestinoService {
         return repository.save(declaracion);
     }
 
-    public List<DeclaracionPlantaDestinoModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
+    public List<DeclaracionPlantaDestinoModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId) {
         return repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
     }
 
     private String generarFolioAbastecimientoPlanta() {
         String prefijo = "DPLA"; // He cambiado el prefijo para reflejar "Destino Planta"
         String anio = new SimpleDateFormat("yyyy").format(Calendar.getInstance().getTime());
-        String ultimoFolio = repository.findLastFolioDeclaracionAbastecimientoPlanta().stream().findFirst().orElse(null);
+        String ultimoFolio = repository.findTopByOrderByIdDescFolioDeclaracionAbastecimientoPlanta();
 
         int correlativo = 1;
         if (ultimoFolio != null && ultimoFolio.startsWith(prefijo + "-" + anio)) {
