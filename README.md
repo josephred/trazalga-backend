@@ -119,3 +119,8 @@ mvn spring-boot:run
 
 nohup mvn spring-boot:run > app.log 2>&1 &
 
+
+Empaquetar
+mvn clean package -DskipTests
+Ejecutar
+java -jar target/api-0.0.1-SNAPSHOT.jar

@@ -7,18 +7,35 @@ import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.UsuarioModel;
 
-import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Optional;
 
 @Repository
 public interface IUsuarioRepository extends JpaRepository<UsuarioModel, Long> {
 
-    UsuarioModel findByRut(String rut);
-  
-    // @Query("SELECT u, u.comuna FROM UsuarioModel u WHERE u.perfil.id IN :perfiles")
-    // List<UsuarioModel> findUsuariosByPerfiles(@Param("perfiles") List<Long> perfiles);
+    // 1. Buscador por RUT (Mejorado con Optional)
+    Optional<UsuarioModel> findByRut(String rut);
 
-    @Query("SELECT u FROM UsuarioModel u JOIN FETCH u.comuna WHERE u.perfil.id IN :perfiles")
+    // 2. Buscador para LOGIN (Carga Perfil y Comuna de un golpe para mayor
+    // velocidad)
+    @Query("SELECT u FROM UsuarioModel u " +
+            "JOIN FETCH u.perfil " +
+            "LEFT JOIN FETCH u.comuna " +
+            "WHERE u.rut = :rut")
+    Optional<UsuarioModel> findByRutWithDetails(@Param("rut") String rut);
+
+    // 3. Obtener usuarios por lista de perfiles (Tu consulta original optimizada)
+    @Query("SELECT u FROM UsuarioModel u " +
+            "JOIN FETCH u.perfil " +
+            "JOIN FETCH u.comuna " +
+            "WHERE u.perfil.id IN :perfiles")
     List<UsuarioModel> findUsuariosByPerfiles(@Param("perfiles") List<Long> perfiles);
+
+    // 4. Útil para la App Móvil: Buscar todos los usuarios de un perfil específico
+    // Ejemplo: Buscar todos los Comercializadores (Perfil ID 4) para el selector de
+    // destinatarios
+    List<UsuarioModel> findByPerfilId(Long perfilId);
+
+    // 5. Verificar si existe un RUT antes de registrar
+    boolean existsByRut(String rut);
 }
