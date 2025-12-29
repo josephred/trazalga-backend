@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.trazalga.api.models.UsuarioModel;
@@ -16,12 +17,17 @@ public class UsuarioService {
     @Autowired
     IUsuarioRepository usuarioRepository;
 
-    public ArrayList<UsuarioModel> getUsuarios() {
-        return (ArrayList<UsuarioModel>) usuarioRepository.findAll();
-    }
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
 
     public UsuarioModel saveUsuario(UsuarioModel usuarioModel) {
+        String claveEncriptada = passwordEncoder.encode(usuarioModel.getClave());
+        usuarioModel.setClave(claveEncriptada);
         return usuarioRepository.save(usuarioModel);
+    }
+
+    public ArrayList<UsuarioModel> getUsuarios() {
+        return (ArrayList<UsuarioModel>) usuarioRepository.findAll();
     }
 
     public Optional<UsuarioModel> getById(Long id) {
