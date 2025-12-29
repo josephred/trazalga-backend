@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -8,7 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.trazalga.api.dto.UsuarioRegistroDTO;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IComunaRepository;
+import com.trazalga.api.repositories.IPerfilRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 
 @Service
@@ -19,6 +23,41 @@ public class UsuarioService {
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private IPerfilRepository perfilRepository;
+
+    @Autowired
+    private IComunaRepository comunaRepository;
+
+    public UsuarioModel registrarUsuario(UsuarioRegistroDTO dto) {
+        // 1. Validar si el RUT ya existe
+        if (usuarioRepository.existsByRut(dto.getRut())) {
+            throw new RuntimeException("El RUT ya se encuentra registrado.");
+        }
+
+        // 2. Crear nueva instancia de Usuario
+        UsuarioModel usuario = new UsuarioModel();
+        usuario.setRut(dto.getRut());
+        usuario.setNombres(dto.getNombres());
+        usuario.setApellidop(dto.getApellidop());
+        usuario.setApellidom(dto.getApellidom());
+        usuario.setCorreo(dto.getCorreo());
+        usuario.setEstado("ACTIVO");
+        usuario.setFechaCreacion(new Date());
+
+        // 3. ENCRIPTAR CLAVE (Muy importante)
+        usuario.setClave(passwordEncoder.encode(dto.getClave()));
+
+        // 4. Asignar Perfil y Comuna buscando en sus repositorios
+        usuario.setPerfil(perfilRepository.findById(dto.getPerfilId())
+                .orElseThrow(() -> new RuntimeException("Perfil no encontrado")));
+
+        usuario.setComuna(comunaRepository.findById(dto.getComunaId())
+                .orElseThrow(() -> new RuntimeException("Comuna no encontrada")));
+
+        return usuarioRepository.save(usuario);
+    }
 
     public UsuarioModel saveUsuario(UsuarioModel usuarioModel) {
         String claveEncriptada = passwordEncoder.encode(usuarioModel.getClave());
