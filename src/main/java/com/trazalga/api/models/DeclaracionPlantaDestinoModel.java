@@ -23,6 +23,9 @@ public class DeclaracionPlantaDestinoModel {
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
+    @Column(name = "folio_declaracion_abastecimiento_planta")
+    private String folioDeclaracionAbastecimientoPlanta;
+
     @Column(nullable = false, length = 50)
     private String folioOrigen;
 

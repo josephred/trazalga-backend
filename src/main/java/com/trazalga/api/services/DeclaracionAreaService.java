@@ -69,11 +69,11 @@ public class DeclaracionAreaService {
 
     public String getLastFolioOrigen() {
         List<String> folios = declaracionAreaRepository.findLastFolioOrigen();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
     public String getLastFolioDesembarqueAmerb() {
         List<String> folios = declaracionAreaRepository.findLastFolioDesembarqueAmerb();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 }

@@ -83,12 +83,12 @@ public class DeclaracionComercializadorService {
     
     public String getLastFolioOrigen() {
         List<String> folios = declaracionComercializadorRepository.findLastFolioOrigen();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
     public String getLastFolioDesembarqueAc() {
         List<String> folios = declaracionComercializadorRepository.findLastFolioDesembarqueAc();
-        return folios.isEmpty() ? null : folios.get(0);
+        return folios.isEmpty() ? null : folios.getFirst();
     }
 
 }
