@@ -4,7 +4,7 @@ import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.models.UsuarioModel;
 
 public class DTOConverter {
-    
+
     public static UsuarioDTO convertirAUsuarioDTO(UsuarioModel usuarioModel) {
         UsuarioDTO usuarioDTO = new UsuarioDTO();
         usuarioDTO.setId(usuarioModel.getId());
@@ -13,7 +13,7 @@ public class DTOConverter {
         usuarioDTO.setApellidop(usuarioModel.getApellidop());
         usuarioDTO.setApellidom(usuarioModel.getApellidom());
         usuarioDTO.setCorreo(usuarioModel.getCorreo());
-        usuarioDTO.setFechaCreacion(usuarioModel.getFecha_creacion());
+        usuarioDTO.setFechaCreacion(usuarioModel.getFechaCreacion());
         usuarioDTO.setEstado(usuarioModel.getEstado());
         usuarioDTO.setClave(usuarioModel.getClave());
 
