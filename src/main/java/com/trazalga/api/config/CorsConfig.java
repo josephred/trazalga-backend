@@ -11,19 +11,20 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class CorsConfig {
 
     @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173") // La URL de tu React
+                registry.addMapping("/**") // Permitir todas las rutas de la API
+                        .allowedOrigins(
+                                "http://localhost:5173",
+                                "https://trazalga-web.vercel.app", // Tu dominio principal de Vercel
+                                "https://trazalga-3vechqvi1-josephreds-projects.vercel.app" // La URL específica del
+                                                                                            // error
+                )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("*");
+                        .allowedHeaders("*")
+                        .allowCredentials(true);
             }
         };
     }
