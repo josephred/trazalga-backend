@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "declaracion_planta_produccion")
@@ -12,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionPlantaProduccionModel {
 
     @Id
@@ -35,7 +37,7 @@ public class DeclaracionPlantaProduccionModel {
 
     @Column(nullable = false, length = 8)
     private String hora;
-    
+
     // --- Campos de Identificación (Normativa) ---
     @Column(name = "nombre_planta", nullable = false)
     private String nombrePlanta;
@@ -58,7 +60,7 @@ public class DeclaracionPlantaProduccionModel {
 
     // Si la materia prima ya era un producto intermedio (opcional)
     @ManyToOne
-    @JoinColumn(name = "materia_prima_producto_id", nullable = true) 
+    @JoinColumn(name = "materia_prima_producto_id", nullable = true)
     private ProductoModel materiaPrimaProducto;
 
     @ManyToOne
@@ -72,7 +74,7 @@ public class DeclaracionPlantaProduccionModel {
     // Qué sale de la máquina (MEJORA CRÍTICA)
     @ManyToOne
     @JoinColumn(name = "producto_resultante_id", nullable = false)
-    private ProductoModel productoResultante; 
+    private ProductoModel productoResultante;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal cantidadProducto; // Cuántos Kg salen
@@ -84,7 +86,7 @@ public class DeclaracionPlantaProduccionModel {
 
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
-    
+
     // IDs de las declaraciones de Abastecimiento que se usaron para esta producción
     @Column(name = "declaraciones_abastecimiento_ids", length = 1000)
     private String declaracionesAbastecimientoIds;

@@ -7,8 +7,17 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import lombok.*;
+import lombok.experimental.Accessors;
+
 @Entity
 @Table(name = "region")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Accessors(chain = true)
 public class RegionModel {
 
     @Id
@@ -17,22 +26,5 @@ public class RegionModel {
 
     @Column
     private String nombre;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
 
 }

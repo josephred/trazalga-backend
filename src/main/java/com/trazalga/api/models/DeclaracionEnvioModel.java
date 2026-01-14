@@ -7,8 +7,17 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import lombok.*;
+import lombok.experimental.Accessors;
+
 @Entity
-@Table(name="declaracion_envio")
+@Table(name = "declaracion_envio")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Accessors(chain = true)
 public class DeclaracionEnvioModel {
 
     @Id
@@ -20,29 +29,5 @@ public class DeclaracionEnvioModel {
 
     @Column(nullable = true)
     private String idDestino;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getIdOrigen() {
-        return idOrigen;
-    }
-
-    public void setIdOrigen(String idOrigen) {
-        this.idOrigen = idOrigen;
-    }
-
-    public String getIdDestino() {
-        return idDestino;
-    }
-
-    public void setIdDestino(String idDestino) {
-        this.idDestino = idDestino;
-    }
 
 }

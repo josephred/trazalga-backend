@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "declaracion_planta_destino")
@@ -12,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionPlantaDestinoModel {
 
     @Id
@@ -29,9 +31,10 @@ public class DeclaracionPlantaDestinoModel {
     @Column(nullable = false, length = 50)
     private String folioOrigen;
 
-    // Nota: La guía a veces reutiliza nombres, aquí suele ser un correlativo de salida.
+    // Nota: La guía a veces reutiliza nombres, aquí suele ser un correlativo de
+    // salida.
     @Column(nullable = false, unique = true, length = 50)
-    private String folioDeclaracionDestino; 
+    private String folioDeclaracionDestino;
 
     @Temporal(TemporalType.DATE)
     @Column(nullable = false)
@@ -43,7 +46,7 @@ public class DeclaracionPlantaDestinoModel {
 
     @Column(nullable = false, length = 8) // Aumentado a 8 para HH:mm:ss
     private String hora;
-    
+
     // --- Campos de Identificación de la Planta (Remitente) ---
     // FALTANTES EN TU MODELO ORIGINAL
     @Column(name = "nombre_planta", nullable = false)
@@ -75,10 +78,10 @@ public class DeclaracionPlantaDestinoModel {
     // --- Documentación Legal ---
     @Column(nullable = false)
     private String documentoTributarioTipo;
-    
+
     @Column(nullable = false)
     private String documentoTributarioNumero;
-    
+
     @Temporal(TemporalType.DATE)
     private Date documentoTributarioFecha;
 
@@ -99,7 +102,7 @@ public class DeclaracionPlantaDestinoModel {
 
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
-    
+
     // --- Trazabilidad Inversa ---
     // IDs de las declaraciones de PRODUCCIÓN que componen este envío
     @Column(name = "declaraciones_produccion_ids", length = 1000)

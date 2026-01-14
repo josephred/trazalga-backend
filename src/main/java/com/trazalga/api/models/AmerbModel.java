@@ -2,6 +2,7 @@ package com.trazalga.api.models;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "amerb")
@@ -10,6 +11,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class AmerbModel {
 
     @Id
@@ -23,7 +25,7 @@ public class AmerbModel {
     private String region;
 
     @Column(nullable = true, length = 255)
-    private String ubicacion;  // Puede ser una referencia a coordenadas o una dirección.
+    private String ubicacion; // Puede ser una referencia a coordenadas o una dirección.
 
     @Column(nullable = true)
     private Double superficieHectareas; // Tamaño del área en hectáreas.

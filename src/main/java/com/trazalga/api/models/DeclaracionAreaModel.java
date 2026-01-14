@@ -4,6 +4,7 @@ import java.util.Date;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "declaracion_area")
@@ -12,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionAreaModel {
 
     @Id
@@ -92,7 +94,7 @@ public class DeclaracionAreaModel {
 
     @Column(nullable = true)
     private Double longitud;
-    
+
     // NUEVO CAMPO AÑADIDO
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;

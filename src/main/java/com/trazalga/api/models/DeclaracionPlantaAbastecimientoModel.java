@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "declaracion_planta_abastecimiento")
@@ -12,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionPlantaAbastecimientoModel {
 
     @Id
@@ -70,10 +72,10 @@ public class DeclaracionPlantaAbastecimientoModel {
     // --- Documento Tributario (Factura de compra, guía, etc.) ---
     @Column(nullable = false)
     private String documentoTributarioTipo;
-    
+
     @Column(nullable = false)
     private String documentoTributarioNumero;
-    
+
     @Temporal(TemporalType.DATE)
     @Column(nullable = false)
     private Date documentoTributarioFecha;
@@ -81,9 +83,10 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(nullable = true)
     private String patente;
 
-    // Relación con el usuario que proveyó el recurso (Comercializador, Recolector, etc.)
-    // Nota: En abastecimiento, el 'usuarioDestinatario' es la misma Planta, 
-    // por lo que este campo podría usarse para el PROVEEDOR si se desea, 
+    // Relación con el usuario que proveyó el recurso (Comercializador, Recolector,
+    // etc.)
+    // Nota: En abastecimiento, el 'usuarioDestinatario' es la misma Planta,
+    // por lo que este campo podría usarse para el PROVEEDOR si se desea,
     // o mantenerse como destinatario si la lógica de tu sistema lo requiere.
     @ManyToOne
     @JoinColumn(name = "usuario_destinatario_id", nullable = true)

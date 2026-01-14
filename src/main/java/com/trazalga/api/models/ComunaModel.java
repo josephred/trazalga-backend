@@ -10,10 +10,19 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import lombok.*;
+import lombok.experimental.Accessors;
+
 @Entity
 @Table(name = "comuna")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Accessors(chain = true)
 public class ComunaModel {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,29 +33,5 @@ public class ComunaModel {
     @ManyToOne
     @JoinColumn(name = "region_id") // Nombre de la columna que almacenará la clave foránea
     private RegionModel region;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public RegionModel getRegion() {
-        return region;
-    }
-
-    public void setRegion(RegionModel region) {
-        this.region = region;
-    }
 
 }

@@ -3,6 +3,7 @@ package com.trazalga.api.models;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "usuario")
@@ -11,6 +12,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class UsuarioModel {
 
     @Id

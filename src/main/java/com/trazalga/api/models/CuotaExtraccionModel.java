@@ -15,8 +15,17 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
 
+import lombok.*;
+import lombok.experimental.Accessors;
+
 @Entity
 @Table(name = "cuota_extraccion")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Accessors(chain = true)
 public class CuotaExtraccionModel {
 
     @Id
@@ -46,6 +55,7 @@ public class CuotaExtraccionModel {
     private Double limiteKg;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean activo = true;
 
     @Temporal(TemporalType.TIMESTAMP)
@@ -66,78 +76,6 @@ public class CuotaExtraccionModel {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = new Date();
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPerfil() {
-        return perfil;
-    }
-
-    public void setPerfil(String perfil) {
-        this.perfil = perfil;
-    }
-
-    public EspecieModel getEspecie() {
-        return especie;
-    }
-
-    public void setEspecie(EspecieModel especie) {
-        this.especie = especie;
-    }
-
-    public RegionModel getRegion() {
-        return region;
-    }
-
-    public void setRegion(RegionModel region) {
-        this.region = region;
-    }
-
-    public String getPeriodo() {
-        return periodo;
-    }
-
-    public void setPeriodo(String periodo) {
-        this.periodo = periodo;
-    }
-
-    public Double getLimiteKg() {
-        return limiteKg;
-    }
-
-    public void setLimiteKg(Double limiteKg) {
-        this.limiteKg = limiteKg;
-    }
-
-    public Boolean getActivo() {
-        return activo;
-    }
-
-    public void setActivo(Boolean activo) {
-        this.activo = activo;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Date getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Date updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
 }

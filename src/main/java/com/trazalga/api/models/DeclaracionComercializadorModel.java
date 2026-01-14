@@ -5,14 +5,16 @@ import java.util.Date;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
-@Table(name="declaracion_comercializador")
+@Table(name = "declaracion_comercializador")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionComercializadorModel {
 
     @Id
@@ -22,10 +24,10 @@ public class DeclaracionComercializadorModel {
     @ManyToOne
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
-    
+
     @Column(nullable = true)
     private String folioOrigen;
-    
+
     @Column(nullable = true)
     private String folioDesembarqueAc;
 
@@ -41,7 +43,7 @@ public class DeclaracionComercializadorModel {
 
     @Column(nullable = true)
     private String nombreComercializador;
-    
+
     // MEJORA: Reemplazar 'georreferencia' por latitud y longitud para consistencia
     @Column(nullable = true)
     private Double latitud;
@@ -80,11 +82,11 @@ public class DeclaracionComercializadorModel {
     private String vehiculoTransporte;
     private String choferTransporte;
     private String patente;
-    
+
     // CAMPO FALTANTE AÑADIDO (RUT del destinatario)
     @Column(nullable = false, length = 20)
     private String codigoDestinatario;
- 
+
     // CAMPO FALTANTE AÑADIDO (Nombre del destinatario, desnormalizado)
     @Column(nullable = false)
     private String nombreDestinatario;
@@ -92,11 +94,11 @@ public class DeclaracionComercializadorModel {
     @ManyToOne
     @JoinColumn(name = "usuario_destinatario_id", nullable = false)
     private UsuarioModel usuarioDestinatario;
-    
+
     // --- Campos de Trazabilidad (ya están correctos y son clave) ---
     @Column(name = "declaracion_destinatario_id")
     private Long declaracionDestinatario;
-    
+
     @Column(name = "declaraciones_seleccionadas", length = 1000) // Aumentar longitud si pueden ser muchos IDs
     private String declaracionesSeleccionadas;
 }

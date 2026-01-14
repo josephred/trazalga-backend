@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "declaracion_armador")
@@ -12,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Accessors(chain = true)
 public class DeclaracionArmadorModel {
 
     @Id
@@ -64,7 +66,7 @@ public class DeclaracionArmadorModel {
     @Builder.Default
     @Column(nullable = false, length = 20)
     private String tipoDestinatario = "comercializador";
-    
+
     // CAMPO FALTANTE AÑADIDO (para el RUT del destinatario)
     @Column(name = "codigo_destinatario", nullable = false, length = 20)
     private String codigoDestinatario;

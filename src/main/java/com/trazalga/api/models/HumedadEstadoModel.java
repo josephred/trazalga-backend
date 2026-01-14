@@ -7,8 +7,17 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import lombok.*;
+import lombok.experimental.Accessors;
+
 @Entity
 @Table(name = "humedad")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Accessors(chain = true)
 public class HumedadEstadoModel {
 
     @Id
@@ -24,37 +33,4 @@ public class HumedadEstadoModel {
     @Column
     private int rangoFin;
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public int getRangoInicio() {
-        return rangoInicio;
-    }
-
-    public void setRangoInicio(int rangoInicio) {
-        this.rangoInicio = rangoInicio;
-    }
-
-    public int getRangoFin() {
-        return rangoFin;
-    }
-
-    public void setRangoFin(int rangoFin) {
-        this.rangoFin = rangoFin;
-    }
-
-    
 }
