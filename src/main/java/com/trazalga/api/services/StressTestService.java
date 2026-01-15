@@ -28,14 +28,19 @@ public class StressTestService {
     }
     // ... otros repositorios
 
-    @Transactional
+    // Eliminamos @Transactional para que los registros se guarden por lotes y no al
+    // final de todo
     public PerformanceReport generarCargaMasiva(int cantidad) {
         long startTime = System.currentTimeMillis();
-
         Random random = new Random();
 
-        for (int i = 0; i < cantidad; i++) {
-            Long indice = generarIndice();
+        System.out.println("Iniciando carga masiva de " + cantidad + " registros...");
+
+        for (int i = 1; i <= cantidad; i++) {
+            // Generamos un ID único combinando el timestamp con el contador para evitar
+            // colisiones
+            long baseIndice = Long.parseLong(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmm")));
+            Long indice = Long.parseLong(baseIndice + "" + i);
             DeclaracionRecolectorModel data = new DeclaracionRecolectorModel()
                     .setId(indice)
                     .setFolioOrigen("" + indice)
@@ -65,10 +70,10 @@ public class StressTestService {
 
             recolectorRepo.save(data);
 
-            // Limpiar la memoria cada 500 registros para evitar OutOfMemoryError
+            // Logging de progreso y persistencia cada 500 registros
             if (i % 500 == 0) {
                 recolectorRepo.flush();
-                // Si usas EntityManager directamente: entityManager.clear();
+                System.out.println("Progreso: " + i + " de " + cantidad + " registros guardados...");
             }
         }
 
