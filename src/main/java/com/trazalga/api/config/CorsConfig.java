@@ -16,11 +16,9 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**") // Permitir todas las rutas de la API
-                        .allowedOrigins(
+                        .allowedOriginPatterns(
                                 "http://localhost:5173",
-                                "https://trazalga-web.vercel.app", // Tu dominio principal de Vercel
-                                "https://trazalga-3vechqvi1-josephreds-projects.vercel.app" // La URL específica del
-                                                                                            // error
+                                "https://trazalga-web-*.vercel.app" // Wildcard para Vercel
                 )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
