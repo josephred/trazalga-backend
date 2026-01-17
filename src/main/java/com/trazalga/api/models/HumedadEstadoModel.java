@@ -11,7 +11,7 @@ import lombok.*;
 import lombok.experimental.Accessors;
 
 @Entity
-@Table(name = "humedad")
+@Table(name = "humedad_estado")
 @Getter
 @Setter
 @NoArgsConstructor
