@@ -56,7 +56,6 @@ public class SecurityConfig {
                                 "/declaracionplantadestino/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                // 5. Manejo de autenticación básica (opcional, útil para pruebas)
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
