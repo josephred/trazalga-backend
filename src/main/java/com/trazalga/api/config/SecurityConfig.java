@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -25,12 +26,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Habilitar CORS con la configuración que definiremos abajo
                 .cors(Customizer.withDefaults())
-                // 2. Deshabilitar CSRF (necesario para APIs que reciben POST)
                 .csrf(csrf -> csrf.disable())
+                // 1. DESACTIVAR la sesión (obligatorio para APIs con JWT)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Rutas de autenticación
                         .requestMatchers("/api/auth/**", "/api/stress-test/**").permitAll()
+
+                        // Rutas maestras (permitimos raíz y subrutas)
                         .requestMatchers(
                                 "/comuna", "/comuna/**",
                                 "/extracciontipo", "/extracciontipo/**",
@@ -55,18 +59,19 @@ public class SecurityConfig {
                                 "/declaracionplantaproduccion/**",
                                 "/declaracionplantadestino/**")
                         .permitAll()
+
                         .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults());
+                // 2. DESACTIVAR explícitamente Basic Auth y Form Login para que no salga la
+                // ventana
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable());
 
         return http.build();
     }
 
-    // MEJORA CRÍTICA: Configuración explícita de CORS para evitar el 403 en el
-    // "Preflight" (OPTIONS)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Permitir localhost (desarrollo) y tus dominios de producción (Vercel)
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
