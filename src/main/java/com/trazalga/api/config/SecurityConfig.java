@@ -30,10 +30,7 @@ public class SecurityConfig {
                 // 2. Deshabilitar CSRF (necesario para APIs que reciben POST)
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Rutas de la API (Auth y Stress Test)
                         .requestMatchers("/api/auth/**", "/api/stress-test/**").permitAll()
-
-                        // 3. Rutas maestras: Permitimos tanto la raíz como los sub-recursos
                         .requestMatchers(
                                 "/comuna", "/comuna/**",
                                 "/extracciontipo", "/extracciontipo/**",
@@ -58,8 +55,6 @@ public class SecurityConfig {
                                 "/declaracionplantaproduccion/**",
                                 "/declaracionplantadestino/**")
                         .permitAll()
-
-                        // 4. Exigir autenticación para cualquier otra cosa
                         .anyRequest().authenticated())
                 // 5. Manejo de autenticación básica (opcional, útil para pruebas)
                 .httpBasic(Customizer.withDefaults());
