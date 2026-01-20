@@ -19,26 +19,36 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // http
-        // .cors(Customizer.withDefaults()) // <--- AGREGA ESTA LÍNEA (Importante)
-        // .csrf(csrf -> csrf.disable())
-        // .authorizeHttpRequests(auth -> auth
-        // .requestMatchers("/api/auth/**").permitAll()
-        // .requestMatchers("/api/stress-test/**").permitAll()
-        // .anyRequest().authenticated());
-
-        // return http.build();
-
         http
                 .csrf(csrf -> csrf.disable()) // Asegúrate de que esto esté deshabilitado para peticiones POST
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        // Permitimos el login y registro
                         .requestMatchers("/api/auth/**").permitAll()
-
-                        // --- AGREGA ESTA LÍNEA ---
                         .requestMatchers("/api/stress-test/**").permitAll()
-
+                        .requestMatchers(
+                                "/declaracionrecolector/**",
+                                "/declaracionarmador/**",
+                                "/declaracionarea/**",
+                                "/declaracioncomercializador/**",
+                                "/declaracionplantaabastecimiento/**",
+                                "/declaracionplantaproduccion/**",
+                                "/declaracionplantadestino/**",
+                                "/comuna/**",
+                                "/extracciontipo/**",
+                                "/especie/**",
+                                "/composicion/**",
+                                "/caleta/**",
+                                "/humedadestado/**",
+                                "/perfil/**",
+                                "/usuario/**",
+                                "/region/**",
+                                "/embarcacion/**",
+                                "/buzo/**",
+                                "/amerb/**",
+                                "/patente/**",
+                                "/planta/**",
+                                "/producto/**")
+                        .permitAll()
                         // Todo lo demás sigue requiriendo token
                         .anyRequest().authenticated());
 
