@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.trazalga.api.dto.UsuarioRegistroDTO;
@@ -20,9 +19,6 @@ public class UsuarioService {
 
     @Autowired
     IUsuarioRepository usuarioRepository;
-
-    @Autowired
-    private BCryptPasswordEncoder passwordEncoder;
 
     @Autowired
     private IPerfilRepository perfilRepository;
@@ -46,8 +42,8 @@ public class UsuarioService {
         usuario.setEstado("ACTIVO");
         usuario.setFechaCreacion(new Date());
 
-        // 3. ENCRIPTAR CLAVE (Muy importante)
-        usuario.setClave(passwordEncoder.encode(dto.getClave()));
+        // 3. GUARDAR CLAVE (Sin encriptar según solicitud)
+        usuario.setClave(dto.getClave());
 
         // 4. Asignar Perfil y Comuna buscando en sus repositorios
         usuario.setPerfil(perfilRepository.findById(dto.getPerfilId())
@@ -60,8 +56,7 @@ public class UsuarioService {
     }
 
     public UsuarioModel saveUsuario(UsuarioModel usuarioModel) {
-        String claveEncriptada = passwordEncoder.encode(usuarioModel.getClave());
-        usuarioModel.setClave(claveEncriptada);
+        // No encriptar clave
         return usuarioRepository.save(usuarioModel);
     }
 
