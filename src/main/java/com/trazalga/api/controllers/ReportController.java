@@ -19,13 +19,20 @@ public class ReportController {
     private final ReportService reportService;
 
     @GetMapping
-    public ResponseEntity<List<ReportDTO>> generateReport(
+    public ResponseEntity<?> generateReport(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fechaInicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fechaFin,
             @RequestParam Integer tipoReporte,
             @RequestParam(required = false) String rut) {
         
-        List<ReportDTO> report = reportService.getReport(fechaInicio, fechaFin, tipoReporte, rut);
-        return ResponseEntity.ok(report);
+        try {
+            System.out.println("Generando reporte: " + tipoReporte + " desde " + fechaInicio + " hasta " + fechaFin);
+            List<ReportDTO> report = reportService.getReport(fechaInicio, fechaFin, tipoReporte, rut);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            System.err.println("Error generando reporte: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
     }
 }

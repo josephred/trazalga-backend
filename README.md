@@ -72,5 +72,9 @@ Configuración de referencia para despliegue:
 }
 ```
 
+mvn clean package -DskipTests
+java -jar -Dspring.profiles.active=prod target/api-0.0.1-SNAPSHOT.jar &
+ nohup java -jar target/api-0.0.1-SNAPSHOT.jar > salida.log 2>&1 &
+ 
 ---
 *Desarrollado para Procesac 2024.*

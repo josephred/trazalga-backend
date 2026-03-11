@@ -78,10 +78,17 @@ public class ReportRepository {
                                    (row[9] != null ? row[9].toString() : "") + " " +
                                    (row[10] != null ? row[10].toString() : "");
 
+            Date dateVal = null;
+            if (row[2] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[2]).getTime());
+            } else if (row[2] instanceof Date) {
+                dateVal = (Date) row[2];
+            }
+
             return ReportDTO.builder()
                     .id(((Number) row[0]).longValue())
                     .folio(row[1] != null ? row[1].toString() : "")
-                    .fecha((Date) row[2])
+                    .fecha(dateVal)
                     .hora(row[3] != null ? row[3].toString() : "")
                     .emisorNombre(emisorNombre.trim())
                     .emisorRut(row[7] != null ? row[7].toString() : "")
