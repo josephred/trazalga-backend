@@ -35,6 +35,14 @@ public class DeclaracionRecolectorModel {
     private Date fechaExtraccion;
 
     @Temporal(TemporalType.DATE)
+    @Column(name = "periodo_extraccion_inicio")
+    private Date periodoExtraccionInicio;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "periodo_extraccion_fin")
+    private Date periodoExtraccionFin;
+
+    @Temporal(TemporalType.DATE)
     @Column(nullable = false)
     private Date fechaDeclaracion;
 
@@ -90,6 +98,9 @@ public class DeclaracionRecolectorModel {
 
     @Column(precision = 10, scale = 2)
     private BigDecimal captura; // Calculado por el backend
+
+    @Column(name = "tasa_diaria_recoleccion", precision = 10, scale = 3)
+    private BigDecimal tasaDiariaRecoleccion;
 
     @Column(nullable = false, length = 20)
     private String codigoDestinatario;

@@ -1,8 +1,11 @@
 package com.trazalga.api.services;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class DeclaracionRecolectorService {
 
 
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+        calcularTasaDiaria(declaracionRecolectorModel);
         return declaracionRecolectorRepository.save(declaracionRecolectorModel);
     }
 
@@ -43,6 +47,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionRecolectorModel.setFolioDesembarqueRo(request.getFolioDesembarqueRo());
         declaracionRecolectorModel.setFechaExtraccion(request.getFechaExtraccion());
+        declaracionRecolectorModel.setPeriodoExtraccionInicio(request.getPeriodoExtraccionInicio());
+        declaracionRecolectorModel.setPeriodoExtraccionFin(request.getPeriodoExtraccionFin());
         declaracionRecolectorModel.setFechaDeclaracion(request.getFechaDeclaracion());
         declaracionRecolectorModel.setHora(request.getHora());
         declaracionRecolectorModel.setNombre(request.getNombre());
@@ -63,6 +69,7 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         
+        calcularTasaDiaria(declaracionRecolectorModel);
         declaracionRecolectorRepository.save(declaracionRecolectorModel);
         return declaracionRecolectorModel;
     }
@@ -84,5 +91,33 @@ public class DeclaracionRecolectorService {
         return folios.isEmpty() ? null : folios.getFirst();
     }
 
+
+    /**
+     * Calcula la tasa diaria de recolección y sincroniza fechaExtraccion.
+     * Fórmula: tasa = desembarque / (DATEDIFF(fin, inicio) + 1)
+     * Mantiene retrocompatibilidad: fechaExtraccion = periodoExtraccionFin
+     */
+    private void calcularTasaDiaria(DeclaracionRecolectorModel model) {
+        if (model.getPeriodoExtraccionInicio() != null
+                && model.getPeriodoExtraccionFin() != null
+                && model.getDesembarque() != null) {
+
+            long diffMs = model.getPeriodoExtraccionFin().getTime()
+                        - model.getPeriodoExtraccionInicio().getTime();
+            long dias = TimeUnit.DAYS.convert(diffMs, TimeUnit.MILLISECONDS) + 1;
+
+            if (dias <= 0) {
+                throw new IllegalArgumentException(
+                    "Periodo de extracción inválido: la fecha de inicio no puede ser posterior a la fecha de fin.");
+            }
+
+            BigDecimal tasaDiaria = model.getDesembarque()
+                .divide(BigDecimal.valueOf(dias), 3, RoundingMode.HALF_UP);
+            model.setTasaDiariaRecoleccion(tasaDiaria);
+
+            // Retrocompatibilidad: fecha_extraccion = fecha fin del periodo
+            model.setFechaExtraccion(model.getPeriodoExtraccionFin());
+        }
+    }
 
 }
