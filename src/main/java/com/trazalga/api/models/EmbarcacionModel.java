@@ -21,6 +21,6 @@ public class EmbarcacionModel {
     @Column(nullable = false, length = 100, unique = true)
     private String nombre;
 
-    @Column(nullable = false, length = 50, unique = true)
+    @Column(nullable = true, length = 50, unique = true)
     private String codigo;
 }

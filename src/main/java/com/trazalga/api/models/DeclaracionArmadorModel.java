@@ -42,7 +42,7 @@ public class DeclaracionArmadorModel {
     private String hora;
 
     // CAMPO FALTANTE AÑADIDO (para el RPA de la embarcación)
-    @Column(name = "codigo_sernapesca_embarcacion", nullable = false, length = 50)
+    @Column(name = "codigo_sernapesca_embarcacion", nullable = true, length = 50)
     private String codigoSernapescaEmbarcacion;
 
     @ManyToOne
@@ -50,7 +50,7 @@ public class DeclaracionArmadorModel {
     private EmbarcacionModel embarcacion;
 
     // CAMPO FALTANTE AÑADIDO (para el RPA del buzo)
-    @Column(name = "codigo_sernapesca_buzo", nullable = false, length = 50)
+    @Column(name = "codigo_sernapesca_buzo", nullable = true, length = 50)
     private String codigoSernapescaBuzo;
 
     @ManyToOne
@@ -68,7 +68,7 @@ public class DeclaracionArmadorModel {
     private String tipoDestinatario = "comercializador";
 
     // CAMPO FALTANTE AÑADIDO (para el RUT del destinatario)
-    @Column(name = "codigo_destinatario", nullable = false, length = 20)
+    @Column(name = "codigo_destinatario", nullable = true, length = 20)
     private String codigoDestinatario;
 
     @ManyToOne
@@ -81,7 +81,7 @@ public class DeclaracionArmadorModel {
 
     // CAMPO FALTANTE AÑADIDO (para la comuna, derivada de la caleta)
     @ManyToOne
-    @JoinColumn(name = "comuna_id", nullable = false)
+    @JoinColumn(name = "comuna_id", nullable = true)
     private ComunaModel comuna;
 
     @ManyToOne
@@ -89,7 +89,7 @@ public class DeclaracionArmadorModel {
     private EspecieModel especie;
 
     @ManyToOne
-    @JoinColumn(name = "composicion_id", nullable = false)
+    @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
 
     @ManyToOne
