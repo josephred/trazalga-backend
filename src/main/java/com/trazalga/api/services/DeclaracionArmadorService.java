@@ -1,6 +1,10 @@
 package com.trazalga.api.services;
 
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,6 +16,8 @@ import com.trazalga.api.repositories.*;
 
 @Service
 public class DeclaracionArmadorService {
+    
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
     
     @Autowired
     private IDeclaracionArmadorRepository declaracionArmadorRepository;
@@ -62,23 +68,35 @@ public class DeclaracionArmadorService {
         
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
-        declaracion.setFechaExtraccion(request.getFechaExtraccion());
-        declaracion.setFechaDeclaracion(request.getFechaDeclaracion());
+        declaracion.setFechaExtraccion(parseDate(request.getFechaExtraccion()));
+        declaracion.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracion.setHora(request.getHora());
         
         if (request.getEmbarcacion() != null && request.getEmbarcacion().getId() != null) {
             Optional<EmbarcacionModel> embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId());
-            embarcacion.ifPresent(declaracion::setEmbarcacion);
+            embarcacion.ifPresent(e -> {
+                declaracion.setEmbarcacion(e);
+                declaracion.setCodigoSernapescaEmbarcacion(e.getCodigo() != null ? e.getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+            });
         }
         
         if (request.getBuzo() != null && request.getBuzo().getId() != null) {
             Optional<BuzoModel> buzo = buzoRepository.findById(request.getBuzo().getId());
-            buzo.ifPresent(declaracion::setBuzo);
+            buzo.ifPresent(b -> {
+                declaracion.setBuzo(b);
+                declaracion.setCodigoSernapescaBuzo(b.getCodigo() != null ? b.getCodigo() : String.valueOf(request.getBuzo().getId()));
+            });
         }
         
-        declaracion.setDesembarque(request.getDesembarque());
+        declaracion.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracion.setCaptura(request.getCaptura());
-        declaracion.setTipoDestinatario(request.getTipoDestinatario());
+        declaracion.setTipoDestinatario(request.getTipoDestinatario() != null ? request.getTipoDestinatario() : "comercializador");
+        
+        String codigoDestinatario = null;
+        if (request.getUsuarioDestinatario() != null && request.getUsuarioDestinatario().getRut() != null) {
+            codigoDestinatario = request.getUsuarioDestinatario().getRut();
+        }
+        declaracion.setCodigoDestinatario(codigoDestinatario);
         
         if (request.getUsuarioDestinatario() != null && request.getUsuarioDestinatario().getId() != null) {
             Optional<UsuarioModel> destinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId());
@@ -133,8 +151,8 @@ public class DeclaracionArmadorService {
 
         declaracionArmadorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionArmadorModel.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
-        declaracionArmadorModel.setFechaExtraccion(request.getFechaExtraccion());
-        declaracionArmadorModel.setFechaDeclaracion(request.getFechaDeclaracion());
+        declaracionArmadorModel.setFechaExtraccion(parseDate(request.getFechaExtraccion()));
+        declaracionArmadorModel.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracionArmadorModel.setHora(request.getHora());
         
         if (request.getEmbarcacion() != null && request.getEmbarcacion().getId() != null) {
@@ -147,7 +165,7 @@ public class DeclaracionArmadorService {
             buzo.ifPresent(declaracionArmadorModel::setBuzo);
         }
         
-        declaracionArmadorModel.setDesembarque(request.getDesembarque());
+        declaracionArmadorModel.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracionArmadorModel.setCaptura(request.getCaptura());
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());
         
@@ -204,5 +222,33 @@ public class DeclaracionArmadorService {
     public String getLastFolioDesembarqueDa() {
         List<String> folios = declaracionArmadorRepository.findLastFolioDesembarqueDa();
         return folios.isEmpty() ? null : folios.getFirst();
+    }
+    
+    private Date parseDate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        if (dateObj instanceof Date) {
+            return (Date) dateObj;
+        }
+        try {
+            return dateFormat.parse(dateObj.toString());
+        } catch (ParseException e) {
+            return null;
+        }
+    }
+    
+    private BigDecimal parseBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal) {
+            return (BigDecimal) value;
+        }
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
