@@ -16,4 +16,10 @@ public interface IAmerbRepository extends JpaRepository<AmerbModel, Long> {
 
     // Buscar AMERB por código Sernapesca
     AmerbModel findByCodigoSernapesca(String codigoSernapesca);
+
+    // Buscar AMERB por folio organización
+    AmerbModel findByFolioOrganizacion(Integer folioOrganizacion);
+
+    // Buscar AMERB por nombre (contiene)
+    List<AmerbModel> findByNombreContaining(String nombre);
 }

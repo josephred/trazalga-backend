@@ -39,4 +39,7 @@ public class AmerbModel {
     @Column(nullable = true, length = 50)
     private String codigoSernapesca; // Código de identificación oficial.
 
+    @Column(name = "folio_organizacion", nullable = true)
+    private Integer folioOrganizacion;
+
 }
