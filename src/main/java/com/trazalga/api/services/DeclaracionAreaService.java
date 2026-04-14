@@ -6,8 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.models.AmerbModel;
+import com.trazalga.api.models.EmbarcacionModel;
+import com.trazalga.api.models.BuzoModel;
 import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.repositories.IAmerbRepository;
+import com.trazalga.api.repositories.IEmbarcacionRepository;
+import com.trazalga.api.repositories.IBuzoRepository;
 
 @Service
 public class DeclaracionAreaService {
@@ -17,6 +21,12 @@ public class DeclaracionAreaService {
 
     @Autowired
     private IAmerbRepository amerbRepository;
+
+    @Autowired
+    private IEmbarcacionRepository embarcacionRepository;
+
+    @Autowired
+    private IBuzoRepository buzoRepository;
 
     public List<DeclaracionAreaModel> getAllDeclaraciones() {
         return declaracionAreaRepository.findAll();
@@ -82,6 +92,47 @@ public class DeclaracionAreaService {
                 declaracion.setAmerb(amerbGuardada);
             }
         }
+
+        // Manejar embarcacion
+        if (declaracion.getEmbarcacion() != null) {
+            EmbarcacionModel embarcacionEncontrada = null;
+            if (declaracion.getEmbarcacion().getId() != null) {
+                embarcacionEncontrada = embarcacionRepository.findById(declaracion.getEmbarcacion().getId()).orElse(null);
+            }
+            if (embarcacionEncontrada == null && declaracion.getEmbarcacion().getCodigo() != null) {
+                embarcacionEncontrada = embarcacionRepository.findByCodigo(declaracion.getEmbarcacion().getCodigo());
+            }
+            if (embarcacionEncontrada != null) {
+                declaracion.setEmbarcacion(embarcacionEncontrada);
+            } else if (declaracion.getEmbarcacion().getNombre() != null) {
+                EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
+                nuevaEmbarcacion.setNombre(declaracion.getEmbarcacion().getNombre());
+                nuevaEmbarcacion.setCodigo(declaracion.getEmbarcacion().getCodigo());
+                EmbarcacionModel embarcacionGuardada = embarcacionRepository.save(nuevaEmbarcacion);
+                declaracion.setEmbarcacion(embarcacionGuardada);
+            }
+        }
+
+        // Manejar buzo
+        if (declaracion.getBuzo() != null) {
+            BuzoModel buzoEncontrado = null;
+            if (declaracion.getBuzo().getId() != null) {
+                buzoEncontrado = buzoRepository.findById(declaracion.getBuzo().getId()).orElse(null);
+            }
+            if (buzoEncontrado == null && declaracion.getBuzo().getCodigo() != null) {
+                buzoEncontrado = buzoRepository.findByCodigo(declaracion.getBuzo().getCodigo());
+            }
+            if (buzoEncontrado != null) {
+                declaracion.setBuzo(buzoEncontrado);
+            } else if (declaracion.getBuzo().getNombre() != null) {
+                BuzoModel nuevoBuzo = new BuzoModel();
+                nuevoBuzo.setNombre(declaracion.getBuzo().getNombre());
+                nuevoBuzo.setCodigo(declaracion.getBuzo().getCodigo());
+                BuzoModel buzoGuardado = buzoRepository.save(nuevoBuzo);
+                declaracion.setBuzo(buzoGuardado);
+            }
+        }
+
         return declaracionAreaRepository.save(declaracion);
     }
 
@@ -107,6 +158,8 @@ public class DeclaracionAreaService {
         declaracion.setHumedadEstado(request.getHumedadEstado());
         declaracion.setLatitud(request.getLatitud());
         declaracion.setLongitud(request.getLongitud());
+        declaracion.setEmbarcacion(request.getEmbarcacion());
+        declaracion.setBuzo(request.getBuzo());
         // Asegurarse de actualizar también el nuevo campo si es necesario
         declaracion.setDeclaracionDestinatario(request.getDeclaracionDestinatario());
 
