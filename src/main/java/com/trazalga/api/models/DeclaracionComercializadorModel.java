@@ -86,6 +86,15 @@ public class DeclaracionComercializadorModel {
     private String choferTransporte;
     private String patente;
 
+    @Column(name = "rut_chofer")
+    private String rutChofer;
+
+    @Column(name = "placa_patente")
+    private String placaPatente;
+
+    @Column(name = "placa_patente_carro")
+    private String placaPatenteCarro;
+
     // CAMPO FALTANTE AÑADIDO (RUT del destinatario)
     @Column(nullable = false, length = 20)
     private String codigoDestinatario;

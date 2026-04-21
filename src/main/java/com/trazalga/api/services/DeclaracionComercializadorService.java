@@ -65,6 +65,9 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setDocumentoTributarioDestinoFecha(request.getDocumentoTributarioDestinoFecha());
         declaracionComercializadorModel.setVehiculoTransporte(request.getVehiculoTransporte());
         declaracionComercializadorModel.setChoferTransporte(request.getChoferTransporte());
+        declaracionComercializadorModel.setRutChofer(request.getRutChofer());
+        declaracionComercializadorModel.setPlacaPatente(request.getPlacaPatente());
+        declaracionComercializadorModel.setPlacaPatenteCarro(request.getPlacaPatenteCarro());
         declaracionComercializadorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         // declaracionComercializadorModel.setNombreDestinatario(request.getNombreDestinatario());
         declaracionComercializadorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
