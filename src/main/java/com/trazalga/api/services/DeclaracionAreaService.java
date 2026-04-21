@@ -100,7 +100,7 @@ public class DeclaracionAreaService {
                 embarcacionEncontrada = embarcacionRepository.findById(declaracion.getEmbarcacion().getId()).orElse(null);
             }
             if (embarcacionEncontrada == null && declaracion.getEmbarcacion().getCodigo() != null) {
-                embarcacionEncontrada = embarcacionRepository.findByCodigo(declaracion.getEmbarcacion().getCodigo());
+                embarcacionEncontrada = embarcacionRepository.findByCodigo(declaracion.getEmbarcacion().getCodigo()).orElse(null);
             }
             if (embarcacionEncontrada != null) {
                 declaracion.setEmbarcacion(embarcacionEncontrada);
@@ -120,7 +120,7 @@ public class DeclaracionAreaService {
                 buzoEncontrado = buzoRepository.findById(declaracion.getBuzo().getId()).orElse(null);
             }
             if (buzoEncontrado == null && declaracion.getBuzo().getCodigo() != null) {
-                buzoEncontrado = buzoRepository.findByCodigo(declaracion.getBuzo().getCodigo());
+                buzoEncontrado = buzoRepository.findByCodigo(declaracion.getBuzo().getCodigo()).orElse(null);
             }
             if (buzoEncontrado != null) {
                 declaracion.setBuzo(buzoEncontrado);
