@@ -55,6 +55,7 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setEspecie(request.getEspecie());
         declaracionComercializadorModel.setComposicion(request.getComposicion());
         declaracionComercializadorModel.setHumedadEstado(request.getHumedadEstado());
+        declaracionComercializadorModel.setHumedadHigrometro(request.getHumedadHigrometro());
         declaracionComercializadorModel.setCantidad(request.getCantidad());
         declaracionComercializadorModel.setDocumentoTributarioOrigenTipo(request.getDocumentoTributarioOrigenTipo());
         declaracionComercializadorModel.setDocumentoTributarioOrigenNumero(request.getDocumentoTributarioOrigenNumero());

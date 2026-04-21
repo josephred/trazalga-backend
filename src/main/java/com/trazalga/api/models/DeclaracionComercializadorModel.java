@@ -63,6 +63,9 @@ public class DeclaracionComercializadorModel {
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
+    @Column(name = "humedad_higrometro", precision = 5, scale = 2)
+    private BigDecimal humedadHigrometro;
+
     // MEJORA: Mantener BigDecimal es una buena práctica
     @Column(precision = 10, scale = 2) // Opcional: define precisión y escala para la DB
     private BigDecimal cantidad;
