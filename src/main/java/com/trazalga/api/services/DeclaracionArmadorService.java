@@ -50,15 +50,21 @@ public class DeclaracionArmadorService {
     private DeclaracionBuzosRepository declaracionBuzosRepository;
     
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmador() {
-        return (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAll();
+        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAll();
+        declaraciones.forEach(this::populateBuzos);
+        return declaraciones;
     }
 
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(Long id) {
-        return (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAllByUsuarioId(id);
+        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAllByUsuarioId(id);
+        declaraciones.forEach(this::populateBuzos);
+        return declaraciones;
     }
 
     public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        return declaracionArmadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        declaraciones.forEach(this::populateBuzos);
+        return declaraciones;
     }
 
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
@@ -153,11 +159,14 @@ public class DeclaracionArmadorService {
             }
         }
 
+        populateBuzos(savedDeclaracion);
         return savedDeclaracion;
     }
 
     public Optional<DeclaracionArmadorModel> getById(Long id) {
-        return declaracionArmadorRepository.findById(id);
+        Optional<DeclaracionArmadorModel> declaracion = declaracionArmadorRepository.findById(id);
+        declaracion.ifPresent(this::populateBuzos);
+        return declaracion;
     }
 
     public DeclaracionArmadorModel updateById(DeclaracionArmadorModel request, Long id) {
@@ -246,15 +255,31 @@ public class DeclaracionArmadorService {
             }
         }
 
+        populateBuzos(updatedDeclaracion);
         return updatedDeclaracion;
     }
 
     public Boolean deleteDeclaracionArmador(Long id) {
         try {
+            // Eliminar buzos asociados primero
+            List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionArmadorId(id);
+            declaracionBuzosRepository.deleteAll(buzos);
+            
             declaracionArmadorRepository.deleteById(id);
             return true;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    private void populateBuzos(DeclaracionArmadorModel declaracion) {
+        if (declaracion != null && declaracion.getId() != null) {
+            List<DeclaracionBuzosModel> declaracionBuzos = declaracionBuzosRepository.findByDeclaracionArmadorId(declaracion.getId());
+            List<BuzoModel> buzos = new ArrayList<>();
+            for (DeclaracionBuzosModel db : declaracionBuzos) {
+                buzos.add(db.getBuzo());
+            }
+            declaracion.setBuzos(buzos);
         }
     }
 

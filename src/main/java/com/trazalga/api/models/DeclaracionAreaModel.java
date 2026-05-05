@@ -1,6 +1,7 @@
 package com.trazalga.api.models;
 
 import java.util.Date;
+import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -115,4 +116,8 @@ public class DeclaracionAreaModel {
     // NUEVO CAMPO AÑADIDO
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
+
+    // Campo transitorio para recibir la lista de buzos del frontend
+    @Transient
+    private List<BuzoModel> buzos;
 }

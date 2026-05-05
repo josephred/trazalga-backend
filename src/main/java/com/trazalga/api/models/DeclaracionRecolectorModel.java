@@ -2,6 +2,7 @@ package com.trazalga.api.models;
 
 import java.math.BigDecimal; // Importar BigDecimal
 import java.util.Date;
+import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -115,4 +116,7 @@ public class DeclaracionRecolectorModel {
 
     @Column(name = "declaracion_destinatario_id")
     private Long declaracionDestinatario;
+
+    @Transient
+    private List<BuzoModel> buzos;
 }
