@@ -45,6 +45,9 @@ public class DeclaracionArmadorService {
     
     @Autowired
     private IComunaRepository comunaRepository;
+
+    @Autowired
+    private DeclaracionBuzosRepository declaracionBuzosRepository;
     
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmador() {
         return (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAll();
@@ -131,7 +134,26 @@ public class DeclaracionArmadorService {
         declaracion.setLatitud(request.getLatitud());
         declaracion.setLongitud(request.getLongitud());
         
-        return declaracionArmadorRepository.save(declaracion);
+        DeclaracionArmadorModel savedDeclaracion = declaracionArmadorRepository.save(declaracion);
+
+        // Guardar los buzos asociados en la tabla declaracion_buzos
+        if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
+            PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil() : null;
+            for (BuzoModel buzoRequest : request.getBuzos()) {
+                if (buzoRequest.getId() != null) {
+                    Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
+                    buzoOpt.ifPresent(buzo -> {
+                        DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
+                        declaracionBuzo.setPerfil(perfil);
+                        declaracionBuzo.setBuzo(buzo);
+                        declaracionBuzo.setDeclaracionArmador(savedDeclaracion);
+                        declaracionBuzosRepository.save(declaracionBuzo);
+                    });
+                }
+            }
+        }
+
+        return savedDeclaracion;
     }
 
     public Optional<DeclaracionArmadorModel> getById(Long id) {
@@ -202,7 +224,29 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setLatitud(request.getLatitud());
         declaracionArmadorModel.setLongitud(request.getLongitud());
 
-        return declaracionArmadorRepository.save(declaracionArmadorModel);
+        DeclaracionArmadorModel updatedDeclaracion = declaracionArmadorRepository.save(declaracionArmadorModel);
+
+        // Actualizar buzos: eliminar los anteriores y guardar los nuevos
+        List<DeclaracionBuzosModel> buzosAnteriores = declaracionBuzosRepository.findByDeclaracionArmadorId(id);
+        declaracionBuzosRepository.deleteAll(buzosAnteriores);
+
+        if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
+            PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil() : null;
+            for (BuzoModel buzoRequest : request.getBuzos()) {
+                if (buzoRequest.getId() != null) {
+                    Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
+                    buzoOpt.ifPresent(buzo -> {
+                        DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
+                        declaracionBuzo.setPerfil(perfil);
+                        declaracionBuzo.setBuzo(buzo);
+                        declaracionBuzo.setDeclaracionArmador(updatedDeclaracion);
+                        declaracionBuzosRepository.save(declaracionBuzo);
+                    });
+                }
+            }
+        }
+
+        return updatedDeclaracion;
     }
 
     public Boolean deleteDeclaracionArmador(Long id) {

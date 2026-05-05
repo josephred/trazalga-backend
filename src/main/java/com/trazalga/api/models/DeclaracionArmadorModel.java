@@ -2,6 +2,7 @@ package com.trazalga.api.models;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -104,4 +105,8 @@ public class DeclaracionArmadorModel {
 
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
+
+    // Campo transitorio para recibir la lista de buzos del frontend (no se persiste en esta tabla)
+    @Transient
+    private List<BuzoModel> buzos;
 }
