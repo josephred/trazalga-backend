@@ -177,6 +177,9 @@ public class DeclaracionAreaService {
 
     public DeclaracionAreaModel updateDeclaracion(Long id, DeclaracionAreaModel request) {
         DeclaracionAreaModel declaracion = declaracionAreaRepository.findById(id).orElseThrow();
+        if (declaracion.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+        }
         
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueAmerb(request.getFolioDesembarqueAmerb());
@@ -225,6 +228,10 @@ public class DeclaracionAreaService {
     }
 
     public boolean deleteDeclaracion(Long id) {
+        DeclaracionAreaModel model = declaracionAreaRepository.findById(id).orElse(null);
+        if (model != null && model.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
         try {
             // Eliminar buzos asociados primero
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionAreaId(id);

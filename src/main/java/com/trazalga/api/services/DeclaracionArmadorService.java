@@ -174,6 +174,9 @@ public class DeclaracionArmadorService {
         if (declaracionArmadorModel == null) {
             return null;
         }
+        if (declaracionArmadorModel.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+        }
 
         if (request.getUsuario() != null && request.getUsuario().getId() != null) {
             Optional<UsuarioModel> usuario = usuarioRepository.findById(request.getUsuario().getId());
@@ -260,6 +263,10 @@ public class DeclaracionArmadorService {
     }
 
     public Boolean deleteDeclaracionArmador(Long id) {
+        DeclaracionArmadorModel model = declaracionArmadorRepository.findById(id).orElse(null);
+        if (model != null && model.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
         try {
             // Eliminar buzos asociados primero
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionArmadorId(id);

@@ -80,6 +80,9 @@ public class DeclaracionRecolectorService {
 
     public DeclaracionRecolectorModel updateById(DeclaracionRecolectorModel request, Long id){
         DeclaracionRecolectorModel declaracionRecolectorModel = declaracionRecolectorRepository.findById(id).get();
+        if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+        }
         declaracionRecolectorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionRecolectorModel.setFolioDesembarqueRo(request.getFolioDesembarqueRo());
         declaracionRecolectorModel.setFechaExtraccion(request.getFechaExtraccion());
@@ -131,6 +134,10 @@ public class DeclaracionRecolectorService {
     }
 
     public Boolean deleteDeclaracionRecolector(Long id){
+        DeclaracionRecolectorModel model = declaracionRecolectorRepository.findById(id).orElse(null);
+        if (model != null && model.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
         try{
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionRecolectorId(id);
             declaracionBuzosRepository.deleteAll(buzos);

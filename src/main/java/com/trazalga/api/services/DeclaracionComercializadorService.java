@@ -73,6 +73,9 @@ public class DeclaracionComercializadorService {
     @Transactional
     public DeclaracionComercializadorModel updateById(DeclaracionComercializadorModel request, Long id){
         DeclaracionComercializadorModel declaracionComercializadorModel = declaracionComercializadorRepository.findById(id).get();
+        if (declaracionComercializadorModel.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+        }
         String oldSeleccionadas = declaracionComercializadorModel.getDeclaracionesSeleccionadas();
 
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());
@@ -125,8 +128,11 @@ public class DeclaracionComercializadorService {
 
     @Transactional
     public Boolean deleteDeclaracionComercializador(Long id){
+        DeclaracionComercializadorModel model = declaracionComercializadorRepository.findById(id).orElse(null);
+        if (model != null && model.getDeclaracionDestinatario() != null) {
+            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
         try{
-            DeclaracionComercializadorModel model = declaracionComercializadorRepository.findById(id).orElse(null);
             if (model != null && model.getDeclaracionesSeleccionadas() != null && !model.getDeclaracionesSeleccionadas().isEmpty()) {
                 liberarDeclaracionesConsumidas(model.getDeclaracionesSeleccionadas(), id);
             }
