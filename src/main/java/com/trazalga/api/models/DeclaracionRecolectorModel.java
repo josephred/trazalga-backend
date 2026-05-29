@@ -117,6 +117,9 @@ public class DeclaracionRecolectorModel {
     @Column(name = "declaracion_destinatario_id")
     private Long declaracionDestinatario;
 
+    @Column(name = "consumida_por_tipo", length = 50)
+    private String consumidaPorTipo;
+
     @Transient
     private List<BuzoModel> buzos;
 }

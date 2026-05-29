@@ -95,8 +95,11 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
 
+    @Column(name = "consumida_por_tipo", length = 50)
+    private String consumidaPorTipo;
+
     // MEJORA: Para trazabilidad, saber qué declaraciones originaron este ingreso
     // Ejemplo: IDs de declaraciones de comercializadores separadas por coma
-    @Column(name = "declaraciones_origen_ids", length = 1000)
-    private String declaracionesOrigenIds;
+    @Column(name = "declaraciones_seleccionadas", length = 1000)
+    private String declaracionesSeleccionadas;
 }

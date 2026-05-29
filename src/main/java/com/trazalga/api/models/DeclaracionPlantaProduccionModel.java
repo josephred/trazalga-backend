@@ -87,7 +87,10 @@ public class DeclaracionPlantaProduccionModel {
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
 
+    @Column(name = "consumida_por_tipo", length = 50)
+    private String consumidaPorTipo;
+
     // IDs de las declaraciones de Abastecimiento que se usaron para esta producción
-    @Column(name = "declaraciones_abastecimiento_ids", length = 1000)
-    private String declaracionesAbastecimientoIds;
+    @Column(name = "declaraciones_seleccionadas", length = 1000)
+    private String declaracionesSeleccionadas;
 }

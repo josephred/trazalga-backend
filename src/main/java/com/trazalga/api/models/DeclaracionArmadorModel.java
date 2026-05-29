@@ -106,6 +106,9 @@ public class DeclaracionArmadorModel {
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
 
+    @Column(name = "consumida_por_tipo", length = 50)
+    private String consumidaPorTipo;
+
     // Campo transitorio para recibir la lista de buzos del frontend (no se persiste en esta tabla)
     @Transient
     private List<BuzoModel> buzos;

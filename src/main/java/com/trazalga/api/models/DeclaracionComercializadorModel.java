@@ -111,6 +111,9 @@ public class DeclaracionComercializadorModel {
     @Column(name = "declaracion_destinatario_id")
     private Long declaracionDestinatario;
 
+    @Column(name = "consumida_por_tipo", length = 50)
+    private String consumidaPorTipo;
+
     @Column(name = "declaraciones_seleccionadas", length = 1000) // Aumentar longitud si pueden ser muchos IDs
     private String declaracionesSeleccionadas;
 }

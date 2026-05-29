@@ -4,17 +4,36 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import java.util.stream.Collectors;
+import java.util.Arrays;
+import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
+import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
+import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
+import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 
 @Service
 public class DeclaracionComercializadorService {
     
     @Autowired
     IDeclaracionComercializadorRepository declaracionComercializadorRepository;
+
+    @Autowired
+    IDeclaracionRecolectorRepository recolectorRepository;
+
+    @Autowired
+    IDeclaracionArmadorRepository armadorRepository;
+
+    @Autowired
+    IDeclaracionAreaRepository areaRepository;
     
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializador(){
         return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAll();
@@ -29,8 +48,18 @@ public class DeclaracionComercializadorService {
         return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAllByUsuarioIdOrderByFechaDeclaracionDesc(id);
     }
 
+    @Transactional
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
-        return declaracionComercializadorRepository.save(declaracionComercializadorModel);
+        DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
+        if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
+            marcarDeclaracionesComoConsumidas(
+                saved.getDeclaracionesSeleccionadas(), 
+                saved.getId(), 
+                "COMERCIALIZADOR", 
+                saved.getUsuario().getId()
+            );
+        }
+        return saved;
     }
 
     public Optional<DeclaracionComercializadorModel> getById(Long id){
@@ -41,8 +70,11 @@ public class DeclaracionComercializadorService {
         return declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
     }
 
+    @Transactional
     public DeclaracionComercializadorModel updateById(DeclaracionComercializadorModel request, Long id){
         DeclaracionComercializadorModel declaracionComercializadorModel = declaracionComercializadorRepository.findById(id).get();
+        String oldSeleccionadas = declaracionComercializadorModel.getDeclaracionesSeleccionadas();
+
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionComercializadorModel.setFolioDesembarqueAc(request.getFolioDesembarqueAc());
         declaracionComercializadorModel.setFechaDeclaracion(request.getFechaDeclaracion());
@@ -75,11 +107,29 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
         declaracionComercializadorRepository.save(declaracionComercializadorModel);
+
+        if (oldSeleccionadas != null && !oldSeleccionadas.isEmpty()) {
+            liberarDeclaracionesConsumidas(oldSeleccionadas, id);
+        }
+        if (request.getDeclaracionesSeleccionadas() != null && !request.getDeclaracionesSeleccionadas().isEmpty()) {
+            marcarDeclaracionesComoConsumidas(
+                request.getDeclaracionesSeleccionadas(), 
+                id, 
+                "COMERCIALIZADOR", 
+                declaracionComercializadorModel.getUsuario().getId()
+            );
+        }
+
         return declaracionComercializadorModel;
     }
 
+    @Transactional
     public Boolean deleteDeclaracionComercializador(Long id){
         try{
+            DeclaracionComercializadorModel model = declaracionComercializadorRepository.findById(id).orElse(null);
+            if (model != null && model.getDeclaracionesSeleccionadas() != null && !model.getDeclaracionesSeleccionadas().isEmpty()) {
+                liberarDeclaracionesConsumidas(model.getDeclaracionesSeleccionadas(), id);
+            }
             declaracionComercializadorRepository.deleteById(id);
             return true;
         } catch( Exception e){return false;}
@@ -95,4 +145,77 @@ public class DeclaracionComercializadorService {
         return folios.isEmpty() ? null : folios.getFirst();
     }
 
+    private void marcarDeclaracionesComoConsumidas(String idsCSV, Long consumidaPorId, String tipo, Long usuarioDestinatarioId) {
+        List<Long> ids = Arrays.stream(idsCSV.split(","))
+                               .map(String::trim)
+                               .filter(s -> !s.isEmpty())
+                               .map(Long::valueOf)
+                               .collect(Collectors.toList());
+        
+        if (ids.isEmpty()) return;
+
+        List<DeclaracionRecolectorModel> recolectores = recolectorRepository.findAllById(ids);
+        for (DeclaracionRecolectorModel r : recolectores) {
+            if (r.getUsuarioDestinatario() != null && r.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && r.getDeclaracionDestinatario() == null) {
+                r.setDeclaracionDestinatario(consumidaPorId);
+                r.setConsumidaPorTipo(tipo);
+                recolectorRepository.save(r);
+            }
+        }
+
+        List<DeclaracionArmadorModel> armadores = armadorRepository.findAllById(ids);
+        for (DeclaracionArmadorModel a : armadores) {
+            if (a.getUsuarioDestinatario() != null && a.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && a.getDeclaracionDestinatario() == null) {
+                a.setDeclaracionDestinatario(consumidaPorId);
+                a.setConsumidaPorTipo(tipo);
+                armadorRepository.save(a);
+            }
+        }
+
+        List<DeclaracionAreaModel> areas = areaRepository.findAllById(ids);
+        for (DeclaracionAreaModel ar : areas) {
+            if (ar.getUsuarioDestinatario() != null && ar.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && ar.getDeclaracionDestinatario() == null) {
+                ar.setDeclaracionDestinatario(consumidaPorId);
+                ar.setConsumidaPorTipo(tipo);
+                areaRepository.save(ar);
+            }
+        }
+    }
+
+    private void liberarDeclaracionesConsumidas(String idsCSV, Long consumidaPorId) {
+        List<Long> ids = Arrays.stream(idsCSV.split(","))
+                               .map(String::trim)
+                               .filter(s -> !s.isEmpty())
+                               .map(Long::valueOf)
+                               .collect(Collectors.toList());
+        
+        if (ids.isEmpty()) return;
+
+        List<DeclaracionRecolectorModel> recolectores = recolectorRepository.findAllById(ids);
+        for (DeclaracionRecolectorModel r : recolectores) {
+            if (consumidaPorId.equals(r.getDeclaracionDestinatario())) {
+                r.setDeclaracionDestinatario(null);
+                r.setConsumidaPorTipo(null);
+                recolectorRepository.save(r);
+            }
+        }
+
+        List<DeclaracionArmadorModel> armadores = armadorRepository.findAllById(ids);
+        for (DeclaracionArmadorModel a : armadores) {
+            if (consumidaPorId.equals(a.getDeclaracionDestinatario())) {
+                a.setDeclaracionDestinatario(null);
+                a.setConsumidaPorTipo(null);
+                armadorRepository.save(a);
+            }
+        }
+
+        List<DeclaracionAreaModel> areas = areaRepository.findAllById(ids);
+        for (DeclaracionAreaModel ar : areas) {
+            if (consumidaPorId.equals(ar.getDeclaracionDestinatario())) {
+                ar.setDeclaracionDestinatario(null);
+                ar.setConsumidaPorTipo(null);
+                areaRepository.save(ar);
+            }
+        }
+    }
 }

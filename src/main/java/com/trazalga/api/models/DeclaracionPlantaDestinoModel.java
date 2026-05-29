@@ -105,6 +105,6 @@ public class DeclaracionPlantaDestinoModel {
 
     // --- Trazabilidad Inversa ---
     // IDs de las declaraciones de PRODUCCIÓN que componen este envío
-    @Column(name = "declaraciones_produccion_ids", length = 1000)
-    private String declaracionesProduccionIds;
+    @Column(name = "declaraciones_seleccionadas", length = 1000)
+    private String declaracionesSeleccionadas;
 }
