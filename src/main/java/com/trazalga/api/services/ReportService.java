@@ -17,4 +17,8 @@ public class ReportService {
     public List<ReportDTO> getReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
         return reportRepository.generateReport(fechaInicio, fechaFin, tipoReporte, rut);
     }
+
+    public java.util.Map<String, Object> getIndicadoresRecolector() {
+        return reportRepository.getIndicadoresRecolector();
+    }
 }

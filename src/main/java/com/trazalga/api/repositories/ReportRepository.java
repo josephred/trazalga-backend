@@ -114,4 +114,28 @@ public class ReportRepository {
             default: return "Desconocido";
         }
     }
+
+    public java.util.Map<String, Object> getIndicadoresRecolector() {
+        String sql = "SELECT " +
+            "SUM(CASE WHEN DATE(d.fecha_declaracion) = CURRENT_DATE() THEN 1 ELSE 0 END) as decDiarias, " +
+            "COALESCE(SUM(CASE WHEN DATE(d.fecha_declaracion) = CURRENT_DATE() THEN d.desembarque ELSE 0 END), 0) as totDiario, " +
+            "SUM(CASE WHEN YEARWEEK(d.fecha_declaracion, 1) = YEARWEEK(CURRENT_DATE(), 1) THEN 1 ELSE 0 END) as decSemanales, " +
+            "COALESCE(SUM(CASE WHEN YEARWEEK(d.fecha_declaracion, 1) = YEARWEEK(CURRENT_DATE(), 1) THEN d.desembarque ELSE 0 END), 0) as totSemanal, " +
+            "SUM(CASE WHEN MONTH(d.fecha_declaracion) = MONTH(CURRENT_DATE()) AND YEAR(d.fecha_declaracion) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as decMensuales, " +
+            "COALESCE(SUM(CASE WHEN MONTH(d.fecha_declaracion) = MONTH(CURRENT_DATE()) AND YEAR(d.fecha_declaracion) = YEAR(CURRENT_DATE()) THEN d.desembarque ELSE 0 END), 0) as totMensual " +
+            "FROM declaracion_recolector d";
+        
+        Query query = entityManager.createNativeQuery(sql);
+        Object[] result = (Object[]) query.getSingleResult();
+        
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("declaracionesDiarias", result[0] != null ? ((Number) result[0]).longValue() : 0);
+        map.put("totalDiario", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
+        map.put("declaracionesSemanales", result[2] != null ? ((Number) result[2]).longValue() : 0);
+        map.put("totalSemanal", result[3] != null ? ((Number) result[3]).doubleValue() : 0.0);
+        map.put("declaracionesMensuales", result[4] != null ? ((Number) result[4]).longValue() : 0);
+        map.put("totalMensual", result[5] != null ? ((Number) result[5]).doubleValue() : 0.0);
+        
+        return map;
+    }
 }

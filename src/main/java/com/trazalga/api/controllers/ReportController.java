@@ -34,4 +34,15 @@ public class ReportController {
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
     }
+
+    @GetMapping("/indicadores-recolector")
+    public ResponseEntity<?> getIndicadoresRecolector() {
+        try {
+            return ResponseEntity.ok(reportService.getIndicadoresRecolector());
+        } catch (Exception e) {
+            System.err.println("Error obteniendo indicadores de recolector: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
 }
