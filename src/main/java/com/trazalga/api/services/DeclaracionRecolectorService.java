@@ -50,6 +50,7 @@ public class DeclaracionRecolectorService {
 
 
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+        sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
 
@@ -108,6 +109,7 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         
+        sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         DeclaracionRecolectorModel updated = declaracionRecolectorRepository.save(declaracionRecolectorModel);
 
@@ -193,6 +195,13 @@ public class DeclaracionRecolectorService {
 
             // Retrocompatibilidad: fecha_extraccion = fecha fin del periodo
             model.setFechaExtraccion(model.getPeriodoExtraccionFin());
+        }
+    }
+
+    private void sanearComposicion(DeclaracionRecolectorModel model) {
+        if (model.getComposicion() != null && 
+            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+            model.setComposicion(null);
         }
     }
 

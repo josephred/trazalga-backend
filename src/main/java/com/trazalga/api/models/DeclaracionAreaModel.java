@@ -86,7 +86,7 @@ public class DeclaracionAreaModel {
 
     // Relación con la composición de fronda
     @ManyToOne
-    @JoinColumn(name = "composicion_id", nullable = false)
+    @JoinColumn(name = "composicion_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ComposicionModel composicion;
 

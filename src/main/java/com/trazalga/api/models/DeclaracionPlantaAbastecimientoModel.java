@@ -58,7 +58,7 @@ public class DeclaracionPlantaAbastecimientoModel {
     private EspecieModel especie;
 
     @ManyToOne
-    @JoinColumn(name = "composicion_id", nullable = false)
+    @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
 
     @ManyToOne

@@ -50,6 +50,7 @@ public class DeclaracionComercializadorService {
 
     @Transactional
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
+        sanearComposicion(declaracionComercializadorModel);
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
@@ -108,7 +109,8 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracionComercializadorModel.setPatente(request.getPatente());
         declaracionComercializadorModel.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
-
+        
+        sanearComposicion(declaracionComercializadorModel);
         declaracionComercializadorRepository.save(declaracionComercializadorModel);
 
         if (oldSeleccionadas != null && !oldSeleccionadas.isEmpty()) {
@@ -222,6 +224,13 @@ public class DeclaracionComercializadorService {
                 ar.setConsumidaPorTipo(null);
                 areaRepository.save(ar);
             }
+        }
+    }
+
+    private void sanearComposicion(DeclaracionComercializadorModel model) {
+        if (model.getComposicion() != null && 
+            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+            model.setComposicion(null);
         }
     }
 }

@@ -42,6 +42,7 @@ public class DeclaracionPlantaAbastecimientoService {
         if (declaracion.getFechaIngresoPlanta() == null) {
             declaracion.setFechaIngresoPlanta(new Date());
         }
+        sanearComposicion(declaracion);
         DeclaracionPlantaAbastecimientoModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -89,6 +90,13 @@ public class DeclaracionPlantaAbastecimientoService {
                 c.setConsumidaPorTipo(tipo);
                 comercializadorRepository.save(c);
             }
+        }
+    }
+
+    private void sanearComposicion(DeclaracionPlantaAbastecimientoModel model) {
+        if (model.getComposicion() != null && 
+            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+            model.setComposicion(null);
         }
     }
 }

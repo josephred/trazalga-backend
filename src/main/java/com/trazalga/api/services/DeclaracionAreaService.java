@@ -55,6 +55,7 @@ public class DeclaracionAreaService {
     }
 
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
+        sanearComposicion(declaracion);
         // Si la AMERB tiene datos, intentar encontrar la AMERB real en el servidor
         if (declaracion.getAmerb() != null) {
             AmerbModel amerbEncontrada = null;
@@ -193,6 +194,7 @@ public class DeclaracionAreaService {
         declaracion.setTipoDestinatario(request.getTipoDestinatario());
         declaracion.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracion.setComposicion(request.getComposicion());
+        sanearComposicion(declaracion);
         declaracion.setHumedadEstado(request.getHumedadEstado());
         declaracion.setLatitud(request.getLatitud());
         declaracion.setLongitud(request.getLongitud());
@@ -263,5 +265,12 @@ public class DeclaracionAreaService {
     public String getLastFolioDesembarqueAmerb() {
         List<String> folios = declaracionAreaRepository.findLastFolioDesembarqueAmerb();
         return folios.isEmpty() ? null : folios.getFirst();
+    }
+
+    private void sanearComposicion(DeclaracionAreaModel model) {
+        if (model.getComposicion() != null && 
+            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+            model.setComposicion(null);
+        }
     }
 }
