@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
@@ -117,6 +118,48 @@ public class CuotaExtraccionService {
         }
 
         return new QuotaCheckResult(true, "Declaración permitida dentro de la cuota.");
+    }
+
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate) {
+        List<ControlCuotaDiariaDTO> result = new ArrayList<>();
+        // Obtener todas las cuotas activas de tipo RECOLECTOR y periodo DIARIO
+        List<CuotaExtraccionModel> cuotas = cuotaRepository.findByPerfilAndActivoTrue("RECOLECTOR");
+        
+        // Si no vienen fechas, usar el día de hoy
+        if (startDate == null) {
+            LocalDate localDate = new Date().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            startDate = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        }
+        if (endDate == null) {
+            endDate = startDate;
+        }
+
+        for (CuotaExtraccionModel cuota : cuotas) {
+            if (!"DIARIO".equalsIgnoreCase(cuota.getPeriodo()) || cuota.getEspecie() == null) {
+                continue;
+            }
+
+            BigDecimal sumCaptura = declaracionRecolectorRepository.sumDesembarqueByEspecieIdAndDateRange(cuota.getEspecie().getId(), startDate, endDate);
+            if (sumCaptura == null) {
+                sumCaptura = BigDecimal.ZERO;
+            }
+
+            BigDecimal limite = BigDecimal.valueOf(cuota.getLimiteKg());
+            Double porcentaje = 0.0;
+            if (limite.compareTo(BigDecimal.ZERO) > 0) {
+                porcentaje = sumCaptura.doubleValue() / limite.doubleValue() * 100.0;
+            }
+
+            ControlCuotaDiariaDTO dto = ControlCuotaDiariaDTO.builder()
+                .especieNombre(cuota.getEspecie().getNombre())
+                .volumenExtraido(sumCaptura)
+                .limiteCuota(limite)
+                .porcentajeUso(Math.round(porcentaje * 100.0) / 100.0) // Redondear a 2 decimales
+                .build();
+            
+            result.add(dto);
+        }
+        return result;
     }
 
     public static class QuotaCheckResult {

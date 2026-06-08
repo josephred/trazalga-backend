@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.services.CuotaExtraccionService;
+import java.util.List;
 
 @RestController
 @RequestMapping("/cuotas")
@@ -26,6 +28,13 @@ public class CuotaExtraccionController {
 
     @Autowired
     CuotaExtraccionService cuotaService;
+
+    @GetMapping("/dashboard-diario")
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date endDate) {
+        return cuotaService.getControlCuotasDiarioGlobal(startDate, endDate);
+    }
 
     @GetMapping
     public ArrayList<CuotaExtraccionModel> getAll() {

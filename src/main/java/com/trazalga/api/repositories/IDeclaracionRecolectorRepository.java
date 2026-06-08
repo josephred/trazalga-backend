@@ -1,11 +1,13 @@
 package com.trazalga.api.repositories;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionRecolectorModel;
@@ -36,5 +38,9 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
     // --- NUEVO MÉTODO PARA EL SERVICIO DE CUOTAS (OPTIMIZADO) ---
     // Este método permite filtrar en la base de datos por Usuario, Especie y Fecha exacta.
     List<DeclaracionRecolectorModel> findByUsuarioIdAndEspecieIdAndFechaDeclaracion(Long usuarioId, Long especieId, Date fechaDeclaracion);
+
+    // --- NUEVO MÉTODO PARA DASHBOARD DE CUOTAS GLOBAL ---
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionRecolectorModel d WHERE d.especie.id = :especieId AND DATE(d.fechaDeclaracion) BETWEEN DATE(:startDate) AND DATE(:endDate)")
+    BigDecimal sumDesembarqueByEspecieIdAndDateRange(@Param("especieId") Long especieId, @Param("startDate") Date startDate, @Param("endDate") Date endDate);
 
 }

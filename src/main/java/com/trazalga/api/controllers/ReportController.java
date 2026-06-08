@@ -36,9 +36,11 @@ public class ReportController {
     }
 
     @GetMapping("/indicadores-recolector")
-    public ResponseEntity<?> getIndicadoresRecolector() {
+    public ResponseEntity<?> getIndicadoresRecolector(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
         try {
-            return ResponseEntity.ok(reportService.getIndicadoresRecolector());
+            return ResponseEntity.ok(reportService.getIndicadoresRecolector(startDate, endDate));
         } catch (Exception e) {
             System.err.println("Error obteniendo indicadores de recolector: " + e.getMessage());
             e.printStackTrace();
