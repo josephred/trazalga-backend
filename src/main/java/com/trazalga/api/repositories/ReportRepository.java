@@ -141,8 +141,44 @@ public class ReportRepository {
         map.put("totalDiario", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
         map.put("declaracionesSemanales", 0L); // Mantenemos compatibilidad con el DTO viejo
         map.put("totalSemanal", 0.0);
-        map.put("declaracionesMensuales", 0L);
         map.put("totalMensual", 0.0);
+        
+        return map;
+    }
+
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT " +
+            "COUNT(decl.id) as total_declaraciones_veda, " +
+            "COALESCE(SUM(decl.desembarque), 0) as total_kg_veda " +
+            "FROM (" +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_area " +
+            ") as decl " +
+            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+            "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
+            "WHERE 1=1" + dateFilter;
+        
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        Object[] result = (Object[]) query.getSingleResult();
+        
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("declaracionesVeda", result[0] != null ? ((Number) result[0]).longValue() : 0);
+        map.put("totalKgVeda", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
         
         return map;
     }

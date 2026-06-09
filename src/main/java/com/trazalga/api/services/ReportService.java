@@ -21,4 +21,8 @@ public class ReportService {
     public java.util.Map<String, Object> getIndicadoresRecolector(Date startDate, Date endDate) {
         return reportRepository.getIndicadoresRecolector(startDate, endDate);
     }
+
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
+        return reportRepository.getExtraccionVedaMetrics(startDate, endDate);
+    }
 }

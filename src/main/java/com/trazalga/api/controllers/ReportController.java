@@ -47,4 +47,16 @@ public class ReportController {
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
     }
+    @GetMapping("/extraccion-veda")
+    public ResponseEntity<?> getExtraccionVedaMetrics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getExtraccionVedaMetrics(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo indicadores de veda: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
 }
