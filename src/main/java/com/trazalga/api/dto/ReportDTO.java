@@ -25,4 +25,10 @@ public class ReportDTO {
     private String especie;
     private String tipoReporte;
     private String folioRelacionado; // Para el caso recolector -> comercializador
+    
+    // Nuevas columnas de trazabilidad extendida
+    private String plantaAbastecimiento;
+    private Date fechaComercializador;
+    private String plantaProduccion;
+    private Date fechaPlantaAbastecimiento;
 }

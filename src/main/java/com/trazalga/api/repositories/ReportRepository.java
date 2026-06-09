@@ -41,8 +41,12 @@ public class ReportRepository {
         
         if (tipoReporte == 1) {
             sql.append(", dc.folio_origen as folio_comercializador ");
+            sql.append(", udc.nombres as p_abast_nombres, udc.rut as p_abast_rut, dc.fecha_declaracion as fecha_comercializador ");
+            sql.append(", udpa.nombres as p_prod_nombres, udpa.rut as p_prod_rut, dpa.fecha_ingreso_planta as fecha_planta_abast ");
         } else {
             sql.append(", NULL as folio_comercializador ");
+            sql.append(", NULL as p_abast_nombres, NULL as p_abast_rut, NULL as fecha_comercializador ");
+            sql.append(", NULL as p_prod_nombres, NULL as p_prod_rut, NULL as fecha_planta_abast ");
         }
 
         sql.append("FROM ").append(tableName).append(" d ");
@@ -52,6 +56,9 @@ public class ReportRepository {
 
         if (tipoReporte == 1) {
             sql.append("LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id ");
+            sql.append("LEFT JOIN usuario udc ON dc.usuario_destinatario_id = udc.id ");
+            sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa ON dc.declaracion_destinatario_id = dpa.id ");
+            sql.append("LEFT JOIN usuario udpa ON dpa.usuario_destinatario_id = udpa.id ");
         }
 
         sql.append("WHERE d.").append(dateColumn).append(" BETWEEN :fechaInicio AND :fechaFin ");
@@ -85,6 +92,22 @@ public class ReportRepository {
                 dateVal = (Date) row[2];
             }
 
+            String pAbastNombre = (row[15] != null ? row[15].toString() : "");
+            String pAbastRut = (row[16] != null ? row[16].toString() : "");
+            String pAbastCompleto = pAbastNombre.isEmpty() ? "" : pAbastNombre + " (" + pAbastRut + ")";
+
+            Date fechaComercializador = null;
+            if (row[17] instanceof java.sql.Timestamp) fechaComercializador = new Date(((java.sql.Timestamp) row[17]).getTime());
+            else if (row[17] instanceof Date) fechaComercializador = (Date) row[17];
+
+            String pProdNombre = (row[18] != null ? row[18].toString() : "");
+            String pProdRut = (row[19] != null ? row[19].toString() : "");
+            String pProdCompleto = pProdNombre.isEmpty() ? "" : pProdNombre + " (" + pProdRut + ")";
+
+            Date fechaPlantaAbast = null;
+            if (row[20] instanceof java.sql.Timestamp) fechaPlantaAbast = new Date(((java.sql.Timestamp) row[20]).getTime());
+            else if (row[20] instanceof Date) fechaPlantaAbast = (Date) row[20];
+
             return ReportDTO.builder()
                     .id(((Number) row[0]).longValue())
                     .folio(row[1] != null ? row[1].toString() : "")
@@ -98,6 +121,10 @@ public class ReportRepository {
                     .especie(row[13] != null ? row[13].toString() : "")
                     .tipoReporte(getReportLabel(tipoReporte))
                     .folioRelacionado(row[14] != null ? row[14].toString() : "")
+                    .plantaAbastecimiento(pAbastCompleto)
+                    .fechaComercializador(fechaComercializador)
+                    .plantaProduccion(pProdCompleto)
+                    .fechaPlantaAbastecimiento(fechaPlantaAbast)
                     .build();
         }).collect(Collectors.toList());
     }
