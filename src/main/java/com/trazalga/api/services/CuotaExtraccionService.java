@@ -120,12 +120,16 @@ public class CuotaExtraccionService {
         return new QuotaCheckResult(true, "Declaración permitida dentro de la cuota.");
     }
 
-    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate) {
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate, String periodo, String perfil) {
+        if (periodo == null || periodo.isEmpty()) periodo = "DIARIO";
+        if (perfil == null || perfil.isEmpty()) perfil = "RECOLECTOR";
+
         List<ControlCuotaDiariaDTO> result = new ArrayList<>();
-        // Obtener todas las cuotas activas de tipo RECOLECTOR y periodo DIARIO
-        List<CuotaExtraccionModel> cuotas = cuotaRepository.findByPerfilAndActivoTrue("RECOLECTOR");
+        List<CuotaExtraccionModel> cuotas = cuotaRepository.findByPerfilAndActivoTrue(perfil.toUpperCase());
         
-        // Si no vienen fechas, usar el día de hoy
         if (startDate == null) {
             LocalDate localDate = new Date().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
             startDate = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
@@ -134,14 +138,27 @@ public class CuotaExtraccionService {
             endDate = startDate;
         }
 
+        String tableName = "declaracion_recolector";
+        if ("ARMADOR".equalsIgnoreCase(perfil)) tableName = "declaracion_armador";
+        if ("AREA".equalsIgnoreCase(perfil) || "ÁREA DE MANEJO".equalsIgnoreCase(perfil)) tableName = "declaracion_area";
+
         for (CuotaExtraccionModel cuota : cuotas) {
-            if (!"DIARIO".equalsIgnoreCase(cuota.getPeriodo()) || cuota.getEspecie() == null) {
+            if (!periodo.equalsIgnoreCase(cuota.getPeriodo()) || cuota.getEspecie() == null) {
                 continue;
             }
 
-            BigDecimal sumCaptura = declaracionRecolectorRepository.sumDesembarqueByEspecieIdAndDateRange(cuota.getEspecie().getId(), startDate, endDate);
-            if (sumCaptura == null) {
-                sumCaptura = BigDecimal.ZERO;
+            String sql = "SELECT COALESCE(SUM(desembarque), 0) FROM " + tableName + 
+                         " WHERE especie_id = :especieId AND fecha_declaracion BETWEEN :startDate AND :endDate";
+            
+            jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
+            query.setParameter("especieId", cuota.getEspecie().getId());
+            query.setParameter("startDate", startDate);
+            query.setParameter("endDate", endDate);
+
+            Object res = query.getSingleResult();
+            BigDecimal sumCaptura = BigDecimal.ZERO;
+            if (res != null) {
+                sumCaptura = new BigDecimal(res.toString());
             }
 
             BigDecimal limite = BigDecimal.valueOf(cuota.getLimiteKg());
@@ -154,7 +171,7 @@ public class CuotaExtraccionService {
                 .especieNombre(cuota.getEspecie().getNombre())
                 .volumenExtraido(sumCaptura)
                 .limiteCuota(limite)
-                .porcentajeUso(Math.round(porcentaje * 100.0) / 100.0) // Redondear a 2 decimales
+                .porcentajeUso(Math.round(porcentaje * 100.0) / 100.0)
                 .build();
             
             result.add(dto);

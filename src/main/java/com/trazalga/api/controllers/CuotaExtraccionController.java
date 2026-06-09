@@ -33,8 +33,10 @@ public class CuotaExtraccionController {
     @GetMapping("/dashboard-diario")
     public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date endDate) {
-        return cuotaService.getControlCuotasDiarioGlobal(startDate, endDate);
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false, defaultValue = "DIARIO") String periodo,
+            @RequestParam(required = false, defaultValue = "RECOLECTOR") String perfil) {
+        return cuotaService.getControlCuotasDiarioGlobal(startDate, endDate, periodo, perfil);
     }
 
     @GetMapping
