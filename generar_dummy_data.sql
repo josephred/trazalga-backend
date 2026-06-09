@@ -13,7 +13,9 @@ BEGIN
     DECLARE v_usuario_id BIGINT;
     DECLARE v_usuario_dest_id BIGINT;
     DECLARE v_caleta_id BIGINT;
+    DECLARE v_comuna_id BIGINT;
     DECLARE v_especie_id BIGINT;
+    DECLARE v_extraccion_tipo_id BIGINT;
     DECLARE v_composicion_id BIGINT;
     DECLARE v_humedad_id BIGINT;
     DECLARE v_embarcacion_id BIGINT;
@@ -22,45 +24,43 @@ BEGIN
 
     SET v_current_date = p_start_date;
     
-    -- Loop a través de cada día del rango de fechas
     WHILE v_current_date <= p_end_date DO
         
-        -- ---------------------------------------------------------
-        -- 1. Insertar declaraciones de RECOLECTOR (5 a 50 al azar)
-        -- ---------------------------------------------------------
+        -- 1. Insertar declaraciones de RECOLECTOR
         SET v_recolector_count = FLOOR(5 + (RAND() * 46));
         SET i = 1;
         WHILE i <= v_recolector_count DO
             SELECT id INTO v_usuario_id FROM usuario ORDER BY RAND() LIMIT 1;
             SELECT id INTO v_usuario_dest_id FROM usuario ORDER BY RAND() LIMIT 1;
             SELECT id INTO v_caleta_id FROM caleta ORDER BY RAND() LIMIT 1;
+            SELECT id INTO v_comuna_id FROM comuna ORDER BY RAND() LIMIT 1;
             SELECT id INTO v_especie_id FROM especie ORDER BY RAND() LIMIT 1;
+            SELECT id INTO v_extraccion_tipo_id FROM extraccion_tipo ORDER BY RAND() LIMIT 1;
             SELECT id INTO v_composicion_id FROM composicion ORDER BY RAND() LIMIT 1;
             SELECT id INTO v_humedad_id FROM humedad_estado ORDER BY RAND() LIMIT 1;
             
-            -- Asegurar defaults por si alguna tabla está vacía
             SET v_usuario_id = COALESCE(v_usuario_id, 1);
             SET v_usuario_dest_id = COALESCE(v_usuario_dest_id, 1);
             SET v_caleta_id = COALESCE(v_caleta_id, 1);
+            SET v_comuna_id = COALESCE(v_comuna_id, 1);
             SET v_especie_id = COALESCE(v_especie_id, 1);
+            SET v_extraccion_tipo_id = COALESCE(v_extraccion_tipo_id, 1);
             SET v_composicion_id = COALESCE(v_composicion_id, 1);
             SET v_humedad_id = COALESCE(v_humedad_id, 1);
             
             INSERT INTO declaracion_recolector (
                 usuario_id, folio_origen, fecha_extraccion, fecha_declaracion, hora, 
-                desembarque, captura, tipo_destinatario, usuario_destinatario_id,
-                caleta_id, especie_id, composicion_id, humedad_estado_id
+                nombre, codigo_sernapesca, caleta_id, comuna_id, especie_id, extraccion_tipo_id, composicion_id, humedad_estado_id,
+                desembarque, captura, codigo_destinatario, nombre_destinatario, usuario_destinatario_id
             ) VALUES (
                 v_usuario_id, CONCAT('FOL-REC-', FLOOR(RAND()*100000)), v_current_date, v_current_date, '10:00:00',
-                FLOOR(100 + (RAND() * 900)), FLOOR(100 + (RAND() * 900)), 'comercializador', v_usuario_dest_id,
-                v_caleta_id, v_especie_id, v_composicion_id, v_humedad_id
+                'Recolector Dummy', 'RPA-123', v_caleta_id, v_comuna_id, v_especie_id, v_extraccion_tipo_id, v_composicion_id, v_humedad_id,
+                FLOOR(100 + (RAND() * 900)), FLOOR(100 + (RAND() * 900)), 'RUT-DEST', 'Comercializadora Dummy', v_usuario_dest_id
             );
             SET i = i + 1;
         END WHILE;
 
-        -- ---------------------------------------------------------
-        -- 2. Insertar declaraciones de ARMADOR (5 a 50 al azar)
-        -- ---------------------------------------------------------
+        -- 2. Insertar declaraciones de ARMADOR
         SET v_armador_count = FLOOR(5 + (RAND() * 46));
         SET i = 1;
         WHILE i <= v_armador_count DO
@@ -94,9 +94,7 @@ BEGIN
             SET i = i + 1;
         END WHILE;
 
-        -- ---------------------------------------------------------
-        -- 3. Insertar declaraciones de AREA (5 a 50 al azar)
-        -- ---------------------------------------------------------
+        -- 3. Insertar declaraciones de AREA
         SET v_area_count = FLOOR(5 + (RAND() * 46));
         SET i = 1;
         WHILE i <= v_area_count DO
@@ -128,7 +126,6 @@ BEGIN
             SET i = i + 1;
         END WHILE;
 
-        -- Avanzar al siguiente día
         SET v_current_date = DATE_ADD(v_current_date, INTERVAL 1 DAY);
     END WHILE;
 END //
