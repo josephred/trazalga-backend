@@ -272,4 +272,56 @@ public class ReportRepository {
         
         return map;
     }
+
+    public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
+        String tableName = "";
+        String roleName = "";
+        String dateCol = "fecha_declaracion";
+        String amountCol = "desembarque";
+        String folioCol = "folio_origen";
+        
+        switch (tipo) {
+            case 1: tableName = "declaracion_recolector"; roleName = "Recolector"; break;
+            case 2: tableName = "declaracion_armador"; roleName = "Armador"; break;
+            case 3: tableName = "declaracion_area"; roleName = "Área de Manejo"; break;
+            case 4: tableName = "declaracion_comercializador"; roleName = "Comercializador"; amountCol = "cantidad"; break;
+            case 5: tableName = "declaracion_planta_abastecimiento"; roleName = "Planta Abastecimiento"; amountCol = "cantidad"; dateCol = "fecha_ingreso_planta"; folioCol = "folio_declaracion_a_pla"; break;
+            case 6: tableName = "declaracion_planta_produccion"; roleName = "Planta Producción"; amountCol = "cantidad_producto"; dateCol = "fecha_produccion"; folioCol = "folio_declaracion_p_pla"; break;
+            case 7: tableName = "declaracion_planta_destino"; roleName = "Planta Destino"; amountCol = "cantidad"; dateCol = "fecha_declaracion_destino"; folioCol = "folio_declaracion_destino"; break;
+            default: throw new IllegalArgumentException("Tipo inválido");
+        }
+
+        String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol + " " +
+                     "FROM " + tableName + " d " +
+                     "INNER JOIN usuario u ON d.usuario_id = u.id " +
+                     "WHERE d.id = :id";
+                     
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("id", id);
+        List<Object[]> results = query.getResultList();
+        
+        List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = new java.util.ArrayList<>();
+        
+        for (Object[] row : results) {
+            String actor = (row[1] != null ? row[1].toString() : "") + " " + (row[2] != null ? row[2].toString() : "");
+            Date d = null;
+            if (row[4] instanceof java.sql.Timestamp) d = new Date(((java.sql.Timestamp) row[4]).getTime());
+            else if (row[4] instanceof Date) d = (Date) row[4];
+            
+            nodos.add(com.trazalga.api.dto.TrazabilidadNodoDTO.builder()
+                .idDeclaracion(((Number)row[0]).longValue())
+                .tipoNodo(roleName)
+                .nombreActor(actor.trim())
+                .rutActor(row[3] != null ? row[3].toString() : "")
+                .fecha(d)
+                .cantidad(row[5] != null ? new java.math.BigDecimal(row[5].toString()) : java.math.BigDecimal.ZERO)
+                .descripcionEvento("Declaración de tipo " + roleName)
+                .folio(row[6] != null ? row[6].toString() : "")
+                .build());
+        }
+        
+        // Idealmente, aquí se deben hacer más consultas hacia atrás y adelante
+        // para construir todo el árbol. Por ahora enviamos el nodo principal para conectar la UI.
+        return nodos;
+    }
 }

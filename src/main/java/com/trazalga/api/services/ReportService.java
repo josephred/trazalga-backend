@@ -33,4 +33,8 @@ public class ReportService {
     public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
         return reportRepository.getResumenGlobal(startDate, endDate);
     }
+
+    public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
+        return reportRepository.getTrazabilidad(tipo, id);
+    }
 }

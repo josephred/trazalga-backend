@@ -85,4 +85,18 @@ public class ReportController {
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
     }
+
+    @GetMapping("/trazabilidad/{tipo}/{id}")
+    public ResponseEntity<?> getTrazabilidad(
+            @PathVariable Integer tipo,
+            @PathVariable Long id) {
+        try {
+            List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = reportService.getTrazabilidad(tipo, id);
+            return ResponseEntity.ok(nodos);
+        } catch (Exception e) {
+            System.err.println("Error obteniendo trazabilidad: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
 }
