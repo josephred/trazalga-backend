@@ -25,9 +25,6 @@ public class NotificationService {
     @PostConstruct
     public void initialize() {
         try {
-            // Nota: Aquí se debería cargar el service-account.json de Firebase real.
-            // Para la prueba/dummy se omite para no romper el inicio si no existe.
-            /*
             InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("firebase-service-account.json");
             if (serviceAccount != null && FirebaseApp.getApps().isEmpty()) {
                 FirebaseOptions options = FirebaseOptions.builder()
@@ -35,8 +32,9 @@ public class NotificationService {
                         .build();
                 FirebaseApp.initializeApp(options);
                 System.out.println("Firebase App initialized.");
+            } else if (serviceAccount == null) {
+                System.out.println("WARNING: firebase-service-account.json not found in resources.");
             }
-            */
             System.out.println("Notification Service Ready.");
         } catch (Exception e) {
             e.printStackTrace();
