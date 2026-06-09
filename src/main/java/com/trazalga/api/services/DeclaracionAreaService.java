@@ -54,6 +54,9 @@ public class DeclaracionAreaService {
         return declaraciones;
     }
 
+    @Autowired
+    private AlertaTriggerService alertaTriggerService;
+
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
         sanearComposicion(declaracion);
         // Si la AMERB tiene datos, intentar encontrar la AMERB real en el servidor
@@ -167,6 +170,15 @@ public class DeclaracionAreaService {
         }
 
         populateBuzos(savedDeclaracion);
+        
+        // Trigger Alertas
+        alertaTriggerService.evaluarDeclaracion(
+            savedDeclaracion.getEspecie() != null ? savedDeclaracion.getEspecie().getId() : null,
+            savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
+            savedDeclaracion.getDesembarque() != null ? savedDeclaracion.getDesembarque().doubleValue() : 0.0,
+            "AREA"
+        );
+        
         return savedDeclaracion;
     }
 

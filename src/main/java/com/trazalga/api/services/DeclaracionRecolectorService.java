@@ -49,6 +49,9 @@ public class DeclaracionRecolectorService {
     }
 
 
+    @Autowired
+    private AlertaTriggerService alertaTriggerService;
+
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
@@ -70,6 +73,15 @@ public class DeclaracionRecolectorService {
             }
         }
         populateBuzos(saved);
+        
+        // Trigger Alertas
+        alertaTriggerService.evaluarDeclaracion(
+            saved.getEspecie() != null ? saved.getEspecie().getId() : null,
+            saved.getUsuario() != null ? saved.getUsuario().getId() : null,
+            saved.getDesembarque() != null ? saved.getDesembarque().doubleValue() : 0.0,
+            "RECOLECTOR"
+        );
+        
         return saved;
     }
 
