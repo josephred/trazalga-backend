@@ -182,4 +182,35 @@ public class ReportRepository {
         
         return map;
     }
+
+    public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " WHERE fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " WHERE fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " WHERE fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT COUNT(id) as total_declaraciones, COALESCE(SUM(desembarque), 0) as total_volumen FROM (" +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_area " +
+            ") as decl " + dateFilter;
+        
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        Object[] result = (Object[]) query.getSingleResult();
+        
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("declaracionesTotales", result[0] != null ? ((Number) result[0]).longValue() : 0);
+        map.put("volumenTotal", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
+        
+        return map;
+    }
 }

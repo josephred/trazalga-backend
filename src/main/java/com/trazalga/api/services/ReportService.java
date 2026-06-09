@@ -25,4 +25,8 @@ public class ReportService {
     public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
         return reportRepository.getExtraccionVedaMetrics(startDate, endDate);
     }
+
+    public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
+        return reportRepository.getResumenGlobal(startDate, endDate);
+    }
 }
