@@ -125,11 +125,17 @@ public class ReportRepository {
             dateFilter = " WHERE d.fecha_declaracion <= :endDate";
         }
 
-        String sql = "SELECT DATE(d.fecha_declaracion) as fecha, " +
-            "COUNT(d.id) as decDiarias, " +
-            "COALESCE(SUM(d.desembarque), 0) as totDiario " +
-            "FROM declaracion_recolector d" + dateFilter + " " +
-            "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
+        String sql = "SELECT DATE(fecha_declaracion) as fecha, " +
+            "COUNT(id) as decDiarias, " +
+            "COALESCE(SUM(desembarque), 0) as totDiario " +
+            "FROM (" +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_area " +
+            ") as d" + dateFilter + " " +
+            "GROUP BY DATE(fecha_declaracion) ORDER BY DATE(fecha_declaracion) ASC";
         
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
