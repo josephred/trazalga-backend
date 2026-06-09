@@ -115,7 +115,7 @@ public class ReportRepository {
         }
     }
 
-    public java.util.Map<String, Object> getIndicadoresRecolector(Date startDate, Date endDate) {
+    public List<java.util.Map<String, Object>> getIndicadoresRecolector(Date startDate, Date endDate) {
         String dateFilter = "";
         if (startDate != null && endDate != null) {
             dateFilter = " WHERE d.fecha_declaracion BETWEEN :startDate AND :endDate";
@@ -125,25 +125,25 @@ public class ReportRepository {
             dateFilter = " WHERE d.fecha_declaracion <= :endDate";
         }
 
-        String sql = "SELECT " +
+        String sql = "SELECT DATE(d.fecha_declaracion) as fecha, " +
             "COUNT(d.id) as decDiarias, " +
             "COALESCE(SUM(d.desembarque), 0) as totDiario " +
-            "FROM declaracion_recolector d" + dateFilter;
+            "FROM declaracion_recolector d" + dateFilter + " " +
+            "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
         
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
 
-        Object[] result = (Object[]) query.getSingleResult();
+        List<Object[]> results = query.getResultList();
         
-        java.util.Map<String, Object> map = new java.util.HashMap<>();
-        map.put("declaracionesDiarias", result[0] != null ? ((Number) result[0]).longValue() : 0);
-        map.put("totalDiario", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
-        map.put("declaracionesSemanales", 0L); // Mantenemos compatibilidad con el DTO viejo
-        map.put("totalSemanal", 0.0);
-        map.put("totalMensual", 0.0);
-        
-        return map;
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("fecha", row[0] != null ? row[0].toString() : "");
+            map.put("declaracionesDiarias", row[1] != null ? ((Number) row[1]).longValue() : 0);
+            map.put("totalDiario", row[2] != null ? ((Number) row[2]).doubleValue() : 0.0);
+            return map;
+        }).collect(Collectors.toList());
     }
 
     public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
