@@ -24,7 +24,7 @@ import com.trazalga.api.services.CuotaExtraccionService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/cuotas")
+@RequestMapping("/api/cuotas")
 public class CuotaExtraccionController {
 
     @Autowired
