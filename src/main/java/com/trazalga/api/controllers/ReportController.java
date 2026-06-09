@@ -60,6 +60,19 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/extraccion-veda-detalle")
+    public ResponseEntity<?> getExtraccionVedaDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getExtraccionVedaDetalle(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de veda: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/resumen-global")
     public ResponseEntity<?> getResumenGlobal(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,

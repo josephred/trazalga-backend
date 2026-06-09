@@ -189,6 +189,59 @@ public class ReportRepository {
         return map;
     }
 
+    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT decl.id, decl.tipo_perfil, decl.fecha_declaracion, decl.desembarque, " +
+            "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop " +
+            "FROM (" +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'AREA' as tipo_perfil FROM declaracion_area " +
+            ") as decl " +
+            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+            "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
+            "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+            "WHERE 1=1" + dateFilter + " ORDER BY decl.fecha_declaracion DESC";
+        
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> results = query.getResultList();
+        
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", row[0]);
+            map.put("perfil", row[1]);
+            
+            Date dateVal = null;
+            if (row[2] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[2]).getTime());
+            } else if (row[2] instanceof Date) {
+                dateVal = (Date) row[2];
+            }
+            map.put("fecha", dateVal);
+            map.put("kg", row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+            map.put("especie", row[4]);
+            
+            String nombreActor = (row[6] != null ? row[6].toString() : "") + " " + (row[7] != null ? row[7].toString() : "");
+            map.put("actor", row[5] + " - " + nombreActor.trim());
+            
+            return map;
+        }).collect(Collectors.toList());
+    }
+
     public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
         String dateFilter = "";
         if (startDate != null && endDate != null) {
