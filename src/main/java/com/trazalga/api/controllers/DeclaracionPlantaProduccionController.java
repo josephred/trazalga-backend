@@ -16,7 +16,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/declaracion-planta-produccion")
 @Tag(name = "Planta - Producción", description = "Operaciones para las declaraciones de producción de la planta")
-@CrossOrigin(origins = "*")
 public class DeclaracionPlantaProduccionController {
 
     @Autowired
