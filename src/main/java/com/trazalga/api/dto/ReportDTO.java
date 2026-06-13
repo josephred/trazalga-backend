@@ -31,4 +31,8 @@ public class ReportDTO {
     private Date fechaComercializador;
     private String plantaProduccion;
     private Date fechaPlantaAbastecimiento;
+    
+    // Campos extra para trazabilidad
+    private String composicion;
+    private String estadoHumedad;
 }

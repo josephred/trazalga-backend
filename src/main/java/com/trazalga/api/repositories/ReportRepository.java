@@ -48,11 +48,26 @@ public class ReportRepository {
             sql.append(", NULL as p_abast_nombres, NULL as p_abast_rut, NULL as fecha_comercializador ");
             sql.append(", NULL as p_prod_nombres, NULL as p_prod_rut, NULL as fecha_planta_abast ");
         }
+        
+        if (tipoReporte >= 1 && tipoReporte <= 5) {
+            sql.append(", c.nombre as composicion_nombre, h.nombre as humedad_nombre ");
+        } else if (tipoReporte == 6) {
+            sql.append(", NULL as composicion_nombre, h.nombre as humedad_nombre ");
+        } else {
+            sql.append(", NULL as composicion_nombre, NULL as humedad_nombre ");
+        }
 
         sql.append("FROM ").append(tableName).append(" d ");
         sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
         sql.append("LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id ");
         sql.append("INNER JOIN especie e ON d.especie_id = e.id ");
+
+        if (tipoReporte >= 1 && tipoReporte <= 5) {
+            sql.append("LEFT JOIN composicion c ON d.composicion_id = c.id ");
+            sql.append("LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id ");
+        } else if (tipoReporte == 6) {
+            sql.append("LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id ");
+        }
 
         if (tipoReporte == 1) {
             sql.append("LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id ");
@@ -125,6 +140,8 @@ public class ReportRepository {
                     .fechaComercializador(fechaComercializador)
                     .plantaProduccion(pProdCompleto)
                     .fechaPlantaAbastecimiento(fechaPlantaAbast)
+                    .composicion(row.length > 21 && row[21] != null ? row[21].toString() : null)
+                    .estadoHumedad(row.length > 22 && row[22] != null ? row[22].toString() : null)
                     .build();
         }).collect(Collectors.toList());
     }
