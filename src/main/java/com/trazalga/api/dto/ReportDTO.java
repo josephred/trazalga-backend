@@ -35,4 +35,6 @@ public class ReportDTO {
     // Campos extra para trazabilidad
     private String composicion;
     private String estadoHumedad;
+    private Double latitud;
+    private Double longitud;
 }

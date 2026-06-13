@@ -56,6 +56,8 @@ public class ReportRepository {
         } else {
             sql.append(", NULL as composicion_nombre, NULL as humedad_nombre ");
         }
+        
+        sql.append(", d.latitud, d.longitud ");
 
         sql.append("FROM ").append(tableName).append(" d ");
         sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
@@ -142,6 +144,8 @@ public class ReportRepository {
                     .fechaPlantaAbastecimiento(fechaPlantaAbast)
                     .composicion(row.length > 21 && row[21] != null ? row[21].toString() : null)
                     .estadoHumedad(row.length > 22 && row[22] != null ? row[22].toString() : null)
+                    .latitud(row.length > 23 && row[23] != null ? ((Number) row[23]).doubleValue() : null)
+                    .longitud(row.length > 24 && row[24] != null ? ((Number) row[24]).doubleValue() : null)
                     .build();
         }).collect(Collectors.toList());
     }
