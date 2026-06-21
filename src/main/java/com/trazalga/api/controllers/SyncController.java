@@ -68,4 +68,10 @@ public class SyncController {
     public SyncResult syncAmerbs() {
         return syncService.syncAmerbs();
     }
+
+    @PostMapping("/plantas")
+    @Operation(summary = "Pobla plantas (destinatarios tipo planta, itera por región)")
+    public SyncResult syncPlantas() {
+        return syncService.syncPlantas();
+    }
 }

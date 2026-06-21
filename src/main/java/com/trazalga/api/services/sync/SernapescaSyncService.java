@@ -16,6 +16,7 @@ import com.trazalga.api.dto.sernapesca.AmIdentificacionDto;
 import com.trazalga.api.dto.sernapesca.CaletaDto;
 import com.trazalga.api.dto.sernapesca.ComboIntDto;
 import com.trazalga.api.dto.sernapesca.ComunaTreeDto;
+import com.trazalga.api.dto.sernapesca.DestinatarioDto;
 import com.trazalga.api.dto.sernapesca.EmbarcacionDto;
 import com.trazalga.api.dto.sernapesca.MetodoRecoleccionDto;
 import com.trazalga.api.dto.sernapesca.PescadorDto;
@@ -28,6 +29,7 @@ import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.EmbarcacionModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.ExtraccionTipoModel;
+import com.trazalga.api.models.PlantaModel;
 import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.repositories.IAmerbRepository;
 import com.trazalga.api.repositories.IBuzoRepository;
@@ -36,6 +38,7 @@ import com.trazalga.api.repositories.IComunaRepository;
 import com.trazalga.api.repositories.IEmbarcacionRepository;
 import com.trazalga.api.repositories.IEspecieRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
+import com.trazalga.api.repositories.IPlantaRepository;
 import com.trazalga.api.repositories.IRegionRepository;
 
 /**
@@ -57,11 +60,13 @@ public class SernapescaSyncService {
     private final IEmbarcacionRepository embarcacionRepo;
     private final IBuzoRepository buzoRepo;
     private final IAmerbRepository amerbRepo;
+    private final IPlantaRepository plantaRepo;
 
     public SernapescaSyncService(SernapescaApiClient api,
             IRegionRepository regionRepo, IComunaRepository comunaRepo, ICaletaRepository caletaRepo,
             IEspecieRepository especieRepo, IExtraccionTipoRepository extraccionTipoRepo,
-            IEmbarcacionRepository embarcacionRepo, IBuzoRepository buzoRepo, IAmerbRepository amerbRepo) {
+            IEmbarcacionRepository embarcacionRepo, IBuzoRepository buzoRepo, IAmerbRepository amerbRepo,
+            IPlantaRepository plantaRepo) {
         this.api = api;
         this.regionRepo = regionRepo;
         this.comunaRepo = comunaRepo;
@@ -71,6 +76,7 @@ public class SernapescaSyncService {
         this.embarcacionRepo = embarcacionRepo;
         this.buzoRepo = buzoRepo;
         this.amerbRepo = amerbRepo;
+        this.plantaRepo = plantaRepo;
     }
 
     // ------------------------------------------------------------------
@@ -86,6 +92,7 @@ public class SernapescaSyncService {
         results.add(syncEmbarcaciones());
         results.add(syncBuzos());
         results.add(syncAmerbs());
+        results.add(syncPlantas());
         // Sin fuente conocida en el API de Sernapesca:
         results.add(SyncResult.error("composicion",
                 "No existe un endpoint equivalente en el API de Sernapesca. Poblar manualmente."));
@@ -358,6 +365,44 @@ public class SernapescaSyncService {
         }
         amerbRepo.saveAll(nuevas);
         return SyncResult.builder().entidad("amerb").ok(true)
+                .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
+    }
+
+    // ------------------------------------------------------------------
+    // Plantas (destinatarios tipo planta)
+    // ------------------------------------------------------------------
+
+    @Transactional
+    public SyncResult syncPlantas() {
+        Set<Long> existentes = new HashSet<>();
+        for (PlantaModel p : plantaRepo.findAll()) {
+            existentes.add(p.getId());
+        }
+        List<PlantaModel> nuevas = new ArrayList<>();
+        int obt = 0, ins = 0, omit = 0;
+        for (Integer cod : codigosRegiones()) {
+            for (DestinatarioDto d : api.getPlantasPorRegion(cod)) {
+                obt++;
+                if (d.getCdDestinatario() == null || isBlank(d.getNombre())) {
+                    omit++;
+                    continue;
+                }
+                Long id = d.getCdDestinatario().longValue();
+                if (!existentes.add(id)) {
+                    omit++;
+                    continue;
+                }
+                nuevas.add(new PlantaModel()
+                        .setId(id)
+                        .setCodigo(d.getCdDestinatario())
+                        .setRut(d.getRut())
+                        .setNombre(d.getNombre().trim())
+                        .setDireccion(d.getDireccion() != null ? d.getDireccion().trim() : null));
+                ins++;
+            }
+        }
+        plantaRepo.saveAll(nuevas);
+        return SyncResult.builder().entidad("planta").ok(true)
                 .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
     }
 

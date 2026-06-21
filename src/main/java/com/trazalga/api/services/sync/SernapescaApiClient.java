@@ -15,6 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.trazalga.api.dto.sernapesca.AmIdentificacionDto;
 import com.trazalga.api.dto.sernapesca.ComboIntDto;
+import com.trazalga.api.dto.sernapesca.DestinatarioDto;
 import com.trazalga.api.dto.sernapesca.EmbarcacionDto;
 import com.trazalga.api.dto.sernapesca.MetodoRecoleccionDto;
 import com.trazalga.api.dto.sernapesca.PescadorDto;
@@ -98,6 +99,13 @@ public class SernapescaApiClient {
                 .queryParam("rpaArmador", rpaArmador)
                 .queryParam("tipoArmador", tipoArmador).toUriString();
         return getList(url, new ParameterizedTypeReference<SernapescaResponse<EmbarcacionDto>>() {});
+    }
+
+    /** Plantas (destinatarios) por código de región. */
+    public List<DestinatarioDto> getPlantasPorRegion(int cdRegion) {
+        String url = UriComponentsBuilder.fromPath("/destinatarios/planta/por-region")
+                .queryParam("codigoRegion", cdRegion).toUriString();
+        return getList(url, new ParameterizedTypeReference<SernapescaResponse<DestinatarioDto>>() {});
     }
 
     private <T> List<T> getList(String path, ParameterizedTypeReference<SernapescaResponse<T>> typeRef) {
