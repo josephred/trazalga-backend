@@ -230,7 +230,12 @@ public class SernapescaSyncService {
         }
         List<EspecieModel> nuevas = new ArrayList<>();
         int ins = 0, omit = 0;
+        Set<Integer> permitidos = Set.of(50, 70, 71, 72);
+        
         for (ComboIntDto es : especies) {
+            if (es.getCodigo() == null || !permitidos.contains(es.getCodigo())) {
+                continue;
+            }
             if (isBlank(es.getValor())) {
                 continue;
             }
