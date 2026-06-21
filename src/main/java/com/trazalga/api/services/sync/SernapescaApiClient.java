@@ -20,6 +20,7 @@ import com.trazalga.api.dto.sernapesca.MetodoRecoleccionDto;
 import com.trazalga.api.dto.sernapesca.PescadorDto;
 import com.trazalga.api.dto.sernapesca.RegionTreeDto;
 import com.trazalga.api.dto.sernapesca.SernapescaResponse;
+import com.trazalga.api.dto.sernapesca.SernapescaSingleResponse;
 
 /**
  * Cliente del API público de Sernapesca (https://data-api.sernapesca.cl).
@@ -84,6 +85,21 @@ public class SernapescaApiClient {
         return getList(url, new ParameterizedTypeReference<SernapescaResponse<AmIdentificacionDto>>() {});
     }
 
+    /** Obtiene Pescador por RUT (sin dígito verificador). */
+    public PescadorDto getPescadorPorRut(Integer rut) {
+        String url = UriComponentsBuilder.fromPath("/pescadores/buscar")
+                .queryParam("rut", rut).toUriString();
+        return getObject(url, new ParameterizedTypeReference<SernapescaSingleResponse<PescadorDto>>() {});
+    }
+
+    /** Obtiene Embarcaciones de un armador por Folio RPA. */
+    public List<EmbarcacionDto> getEmbarcacionesPorArmador(Integer rpaArmador, String tipoArmador) {
+        String url = UriComponentsBuilder.fromPath("/embarcacion/por-armador")
+                .queryParam("rpaArmador", rpaArmador)
+                .queryParam("tipoArmador", tipoArmador).toUriString();
+        return getList(url, new ParameterizedTypeReference<SernapescaResponse<EmbarcacionDto>>() {});
+    }
+
     private <T> List<T> getList(String path, ParameterizedTypeReference<SernapescaResponse<T>> typeRef) {
         String url = baseUrl + path;
         try {
@@ -97,6 +113,22 @@ public class SernapescaApiClient {
         } catch (Exception e) {
             log.warn("Error consultando Sernapesca {}: {}", url, e.getMessage());
             return Collections.emptyList();
+        }
+    }
+
+    private <T> T getObject(String path, ParameterizedTypeReference<SernapescaSingleResponse<T>> typeRef) {
+        String url = baseUrl + path;
+        try {
+            ResponseEntity<SernapescaSingleResponse<T>> response = restTemplate.exchange(
+                    url, HttpMethod.GET, null, typeRef);
+            SernapescaSingleResponse<T> body = response.getBody();
+            if (body == null || body.getData() == null) {
+                return null;
+            }
+            return body.getData();
+        } catch (Exception e) {
+            log.warn("Error consultando Sernapesca {}: {}", url, e.getMessage());
+            return null;
         }
     }
 }
