@@ -462,7 +462,10 @@ public class SernapescaSyncService {
     }
 
     private static String norm(String s) {
-        return s == null ? "" : s.trim().toUpperCase();
+        if (s == null) return "";
+        String n = s.trim().toUpperCase();
+        n = java.text.Normalizer.normalize(n, java.text.Normalizer.Form.NFD);
+        return n.replaceAll("\\p{M}", "");
     }
 
     private static boolean isBlank(String s) {
