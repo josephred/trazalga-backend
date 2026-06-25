@@ -9,13 +9,13 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.Arrays;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
+import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 
 @Service
 public class DeclaracionPlantaAbastecimientoService {
@@ -75,12 +75,9 @@ public class DeclaracionPlantaAbastecimientoService {
     }
 
     private void marcarDeclaracionesComoConsumidas(String idsCSV, Long consumidaPorId, String tipo, Long usuarioDestinatarioId) {
-        List<Long> ids = Arrays.stream(idsCSV.split(","))
-                               .map(String::trim)
-                               .filter(s -> !s.isEmpty())
-                               .map(Long::valueOf)
-                               .collect(Collectors.toList());
-        
+        Map<String, List<Long>> sel = SeleccionTokens.parse(idsCSV);
+        List<Long> ids = SeleccionTokens.idsParaTipo(sel, "COMERCIALIZADOR");
+
         if (ids.isEmpty()) return;
 
         List<DeclaracionComercializadorModel> comercializadores = comercializadorRepository.findAllById(ids);
