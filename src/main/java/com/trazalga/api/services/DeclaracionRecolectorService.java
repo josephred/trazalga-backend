@@ -57,28 +57,28 @@ public class DeclaracionRecolectorService {
 
     private void resolveDependencies(DeclaracionRecolectorModel model) {
         if (model.getUsuario() != null && model.getUsuario().getId() != null) {
-            model.setUsuario(entityManager.getReference(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
+            model.setUsuario(entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
         }
         if (model.getCaleta() != null && model.getCaleta().getId() != null) {
-            model.setCaleta(entityManager.getReference(com.trazalga.api.models.CaletaModel.class, model.getCaleta().getId()));
+            model.setCaleta(entityManager.find(com.trazalga.api.models.CaletaModel.class, model.getCaleta().getId()));
         }
         if (model.getEspecie() != null && model.getEspecie().getId() != null) {
-            model.setEspecie(entityManager.getReference(com.trazalga.api.models.EspecieModel.class, model.getEspecie().getId()));
+            model.setEspecie(entityManager.find(com.trazalga.api.models.EspecieModel.class, model.getEspecie().getId()));
         }
         if (model.getComuna() != null && model.getComuna().getId() != null) {
-            model.setComuna(entityManager.getReference(com.trazalga.api.models.ComunaModel.class, model.getComuna().getId()));
+            model.setComuna(entityManager.find(com.trazalga.api.models.ComunaModel.class, model.getComuna().getId()));
         }
         if (model.getExtraccionTipo() != null && model.getExtraccionTipo().getId() != null) {
-            model.setExtraccionTipo(entityManager.getReference(com.trazalga.api.models.ExtraccionTipoModel.class, model.getExtraccionTipo().getId()));
+            model.setExtraccionTipo(entityManager.find(com.trazalga.api.models.ExtraccionTipoModel.class, model.getExtraccionTipo().getId()));
         }
         if (model.getComposicion() != null && model.getComposicion().getId() != null) {
-            model.setComposicion(entityManager.getReference(com.trazalga.api.models.ComposicionModel.class, model.getComposicion().getId()));
+            model.setComposicion(entityManager.find(com.trazalga.api.models.ComposicionModel.class, model.getComposicion().getId()));
         }
         if (model.getHumedadEstado() != null && model.getHumedadEstado().getId() != null) {
-            model.setHumedadEstado(entityManager.getReference(com.trazalga.api.models.HumedadEstadoModel.class, model.getHumedadEstado().getId()));
+            model.setHumedadEstado(entityManager.find(com.trazalga.api.models.HumedadEstadoModel.class, model.getHumedadEstado().getId()));
         }
         if (model.getUsuarioDestinatario() != null && model.getUsuarioDestinatario().getId() != null) {
-            model.setUsuarioDestinatario(entityManager.getReference(com.trazalga.api.models.UsuarioModel.class, model.getUsuarioDestinatario().getId()));
+            model.setUsuarioDestinatario(entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuarioDestinatario().getId()));
         }
     }
 
