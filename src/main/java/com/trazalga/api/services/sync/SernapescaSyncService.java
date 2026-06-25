@@ -248,7 +248,7 @@ public class SernapescaSyncService {
         }
         List<EspecieModel> nuevas = new ArrayList<>();
         int ins = 0, omit = 0;
-        Set<Integer> permitidos = Set.of(50, 70, 71, 72);
+        Set<Integer> permitidos = Set.of(145, 141, 142, 110, 130, 150, 138, 137, 136, 122, 125, 120, 116, 115, 165, 225);
         
         for (ComboIntDto es : especies) {
             if (es.getCodigo() == null || !permitidos.contains(es.getCodigo())) {
@@ -264,6 +264,16 @@ public class SernapescaSyncService {
                 omit++;
             }
         }
+        
+        // Garantizar que "Huiro Palo" sea el primer elemento guardado para que obtenga ID 1
+        nuevas.sort((a, b) -> {
+            boolean aIsHuiroPalo = a.getNombre().toUpperCase().contains("HUIRO PALO");
+            boolean bIsHuiroPalo = b.getNombre().toUpperCase().contains("HUIRO PALO");
+            if (aIsHuiroPalo && !bIsHuiroPalo) return -1;
+            if (!aIsHuiroPalo && bIsHuiroPalo) return 1;
+            return a.getNombre().compareTo(b.getNombre());
+        });
+        
         especieRepo.saveAll(nuevas);
         return SyncResult.builder().entidad("especie").ok(true)
                 .obtenidos(especies.size()).insertados(ins).actualizados(0).omitidos(omit).build();
