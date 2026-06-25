@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +62,10 @@ public class SernapescaSyncService {
     private final IBuzoRepository buzoRepo;
     private final IAmerbRepository amerbRepo;
     private final IPlantaRepository plantaRepo;
+
+    /** Códigos de región (CSV) a sincronizar para buzos. Por defecto solo la 4 (Coquimbo). */
+    @Value("${trazalga.sync.buzos.regiones:4}")
+    private String regionesBuzosCsv;
 
     public SernapescaSyncService(SernapescaApiClient api,
             IRegionRepository regionRepo, IComunaRepository comunaRepo, ICaletaRepository caletaRepo,
@@ -325,15 +330,18 @@ public class SernapescaSyncService {
     public SyncResult syncBuzos() {
         Set<String> codigos = new HashSet<>();
         Set<String> nombres = new HashSet<>();
+        Map<String, BuzoModel> existentePorCodigo = new HashMap<>();
         for (BuzoModel b : buzoRepo.findAll()) {
             if (b.getCodigo() != null) {
                 codigos.add(b.getCodigo());
+                existentePorCodigo.put(b.getCodigo(), b);
             }
             nombres.add(norm(b.getNombre()));
         }
         List<BuzoModel> nuevos = new ArrayList<>();
-        int obt = 0, ins = 0, omit = 0;
-        for (Integer cod : codigosRegiones()) {
+        List<BuzoModel> actualizados = new ArrayList<>();
+        int obt = 0, ins = 0, act = 0, omit = 0;
+        for (Integer cod : regionesBuzos()) {
             for (PescadorDto d : api.getRecolectoresPorRegion(cod)) {
                 obt++;
                 String codigo = !isBlank(d.getRutCompleto()) ? d.getRutCompleto().trim()
@@ -344,16 +352,46 @@ public class SernapescaSyncService {
                 }
                 String nombre = d.getNombreCompleto().trim();
                 if (!codigos.add(codigo) || !nombres.add(norm(nombre))) {
-                    omit++;
+                    // Ya existe: etiquetar su región si aún no la tiene (para filas previas sin región).
+                    BuzoModel existente = existentePorCodigo.get(codigo);
+                    if (existente != null && existente.getCodigoRegion() == null) {
+                        existente.setCodigoRegion(cod);
+                        actualizados.add(existente);
+                        act++;
+                    } else {
+                        omit++;
+                    }
                     continue;
                 }
-                nuevos.add(new BuzoModel().setNombre(nombre).setCodigo(codigo));
+                nuevos.add(new BuzoModel().setNombre(nombre).setCodigo(codigo).setCodigoRegion(cod));
                 ins++;
             }
         }
         buzoRepo.saveAll(nuevos);
+        buzoRepo.saveAll(actualizados);
         return SyncResult.builder().entidad("buzo").ok(true)
-                .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
+                .obtenidos(obt).insertados(ins).actualizados(act).omitidos(omit).build();
+    }
+
+    /** Códigos de región a sincronizar para buzos (configurable; por defecto solo la 4). */
+    private List<Integer> regionesBuzos() {
+        List<Integer> out = new ArrayList<>();
+        if (regionesBuzosCsv != null) {
+            for (String s : regionesBuzosCsv.split(",")) {
+                String t = s.trim();
+                if (!t.isEmpty()) {
+                    try {
+                        out.add(Integer.parseInt(t));
+                    } catch (NumberFormatException e) {
+                        log.warn("Código de región inválido en trazalga.sync.buzos.regiones: '{}'", t);
+                    }
+                }
+            }
+        }
+        if (out.isEmpty()) {
+            out.add(4);
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------

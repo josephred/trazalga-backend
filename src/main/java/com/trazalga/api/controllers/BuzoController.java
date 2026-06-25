@@ -1,6 +1,7 @@
 package com.trazalga.api.controllers;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,12 @@ public class BuzoController {
     public ArrayList<BuzoModel> getBuzos(){
         return this.buzoService.getBuzos();
     }
-    
+
+    @GetMapping(path = "/por-region/{codigo}")
+    public List<BuzoModel> getBuzosPorRegion(@PathVariable("codigo") Integer codigo){
+        return this.buzoService.getByRegion(codigo);
+    }
+
     @PostMapping
     public BuzoModel saveBuzo(@RequestBody BuzoModel buzo) {       
         return this.buzoService.saveBuzo(buzo);

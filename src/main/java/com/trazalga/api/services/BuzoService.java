@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -20,7 +21,11 @@ public class BuzoService {
 
        public ArrayList<BuzoModel> getBuzos(){
         return (ArrayList<BuzoModel>) buzoRepository.findAll();
-    } 
+    }
+
+    public List<BuzoModel> getByRegion(Integer codigoRegion){
+        return buzoRepository.findByCodigoRegion(codigoRegion);
+    }
 
     public BuzoModel saveBuzo(BuzoModel buzo){
         return buzoRepository.save(buzo);

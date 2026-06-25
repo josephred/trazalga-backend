@@ -23,4 +23,8 @@ public class BuzoModel {
 
     @Column(nullable = true, length = 50, unique = true)
     private String codigo;
+
+    /** Código de región Sernapesca al que pertenece el buzo (ej. 4 = Coquimbo). */
+    @Column(name = "codigo_region", nullable = true)
+    private Integer codigoRegion;
 }
