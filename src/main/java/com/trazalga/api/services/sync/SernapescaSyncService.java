@@ -113,13 +113,13 @@ public class SernapescaSyncService {
         for (RegionModel r : regionRepo.findAll()) {
             regionByName.put(norm(r.getNombre()), r);
         }
-        Set<String> comunaKeys = new HashSet<>();
+        Map<String, ComunaModel> comunaByKey = new HashMap<>();
         for (ComunaModel c : comunaRepo.findAll()) {
-            comunaKeys.add(comunaKey(c.getNombre(), c.getRegion() != null ? c.getRegion().getId() : null));
+            comunaByKey.put(comunaKey(c.getNombre(), c.getRegion() != null ? c.getRegion().getId() : null), c);
         }
-        Set<String> caletaKeys = new HashSet<>();
+        Map<String, CaletaModel> caletaByKey = new HashMap<>();
         for (CaletaModel c : caletaRepo.findAll()) {
-            caletaKeys.add(comunaKey(c.getNombre(), c.getRegion() != null ? c.getRegion().getId() : null));
+            caletaByKey.put(comunaKey(c.getNombre(), c.getRegion() != null ? c.getRegion().getId() : null), c);
         }
 
         int regObt = 0, regIns = 0, regOmit = 0;
@@ -149,8 +149,11 @@ public class SernapescaSyncService {
                 if (!isBlank(ct.getNombreComuna())) {
                     comObt++;
                     String ck = comunaKey(ct.getNombreComuna(), region.getId());
-                    if (comunaKeys.add(ck)) {
-                        nuevasComunas.add(new ComunaModel().setNombre(ct.getNombreComuna().trim()).setRegion(region));
+                    ComunaModel comuna = comunaByKey.get(ck);
+                    if (comuna == null) {
+                        comuna = new ComunaModel().setNombre(ct.getNombreComuna().trim()).setRegion(region);
+                        nuevasComunas.add(comuna);
+                        comunaByKey.put(ck, comuna);
                         comIns++;
                     } else {
                         comOmit++;
@@ -165,11 +168,26 @@ public class SernapescaSyncService {
                     }
                     calObt++;
                     String calKey = comunaKey(cal.getNombreCaleta(), region.getId());
-                    if (caletaKeys.add(calKey)) {
-                        nuevasCaletas.add(new CaletaModel().setNombre(cal.getNombreCaleta().trim()).setRegion(region));
+                    CaletaModel caleta = caletaByKey.get(calKey);
+                    
+                    ComunaModel comuna = null;
+                    if (!isBlank(ct.getNombreComuna())) {
+                        String ck = comunaKey(ct.getNombreComuna(), region.getId());
+                        comuna = comunaByKey.get(ck);
+                    }
+
+                    if (caleta == null) {
+                        caleta = new CaletaModel().setNombre(cal.getNombreCaleta().trim()).setRegion(region).setComuna(comuna);
+                        nuevasCaletas.add(caleta);
+                        caletaByKey.put(calKey, caleta);
                         calIns++;
                     } else {
-                        calOmit++;
+                        if (caleta.getComuna() == null && comuna != null) {
+                            caleta.setComuna(comuna);
+                            nuevasCaletas.add(caleta);
+                        } else {
+                            calOmit++;
+                        }
                     }
                 }
             }
