@@ -32,4 +32,12 @@ public class CaletaModel {
     @JoinColumn(name = "region_id") // Nombre de la columna que almacenará la clave foránea
     private RegionModel region;
 
+    @ManyToOne
+    @JoinColumn(name = "comuna_id")
+    private ComunaModel comuna;
+
+    @ManyToOne
+    @JoinColumn(name = "varadero_id")
+    private VaraderoModel varadero;
+
 }
