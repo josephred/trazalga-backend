@@ -52,9 +52,40 @@ public class DeclaracionRecolectorService {
     @Autowired
     private AlertaTriggerService alertaTriggerService;
 
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
+    private void resolveDependencies(DeclaracionRecolectorModel model) {
+        if (model.getUsuario() != null && model.getUsuario().getId() != null) {
+            model.setUsuario(entityManager.getReference(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
+        }
+        if (model.getCaleta() != null && model.getCaleta().getId() != null) {
+            model.setCaleta(entityManager.getReference(com.trazalga.api.models.CaletaModel.class, model.getCaleta().getId()));
+        }
+        if (model.getEspecie() != null && model.getEspecie().getId() != null) {
+            model.setEspecie(entityManager.getReference(com.trazalga.api.models.EspecieModel.class, model.getEspecie().getId()));
+        }
+        if (model.getComuna() != null && model.getComuna().getId() != null) {
+            model.setComuna(entityManager.getReference(com.trazalga.api.models.ComunaModel.class, model.getComuna().getId()));
+        }
+        if (model.getExtraccionTipo() != null && model.getExtraccionTipo().getId() != null) {
+            model.setExtraccionTipo(entityManager.getReference(com.trazalga.api.models.ExtraccionTipoModel.class, model.getExtraccionTipo().getId()));
+        }
+        if (model.getComposicion() != null && model.getComposicion().getId() != null) {
+            model.setComposicion(entityManager.getReference(com.trazalga.api.models.ComposicionModel.class, model.getComposicion().getId()));
+        }
+        if (model.getHumedadEstado() != null && model.getHumedadEstado().getId() != null) {
+            model.setHumedadEstado(entityManager.getReference(com.trazalga.api.models.HumedadEstadoModel.class, model.getHumedadEstado().getId()));
+        }
+        if (model.getUsuarioDestinatario() != null && model.getUsuarioDestinatario().getId() != null) {
+            model.setUsuarioDestinatario(entityManager.getReference(com.trazalga.api.models.UsuarioModel.class, model.getUsuarioDestinatario().getId()));
+        }
+    }
+
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
+        resolveDependencies(declaracionRecolectorModel);
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
 
         // Guardar buzos
@@ -96,6 +127,7 @@ public class DeclaracionRecolectorService {
         if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        resolveDependencies(request);
         declaracionRecolectorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionRecolectorModel.setFolioDesembarqueRo(request.getFolioDesembarqueRo());
         declaracionRecolectorModel.setFechaExtraccion(request.getFechaExtraccion());
