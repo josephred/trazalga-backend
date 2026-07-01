@@ -88,21 +88,57 @@ public class DeclaracionArmadorService {
         declaracion.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracion.setHora(request.getHora());
         
-        if (request.getEmbarcacion() == null || request.getEmbarcacion().getId() == null) {
+        if (request.getEmbarcacion() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
-        EmbarcacionModel embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe."));
+        EmbarcacionModel embarcacion = null;
+        if (request.getEmbarcacion().getId() != null) {
+            embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId()).orElse(null);
+        }
+        if (embarcacion == null && request.getEmbarcacion().getCodigo() != null) {
+            embarcacion = embarcacionRepository.findByCodigo(request.getEmbarcacion().getCodigo()).orElse(null);
+        }
+        if (embarcacion == null && request.getEmbarcacion().getId() != null) {
+            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
+        }
+        if (embarcacion == null) {
+            if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
+                EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
+                nuevaEmbarcacion.setNombre(request.getEmbarcacion().getNombre());
+                nuevaEmbarcacion.setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+                embarcacion = embarcacionRepository.save(nuevaEmbarcacion);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe en la base de datos local.");
+            }
+        }
         declaracion.setEmbarcacion(embarcacion);
-        declaracion.setCodigoSernapescaEmbarcacion(embarcacion.getCodigo() != null ? embarcacion.getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+        declaracion.setCodigoSernapescaEmbarcacion(embarcacion.getCodigo() != null ? embarcacion.getCodigo() : String.valueOf(embarcacion.getId()));
         
-        if (request.getBuzo() == null || request.getBuzo().getId() == null) {
+        if (request.getBuzo() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
         }
-        BuzoModel buzo = buzoRepository.findById(request.getBuzo().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe."));
+        BuzoModel buzo = null;
+        if (request.getBuzo().getId() != null) {
+            buzo = buzoRepository.findById(request.getBuzo().getId()).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getCodigo() != null) {
+            buzo = buzoRepository.findByCodigo(request.getBuzo().getCodigo()).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getId() != null) {
+            buzo = buzoRepository.findByCodigo(String.valueOf(request.getBuzo().getId())).orElse(null);
+        }
+        if (buzo == null) {
+            if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
+                BuzoModel nuevoBuzo = new BuzoModel();
+                nuevoBuzo.setNombre(request.getBuzo().getNombre());
+                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo() : String.valueOf(request.getBuzo().getId()));
+                buzo = buzoRepository.save(nuevoBuzo);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe en la base de datos local.");
+            }
+        }
         declaracion.setBuzo(buzo);
-        declaracion.setCodigoSernapescaBuzo(buzo.getCodigo() != null ? buzo.getCodigo() : String.valueOf(request.getBuzo().getId()));
+        declaracion.setCodigoSernapescaBuzo(buzo.getCodigo() != null ? buzo.getCodigo() : String.valueOf(buzo.getId()));
         
         declaracion.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracion.setCaptura(request.getCaptura());
@@ -161,15 +197,29 @@ public class DeclaracionArmadorService {
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
             PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil() : null;
             for (BuzoModel buzoRequest : request.getBuzos()) {
+                BuzoModel b = null;
                 if (buzoRequest.getId() != null) {
-                    Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
-                    buzoOpt.ifPresent(b -> {
-                        DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
-                        declaracionBuzo.setPerfil(perfil);
-                        declaracionBuzo.setBuzo(b);
-                        declaracionBuzo.setDeclaracionArmador(savedDeclaracion);
-                        declaracionBuzosRepository.save(declaracionBuzo);
-                    });
+                    b = buzoRepository.findById(buzoRequest.getId()).orElse(null);
+                }
+                if (b == null && buzoRequest.getCodigo() != null) {
+                    b = buzoRepository.findByCodigo(buzoRequest.getCodigo()).orElse(null);
+                }
+                if (b == null && buzoRequest.getId() != null) {
+                    b = buzoRepository.findByCodigo(String.valueOf(buzoRequest.getId())).orElse(null);
+                }
+                if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
+                    BuzoModel nuevoB = new BuzoModel();
+                    nuevoB.setNombre(buzoRequest.getNombre());
+                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo() : String.valueOf(buzoRequest.getId()));
+                    b = buzoRepository.save(nuevoB);
+                }
+                
+                if (b != null) {
+                    DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
+                    declaracionBuzo.setPerfil(perfil);
+                    declaracionBuzo.setBuzo(b);
+                    declaracionBuzo.setDeclaracionArmador(savedDeclaracion);
+                    declaracionBuzosRepository.save(declaracionBuzo);
                 }
             }
         }
@@ -215,18 +265,54 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracionArmadorModel.setHora(request.getHora());
         
-        if (request.getEmbarcacion() == null || request.getEmbarcacion().getId() == null) {
+        if (request.getEmbarcacion() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
-        EmbarcacionModel embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe."));
+        EmbarcacionModel embarcacion = null;
+        if (request.getEmbarcacion().getId() != null) {
+            embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId()).orElse(null);
+        }
+        if (embarcacion == null && request.getEmbarcacion().getCodigo() != null) {
+            embarcacion = embarcacionRepository.findByCodigo(request.getEmbarcacion().getCodigo()).orElse(null);
+        }
+        if (embarcacion == null && request.getEmbarcacion().getId() != null) {
+            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
+        }
+        if (embarcacion == null) {
+            if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
+                EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
+                nuevaEmbarcacion.setNombre(request.getEmbarcacion().getNombre());
+                nuevaEmbarcacion.setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+                embarcacion = embarcacionRepository.save(nuevaEmbarcacion);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe en la base de datos local.");
+            }
+        }
         declaracionArmadorModel.setEmbarcacion(embarcacion);
         
-        if (request.getBuzo() == null || request.getBuzo().getId() == null) {
+        if (request.getBuzo() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
         }
-        BuzoModel buzo = buzoRepository.findById(request.getBuzo().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe."));
+        BuzoModel buzo = null;
+        if (request.getBuzo().getId() != null) {
+            buzo = buzoRepository.findById(request.getBuzo().getId()).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getCodigo() != null) {
+            buzo = buzoRepository.findByCodigo(request.getBuzo().getCodigo()).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getId() != null) {
+            buzo = buzoRepository.findByCodigo(String.valueOf(request.getBuzo().getId())).orElse(null);
+        }
+        if (buzo == null) {
+            if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
+                BuzoModel nuevoBuzo = new BuzoModel();
+                nuevoBuzo.setNombre(request.getBuzo().getNombre());
+                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo() : String.valueOf(request.getBuzo().getId()));
+                buzo = buzoRepository.save(nuevoBuzo);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe en la base de datos local.");
+            }
+        }
         declaracionArmadorModel.setBuzo(buzo);
         
         declaracionArmadorModel.setDesembarque(parseBigDecimal(request.getDesembarque()));
@@ -283,15 +369,29 @@ public class DeclaracionArmadorService {
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
             PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil() : null;
             for (BuzoModel buzoRequest : request.getBuzos()) {
+                BuzoModel b = null;
                 if (buzoRequest.getId() != null) {
-                    Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
-                    buzoOpt.ifPresent(b -> {
-                        DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
-                        declaracionBuzo.setPerfil(perfil);
-                        declaracionBuzo.setBuzo(b);
-                        declaracionBuzo.setDeclaracionArmador(updatedDeclaracion);
-                        declaracionBuzosRepository.save(declaracionBuzo);
-                    });
+                    b = buzoRepository.findById(buzoRequest.getId()).orElse(null);
+                }
+                if (b == null && buzoRequest.getCodigo() != null) {
+                    b = buzoRepository.findByCodigo(buzoRequest.getCodigo()).orElse(null);
+                }
+                if (b == null && buzoRequest.getId() != null) {
+                    b = buzoRepository.findByCodigo(String.valueOf(buzoRequest.getId())).orElse(null);
+                }
+                if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
+                    BuzoModel nuevoB = new BuzoModel();
+                    nuevoB.setNombre(buzoRequest.getNombre());
+                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo() : String.valueOf(buzoRequest.getId()));
+                    b = buzoRepository.save(nuevoB);
+                }
+                
+                if (b != null) {
+                    DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
+                    declaracionBuzo.setPerfil(perfil);
+                    declaracionBuzo.setBuzo(b);
+                    declaracionBuzo.setDeclaracionArmador(updatedDeclaracion);
+                    declaracionBuzosRepository.save(declaracionBuzo);
                 }
             }
         }
