@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.trazalga.api.models.*;
 import com.trazalga.api.repositories.*;
@@ -73,10 +75,12 @@ public class DeclaracionArmadorService {
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
         
-        if (request.getUsuario() != null && request.getUsuario().getId() != null) {
-            Optional<UsuarioModel> usuario = usuarioRepository.findById(request.getUsuario().getId());
-            usuario.ifPresent(declaracion::setUsuario);
+        if (request.getUsuario() == null || request.getUsuario().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario es obligatorio.");
         }
+        UsuarioModel usuario = usuarioRepository.findById(request.getUsuario().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario especificado no existe."));
+        declaracion.setUsuario(usuario);
         
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
@@ -84,21 +88,21 @@ public class DeclaracionArmadorService {
         declaracion.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracion.setHora(request.getHora());
         
-        if (request.getEmbarcacion() != null && request.getEmbarcacion().getId() != null) {
-            Optional<EmbarcacionModel> embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId());
-            embarcacion.ifPresent(e -> {
-                declaracion.setEmbarcacion(e);
-                declaracion.setCodigoSernapescaEmbarcacion(e.getCodigo() != null ? e.getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
-            });
+        if (request.getEmbarcacion() == null || request.getEmbarcacion().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
+        EmbarcacionModel embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe."));
+        declaracion.setEmbarcacion(embarcacion);
+        declaracion.setCodigoSernapescaEmbarcacion(embarcacion.getCodigo() != null ? embarcacion.getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
         
-        if (request.getBuzo() != null && request.getBuzo().getId() != null) {
-            Optional<BuzoModel> buzo = buzoRepository.findById(request.getBuzo().getId());
-            buzo.ifPresent(b -> {
-                declaracion.setBuzo(b);
-                declaracion.setCodigoSernapescaBuzo(b.getCodigo() != null ? b.getCodigo() : String.valueOf(request.getBuzo().getId()));
-            });
+        if (request.getBuzo() == null || request.getBuzo().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
         }
+        BuzoModel buzo = buzoRepository.findById(request.getBuzo().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe."));
+        declaracion.setBuzo(buzo);
+        declaracion.setCodigoSernapescaBuzo(buzo.getCodigo() != null ? buzo.getCodigo() : String.valueOf(request.getBuzo().getId()));
         
         declaracion.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracion.setCaptura(request.getCaptura());
@@ -110,35 +114,43 @@ public class DeclaracionArmadorService {
         }
         declaracion.setCodigoDestinatario(codigoDestinatario);
         
-        if (request.getUsuarioDestinatario() != null && request.getUsuarioDestinatario().getId() != null) {
-            Optional<UsuarioModel> destinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId());
-            destinatario.ifPresent(declaracion::setUsuarioDestinatario);
+        if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario es obligatorio.");
         }
+        UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
+        declaracion.setUsuarioDestinatario(usuarioDestinatario);
         
-        if (request.getCaleta() != null && request.getCaleta().getId() != null) {
-            Optional<CaletaModel> caleta = caletaRepository.findById(request.getCaleta().getId());
-            caleta.ifPresent(declaracion::setCaleta);
+        if (request.getCaleta() == null || request.getCaleta().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");
         }
+        CaletaModel caleta = caletaRepository.findById(request.getCaleta().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+        declaracion.setCaleta(caleta);
         
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             Optional<ComunaModel> comuna = comunaRepository.findById(request.getComuna().getId());
             comuna.ifPresent(declaracion::setComuna);
         }
         
-        if (request.getEspecie() != null && request.getEspecie().getId() != null) {
-            Optional<EspecieModel> especie = especieRepository.findById(request.getEspecie().getId());
-            especie.ifPresent(declaracion::setEspecie);
+        if (request.getEspecie() == null || request.getEspecie().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie es obligatoria.");
         }
+        EspecieModel especie = especieRepository.findById(request.getEspecie().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie especificada no existe."));
+        declaracion.setEspecie(especie);
         
         if (request.getComposicion() != null && request.getComposicion().getId() != null) {
             Optional<ComposicionModel> composicion = composicionRepository.findById(request.getComposicion().getId());
             composicion.ifPresent(declaracion::setComposicion);
         }
         
-        if (request.getHumedadEstado() != null && request.getHumedadEstado().getId() != null) {
-            Optional<HumedadEstadoModel> humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId());
-            humedadEstado.ifPresent(declaracion::setHumedadEstado);
+        if (request.getHumedadEstado() == null || request.getHumedadEstado().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad es obligatorio.");
         }
+        HumedadEstadoModel humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad especificado no existe."));
+        declaracion.setHumedadEstado(humedadEstado);
         
         declaracion.setLatitud(request.getLatitud());
         declaracion.setLongitud(request.getLongitud());
@@ -151,10 +163,10 @@ public class DeclaracionArmadorService {
             for (BuzoModel buzoRequest : request.getBuzos()) {
                 if (buzoRequest.getId() != null) {
                     Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
-                    buzoOpt.ifPresent(buzo -> {
+                    buzoOpt.ifPresent(b -> {
                         DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
                         declaracionBuzo.setPerfil(perfil);
-                        declaracionBuzo.setBuzo(buzo);
+                        declaracionBuzo.setBuzo(b);
                         declaracionBuzo.setDeclaracionArmador(savedDeclaracion);
                         declaracionBuzosRepository.save(declaracionBuzo);
                     });
@@ -190,10 +202,12 @@ public class DeclaracionArmadorService {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
 
-        if (request.getUsuario() != null && request.getUsuario().getId() != null) {
-            Optional<UsuarioModel> usuario = usuarioRepository.findById(request.getUsuario().getId());
-            usuario.ifPresent(declaracionArmadorModel::setUsuario);
+        if (request.getUsuario() == null || request.getUsuario().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario es obligatorio.");
         }
+        UsuarioModel usuario = usuarioRepository.findById(request.getUsuario().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario especificado no existe."));
+        declaracionArmadorModel.setUsuario(usuario);
 
         declaracionArmadorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionArmadorModel.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
@@ -201,49 +215,61 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
         declaracionArmadorModel.setHora(request.getHora());
         
-        if (request.getEmbarcacion() != null && request.getEmbarcacion().getId() != null) {
-            Optional<EmbarcacionModel> embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId());
-            embarcacion.ifPresent(declaracionArmadorModel::setEmbarcacion);
+        if (request.getEmbarcacion() == null || request.getEmbarcacion().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
+        EmbarcacionModel embarcacion = embarcacionRepository.findById(request.getEmbarcacion().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe."));
+        declaracionArmadorModel.setEmbarcacion(embarcacion);
         
-        if (request.getBuzo() != null && request.getBuzo().getId() != null) {
-            Optional<BuzoModel> buzo = buzoRepository.findById(request.getBuzo().getId());
-            buzo.ifPresent(declaracionArmadorModel::setBuzo);
+        if (request.getBuzo() == null || request.getBuzo().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
         }
+        BuzoModel buzo = buzoRepository.findById(request.getBuzo().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe."));
+        declaracionArmadorModel.setBuzo(buzo);
         
         declaracionArmadorModel.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracionArmadorModel.setCaptura(request.getCaptura());
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());
         
-        if (request.getUsuarioDestinatario() != null && request.getUsuarioDestinatario().getId() != null) {
-            Optional<UsuarioModel> destinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId());
-            destinatario.ifPresent(declaracionArmadorModel::setUsuarioDestinatario);
+        if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario es obligatorio.");
         }
+        UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
+        declaracionArmadorModel.setUsuarioDestinatario(usuarioDestinatario);
         
-        if (request.getCaleta() != null && request.getCaleta().getId() != null) {
-            Optional<CaletaModel> caleta = caletaRepository.findById(request.getCaleta().getId());
-            caleta.ifPresent(declaracionArmadorModel::setCaleta);
+        if (request.getCaleta() == null || request.getCaleta().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");
         }
+        CaletaModel caleta = caletaRepository.findById(request.getCaleta().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+        declaracionArmadorModel.setCaleta(caleta);
         
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             Optional<ComunaModel> comuna = comunaRepository.findById(request.getComuna().getId());
             comuna.ifPresent(declaracionArmadorModel::setComuna);
         }
         
-        if (request.getEspecie() != null && request.getEspecie().getId() != null) {
-            Optional<EspecieModel> especie = especieRepository.findById(request.getEspecie().getId());
-            especie.ifPresent(declaracionArmadorModel::setEspecie);
+        if (request.getEspecie() == null || request.getEspecie().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie es obligatoria.");
         }
+        EspecieModel especie = especieRepository.findById(request.getEspecie().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie especificada no existe."));
+        declaracionArmadorModel.setEspecie(especie);
         
         if (request.getComposicion() != null && request.getComposicion().getId() != null) {
             Optional<ComposicionModel> composicion = composicionRepository.findById(request.getComposicion().getId());
             composicion.ifPresent(declaracionArmadorModel::setComposicion);
         }
         
-        if (request.getHumedadEstado() != null && request.getHumedadEstado().getId() != null) {
-            Optional<HumedadEstadoModel> humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId());
-            humedadEstado.ifPresent(declaracionArmadorModel::setHumedadEstado);
+        if (request.getHumedadEstado() == null || request.getHumedadEstado().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad es obligatorio.");
         }
+        HumedadEstadoModel humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad especificado no existe."));
+        declaracionArmadorModel.setHumedadEstado(humedadEstado);
         
         declaracionArmadorModel.setLatitud(request.getLatitud());
         declaracionArmadorModel.setLongitud(request.getLongitud());
@@ -259,10 +285,10 @@ public class DeclaracionArmadorService {
             for (BuzoModel buzoRequest : request.getBuzos()) {
                 if (buzoRequest.getId() != null) {
                     Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
-                    buzoOpt.ifPresent(buzo -> {
+                    buzoOpt.ifPresent(b -> {
                         DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
                         declaracionBuzo.setPerfil(perfil);
-                        declaracionBuzo.setBuzo(buzo);
+                        declaracionBuzo.setBuzo(b);
                         declaracionBuzo.setDeclaracionArmador(updatedDeclaracion);
                         declaracionBuzosRepository.save(declaracionBuzo);
                     });
