@@ -101,6 +101,9 @@ public class DeclaracionArmadorService {
         if (embarcacion == null && request.getEmbarcacion().getId() != null) {
             embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
         }
+        if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
+            embarcacion = embarcacionRepository.findByNombre(request.getEmbarcacion().getNombre()).orElse(null);
+        }
         if (embarcacion == null) {
             if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
                 EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
@@ -126,6 +129,9 @@ public class DeclaracionArmadorService {
         }
         if (buzo == null && request.getBuzo().getId() != null) {
             buzo = buzoRepository.findByCodigo(String.valueOf(request.getBuzo().getId())).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getNombre() != null) {
+            buzo = buzoRepository.findByNombre(request.getBuzo().getNombre()).orElse(null);
         }
         if (buzo == null) {
             if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
@@ -207,6 +213,9 @@ public class DeclaracionArmadorService {
                 if (b == null && buzoRequest.getId() != null) {
                     b = buzoRepository.findByCodigo(String.valueOf(buzoRequest.getId())).orElse(null);
                 }
+                if (b == null && buzoRequest.getNombre() != null) {
+                    b = buzoRepository.findByNombre(buzoRequest.getNombre()).orElse(null);
+                }
                 if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
                     BuzoModel nuevoB = new BuzoModel();
                     nuevoB.setNombre(buzoRequest.getNombre());
@@ -278,6 +287,9 @@ public class DeclaracionArmadorService {
         if (embarcacion == null && request.getEmbarcacion().getId() != null) {
             embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
         }
+        if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
+            embarcacion = embarcacionRepository.findByNombre(request.getEmbarcacion().getNombre()).orElse(null);
+        }
         if (embarcacion == null) {
             if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
                 EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
@@ -302,6 +314,9 @@ public class DeclaracionArmadorService {
         }
         if (buzo == null && request.getBuzo().getId() != null) {
             buzo = buzoRepository.findByCodigo(String.valueOf(request.getBuzo().getId())).orElse(null);
+        }
+        if (buzo == null && request.getBuzo().getNombre() != null) {
+            buzo = buzoRepository.findByNombre(request.getBuzo().getNombre()).orElse(null);
         }
         if (buzo == null) {
             if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
@@ -378,6 +393,9 @@ public class DeclaracionArmadorService {
                 }
                 if (b == null && buzoRequest.getId() != null) {
                     b = buzoRepository.findByCodigo(String.valueOf(buzoRequest.getId())).orElse(null);
+                }
+                if (b == null && buzoRequest.getNombre() != null) {
+                    b = buzoRepository.findByNombre(buzoRequest.getNombre()).orElse(null);
                 }
                 if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
                     BuzoModel nuevoB = new BuzoModel();

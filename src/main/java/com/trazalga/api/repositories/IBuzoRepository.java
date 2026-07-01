@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface IBuzoRepository extends JpaRepository<BuzoModel, Long> {
     Optional<BuzoModel> findByCodigo(String codigo);
+    Optional<BuzoModel> findByNombre(String nombre);
 
     List<BuzoModel> findByCodigoRegion(Integer codigoRegion);
 }

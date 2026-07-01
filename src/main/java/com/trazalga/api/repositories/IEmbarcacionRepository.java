@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface IEmbarcacionRepository extends JpaRepository<EmbarcacionModel, Long> {
     Optional<EmbarcacionModel> findByCodigo(String codigo);
+    Optional<EmbarcacionModel> findByNombre(String nombre);
 }
+
