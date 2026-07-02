@@ -245,6 +245,48 @@ public class ReportController {
         html.append("            font-weight: 500;\n");
         html.append("        }\n");
         html.append("        .btn-map:hover { text-decoration: underline; }\n");
+        html.append("        .tabs-container {\n");
+        html.append("            display: flex;\n");
+        html.append("            gap: 8px;\n");
+        html.append("            border-bottom: 2px solid var(--border);\n");
+        html.append("            margin-bottom: 30px;\n");
+        html.append("            overflow-x: auto;\n");
+        html.append("            scrollbar-width: none;\n");
+        html.append("        }\n");
+        html.append("        .tabs-container::-webkit-scrollbar { display: none; }\n");
+        html.append("        .tab-btn {\n");
+        html.append("            background: none;\n");
+        html.append("            border: none;\n");
+        html.append("            padding: 12px 20px;\n");
+        html.append("            font-size: 0.95rem;\n");
+        html.append("            font-weight: 600;\n");
+        html.append("            color: var(--text-secondary);\n");
+        html.append("            cursor: pointer;\n");
+        html.append("            border-bottom: 3px solid transparent;\n");
+        html.append("            transition: all 0.2s ease;\n");
+        html.append("            white-space: nowrap;\n");
+        html.append("            display: inline-flex;\n");
+        html.append("            align-items: center;\n");
+        html.append("            gap: 8px;\n");
+        html.append("        }\n");
+        html.append("        .tab-btn:hover {\n");
+        html.append("            color: var(--primary-light);\n");
+        html.append("        }\n");
+        html.append("        .tab-btn.active {\n");
+        html.append("            color: var(--primary);\n");
+        html.append("            border-bottom-color: var(--primary);\n");
+        html.append("        }\n");
+        html.append("        .tab-panel {\n");
+        html.append("            display: none;\n");
+        html.append("        }\n");
+        html.append("        .tab-panel.active {\n");
+        html.append("            display: block;\n");
+        html.append("            animation: fadeIn 0.2s ease-in-out;\n");
+        html.append("        }\n");
+        html.append("        @keyframes fadeIn {\n");
+        html.append("            from { opacity: 0; transform: translateY(4px); }\n");
+        html.append("            to { opacity: 1; transform: translateY(0); }\n");
+        html.append("        }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
@@ -308,93 +350,129 @@ public class ReportController {
             html.append("            </div>\n");
         }
         
-        html.append("        </div>\n");
-        
-        // Tables for each profile
+        // Tabs container
+        html.append("        <div class=\"tabs-container\">\n");
+        boolean isFirstTab = true;
         for (Integer type : selectedTypes) {
             List<ReportDTO> list = reports.getOrDefault(type, new ArrayList<>());
-            String label = getReportLabel(type);
+            String activeClass = isFirstTab ? " active" : "";
+            html.append("            <button class=\"tab-btn").append(activeClass).append("\" onclick=\"showTab(event, ").append(type).append(")\">\n");
+            html.append("                <span>").append(getReportLabel(type)).append("</span>\n");
+            html.append("                <span class=\"badge-count\">").append(list.size()).append("</span>\n");
+            html.append("            </button>\n");
+            isFirstTab = false;
+        }
+        html.append("        </div>\n");
+
+        // Tables for each profile (tab panels)
+        isFirstTab = true;
+        for (Integer type : selectedTypes) {
+            List<ReportDTO> list = reports.getOrDefault(type, new ArrayList<>());
+            String activeClass = isFirstTab ? " active" : "";
+            String displayStyle = isFirstTab ? "block" : "none";
             
-            html.append("        <div class=\"section-card\">\n");
-            html.append("            <div class=\"section-header\">\n");
-            html.append("                <h2 class=\"section-title\">\n");
-            html.append("                    <span>").append(label).append("</span>\n");
-            html.append("                    <span class=\"badge-count\">").append(list.size()).append("</span>\n");
-            html.append("                </h2>\n");
-            html.append("            </div>\n");
+            html.append("        <div id=\"tab-panel-").append(type).append("\" class=\"tab-panel").append(activeClass).append("\" style=\"display: ").append(displayStyle).append(";\">\n");
+            html.append("            <div class=\"section-card\">\n");
+            html.append("                <div class=\"section-header\">\n");
+            html.append("                    <h2 class=\"section-title\">\n");
+            html.append("                        <span>Detalle de ").append(getReportLabel(type)).append("</span>\n");
+            html.append("                        <span class=\"badge-count\">").append(list.size()).append(" registros</span>\n");
+            html.append("                    </h2>\n");
+            html.append("                </div>\n");
             
             if (list.isEmpty()) {
-                html.append("            <div class=\"empty-state\">\n");
-                html.append("                <p>No se encontraron declaraciones registradas para este perfil en el periodo seleccionado.</p>\n");
-                html.append("            </div>\n");
+                html.append("                <div class=\"empty-state\">\n");
+                html.append("                    <p>No se encontraron declaraciones registradas para este perfil en el periodo seleccionado.</p>\n");
+                html.append("                </div>\n");
             } else {
-                html.append("            <div class=\"table-responsive\">\n");
-                html.append("                <table>\n");
-                html.append("                    <thead>\n");
-                html.append("                        <tr>\n");
-                html.append("                            <th>Folio</th>\n");
-                html.append("                            <th>Fecha / Hora</th>\n");
-                html.append("                            <th>Emisor (RUT)</th>\n");
-                html.append("                            <th>Receptor (RUT)</th>\n");
-                html.append("                            <th>Cantidad</th>\n");
-                html.append("                            <th>Especie</th>\n");
+                html.append("                <div class=\"table-responsive\">\n");
+                html.append("                    <table>\n");
+                html.append("                        <thead>\n");
+                html.append("                            <tr>\n");
+                html.append("                                <th>Folio</th>\n");
+                html.append("                                <th>Fecha / Hora</th>\n");
+                html.append("                                <th>Emisor (RUT)</th>\n");
+                html.append("                                <th>Receptor (RUT)</th>\n");
+                html.append("                                <th>Cantidad</th>\n");
+                html.append("                                <th>Especie</th>\n");
                 
                 if (type <= 5) {
-                    html.append("                            <th>Composición</th>\n");
-                    html.append("                            <th>Humedad</th>\n");
+                    html.append("                                <th>Composición</th>\n");
+                    html.append("                                <th>Humedad</th>\n");
                 }
                 
-                html.append("                            <th>Georreferencia</th>\n");
+                html.append("                                <th>Georreferencia</th>\n");
                 
                 if (type == 1) {
-                    html.append("                            <th>Folio Comercializador</th>\n");
+                    html.append("                                <th>Folio Comercializador</th>\n");
                 }
                 
-                html.append("                        </tr>\n");
-                html.append("                    </thead>\n");
-                html.append("                    <tbody>\n");
+                html.append("                            </tr>\n");
+                html.append("                        </thead>\n");
+                html.append("                        <tbody>\n");
                 
                 for (ReportDTO d : list) {
-                    html.append("                        <tr>\n");
-                    html.append("                            <td><strong>").append(d.getFolio()).append("</strong></td>\n");
-                    html.append("                            <td>").append(formatDate(d.getFecha())).append(" ").append(d.getHora() != null ? d.getHora() : "").append("</td>\n");
-                    html.append("                            <td>").append(d.getEmisorNombre() != null ? d.getEmisorNombre() : "-").append("<br><small style=\"color: #64748b;\">").append(d.getEmisorRut() != null ? d.getEmisorRut() : "").append("</small></td>\n");
-                    html.append("                            <td>").append(d.getReceptorNombre() != null && !d.getReceptorNombre().isEmpty() ? d.getReceptorNombre() : "-").append("<br><small style=\"color: #64748b;\">").append(d.getReceptorRut() != null ? d.getReceptorRut() : "").append("</small></td>\n");
-                    html.append("                            <td><strong>").append(d.getCantidad() != null ? String.format("%,.1f", d.getCantidad().doubleValue()) : "0").append(" Kg</strong></td>\n");
-                    html.append("                            <td>").append(d.getEspecie() != null ? d.getEspecie() : "-").append("</td>\n");
+                    html.append("                            <tr>\n");
+                    html.append("                                <td><strong>").append(d.getFolio()).append("</strong></td>\n");
+                    html.append("                                <td>").append(formatDate(d.getFecha())).append(" ").append(d.getHora() != null ? d.getHora() : "").append("</td>\n");
+                    html.append("                                <td>").append(d.getEmisorNombre() != null ? d.getEmisorNombre() : "-").append("<br><small style=\"color: #64748b;\">").append(d.getEmisorRut() != null ? d.getEmisorRut() : "").append("</small></td>\n");
+                    html.append("                                <td>").append(d.getReceptorNombre() != null && !d.getReceptorNombre().isEmpty() ? d.getReceptorNombre() : "-").append("<br><small style=\"color: #64748b;\">").append(d.getReceptorRut() != null ? d.getReceptorRut() : "").append("</small></td>\n");
+                    html.append("                                <td><strong>").append(d.getCantidad() != null ? String.format("%,.1f", d.getCantidad().doubleValue()) : "0").append(" Kg</strong></td>\n");
+                    html.append("                                <td>").append(d.getEspecie() != null ? d.getEspecie() : "-").append("</td>\n");
                     
                     if (type <= 5) {
-                        html.append("                            <td>").append(d.getComposicion() != null ? d.getComposicion() : "-").append("</td>\n");
-                        html.append("                            <td>").append(d.getEstadoHumedad() != null ? d.getEstadoHumedad() : "-").append("</td>\n");
+                        html.append("                                <td>").append(d.getComposicion() != null ? d.getComposicion() : "-").append("</td>\n");
+                        html.append("                                <td>").append(d.getEstadoHumedad() != null ? d.getEstadoHumedad() : "-").append("</td>\n");
                     }
                     
-                    html.append("                            <td>\n");
+                    html.append("                                <td>\n");
                     if (d.getLatitud() != null && d.getLongitud() != null) {
-                        html.append("                                <a href=\"https://www.google.com/maps?q=").append(d.getLatitud()).append(",").append(d.getLongitud()).append("\" target=\"_blank\" class=\"btn-map\">\n");
-                        html.append("                                    <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z\"></path><circle cx=\"12\" cy=\"10\" r=\"3\"></circle></svg>\n");
-                        html.append("                                    Ver ubicación\n");
-                        html.append("                                </a>\n");
+                        html.append("                                    <a href=\"https://www.google.com/maps?q=").append(d.getLatitud()).append(",").append(d.getLongitud()).append("\" target=\"_blank\" class=\"btn-map\">\n");
+                        html.append("                                        <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z\"></path><circle cx=\"12\" cy=\"10\" r=\"3\"></circle></svg>\n");
+                        html.append("                                        Ver ubicación\n");
+                        html.append("                                    </a>\n");
                     } else {
-                        html.append("                                -\n");
+                        html.append("                                    -\n");
                     }
-                    html.append("                            </td>\n");
+                    html.append("                                </td>\n");
                     
                     if (type == 1) {
-                        html.append("                            <td>").append(d.getFolioRelacionado() != null && !d.getFolioRelacionado().isEmpty() ? d.getFolioRelacionado() : "-").append("</td>\n");
+                        html.append("                                <td>").append(d.getFolioRelacionado() != null && !d.getFolioRelacionado().isEmpty() ? d.getFolioRelacionado() : "-").append("</td>\n");
                     }
                     
-                    html.append("                        </tr>\n");
+                    html.append("                            </tr>\n");
                 }
                 
-                html.append("                    </tbody>\n");
-                html.append("                </table>\n");
-                html.append("            </div>\n");
+                html.append("                        </tbody>\n");
+                html.append("                    </table>\n");
+                html.append("                </div>\n");
             }
             
+            html.append("            </div>\n");
             html.append("        </div>\n");
+            isFirstTab = false;
         }
         
         html.append("    </div>\n");
+        html.append("    <script>\n");
+        html.append("        function showTab(event, typeId) {\n");
+        html.append("            var panels = document.querySelectorAll('.tab-panel');\n");
+        html.append("            panels.forEach(function(panel) {\n");
+        html.append("                panel.style.display = 'none';\n");
+        html.append("                panel.classList.remove('active');\n");
+        html.append("            });\n");
+        html.append("            var activePanel = document.getElementById('tab-panel-' + typeId);\n");
+        html.append("            if (activePanel) {\n");
+        html.append("                activePanel.style.display = 'block';\n");
+        html.append("                activePanel.classList.add('active');\n");
+        html.append("            }\n");
+        html.append("            var buttons = document.querySelectorAll('.tab-btn');\n");
+        html.append("            buttons.forEach(function(btn) {\n");
+        html.append("                btn.classList.remove('active');\n");
+        html.append("            });\n");
+        html.append("            event.currentTarget.classList.add('active');\n");
+        html.append("        }\n");
+        html.append("    </script>\n");
         html.append("</body>\n");
         html.append("</html>");
         
