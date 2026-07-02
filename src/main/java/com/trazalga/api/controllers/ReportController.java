@@ -220,12 +220,14 @@ public class ReportController {
         html.append("            letter-spacing: 0.05em;\n");
         html.append("            padding: 12px 16px;\n");
         html.append("            border-bottom: 1px solid var(--border);\n");
+        html.append("            white-space: nowrap;\n");
         html.append("        }\n");
         html.append("        td {\n");
         html.append("            padding: 14px 16px;\n");
         html.append("            border-bottom: 1px solid #f1f5f9;\n");
         html.append("            font-size: 0.875rem;\n");
         html.append("            color: #334155;\n");
+        html.append("            white-space: nowrap;\n");
         html.append("        }\n");
         html.append("        tr:hover td {\n");
         html.append("            background-color: #f8fafc;\n");
