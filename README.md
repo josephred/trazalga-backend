@@ -72,6 +72,12 @@ Configuración de referencia para despliegue:
 }
 ```
 
+
+git stash
+git remote set-url origin https://github.com/josephred/trazalga-backend.git
+git pull origin development
+
+
 .\mvnw spring-boot:run
 .\mvnw clean package -DskipTests
 java -jar target\api-0.0.1-SNAPSHOT.jar
@@ -86,5 +92,6 @@ nohup java -jar target/api-0.0.1-SNAPSHOT.jar > backend.log 2>&1 &
 
  & "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Medium_Phone_API_36.1 -wipe-data -dns-server 8.8.8.8
  
+
 ---
 *Desarrollado para Procesac 2024.*
