@@ -352,6 +352,8 @@ public class ReportController {
             html.append("            </div>\n");
         }
         
+        html.append("        </div>\n");
+        
         // Tabs container
         html.append("        <div class=\"tabs-container\">\n");
         boolean isFirstTab = true;
