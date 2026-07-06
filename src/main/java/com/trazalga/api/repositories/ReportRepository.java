@@ -366,6 +366,121 @@ public class ReportRepository {
         return map;
     }
 
+    // Indicador "Tiempo entre extracción y validación".
+    // Definición de "validación" (según observación SERNAPESCA "A Comercializador"): momento en que la
+    // declaración de origen (recolector/armador/área) es consumida por la declaración de un comercializador.
+    // Origen del intervalo: fecha_declaracion + hora de la declaración de origen.
+    // Si el cliente define otro eslabón como cierre (ej. planta), basta cambiar el JOIN de esta consulta.
+    private static final String SQL_ORIGENES_VALIDACION =
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+        "    UNION ALL " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+        "    UNION ALL " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'AREA' as tipo_perfil FROM declaracion_area ";
+
+    public java.util.Map<String, Object> getTiempoValidacionMetrics(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT " +
+            "COUNT(decl.id) as total, " +
+            "SUM(CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END) as validadas, " +
+            "AVG(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as prom_min, " +
+            "MAX(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as max_min, " +
+            "SUM(CASE WHEN c.id IS NULL AND TIMESTAMP(decl.fecha_declaracion, decl.hora) < NOW() - INTERVAL 48 HOUR THEN 1 ELSE 0 END) as pendientes_48h " +
+            "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
+            "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "WHERE 1=1" + dateFilter;
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        Object[] result = (Object[]) query.getSingleResult();
+
+        long total = result[0] != null ? ((Number) result[0]).longValue() : 0;
+        long validadas = result[1] != null ? ((Number) result[1]).longValue() : 0;
+        Double promHoras = result[2] != null ? Math.round(((Number) result[2]).doubleValue() / 60.0 * 10.0) / 10.0 : null;
+        Double maxHoras = result[3] != null ? Math.round(((Number) result[3]).doubleValue() / 60.0 * 10.0) / 10.0 : null;
+        long pendientes48h = result[4] != null ? ((Number) result[4]).longValue() : 0;
+
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("definicionValidacion", "Recepción por comercializador (declaración que consume el documento de origen)");
+        map.put("totalDeclaraciones", total);
+        map.put("validadas", validadas);
+        map.put("pendientes", total - validadas);
+        map.put("pendientesMas48h", pendientes48h);
+        map.put("promedioHoras", promHoras);
+        map.put("maxHoras", maxHoras);
+        return map;
+    }
+
+    public List<java.util.Map<String, Object>> getTiempoValidacionDetalle(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+        }
+
+        // Para pendientes, las horas transcurridas se miden contra NOW().
+        // Se devuelven las 50 validaciones más lentas y los 50 pendientes más antiguos,
+        // para que ninguno de los dos estados quede fuera del detalle.
+        String cuerpo = "SELECT decl.id, decl.tipo_perfil, decl.fecha_declaracion, decl.hora, decl.desembarque, " +
+            "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop, " +
+            "CASE WHEN c.id IS NULL THEN 'PENDIENTE' ELSE 'VALIDADA' END as estado, " +
+            "ROUND(TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), COALESCE(TIMESTAMP(c.fecha_declaracion, c.hora), NOW())) / 60.0, 1) as horas " +
+            "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
+            "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+            "WHERE 1=1" + dateFilter;
+
+        String sql = "SELECT * FROM (" +
+            "(" + cuerpo + " AND c.id IS NOT NULL ORDER BY horas DESC LIMIT 50) " +
+            "UNION ALL " +
+            "(" + cuerpo + " AND c.id IS NULL ORDER BY horas DESC LIMIT 50)" +
+            ") as t ORDER BY estado DESC, horas DESC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> results = query.getResultList();
+
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", row[0]);
+            map.put("perfil", row[1]);
+
+            Date dateVal = null;
+            if (row[2] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[2]).getTime());
+            } else if (row[2] instanceof Date) {
+                dateVal = (Date) row[2];
+            }
+            map.put("fecha", dateVal);
+            map.put("hora", row[3] != null ? row[3].toString() : "");
+            map.put("kg", row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
+            map.put("especie", row[5]);
+
+            String nombreActor = (row[7] != null ? row[7].toString() : "") + " " + (row[8] != null ? row[8].toString() : "");
+            map.put("actor", nombreActor.trim());
+            map.put("rut", row[6] != null ? row[6].toString() : "");
+            map.put("estado", row[9]);
+            map.put("horas", row[10] != null ? ((Number) row[10]).doubleValue() : null);
+            return map;
+        }).collect(Collectors.toList());
+    }
+
     public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
         String tableName = "";
         String roleName = "";

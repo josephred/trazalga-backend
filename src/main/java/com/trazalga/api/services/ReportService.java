@@ -38,6 +38,14 @@ public class ReportService {
         return reportRepository.getVolumenPorEspecie(startDate, endDate, perfil);
     }
 
+    public java.util.Map<String, Object> getTiempoValidacionMetrics(Date startDate, Date endDate) {
+        return reportRepository.getTiempoValidacionMetrics(startDate, endDate);
+    }
+
+    public List<java.util.Map<String, Object>> getTiempoValidacionDetalle(Date startDate, Date endDate) {
+        return reportRepository.getTiempoValidacionDetalle(startDate, endDate);
+    }
+
     public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
         return reportRepository.getTrazabilidad(tipo, id);
     }

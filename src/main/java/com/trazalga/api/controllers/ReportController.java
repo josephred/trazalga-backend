@@ -534,6 +534,32 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/tiempo-validacion")
+    public ResponseEntity<?> getTiempoValidacion(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getTiempoValidacionMetrics(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo tiempo de validación: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/tiempo-validacion-detalle")
+    public ResponseEntity<?> getTiempoValidacionDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getTiempoValidacionDetalle(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de tiempo de validación: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/volumen-por-especie")
     public ResponseEntity<?> getVolumenPorEspecie(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
