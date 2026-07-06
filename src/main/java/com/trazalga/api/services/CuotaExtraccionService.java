@@ -63,6 +63,24 @@ public class CuotaExtraccionService {
             cuotas = cuotaRepository.findByPerfilAndActivoTrue(perfil);
         }
 
+        // Las cuotas por AMERB aplican a declaraciones de área, que no se validan por este flujo
+        cuotas = new ArrayList<>(cuotas);
+        cuotas.removeIf(c -> c.getAmerb() != null);
+
+        // Si existen cuotas específicas para este actor, priman sobre las globales;
+        // las cuotas de otros actores nunca aplican
+        List<CuotaExtraccionModel> especificasActor = new ArrayList<>();
+        for (CuotaExtraccionModel c : cuotas) {
+            if (c.getUsuario() != null && c.getUsuario().getId().equals(usuarioId)) {
+                especificasActor.add(c);
+            }
+        }
+        if (!especificasActor.isEmpty()) {
+            cuotas = especificasActor;
+        } else {
+            cuotas.removeIf(c -> c.getUsuario() != null);
+        }
+
         if (cuotas.isEmpty()) {
             return new QuotaCheckResult(true, "No hay cuota definida para este perfil/especie.");
         }
@@ -71,6 +89,11 @@ public class CuotaExtraccionService {
         if (fechaDeclaracion == null) {
             return new QuotaCheckResult(false, "La fecha de declaración es requerida para validar la cuota.");
         }
+
+        // Normalizar a la fecha calendario en UTC (el JSON "yyyy-MM-dd" se parsea como medianoche UTC;
+        // sin esto, la truncación a DATE en la zona horaria local puede restar un día)
+        LocalDate diaDeclaracion = fechaDeclaracion.toInstant().atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        Date fechaConsulta = java.sql.Date.valueOf(diaDeclaracion);
 
         // 3. Revisar cada cuota aplicable
         for (CuotaExtraccionModel cuota : cuotas) {
@@ -82,7 +105,7 @@ public class CuotaExtraccionService {
 
             // 4. Sumar capturas del día
             if ("RECOLECTOR".equalsIgnoreCase(perfil)) {
-                List<DeclaracionRecolectorModel> decls = declaracionRecolectorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaDeclaracion);
+                List<DeclaracionRecolectorModel> decls = declaracionRecolectorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaConsulta);
                 for (DeclaracionRecolectorModel d : decls) {
                     if (d.getCaptura() != null) {
                         // Seguridad: Convertimos a BigDecimal por si el modelo sigue siendo Double
@@ -90,7 +113,7 @@ public class CuotaExtraccionService {
                     }
                 }
             } else if ("ARMADOR".equalsIgnoreCase(perfil)) {
-                List<DeclaracionArmadorModel> decls = declaracionArmadorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaDeclaracion);
+                List<DeclaracionArmadorModel> decls = declaracionArmadorRepository.findByUsuarioIdAndEspecieIdAndFechaDeclaracion(usuarioId, especieId, fechaConsulta);
                 for (DeclaracionArmadorModel d : decls) {
                     if (d.getCaptura() != null) {
                         // Seguridad: Convertimos a BigDecimal por si el modelo sigue siendo Double
@@ -142,18 +165,27 @@ public class CuotaExtraccionService {
         if ("ARMADOR".equalsIgnoreCase(perfil)) tableName = "declaracion_armador";
         if ("AREA".equalsIgnoreCase(perfil) || "ÁREA DE MANEJO".equalsIgnoreCase(perfil)) tableName = "declaracion_area";
 
+        boolean esArea = "declaracion_area".equals(tableName);
+
         for (CuotaExtraccionModel cuota : cuotas) {
             if (!periodo.equalsIgnoreCase(cuota.getPeriodo()) || cuota.getEspecie() == null) {
                 continue;
             }
 
-            String sql = "SELECT COALESCE(SUM(desembarque), 0) FROM " + tableName + 
+            boolean filtraActor = cuota.getUsuario() != null;
+            boolean filtraAmerb = cuota.getAmerb() != null && esArea;
+
+            String sql = "SELECT COALESCE(SUM(desembarque), 0) FROM " + tableName +
                          " WHERE especie_id = :especieId AND fecha_declaracion BETWEEN :startDate AND :endDate";
-            
+            if (filtraActor) sql += " AND usuario_id = :usuarioId";
+            if (filtraAmerb) sql += " AND amerb_id = :amerbId";
+
             jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
             query.setParameter("especieId", cuota.getEspecie().getId());
             query.setParameter("startDate", startDate);
             query.setParameter("endDate", endDate);
+            if (filtraActor) query.setParameter("usuarioId", cuota.getUsuario().getId());
+            if (filtraAmerb) query.setParameter("amerbId", cuota.getAmerb().getId());
 
             Object res = query.getSingleResult();
             BigDecimal sumCaptura = BigDecimal.ZERO;
@@ -172,11 +204,26 @@ public class CuotaExtraccionService {
                 .volumenExtraido(sumCaptura)
                 .limiteCuota(limite)
                 .porcentajeUso(Math.round(porcentaje * 100.0) / 100.0)
+                .alcance(describirAlcance(cuota))
                 .build();
             
             result.add(dto);
         }
         return result;
+    }
+
+    private String describirAlcance(CuotaExtraccionModel cuota) {
+        if (cuota.getUsuario() != null) {
+            String nombre = ((cuota.getUsuario().getNombres() != null ? cuota.getUsuario().getNombres() : "") + " " +
+                             (cuota.getUsuario().getApellidop() != null ? cuota.getUsuario().getApellidop() : "")).trim();
+            return nombre.isEmpty() ? "Actor " + cuota.getUsuario().getId() : nombre;
+        }
+        if (cuota.getAmerb() != null) {
+            String nombre = cuota.getAmerb().getNombre();
+            if (nombre == null || nombre.trim().isEmpty()) return "AMERB " + cuota.getAmerb().getId();
+            return nombre.toUpperCase().startsWith("AMERB") ? nombre : "AMERB " + nombre;
+        }
+        return "Global";
     }
 
     public static class QuotaCheckResult {

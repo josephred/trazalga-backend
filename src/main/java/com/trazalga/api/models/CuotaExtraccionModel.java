@@ -46,6 +46,16 @@ public class CuotaExtraccionModel {
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
+    // Actor específico (nullable = null means applies to any actor of the perfil)
+    @ManyToOne
+    @JoinColumn(name = "usuario_id", nullable = true)
+    private UsuarioModel usuario;
+
+    // Área de manejo específica (nullable = null means applies to any AMERB; only relevant for perfil AREA)
+    @ManyToOne
+    @JoinColumn(name = "amerb_id", nullable = true)
+    private AmerbModel amerb;
+
     // Periodo: "DIARIO" o "MENSUAL"
     @Column(nullable = false)
     private String periodo;

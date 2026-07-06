@@ -16,4 +16,6 @@ public class ControlCuotaDiariaDTO {
     private BigDecimal volumenExtraido;
     private BigDecimal limiteCuota;
     private Double porcentajeUso;
+    // Alcance de la cuota: "Global", nombre del actor o nombre del área de manejo
+    private String alcance;
 }
