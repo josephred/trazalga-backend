@@ -481,6 +481,145 @@ public class ReportRepository {
         }).collect(Collectors.toList());
     }
 
+    // Indicador "Variación de peso" (posible adulteración).
+    // Dos niveles de conciliación:
+    //  - PESAJE: peso_recepcionado registrado por el receptor vs lo declarado en origen (por transacción).
+    //  - DOCUMENTO: cantidad del documento receptor vs suma de lo declarado en los documentos que consume
+    //    (origen→comercializador y comercializador→planta abastecimiento).
+    private static final String SQL_PESAJES =
+        "SELECT decl.tipo_registro, decl.eslabon, decl.fecha, u.nombres, u.apellidop, e.nombre as especie, " +
+        "decl.kg_declarado as kg_origen, decl.peso_recepcionado as kg_destino, " +
+        "ROUND((decl.peso_recepcionado - decl.kg_declarado) / decl.kg_declarado * 100, 1) as pct " +
+        "FROM (" +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion as fecha, desembarque as kg_declarado, peso_recepcionado, 'PESAJE' as tipo_registro, 'RECOLECTOR' as eslabon FROM declaracion_recolector " +
+        "    UNION ALL " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, 'PESAJE', 'ARMADOR' FROM declaracion_armador " +
+        "    UNION ALL " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, 'PESAJE', 'AREA' FROM declaracion_area " +
+        "    UNION ALL " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, cantidad, peso_recepcionado, 'PESAJE', 'COMERCIALIZADOR' FROM declaracion_comercializador " +
+        ") as decl " +
+        "INNER JOIN especie e ON decl.especie_id = e.id " +
+        "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+        "WHERE decl.peso_recepcionado IS NOT NULL AND decl.kg_declarado > 0";
+
+    private static final String SQL_ORIGENES_KG =
+        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_recolector " +
+        "    UNION ALL " +
+        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_armador " +
+        "    UNION ALL " +
+        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_area ";
+
+    private static final String SQL_DOCS_COMERCIALIZADOR =
+        "SELECT 'DOCUMENTO' as tipo_registro, 'ORIGEN-COMERCIALIZADOR' as eslabon, c.fecha_declaracion as fecha, " +
+        "u.nombres, u.apellidop, e.nombre as especie, " +
+        "SUM(o.desembarque) as kg_origen, c.cantidad as kg_destino, " +
+        "ROUND((c.cantidad - SUM(o.desembarque)) / SUM(o.desembarque) * 100, 1) as pct " +
+        "FROM declaracion_comercializador c " +
+        "INNER JOIN (" + SQL_ORIGENES_KG + ") as o " +
+        "    ON o.declaracion_destinatario_id = c.id AND o.consumida_por_tipo = 'COMERCIALIZADOR' " +
+        "INNER JOIN especie e ON c.especie_id = e.id " +
+        "INNER JOIN usuario u ON c.usuario_id = u.id " +
+        "WHERE 1=1 %s " +
+        "GROUP BY c.id, c.cantidad, c.fecha_declaracion, u.nombres, u.apellidop, e.nombre " +
+        "HAVING SUM(o.desembarque) > 0";
+
+    private static final String SQL_DOCS_PLANTA =
+        "SELECT 'DOCUMENTO' as tipo_registro, 'COMERCIALIZADOR-PLANTA' as eslabon, p.fecha_ingreso_planta as fecha, " +
+        "u.nombres, u.apellidop, e.nombre as especie, " +
+        "SUM(c2.cantidad) as kg_origen, p.cantidad as kg_destino, " +
+        "ROUND((p.cantidad - SUM(c2.cantidad)) / SUM(c2.cantidad) * 100, 1) as pct " +
+        "FROM declaracion_planta_abastecimiento p " +
+        "INNER JOIN declaracion_comercializador c2 " +
+        "    ON c2.declaracion_destinatario_id = p.id AND c2.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+        "INNER JOIN especie e ON p.especie_id = e.id " +
+        "INNER JOIN usuario u ON p.usuario_id = u.id " +
+        "WHERE 1=1 %s " +
+        "GROUP BY p.id, p.cantidad, p.fecha_ingreso_planta, u.nombres, u.apellidop, e.nombre " +
+        "HAVING SUM(c2.cantidad) > 0";
+
+    private String sqlVariacionPesoUnion(Date startDate, Date endDate) {
+        String filtroPesaje = "";
+        String filtroComercializador = "";
+        String filtroPlanta = "";
+        if (startDate != null && endDate != null) {
+            filtroPesaje = " AND decl.fecha BETWEEN :startDate AND :endDate";
+            filtroComercializador = " AND c.fecha_declaracion BETWEEN :startDate AND :endDate";
+            filtroPlanta = " AND p.fecha_ingreso_planta BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            filtroPesaje = " AND decl.fecha >= :startDate";
+            filtroComercializador = " AND c.fecha_declaracion >= :startDate";
+            filtroPlanta = " AND p.fecha_ingreso_planta >= :startDate";
+        } else if (endDate != null) {
+            filtroPesaje = " AND decl.fecha <= :endDate";
+            filtroComercializador = " AND c.fecha_declaracion <= :endDate";
+            filtroPlanta = " AND p.fecha_ingreso_planta <= :endDate";
+        }
+
+        return "(" + SQL_PESAJES + filtroPesaje + ") " +
+               "UNION ALL (" + SQL_DOCS_COMERCIALIZADOR.replace("%s", filtroComercializador) + ") " +
+               "UNION ALL (" + SQL_DOCS_PLANTA.replace("%s", filtroPlanta) + ")";
+    }
+
+    public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
+        double umbral = umbralPct != null ? umbralPct : 5.0;
+
+        String sql = "SELECT COUNT(*), AVG(ABS(t.pct)), " +
+            "SUM(CASE WHEN ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN t.tipo_registro = 'PESAJE' THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN 1 ELSE 0 END) " +
+            "FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t";
+
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("umbral", umbral);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        Object[] result = (Object[]) query.getSingleResult();
+
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("umbralPct", umbral);
+        map.put("totalConciliaciones", result[0] != null ? ((Number) result[0]).longValue() : 0);
+        map.put("promedioVariacionPct", result[1] != null ? Math.round(((Number) result[1]).doubleValue() * 10.0) / 10.0 : null);
+        map.put("fueraUmbral", result[2] != null ? ((Number) result[2]).longValue() : 0);
+        map.put("pesajes", result[3] != null ? ((Number) result[3]).longValue() : 0);
+        map.put("documentos", result[4] != null ? ((Number) result[4]).longValue() : 0);
+        return map;
+    }
+
+    public List<java.util.Map<String, Object>> getVariacionPesoDetalle(Date startDate, Date endDate) {
+        String sql = "SELECT * FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t " +
+            "ORDER BY ABS(t.pct) DESC LIMIT 100";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> results = query.getResultList();
+
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("tipoRegistro", row[0]);
+            map.put("eslabon", row[1]);
+
+            Date dateVal = null;
+            if (row[2] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[2]).getTime());
+            } else if (row[2] instanceof Date) {
+                dateVal = (Date) row[2];
+            }
+            map.put("fecha", dateVal);
+
+            String actor = (row[3] != null ? row[3].toString() : "") + " " + (row[4] != null ? row[4].toString() : "");
+            map.put("actor", actor.trim());
+            map.put("especie", row[5]);
+            map.put("kgOrigen", row[6] != null ? ((Number) row[6]).doubleValue() : null);
+            map.put("kgDestino", row[7] != null ? ((Number) row[7]).doubleValue() : null);
+            map.put("variacionPct", row[8] != null ? ((Number) row[8]).doubleValue() : null);
+            return map;
+        }).collect(Collectors.toList());
+    }
+
     public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
         String tableName = "";
         String roleName = "";

@@ -534,6 +534,33 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/variacion-peso")
+    public ResponseEntity<?> getVariacionPeso(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Double umbral) {
+        try {
+            return ResponseEntity.ok(reportService.getVariacionPesoMetrics(startDate, endDate, umbral));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo variación de peso: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/variacion-peso-detalle")
+    public ResponseEntity<?> getVariacionPesoDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getVariacionPesoDetalle(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de variación de peso: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/tiempo-validacion")
     public ResponseEntity<?> getTiempoValidacion(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,

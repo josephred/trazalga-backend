@@ -120,6 +120,11 @@ public class DeclaracionRecolectorModel {
     @Column(name = "consumida_por_tipo", length = 50)
     private String consumidaPorTipo;
 
+    // Peso verificado por el receptor al recibir esta declaración (kg).
+    // Permite conciliar contra lo declarado en origen (indicador variación de peso).
+    @Column(name = "peso_recepcionado", nullable = true)
+    private Double pesoRecepcionado;
+
     @Transient
     private List<BuzoModel> buzos;
 }

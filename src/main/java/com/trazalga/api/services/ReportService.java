@@ -46,6 +46,14 @@ public class ReportService {
         return reportRepository.getTiempoValidacionDetalle(startDate, endDate);
     }
 
+    public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
+        return reportRepository.getVariacionPesoMetrics(startDate, endDate, umbralPct);
+    }
+
+    public List<java.util.Map<String, Object>> getVariacionPesoDetalle(Date startDate, Date endDate) {
+        return reportRepository.getVariacionPesoDetalle(startDate, endDate);
+    }
+
     public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
         return reportRepository.getTrazabilidad(tipo, id);
     }

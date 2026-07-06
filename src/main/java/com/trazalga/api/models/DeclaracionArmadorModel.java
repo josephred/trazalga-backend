@@ -109,6 +109,11 @@ public class DeclaracionArmadorModel {
     @Column(name = "consumida_por_tipo", length = 50)
     private String consumidaPorTipo;
 
+    // Peso verificado por el receptor al recibir esta declaración (kg).
+    // Permite conciliar contra lo declarado en origen (indicador variación de peso).
+    @Column(name = "peso_recepcionado", nullable = true)
+    private Double pesoRecepcionado;
+
     // Campo transitorio para recibir la lista de buzos del frontend (no se persiste en esta tabla)
     @Transient
     private List<BuzoModel> buzos;
