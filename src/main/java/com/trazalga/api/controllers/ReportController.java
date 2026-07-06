@@ -534,6 +534,20 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/volumen-por-especie")
+    public ResponseEntity<?> getVolumenPorEspecie(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
+        try {
+            return ResponseEntity.ok(reportService.getVolumenPorEspecie(startDate, endDate, perfil));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo volumen por especie: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/trazabilidad/{tipo}/{id}")
     public ResponseEntity<?> getTrazabilidad(
             @PathVariable Integer tipo,

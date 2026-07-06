@@ -290,6 +290,51 @@ public class ReportRepository {
         }).collect(Collectors.toList());
     }
 
+    public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+        }
+
+        String perfilNormalizado = (perfil == null || perfil.isEmpty() || "TODOS".equalsIgnoreCase(perfil))
+            ? null : perfil.toUpperCase();
+        String perfilFilter = perfilNormalizado != null ? " AND decl.tipo_perfil = :perfil" : "";
+
+        String sql = "SELECT e.nombre as especie_nombre, " +
+            "COUNT(decl.id) as total_declaraciones, " +
+            "COALESCE(SUM(decl.desembarque), 0) as volumen_kg " +
+            "FROM (" +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'AREA' as tipo_perfil FROM declaracion_area " +
+            ") as decl " +
+            "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "WHERE 1=1" + dateFilter + perfilFilter + " " +
+            "GROUP BY e.nombre " +
+            "ORDER BY volumen_kg DESC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (perfilNormalizado != null) query.setParameter("perfil", perfilNormalizado);
+
+        List<Object[]> results = query.getResultList();
+
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("especie", row[0] != null ? row[0].toString() : "");
+            map.put("declaraciones", row[1] != null ? ((Number) row[1]).longValue() : 0);
+            map.put("volumenKg", row[2] != null ? ((Number) row[2]).doubleValue() : 0.0);
+            return map;
+        }).collect(Collectors.toList());
+    }
+
     public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
         String dateFilter = "";
         if (startDate != null && endDate != null) {

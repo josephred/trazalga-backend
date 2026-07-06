@@ -34,6 +34,10 @@ public class ReportService {
         return reportRepository.getResumenGlobal(startDate, endDate);
     }
 
+    public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {
+        return reportRepository.getVolumenPorEspecie(startDate, endDate, perfil);
+    }
+
     public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
         return reportRepository.getTrazabilidad(tipo, id);
     }
