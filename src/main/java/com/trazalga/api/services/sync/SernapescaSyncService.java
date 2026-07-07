@@ -69,6 +69,10 @@ public class SernapescaSyncService {
     @Value("${trazalga.sync.buzos.regiones:4}")
     private String regionesBuzosCsv;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private SernapescaSyncService self;
+
     public SernapescaSyncService(SernapescaApiClient api,
             IRegionRepository regionRepo, IComunaRepository comunaRepo, ICaletaRepository caletaRepo,
             IEspecieRepository especieRepo, IExtraccionTipoRepository extraccionTipoRepo,
@@ -481,8 +485,28 @@ public class SernapescaSyncService {
                 .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
     }
 
-    @Transactional
     public SyncResult syncUsuarioEmbarcaciones() {
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                self.syncUsuarioEmbarcacionesInternal();
+            } catch (Exception e) {
+                log.error("Error en sincronización en segundo plano de usuario-embarcacion", e);
+            }
+        });
+
+        return SyncResult.builder()
+                .entidad("usuario_embarcacion")
+                .ok(true)
+                .obtenidos(0)
+                .insertados(0)
+                .actualizados(0)
+                .omitidos(0)
+                .mensaje("La sincronización de la relación Usuario-Embarcación se ha iniciado en segundo plano. Los datos se actualizarán progresivamente.")
+                .build();
+    }
+
+    @Transactional
+    public void syncUsuarioEmbarcacionesInternal() {
         List<com.trazalga.api.models.UsuarioModel> usuarios = usuarioRepo.findAll();
         int obt = 0, ins = 0, omit = 0;
         
@@ -586,8 +610,7 @@ public class SernapescaSyncService {
             }
         }
 
-        return SyncResult.builder().entidad("usuario_embarcacion").ok(true)
-                .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
+        log.info("Sincronización de usuario-embarcación finalizada. Total procesados/obtenidos: {}, insertados: {}, omitidos: {}", obt, ins, omit);
     }
 
     // ------------------------------------------------------------------
