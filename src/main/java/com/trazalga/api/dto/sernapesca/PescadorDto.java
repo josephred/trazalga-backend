@@ -19,4 +19,5 @@ public class PescadorDto {
     private String rutCompleto;
     private String nombreCompleto;
     private ComboIntDto region;
+    private java.util.List<ComboIntDto> categorias;
 }

@@ -1,9 +1,12 @@
 package com.trazalga.api.controllers;
 
 import com.trazalga.api.dto.ReportDTO;
+import com.trazalga.api.dto.sernapesca.ComboIntDto;
+import com.trazalga.api.dto.sernapesca.PescadorDto;
 import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.ReportService;
+import com.trazalga.api.services.sync.SernapescaApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +29,7 @@ public class ReportController {
 
     private final ReportService reportService;
     private final IUsuarioRepository usuarioRepository;
+    private final SernapescaApiClient sernapescaApiClient;
 
     @GetMapping
     public ResponseEntity<?> generateReport(
@@ -677,14 +681,33 @@ public class ReportController {
             html.append("                    <th>Correo</th>\n");
             html.append("                    <th>Perfil</th>\n");
             html.append("                    <th>Estado</th>\n");
+            html.append("                    <th>Categorías Sernapesca</th>\n");
             html.append("                </tr>\n");
             html.append("            </thead>\n");
             html.append("            <tbody>\n");
             
+            int count = 0;
             for (UsuarioModel u : usuarios) {
                 String perfil = (u.getPerfil() != null) ? u.getPerfil().getNombre() : "-";
                 String estado = (u.getEstado() != null) ? u.getEstado() : "INACTIVO";
                 String statusClass = estado.equalsIgnoreCase("ACTIVO") ? "status-activo" : "status-inactivo";
+                
+                String categoriasStr = "-";
+                if (count < 3) {
+                    Integer rutInt = extractRutNumber(u.getRut());
+                    if (rutInt != null) {
+                        PescadorDto pescador = sernapescaApiClient.getPescadorPorRut(rutInt);
+                        if (pescador != null && pescador.getCategorias() != null && !pescador.getCategorias().isEmpty()) {
+                            StringBuilder catBuilder = new StringBuilder();
+                            for (ComboIntDto cat : pescador.getCategorias()) {
+                                catBuilder.append("<span class=\"status-badge\" style=\"background:#e0e7ff; color:#3730a3; margin-right:4px; margin-bottom:4px; display:inline-block;\">")
+                                          .append(cat.getValor()).append("</span>");
+                            }
+                            categoriasStr = catBuilder.toString();
+                        }
+                    }
+                    count++;
+                }
                 
                 html.append("                <tr>\n");
                 html.append("                    <td>").append(u.getId()).append("</td>\n");
@@ -694,6 +717,7 @@ public class ReportController {
                 html.append("                    <td>").append(u.getCorreo() != null ? u.getCorreo() : "").append("</td>\n");
                 html.append("                    <td>").append(perfil).append("</td>\n");
                 html.append("                    <td><span class=\"status-badge ").append(statusClass).append("\">").append(estado).append("</span></td>\n");
+                html.append("                    <td>").append(categoriasStr).append("</td>\n");
                 html.append("                </tr>\n");
             }
             
@@ -710,6 +734,19 @@ public class ReportController {
             System.err.println("Error obteniendo listado de usuarios HTML: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    private Integer extractRutNumber(String rutCompleto) {
+        if (rutCompleto == null) return null;
+        String rutClean = rutCompleto.replace(".", "").trim();
+        if (rutClean.contains("-")) {
+            rutClean = rutClean.split("-")[0];
+        }
+        try {
+            return Integer.parseInt(rutClean);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
