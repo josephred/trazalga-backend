@@ -620,6 +620,8 @@ public class ReportController {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
+    }
+
     @GetMapping(value = "/usuarios", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> getUsuariosHtml() {
         try {
