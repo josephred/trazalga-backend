@@ -487,10 +487,14 @@ public class SernapescaSyncService {
         int obt = 0, ins = 0, omit = 0;
         
         List<EmbarcacionModel> todasEmb = embarcacionRepo.findAll();
-        Map<String, EmbarcacionModel> embMap = new HashMap<>();
+        Map<String, EmbarcacionModel> embMapByCode = new HashMap<>();
+        Map<String, EmbarcacionModel> embMapByName = new HashMap<>();
         for (EmbarcacionModel e : todasEmb) {
             if (e.getCodigo() != null) {
-                embMap.put(e.getCodigo().trim(), e);
+                embMapByCode.put(e.getCodigo().trim(), e);
+            }
+            if (e.getNombre() != null) {
+                embMapByName.put(norm(e.getNombre()), e);
             }
         }
 
@@ -552,14 +556,25 @@ public class SernapescaSyncService {
             obt++;
             if (dto.getFolioRpa() != null && !isBlank(dto.getNombreNave())) {
                 String codigo = String.valueOf(dto.getFolioRpa()).trim();
-                EmbarcacionModel emb = embMap.get(codigo);
+                String nombreNorm = norm(dto.getNombreNave());
+                
+                EmbarcacionModel emb = embMapByCode.get(codigo);
+                if (emb == null) {
+                    emb = embMapByName.get(nombreNorm);
+                }
+                
                 if (emb == null) {
                     emb = new EmbarcacionModel()
                             .setNombre(truncate(dto.getNombreNave().trim(), 100))
                             .setCodigo(truncate(codigo, 50));
                     emb = embarcacionRepo.save(emb);
-                    embMap.put(codigo, emb);
+                    embMapByCode.put(codigo, emb);
+                    embMapByName.put(nombreNorm, emb);
                     ins++;
+                } else if (emb.getCodigo() == null) {
+                    emb.setCodigo(truncate(codigo, 50));
+                    emb = embarcacionRepo.save(emb);
+                    embMapByCode.put(codigo, emb);
                 }
                 userVessels.add(emb);
             }
