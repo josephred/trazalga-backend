@@ -41,6 +41,7 @@ import com.trazalga.api.repositories.IEspecieRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
 import com.trazalga.api.repositories.IPlantaRepository;
 import com.trazalga.api.repositories.IRegionRepository;
+import com.trazalga.api.repositories.IUsuarioRepository;
 
 /**
  * Pobla las tablas de datos maestros a partir del API de Sernapesca.
@@ -62,6 +63,7 @@ public class SernapescaSyncService {
     private final IBuzoRepository buzoRepo;
     private final IAmerbRepository amerbRepo;
     private final IPlantaRepository plantaRepo;
+    private final IUsuarioRepository usuarioRepo;
 
     /** Códigos de región (CSV) a sincronizar para buzos. Por defecto solo la 4 (Coquimbo). */
     @Value("${trazalga.sync.buzos.regiones:4}")
@@ -71,7 +73,7 @@ public class SernapescaSyncService {
             IRegionRepository regionRepo, IComunaRepository comunaRepo, ICaletaRepository caletaRepo,
             IEspecieRepository especieRepo, IExtraccionTipoRepository extraccionTipoRepo,
             IEmbarcacionRepository embarcacionRepo, IBuzoRepository buzoRepo, IAmerbRepository amerbRepo,
-            IPlantaRepository plantaRepo) {
+            IPlantaRepository plantaRepo, IUsuarioRepository usuarioRepo) {
         this.api = api;
         this.regionRepo = regionRepo;
         this.comunaRepo = comunaRepo;
@@ -82,6 +84,7 @@ public class SernapescaSyncService {
         this.buzoRepo = buzoRepo;
         this.amerbRepo = amerbRepo;
         this.plantaRepo = plantaRepo;
+        this.usuarioRepo = usuarioRepo;
     }
 
     // ------------------------------------------------------------------
@@ -98,6 +101,7 @@ public class SernapescaSyncService {
         results.add(syncBuzos());
         results.add(syncAmerbs());
         results.add(syncPlantas());
+        results.add(syncUsuarioEmbarcaciones());
         // Sin fuente conocida en el API de Sernapesca:
         results.add(SyncResult.error("composicion",
                 "No existe un endpoint equivalente en el API de Sernapesca. Poblar manualmente."));
@@ -474,6 +478,103 @@ public class SernapescaSyncService {
         }
         plantaRepo.saveAll(nuevas);
         return SyncResult.builder().entidad("planta").ok(true)
+                .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
+    }
+
+    @Transactional
+    public SyncResult syncUsuarioEmbarcaciones() {
+        List<com.trazalga.api.models.UsuarioModel> usuarios = usuarioRepo.findAll();
+        int obt = 0, ins = 0, omit = 0;
+        
+        List<EmbarcacionModel> todasEmb = embarcacionRepo.findAll();
+        Map<String, EmbarcacionModel> embMap = new HashMap<>();
+        for (EmbarcacionModel e : todasEmb) {
+            if (e.getCodigo() != null) {
+                embMap.put(e.getCodigo().trim(), e);
+            }
+        }
+
+        for (com.trazalga.api.models.UsuarioModel u : usuarios) {
+            if (u.getPerfil() == null) {
+                omit++;
+                continue;
+            }
+            Long pid = u.getPerfil().getId();
+            if (pid != 2 && pid != 9 && pid != 10) {
+                omit++;
+                continue;
+            }
+
+            String rutStr = u.getRut();
+            if (rutStr == null) {
+                omit++;
+                continue;
+            }
+            rutStr = rutStr.replace(".", "").trim();
+            if (rutStr.contains("-")) {
+                rutStr = rutStr.split("-")[0];
+            }
+            Integer rutInt;
+            try {
+                rutInt = Integer.parseInt(rutStr);
+            } catch (NumberFormatException nfe) {
+                omit++;
+                continue;
+            }
+
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+
+            PescadorDto pescador = api.getPescadorPorRut(rutInt);
+            if (pescador == null || pescador.getFolioRpa() == null) {
+                omit++;
+                continue;
+            }
+
+            Integer folioRpa = pescador.getFolioRpa();
+            
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+
+            List<EmbarcacionDto> embs = api.getEmbarcacionesPorFolioRpa(folioRpa);
+            if (embs == null || embs.isEmpty()) {
+                omit++;
+                continue;
+            }
+
+            List<EmbarcacionModel> userVessels = new ArrayList<>();
+            for (EmbarcacionDto dto : embs) {
+                obt++;
+                if (dto.getFolioRpa() == null || isBlank(dto.getNombreNave())) {
+                    continue;
+                }
+                String codigo = String.valueOf(dto.getFolioRpa()).trim();
+                EmbarcacionModel emb = embMap.get(codigo);
+                if (emb == null) {
+                    emb = new EmbarcacionModel()
+                            .setNombre(truncate(dto.getNombreNave().trim(), 100))
+                            .setCodigo(truncate(codigo, 50));
+                    emb = embarcacionRepo.save(emb);
+                    embMap.put(codigo, emb);
+                    ins++;
+                }
+                userVessels.add(emb);
+            }
+
+            if (!userVessels.isEmpty()) {
+                u.getEmbarcaciones().clear();
+                u.getEmbarcaciones().addAll(userVessels);
+                usuarioRepo.save(u);
+            }
+        }
+
+        return SyncResult.builder().entidad("usuario_embarcacion").ok(true)
                 .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
     }
 

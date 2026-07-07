@@ -42,6 +42,14 @@ public class UsuarioModel {
     @JoinColumn(name = "comuna_id")
     private ComunaModel comuna;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "usuario_embarcacion",
+        joinColumns = @JoinColumn(name = "usuario_id"),
+        inverseJoinColumns = @JoinColumn(name = "embarcacion_id")
+    )
+    private java.util.List<EmbarcacionModel> embarcaciones = new java.util.ArrayList<>();
+
     // Este método se ejecuta automáticamente justo antes de insertar en la BD
     @PrePersist
     protected void onCreate() {

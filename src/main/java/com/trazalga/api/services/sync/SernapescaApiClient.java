@@ -108,6 +108,19 @@ public class SernapescaApiClient {
         return getList(url, new ParameterizedTypeReference<SernapescaResponse<DestinatarioDto>>() {});
     }
 
+    /** Obtiene Pescador por Folio RPA. */
+    public PescadorDto getPescadorPorFolioRpa(Integer folioRpa) {
+        String url = UriComponentsBuilder.fromPath("/pescadores/" + folioRpa).toUriString();
+        return getObject(url, new ParameterizedTypeReference<SernapescaSingleResponse<PescadorDto>>() {});
+    }
+
+    /** Obtiene Embarcaciones por Folio RPA. */
+    public List<EmbarcacionDto> getEmbarcacionesPorFolioRpa(Integer folioRpa) {
+        String url = UriComponentsBuilder.fromPath("/embarcacion/por-folio-rpa")
+                .queryParam("folioRpa", folioRpa).toUriString();
+        return getList(url, new ParameterizedTypeReference<SernapescaResponse<EmbarcacionDto>>() {});
+    }
+
     private <T> List<T> getList(String path, ParameterizedTypeReference<SernapescaResponse<T>> typeRef) {
         String url = baseUrl + path;
         try {

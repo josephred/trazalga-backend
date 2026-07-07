@@ -74,4 +74,10 @@ public class SyncController {
     public SyncResult syncPlantas() {
         return syncService.syncPlantas();
     }
+
+    @PostMapping("/usuario-embarcacion")
+    @Operation(summary = "Pobla la relación usuario_embarcacion desde Sernapesca")
+    public SyncResult syncUsuarioEmbarcaciones() {
+        return syncService.syncUsuarioEmbarcaciones();
+    }
 }
