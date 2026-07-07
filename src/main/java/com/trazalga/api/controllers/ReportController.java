@@ -4,6 +4,8 @@ import com.trazalga.api.dto.ReportDTO;
 import com.trazalga.api.dto.sernapesca.ComboIntDto;
 import com.trazalga.api.dto.sernapesca.PescadorDto;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.models.PerfilModel;
+import com.trazalga.api.repositories.IPerfilRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.ReportService;
 import com.trazalga.api.services.sync.SernapescaApiClient;
@@ -29,6 +31,7 @@ public class ReportController {
 
     private final ReportService reportService;
     private final IUsuarioRepository usuarioRepository;
+    private final IPerfilRepository perfilRepository;
     private final SernapescaApiClient sernapescaApiClient;
 
     @GetMapping
@@ -688,6 +691,7 @@ public class ReportController {
             html.append("            <tbody>\n");
             
             int count = 0;
+            java.util.List<String> rutsNoMapeados = new java.util.ArrayList<>();
             for (UsuarioModel u : usuarios) {
                 if (u.getId() <= 4000) {
                     continue;
@@ -713,6 +717,15 @@ public class ReportController {
                             Integer pId = determinePerfilSugerido(pescador.getCategorias());
                             if (pId != null) {
                                 perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
+                                
+                                PerfilModel nuevoPerfil = perfilRepository.findById(Long.valueOf(pId)).orElse(null);
+                                if (nuevoPerfil != null && (u.getPerfil() == null || !u.getPerfil().getId().equals(nuevoPerfil.getId()))) {
+                                    u.setPerfil(nuevoPerfil);
+                                    usuarioRepository.save(u);
+                                }
+                            } else {
+                                rutsNoMapeados.add(u.getRut());
+                                perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fee2e2; color:#991b1b;\">No Mapeado</span>";
                             }
                         }
                     }
@@ -734,6 +747,18 @@ public class ReportController {
             
             html.append("            </tbody>\n");
             html.append("        </table>\n");
+            
+            if (!rutsNoMapeados.isEmpty()) {
+                html.append("        <div style=\"margin-top: 30px; padding: 20px; background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;\">\n");
+                html.append("            <h3 style=\"color: #991b1b; margin-top: 0;\">Usuarios con combinaciones de categorías no mapeadas</h3>\n");
+                html.append("            <ul style=\"color: #7f1d1d;\">\n");
+                for (String r : rutsNoMapeados) {
+                    html.append("                <li>").append(r).append("</li>\n");
+                }
+                html.append("            </ul>\n");
+                html.append("        </div>\n");
+            }
+            
             html.append("    </div>\n");
             html.append("</body>\n");
             html.append("</html>");
