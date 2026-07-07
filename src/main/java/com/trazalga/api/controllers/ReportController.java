@@ -718,12 +718,13 @@ public class ReportController {
                             Integer pId = determinePerfilSugerido(pescador.getCategorias());
                             if (pId != null) {
                                 perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
-                                
-                                System.out.println("RUT: " + u.getRut() + " -> Sugiere Perfil: " + pId);
+                                System.out.println("RUT: " + u.getRut() + " (ID: " + u.getId() + ") -> Sugiere Perfil: " + pId);
                                 PerfilModel nuevoPerfil = perfilRepository.findById(Long.valueOf(pId)).orElse(null);
                                 if (nuevoPerfil != null) {
-                                    System.out.println("Perfil encontrado en BD: " + nuevoPerfil.getNombre());
-                                    if (u.getPerfil() == null || !u.getPerfil().getId().equals(nuevoPerfil.getId())) {
+                                    System.out.println("Perfil encontrado en BD: " + nuevoPerfil.getNombre() + " (ID: " + nuevoPerfil.getId() + ")");
+                                    Long actualPerfilId = (u.getPerfil() != null) ? u.getPerfil().getId() : null;
+                                    System.out.println("Perfil actual de usuario en Java: " + actualPerfilId);
+                                    if (actualPerfilId == null || !actualPerfilId.equals(nuevoPerfil.getId())) {
                                         System.out.println("Actualizando perfil de " + u.getRut() + " a " + nuevoPerfil.getNombre());
                                         u.setPerfil(nuevoPerfil);
                                         usuarioRepository.save(u);
