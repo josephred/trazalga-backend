@@ -630,6 +630,7 @@ public class ReportController {
     }
 
     @GetMapping(value = "/usuarios", produces = MediaType.TEXT_HTML_VALUE)
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<String> getUsuariosHtml() {
         try {
             List<UsuarioModel> usuarios = usuarioRepository.findAll();
@@ -718,10 +719,21 @@ public class ReportController {
                             if (pId != null) {
                                 perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
                                 
+                                System.out.println("RUT: " + u.getRut() + " -> Sugiere Perfil: " + pId);
                                 PerfilModel nuevoPerfil = perfilRepository.findById(Long.valueOf(pId)).orElse(null);
-                                if (nuevoPerfil != null && (u.getPerfil() == null || !u.getPerfil().getId().equals(nuevoPerfil.getId()))) {
-                                    u.setPerfil(nuevoPerfil);
-                                    usuarioRepository.save(u);
+                                if (nuevoPerfil != null) {
+                                    System.out.println("Perfil encontrado en BD: " + nuevoPerfil.getNombre());
+                                    if (u.getPerfil() == null || !u.getPerfil().getId().equals(nuevoPerfil.getId())) {
+                                        System.out.println("Actualizando perfil de " + u.getRut() + " a " + nuevoPerfil.getNombre());
+                                        u.setPerfil(nuevoPerfil);
+                                        usuarioRepository.save(u);
+                                        // Actualizar variable para que se vea reflejado en el HTML inmediatamente
+                                        perfil = nuevoPerfil.getNombre();
+                                    } else {
+                                        System.out.println("El usuario ya tiene ese perfil.");
+                                    }
+                                } else {
+                                    System.out.println("ALERTA: El perfil " + pId + " no existe en la base de datos.");
                                 }
                             } else {
                                 rutsNoMapeados.add(u.getRut());
