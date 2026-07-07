@@ -631,9 +631,27 @@ public class ReportController {
 
     @GetMapping(value = "/usuarios", produces = MediaType.TEXT_HTML_VALUE)
     @org.springframework.transaction.annotation.Transactional
-    public ResponseEntity<String> getUsuariosHtml() {
+    public ResponseEntity<String> getUsuariosHtml(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size) {
         try {
-            List<UsuarioModel> usuarios = usuarioRepository.findAll();
+            List<UsuarioModel> todos = usuarioRepository.findAll();
+            List<UsuarioModel> filtered = new java.util.ArrayList<>();
+            for (UsuarioModel u : todos) {
+                if (u.getId() > 4000) {
+                    filtered.add(u);
+                }
+            }
+            filtered.sort((u1, u2) -> u1.getId().compareTo(u2.getId()));
+
+            int total = filtered.size();
+            int fromIndex = page * size;
+            int toIndex = Math.min(fromIndex + size, total);
+
+            List<UsuarioModel> usuarios = new java.util.ArrayList<>();
+            if (fromIndex < total) {
+                usuarios = filtered.subList(fromIndex, toIndex);
+            }
             
             StringBuilder html = new StringBuilder();
             html.append("<!DOCTYPE html>\n");
@@ -670,6 +688,29 @@ public class ReportController {
             html.append("        }\n");
             html.append("        .status-activo { background-color: #dcfce7; color: #166534; }\n");
             html.append("        .status-inactivo { background-color: #fee2e2; color: #991b1b; }\n");
+            html.append("        .pagination {\n");
+            html.append("            margin-top: 25px;\n");
+            html.append("            display: flex;\n");
+            html.append("            justify-content: space-between;\n");
+            html.append("            align-items: center;\n");
+            html.append("            padding: 10px 0;\n");
+            html.append("        }\n");
+            html.append("        .pagination a, .pagination span {\n");
+            html.append("            padding: 8px 16px;\n");
+            html.append("            text-decoration: none;\n");
+            html.append("            background-color: #e2e8f0;\n");
+            html.append("            color: #1e293b;\n");
+            html.append("            border-radius: 6px;\n");
+            html.append("            font-weight: 500;\n");
+            html.append("        }\n");
+            html.append("        .pagination a:hover {\n");
+            html.append("            background-color: #cbd5e1;\n");
+            html.append("        }\n");
+            html.append("        .pagination .disabled {\n");
+            html.append("            color: #94a3b8;\n");
+            html.append("            background-color: #f1f5f9;\n");
+            html.append("            cursor: not-allowed;\n");
+            html.append("        }\n");
             html.append("    </style>\n");
             html.append("</head>\n");
             html.append("<body>\n");
@@ -691,58 +732,58 @@ public class ReportController {
             html.append("            </thead>\n");
             html.append("            <tbody>\n");
             
-            int count = 0;
             java.util.List<String> rutsNoMapeados = new java.util.ArrayList<>();
             for (UsuarioModel u : usuarios) {
-                if (u.getId() <= 4000) {
-                    continue;
-                }
                 String perfil = (u.getPerfil() != null) ? u.getPerfil().getNombre() : "-";
                 String estado = (u.getEstado() != null) ? u.getEstado() : "INACTIVO";
                 String statusClass = estado.equalsIgnoreCase("ACTIVO") ? "status-activo" : "status-inactivo";
                 
                 String categoriasStr = "-";
                 String perfilSugeridoStr = "-";
-                if (count < 3) {
-                    Integer rutInt = extractRutNumber(u.getRut());
-                    if (rutInt != null) {
-                        PescadorDto pescador = sernapescaApiClient.getPescadorPorRut(rutInt);
-                        if (pescador != null && pescador.getCategorias() != null && !pescador.getCategorias().isEmpty()) {
-                            StringBuilder catBuilder = new StringBuilder();
-                            for (ComboIntDto cat : pescador.getCategorias()) {
-                                catBuilder.append("<span class=\"status-badge\" style=\"background:#e0e7ff; color:#3730a3; margin-right:4px; margin-bottom:4px; display:inline-block;\">")
-                                          .append(cat.getValor()).append("</span>");
-                            }
-                            categoriasStr = catBuilder.toString();
-                            
-                            Integer pId = determinePerfilSugerido(pescador.getCategorias());
-                            if (pId != null) {
-                                perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
-                                System.out.println("RUT: " + u.getRut() + " (ID: " + u.getId() + ") -> Sugiere Perfil: " + pId);
-                                PerfilModel nuevoPerfil = perfilRepository.findById(Long.valueOf(pId)).orElse(null);
-                                if (nuevoPerfil != null) {
-                                    System.out.println("Perfil encontrado en BD: " + nuevoPerfil.getNombre() + " (ID: " + nuevoPerfil.getId() + ")");
-                                    Long actualPerfilId = (u.getPerfil() != null) ? u.getPerfil().getId() : null;
-                                    System.out.println("Perfil actual de usuario en Java: " + actualPerfilId);
-                                    if (actualPerfilId == null || !actualPerfilId.equals(nuevoPerfil.getId())) {
-                                        System.out.println("Actualizando perfil de " + u.getRut() + " a " + nuevoPerfil.getNombre());
-                                        u.setPerfil(nuevoPerfil);
-                                        usuarioRepository.save(u);
-                                        // Actualizar variable para que se vea reflejado en el HTML inmediatamente
-                                        perfil = nuevoPerfil.getNombre();
-                                    } else {
-                                        System.out.println("El usuario ya tiene ese perfil.");
-                                    }
+                
+                Integer rutInt = extractRutNumber(u.getRut());
+                if (rutInt != null) {
+                    // Delay of 250ms to prevent Sernapesca rate-limiting
+                    try {
+                        Thread.sleep(250);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    
+                    PescadorDto pescador = sernapescaApiClient.getPescadorPorRut(rutInt);
+                    if (pescador != null && pescador.getCategorias() != null && !pescador.getCategorias().isEmpty()) {
+                        StringBuilder catBuilder = new StringBuilder();
+                        for (ComboIntDto cat : pescador.getCategorias()) {
+                            catBuilder.append("<span class=\"status-badge\" style=\"background:#e0e7ff; color:#3730a3; margin-right:4px; margin-bottom:4px; display:inline-block;\">")
+                                      .append(cat.getValor()).append("</span>");
+                        }
+                        categoriasStr = catBuilder.toString();
+                        
+                        Integer pId = determinePerfilSugerido(pescador.getCategorias());
+                        if (pId != null) {
+                            perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
+                            System.out.println("RUT: " + u.getRut() + " (ID: " + u.getId() + ") -> Sugiere Perfil: " + pId);
+                            PerfilModel nuevoPerfil = perfilRepository.findById(Long.valueOf(pId)).orElse(null);
+                            if (nuevoPerfil != null) {
+                                System.out.println("Perfil encontrado en BD: " + nuevoPerfil.getNombre() + " (ID: " + nuevoPerfil.getId() + ")");
+                                Long actualPerfilId = (u.getPerfil() != null) ? u.getPerfil().getId() : null;
+                                System.out.println("Perfil actual de usuario en Java: " + actualPerfilId);
+                                if (actualPerfilId == null || !actualPerfilId.equals(nuevoPerfil.getId())) {
+                                    System.out.println("Actualizando perfil de " + u.getRut() + " a " + nuevoPerfil.getNombre());
+                                    u.setPerfil(nuevoPerfil);
+                                    usuarioRepository.save(u);
+                                    perfil = nuevoPerfil.getNombre();
                                 } else {
-                                    System.out.println("ALERTA: El perfil " + pId + " no existe en la base de datos.");
+                                    System.out.println("El usuario ya tiene ese perfil.");
                                 }
                             } else {
-                                rutsNoMapeados.add(u.getRut());
-                                perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fee2e2; color:#991b1b;\">No Mapeado</span>";
+                                System.out.println("ALERTA: El perfil " + pId + " no existe en la base de datos.");
                             }
+                        } else {
+                            rutsNoMapeados.add(u.getRut());
+                            perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fee2e2; color:#991b1b;\">No Mapeado</span>";
                         }
                     }
-                    count++;
                 }
                 
                 html.append("                <tr>\n");
@@ -760,6 +801,27 @@ public class ReportController {
             
             html.append("            </tbody>\n");
             html.append("        </table>\n");
+            
+            // Pagination UI
+            html.append("        <div class=\"pagination\">\n");
+            html.append("            <div>\n");
+            if (page > 0) {
+                html.append("                <a href=\"/api/reportes/usuarios?page=").append(page - 1).append("&size=").append(size).append("\">&laquo; Anterior</a>\n");
+            } else {
+                html.append("                <span class=\"disabled\">&laquo; Anterior</span>\n");
+            }
+            html.append("            </div>\n");
+            html.append("            <div style=\"color: #475569; font-size: 0.9rem;\">\n");
+            html.append("                Mostrando usuarios del ").append(total == 0 ? 0 : fromIndex + 1).append(" al ").append(toIndex).append(" de ").append(total).append("\n");
+            html.append("            </div>\n");
+            html.append("            <div>\n");
+            if (toIndex < total) {
+                html.append("                <a href=\"/api/reportes/usuarios?page=").append(page + 1).append("&size=").append(size).append("\">Siguiente &raquo;</a>\n");
+            } else {
+                html.append("                <span class=\"disabled\">Siguiente &raquo;</span>\n");
+            }
+            html.append("            </div>\n");
+            html.append("        </div>\n");
             
             if (!rutsNoMapeados.isEmpty()) {
                 html.append("        <div style=\"margin-top: 30px; padding: 20px; background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;\">\n");
