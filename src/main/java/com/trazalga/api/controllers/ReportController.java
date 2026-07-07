@@ -323,35 +323,39 @@ public class ReportController {
             }
         }
         
-        // Metrics Summary Grid
+        // Primera fila: tarjetas por perfil (Recolector, Armador, Área, Comercializador, etc.)
         html.append("        <div class=\"summary-grid\">\n");
-        
-        html.append("            <div class=\"card\">\n");
-        html.append("                <span class=\"card-title\">Total Declaraciones</span>\n");
-        html.append("                <span class=\"card-value\">").append(totalDeclaraciones).append("</span>\n");
-        html.append("                <span class=\"card-desc\">En el periodo especificado</span>\n");
-        html.append("            </div>\n");
-        
-        html.append("            <div class=\"card\">\n");
-        html.append("                <span class=\"card-title\">Volumen Total</span>\n");
-        html.append("                <span class=\"card-value\">").append(String.format("%,.1f", totalVolume.doubleValue())).append(" Kg</span>\n");
-        html.append("                <span class=\"card-desc\">Suma de cantidades declaradas</span>\n");
-        html.append("            </div>\n");
-        
-        // Profile specific cards
+
         for (Integer type : selectedTypes) {
             List<ReportDTO> list = reports.getOrDefault(type, new ArrayList<>());
             double vol = list.stream()
                 .mapToDouble(d -> d.getCantidad() != null ? d.getCantidad().doubleValue() : 0.0)
                 .sum();
-            
+
             html.append("            <div class=\"card c-").append(type).append("\">\n");
             html.append("                <span class=\"card-title\">").append(getReportLabel(type)).append("</span>\n");
             html.append("                <span class=\"card-value\">").append(list.size()).append("</span>\n");
             html.append("                <span class=\"card-desc\">").append(String.format("%,.1f", vol)).append(" Kg totales</span>\n");
             html.append("            </div>\n");
         }
-        
+
+        html.append("        </div>\n");
+
+        // Segunda fila: totales globales (Total Declaraciones y Volumen Total)
+        html.append("        <div class=\"summary-grid\">\n");
+
+        html.append("            <div class=\"card\">\n");
+        html.append("                <span class=\"card-title\">Total Declaraciones</span>\n");
+        html.append("                <span class=\"card-value\">").append(totalDeclaraciones).append("</span>\n");
+        html.append("                <span class=\"card-desc\">En el periodo especificado</span>\n");
+        html.append("            </div>\n");
+
+        html.append("            <div class=\"card\">\n");
+        html.append("                <span class=\"card-title\">Volumen Total</span>\n");
+        html.append("                <span class=\"card-value\">").append(String.format("%,.1f", totalVolume.doubleValue())).append(" Kg</span>\n");
+        html.append("                <span class=\"card-desc\">Suma de cantidades declaradas</span>\n");
+        html.append("            </div>\n");
+
         html.append("        </div>\n");
         
         // Tabs container
