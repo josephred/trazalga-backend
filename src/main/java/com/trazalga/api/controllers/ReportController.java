@@ -688,6 +688,9 @@ public class ReportController {
             
             int count = 0;
             for (UsuarioModel u : usuarios) {
+                if (u.getId() <= 4000) {
+                    continue;
+                }
                 String perfil = (u.getPerfil() != null) ? u.getPerfil().getNombre() : "-";
                 String estado = (u.getEstado() != null) ? u.getEstado() : "INACTIVO";
                 String statusClass = estado.equalsIgnoreCase("ACTIVO") ? "status-activo" : "status-inactivo";
