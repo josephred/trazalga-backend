@@ -48,6 +48,7 @@ public class UsuarioModel {
         joinColumns = @JoinColumn(name = "usuario_id"),
         inverseJoinColumns = @JoinColumn(name = "embarcacion_id")
     )
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private java.util.List<EmbarcacionModel> embarcaciones = new java.util.ArrayList<>();
 
     // Este método se ejecuta automáticamente justo antes de insertar en la BD

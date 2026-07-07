@@ -542,18 +542,15 @@ public class SernapescaSyncService {
                 Thread.currentThread().interrupt();
             }
 
-            List<EmbarcacionDto> embs = api.getEmbarcacionesPorFolioRpa(folioRpa);
-            if (embs == null || embs.isEmpty()) {
+            EmbarcacionDto dto = api.getEmbarcacionPorFolioRpa(folioRpa);
+            if (dto == null) {
                 omit++;
                 continue;
             }
 
             List<EmbarcacionModel> userVessels = new ArrayList<>();
-            for (EmbarcacionDto dto : embs) {
-                obt++;
-                if (dto.getFolioRpa() == null || isBlank(dto.getNombreNave())) {
-                    continue;
-                }
+            obt++;
+            if (dto.getFolioRpa() != null && !isBlank(dto.getNombreNave())) {
                 String codigo = String.valueOf(dto.getFolioRpa()).trim();
                 EmbarcacionModel emb = embMap.get(codigo);
                 if (emb == null) {
