@@ -772,6 +772,7 @@ public class ReportController {
         }
         
         if (c2 && c3 && c4) return 10;
+        if (!c2 && c3 && c4) return 10;
         if (c2 && c3 && !c4) return 9;
         if (c2 && !c3 && !c4) return 8;
         if (!c2 && c3 && !c4) return 1;
