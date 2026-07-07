@@ -505,22 +505,10 @@ public class SernapescaSyncService {
                 .build();
     }
 
-    @Transactional
     public void syncUsuarioEmbarcacionesInternal() {
+        log.info("Iniciando sincronización de usuario-embarcación en segundo plano...");
         List<com.trazalga.api.models.UsuarioModel> usuarios = usuarioRepo.findAll();
         int obt = 0, ins = 0, omit = 0;
-        
-        List<EmbarcacionModel> todasEmb = embarcacionRepo.findAll();
-        Map<String, EmbarcacionModel> embMapByCode = new HashMap<>();
-        Map<String, EmbarcacionModel> embMapByName = new HashMap<>();
-        for (EmbarcacionModel e : todasEmb) {
-            if (e.getCodigo() != null) {
-                embMapByCode.put(e.getCodigo().trim(), e);
-            }
-            if (e.getNombre() != null) {
-                embMapByName.put(norm(e.getNombre()), e);
-            }
-        }
 
         for (com.trazalga.api.models.UsuarioModel u : usuarios) {
             if (u.getPerfil() == null) {
@@ -576,41 +564,57 @@ public class SernapescaSyncService {
                 continue;
             }
 
-            List<EmbarcacionModel> userVessels = new ArrayList<>();
             obt++;
-            if (dto.getFolioRpa() != null && !isBlank(dto.getNombreNave())) {
-                String codigo = String.valueOf(dto.getFolioRpa()).trim();
-                String nombreNorm = norm(dto.getNombreNave());
-                
-                EmbarcacionModel emb = embMapByCode.get(codigo);
-                if (emb == null) {
-                    emb = embMapByName.get(nombreNorm);
-                }
-                
-                if (emb == null) {
-                    emb = new EmbarcacionModel()
-                            .setNombre(truncate(dto.getNombreNave().trim(), 100))
-                            .setCodigo(truncate(codigo, 50));
-                    emb = embarcacionRepo.save(emb);
-                    embMapByCode.put(codigo, emb);
-                    embMapByName.put(nombreNorm, emb);
+            try {
+                boolean isNew = self.saveUserVesselRelation(u.getId(), dto);
+                if (isNew) {
                     ins++;
-                } else if (emb.getCodigo() == null) {
-                    emb.setCodigo(truncate(codigo, 50));
-                    emb = embarcacionRepo.save(emb);
-                    embMapByCode.put(codigo, emb);
                 }
-                userVessels.add(emb);
-            }
-
-            if (!userVessels.isEmpty()) {
-                u.getEmbarcaciones().clear();
-                u.getEmbarcaciones().addAll(userVessels);
-                usuarioRepo.save(u);
+            } catch (Exception ex) {
+                log.error("Error guardando relación de embarcación para el usuario con ID " + u.getId(), ex);
+                omit++;
             }
         }
 
-        log.info("Sincronización de usuario-embarcación finalizada. Total procesados/obtenidos: {}, insertados: {}, omitidos: {}", obt, ins, omit);
+        log.info("Sincronización de usuario-embarcación finalizada. Total procesados/obtenidos: {}, insertados/actualizados: {}, omitidos/errores: {}", obt, ins, omit);
+    }
+
+    @Transactional
+    public boolean saveUserVesselRelation(Long userId, EmbarcacionDto dto) {
+        if (dto.getFolioRpa() == null || isBlank(dto.getNombreNave())) {
+            return false;
+        }
+        
+        com.trazalga.api.models.UsuarioModel u = usuarioRepo.findById(userId).orElse(null);
+        if (u == null) {
+            return false;
+        }
+
+        String codigo = String.valueOf(dto.getFolioRpa()).trim();
+        String nombreTrim = dto.getNombreNave().trim();
+        
+        EmbarcacionModel emb = embarcacionRepo.findByCodigo(codigo).orElse(null);
+        boolean isNew = false;
+        if (emb == null) {
+            emb = embarcacionRepo.findByNombre(nombreTrim).orElse(null);
+        }
+        
+        if (emb == null) {
+            emb = new EmbarcacionModel()
+                    .setNombre(truncate(nombreTrim, 100))
+                    .setCodigo(truncate(codigo, 50));
+            emb = embarcacionRepo.save(emb);
+            isNew = true;
+        } else if (emb.getCodigo() == null) {
+            emb.setCodigo(truncate(codigo, 50));
+            emb = embarcacionRepo.save(emb);
+        }
+        
+        u.getEmbarcaciones().clear();
+        u.getEmbarcaciones().add(emb);
+        usuarioRepo.save(u);
+        
+        return isNew;
     }
 
     // ------------------------------------------------------------------
