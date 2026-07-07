@@ -1,6 +1,8 @@
 package com.trazalga.api.controllers;
 
 import com.trazalga.api.dto.ReportDTO;
+import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class ReportController {
 
     private final ReportService reportService;
+    private final IUsuarioRepository usuarioRepository;
 
     @GetMapping
     public ResponseEntity<?> generateReport(
@@ -614,6 +617,95 @@ public class ReportController {
             return ResponseEntity.ok(nodos);
         } catch (Exception e) {
             System.err.println("Error obteniendo trazabilidad: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    @GetMapping(value = "/usuarios", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> getUsuariosHtml() {
+        try {
+            List<UsuarioModel> usuarios = usuarioRepository.findAll();
+            
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html>\n");
+            html.append("<html lang=\"es\">\n");
+            html.append("<head>\n");
+            html.append("    <meta charset=\"UTF-8\">\n");
+            html.append("    <title>Listado de Usuarios</title>\n");
+            html.append("    <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap\" rel=\"stylesheet\">\n");
+            html.append("    <style>\n");
+            html.append("        body {\n");
+            html.append("            font-family: 'Inter', sans-serif;\n");
+            html.append("            background-color: #f8fafc;\n");
+            html.append("            color: #0f172a;\n");
+            html.append("            padding: 40px 20px;\n");
+            html.append("        }\n");
+            html.append("        .container {\n");
+            html.append("            max-width: 1200px;\n");
+            html.append("            margin: 0 auto;\n");
+            html.append("            background: white;\n");
+            html.append("            padding: 30px;\n");
+            html.append("            border-radius: 12px;\n");
+            html.append("            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);\n");
+            html.append("        }\n");
+            html.append("        h2 { color: #1e3a8a; margin-bottom: 20px; }\n");
+            html.append("        table { width: 100%; border-collapse: collapse; margin-top: 20px; }\n");
+            html.append("        th, td { border-bottom: 1px solid #e2e8f0; padding: 12px 15px; text-align: left; }\n");
+            html.append("        th { background-color: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 0.85rem; }\n");
+            html.append("        tr:hover td { background-color: #f8fafc; }\n");
+            html.append("        .status-badge {\n");
+            html.append("            padding: 4px 8px;\n");
+            html.append("            border-radius: 12px;\n");
+            html.append("            font-size: 0.75rem;\n");
+            html.append("            font-weight: 600;\n");
+            html.append("        }\n");
+            html.append("        .status-activo { background-color: #dcfce7; color: #166534; }\n");
+            html.append("        .status-inactivo { background-color: #fee2e2; color: #991b1b; }\n");
+            html.append("    </style>\n");
+            html.append("</head>\n");
+            html.append("<body>\n");
+            html.append("    <div class=\"container\">\n");
+            html.append("        <h2>Listado de Usuarios de la Base de Datos</h2>\n");
+            html.append("        <table>\n");
+            html.append("            <thead>\n");
+            html.append("                <tr>\n");
+            html.append("                    <th>ID</th>\n");
+            html.append("                    <th>RUT</th>\n");
+            html.append("                    <th>Nombres</th>\n");
+            html.append("                    <th>Apellidos</th>\n");
+            html.append("                    <th>Correo</th>\n");
+            html.append("                    <th>Perfil</th>\n");
+            html.append("                    <th>Estado</th>\n");
+            html.append("                </tr>\n");
+            html.append("            </thead>\n");
+            html.append("            <tbody>\n");
+            
+            for (UsuarioModel u : usuarios) {
+                String perfil = (u.getPerfil() != null) ? u.getPerfil().getNombre() : "-";
+                String estado = (u.getEstado() != null) ? u.getEstado() : "INACTIVO";
+                String statusClass = estado.equalsIgnoreCase("ACTIVO") ? "status-activo" : "status-inactivo";
+                
+                html.append("                <tr>\n");
+                html.append("                    <td>").append(u.getId()).append("</td>\n");
+                html.append("                    <td><strong>").append(u.getRut()).append("</strong></td>\n");
+                html.append("                    <td>").append(u.getNombres() != null ? u.getNombres() : "").append("</td>\n");
+                html.append("                    <td>").append(u.getApellidop() != null ? u.getApellidop() : "").append(" ").append(u.getApellidom() != null ? u.getApellidom() : "").append("</td>\n");
+                html.append("                    <td>").append(u.getCorreo() != null ? u.getCorreo() : "").append("</td>\n");
+                html.append("                    <td>").append(perfil).append("</td>\n");
+                html.append("                    <td><span class=\"status-badge ").append(statusClass).append("\">").append(estado).append("</span></td>\n");
+                html.append("                </tr>\n");
+            }
+            
+            html.append("            </tbody>\n");
+            html.append("        </table>\n");
+            html.append("    </div>\n");
+            html.append("</body>\n");
+            html.append("</html>");
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, "text/html; charset=UTF-8")
+                    .body(html.toString());
+        } catch (Exception e) {
+            System.err.println("Error obteniendo listado de usuarios HTML: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
