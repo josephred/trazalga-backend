@@ -44,6 +44,20 @@ public class CuotaExtraccionController {
         return (ArrayList<CuotaExtraccionModel>) cuotaService.getAll();
     }
 
+    /** Datos maestros (regiones, especies, AMERB, usuarios) para los selects del mantenedor. */
+    @GetMapping("/maestros")
+    public Map<String, Object> getMaestros() {
+        return cuotaService.getMaestros();
+    }
+
+    /** Las violaciones de la jerarquía de cuotas (usuario ≤ área ≤ región) llegan como 422 con mensaje. */
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleValidacion(IllegalArgumentException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return org.springframework.http.ResponseEntity.unprocessableEntity().body(body);
+    }
+
     @PostMapping
     public CuotaExtraccionModel create(@RequestBody CuotaExtraccionModel cuota) {
         return cuotaService.save(cuota);

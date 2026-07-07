@@ -31,15 +31,15 @@ public class AlertaTriggerService {
     @Autowired
     private IUsuarioRepository usuarioRepository;
 
-    public void evaluarDeclaracion(Long especieId, Long usuarioId, Double volumen, String perfilAplicable) {
+    public void evaluarDeclaracion(Long especieId, Long usuarioId, Long regionId, Double volumen, String perfilAplicable) {
         if (especieId == null || usuarioId == null) return;
 
         // 1. Evaluar Veda
         Optional<ConfiguracionAlertaModel> configVedaOpt = configuracionService.getByTipo("EXTRACCION_VEDA");
         if (configVedaOpt.isPresent() && configVedaOpt.get().getActivo()) {
             Date hoy = new Date();
-            // Buscar si hay una veda activa para esta especie hoy
-            List<VedaEspecieModel> vedas = vedaRepository.findVedasActivasPorEspecieYFecha(especieId, hoy);
+            // Buscar si hay una veda activa para esta especie y región hoy
+            List<VedaEspecieModel> vedas = vedaRepository.findVedasActivasPorEspecieYRegionYFecha(especieId, regionId, hoy);
             boolean enVeda = vedas != null && !vedas.isEmpty();
 
             if (enVeda) {

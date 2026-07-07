@@ -214,14 +214,16 @@ public class ReportRepository {
             "COUNT(decl.id) as total_declaraciones_veda, " +
             "COALESCE(SUM(decl.desembarque), 0) as total_kg_veda " +
             "FROM (" +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_recolector " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_armador " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion FROM declaracion_area " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_area " +
             ") as decl " +
+            "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
             "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
+            "    AND (v.region_id IS NULL OR v.region_id = c.region_id) " +
             "WHERE 1=1" + dateFilter;
         
         Query query = entityManager.createNativeQuery(sql);
@@ -250,14 +252,16 @@ public class ReportRepository {
         String sql = "SELECT decl.id, decl.tipo_perfil, decl.fecha_declaracion, decl.desembarque, " +
             "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop " +
             "FROM (" +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, 'AREA' as tipo_perfil FROM declaracion_area " +
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'AREA' as tipo_perfil FROM declaracion_area " +
             ") as decl " +
+            "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
             "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
+            "    AND (v.region_id IS NULL OR v.region_id = c.region_id) " +
             "INNER JOIN especie e ON decl.especie_id = e.id " +
             "INNER JOIN usuario u ON decl.usuario_id = u.id " +
             "WHERE 1=1" + dateFilter + " ORDER BY decl.fecha_declaracion DESC";

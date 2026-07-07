@@ -33,6 +33,20 @@ public class VedaEspecieController {
         return vedaService.getById(id);
     }
 
+    /** Datos maestros (especies y regiones) para los selects del mantenedor. */
+    @GetMapping("/maestros")
+    public java.util.Map<String, Object> getMaestros() {
+        return vedaService.getMaestros();
+    }
+
+    /** Los errores de configuración de la veda llegan como 422 con mensaje legible. */
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
+    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> handleValidacion(IllegalArgumentException ex) {
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("message", ex.getMessage());
+        return org.springframework.http.ResponseEntity.unprocessableEntity().body(body);
+    }
+
     @PostMapping
     public VedaEspecieModel create(@RequestBody VedaEspecieModel veda) {
         return vedaService.save(veda);

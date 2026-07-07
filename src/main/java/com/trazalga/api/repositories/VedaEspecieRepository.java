@@ -13,9 +13,9 @@ import java.util.List;
 @Repository
 public interface VedaEspecieRepository extends JpaRepository<VedaEspecieModel, Long> {
 
-    // Find active vedas for a specific species
-    @Query("SELECT v FROM VedaEspecieModel v WHERE v.especie.id = :especieId AND :fecha BETWEEN v.fechaInicio AND v.fechaFin")
-    List<VedaEspecieModel> findVedasActivasPorEspecieYFecha(@Param("especieId") Long especieId, @Param("fecha") Date fecha);
+    // Find active vedas for a specific species and region (null region matches all)
+    @Query("SELECT v FROM VedaEspecieModel v WHERE v.especie.id = :especieId AND (v.region IS NULL OR v.region.id = :regionId) AND :fecha BETWEEN v.fechaInicio AND v.fechaFin")
+    List<VedaEspecieModel> findVedasActivasPorEspecieYRegionYFecha(@Param("especieId") Long especieId, @Param("regionId") Long regionId, @Param("fecha") Date fecha);
 
     // Find active vedas globally or by species within a date range (for reports)
     @Query("SELECT v FROM VedaEspecieModel v WHERE v.fechaInicio <= :endDate AND v.fechaFin >= :startDate")

@@ -239,6 +239,7 @@ public class DeclaracionArmadorService {
         alertaTriggerService.evaluarDeclaracion(
             savedDeclaracion.getEspecie() != null ? savedDeclaracion.getEspecie().getId() : null,
             savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
+            savedDeclaracion.getComuna() != null && savedDeclaracion.getComuna().getRegion() != null ? savedDeclaracion.getComuna().getRegion().getId() : null,
             savedDeclaracion.getDesembarque() != null ? savedDeclaracion.getDesembarque().doubleValue() : 0.0,
             "ARMADOR"
         );

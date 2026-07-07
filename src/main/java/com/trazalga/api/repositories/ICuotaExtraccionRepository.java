@@ -14,4 +14,6 @@ public interface ICuotaExtraccionRepository extends JpaRepository<CuotaExtraccio
 
     List<CuotaExtraccionModel> findByPerfilAndActivoTrue(String perfil);
 
+    List<CuotaExtraccionModel> findByActivoTrue();
+
 }

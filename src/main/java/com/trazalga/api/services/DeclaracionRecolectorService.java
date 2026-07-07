@@ -109,6 +109,7 @@ public class DeclaracionRecolectorService {
         alertaTriggerService.evaluarDeclaracion(
             saved.getEspecie() != null ? saved.getEspecie().getId() : null,
             saved.getUsuario() != null ? saved.getUsuario().getId() : null,
+            saved.getComuna() != null && saved.getComuna().getRegion() != null ? saved.getComuna().getRegion().getId() : null,
             saved.getDesembarque() != null ? saved.getDesembarque().doubleValue() : 0.0,
             "RECOLECTOR"
         );
