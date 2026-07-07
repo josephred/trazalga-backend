@@ -679,9 +679,10 @@ public class ReportController {
             html.append("                    <th>Nombres</th>\n");
             html.append("                    <th>Apellidos</th>\n");
             html.append("                    <th>Correo</th>\n");
-            html.append("                    <th>Perfil</th>\n");
+            html.append("                    <th>Perfil Actual</th>\n");
             html.append("                    <th>Estado</th>\n");
             html.append("                    <th>Categorías Sernapesca</th>\n");
+            html.append("                    <th>Perfil Sugerido (Sernapesca)</th>\n");
             html.append("                </tr>\n");
             html.append("            </thead>\n");
             html.append("            <tbody>\n");
@@ -696,6 +697,7 @@ public class ReportController {
                 String statusClass = estado.equalsIgnoreCase("ACTIVO") ? "status-activo" : "status-inactivo";
                 
                 String categoriasStr = "-";
+                String perfilSugeridoStr = "-";
                 if (count < 3) {
                     Integer rutInt = extractRutNumber(u.getRut());
                     if (rutInt != null) {
@@ -707,6 +709,11 @@ public class ReportController {
                                           .append(cat.getValor()).append("</span>");
                             }
                             categoriasStr = catBuilder.toString();
+                            
+                            Integer pId = determinePerfilSugerido(pescador.getCategorias());
+                            if (pId != null) {
+                                perfilSugeridoStr = "<span class=\"status-badge\" style=\"background:#fef3c7; color:#92400e;\">Perfil " + pId + "</span>";
+                            }
                         }
                     }
                     count++;
@@ -721,6 +728,7 @@ public class ReportController {
                 html.append("                    <td>").append(perfil).append("</td>\n");
                 html.append("                    <td><span class=\"status-badge ").append(statusClass).append("\">").append(estado).append("</span></td>\n");
                 html.append("                    <td>").append(categoriasStr).append("</td>\n");
+                html.append("                    <td>").append(perfilSugeridoStr).append("</td>\n");
                 html.append("                </tr>\n");
             }
             
@@ -751,5 +759,24 @@ public class ReportController {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private Integer determinePerfilSugerido(List<ComboIntDto> categorias) {
+        if (categorias == null || categorias.isEmpty()) return null;
+        
+        boolean c2 = false, c3 = false, c4 = false;
+        for (ComboIntDto cat : categorias) {
+            if (cat.getCodigo() == 2) c2 = true;
+            if (cat.getCodigo() == 3) c3 = true;
+            if (cat.getCodigo() == 4) c4 = true;
+        }
+        
+        if (c2 && c3 && c4) return 10;
+        if (c2 && c3 && !c4) return 9;
+        if (c2 && !c3 && !c4) return 8;
+        if (!c2 && c3 && !c4) return 1;
+        if (!c2 && !c3 && c4) return 2;
+        
+        return null;
     }
 }
