@@ -105,7 +105,7 @@ public class SernapescaSyncService {
         results.add(syncBuzos());
         results.add(syncAmerbs());
         results.add(syncPlantas());
-        results.add(syncUsuarioEmbarcaciones());
+        results.add(syncUsuarioEmbarcaciones(true));
         // Sin fuente conocida en el API de Sernapesca:
         results.add(SyncResult.error("composicion",
                 "No existe un endpoint equivalente en el API de Sernapesca. Poblar manualmente."));
@@ -485,45 +485,137 @@ public class SernapescaSyncService {
                 .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
     }
 
-    public SyncResult syncUsuarioEmbarcaciones() {
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+    // ------------------------------------------------------------------
+    // Relación usuario-embarcación (consulta por RUT al API, en segundo plano)
+    // ------------------------------------------------------------------
+
+    /** Perfiles que operan con embarcación propia (armadores). */
+    private static final List<Long> PERFILES_CON_EMBARCACION = List.of(2L, 9L, 10L);
+
+    /** Pausa entre llamadas al API de Sernapesca, para no saturarlo. */
+    @Value("${trazalga.sync.usuario-embarcacion.delay-ms:250}")
+    private long uexDelayMs;
+
+    /** Hilo dedicado: no ocupa el ForkJoinPool común y serializa ejecuciones. */
+    private final java.util.concurrent.ExecutorService uexExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "sync-usuario-embarcacion");
+                t.setDaemon(true);
+                return t;
+            });
+
+    private final java.util.concurrent.atomic.AtomicBoolean uexEnCurso = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicInteger uexProcesados = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger uexVinculados = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger uexEmbarcacionesCreadas = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger uexOmitidos = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile int uexTotal = 0;
+    private volatile java.util.Date uexInicio;
+    private volatile java.util.Date uexFin;
+    private volatile String uexUltimoError;
+
+    @jakarta.annotation.PreDestroy
+    void shutdownUexExecutor() {
+        uexExecutor.shutdownNow();
+    }
+
+    /**
+     * Lanza la sincronización usuario-embarcación en segundo plano y responde de inmediato.
+     *
+     * @param soloFaltantes true (por defecto): procesa solo usuarios que aún no tienen embarcación
+     *                      vinculada, de modo que cada ejecución continúe donde quedó la anterior.
+     *                      false: re-consulta y re-vincula a todos los usuarios de los perfiles con embarcación.
+     */
+    public SyncResult syncUsuarioEmbarcaciones(boolean soloFaltantes) {
+        if (!uexEnCurso.compareAndSet(false, true)) {
+            return SyncResult.builder().entidad("usuario_embarcacion").ok(true)
+                    .obtenidos(uexProcesados.get()).insertados(uexVinculados.get()).omitidos(uexOmitidos.get())
+                    .mensaje("Ya hay una sincronización Usuario-Embarcación en curso ("
+                            + uexProcesados.get() + " de " + uexTotal + " usuarios procesados). "
+                            + "Puedes consultar el avance en GET /sync/sernapesca/usuario-embarcacion/estado.")
+                    .build();
+        }
+
+        List<Object[]> pendientes;
+        try {
+            pendientes = soloFaltantes
+                    ? usuarioRepo.findIdRutSinEmbarcacionByPerfiles(PERFILES_CON_EMBARCACION)
+                    : usuarioRepo.findIdRutByPerfiles(PERFILES_CON_EMBARCACION);
+        } catch (RuntimeException e) {
+            uexEnCurso.set(false);
+            throw e;
+        }
+
+        uexTotal = pendientes.size();
+        uexProcesados.set(0);
+        uexVinculados.set(0);
+        uexEmbarcacionesCreadas.set(0);
+        uexOmitidos.set(0);
+        uexInicio = new java.util.Date();
+        uexFin = null;
+        uexUltimoError = null;
+
+        final List<Object[]> trabajo = pendientes;
+        uexExecutor.submit(() -> {
             try {
-                self.syncUsuarioEmbarcacionesInternal();
+                syncUsuarioEmbarcacionesInternal(trabajo);
             } catch (Exception e) {
                 log.error("Error en sincronización en segundo plano de usuario-embarcacion", e);
+                uexUltimoError = e.getMessage();
+            } finally {
+                uexFin = new java.util.Date();
+                uexEnCurso.set(false);
             }
         });
 
         return SyncResult.builder()
                 .entidad("usuario_embarcacion")
                 .ok(true)
-                .obtenidos(0)
-                .insertados(0)
-                .actualizados(0)
-                .omitidos(0)
-                .mensaje("La sincronización de la relación Usuario-Embarcación se ha iniciado en segundo plano. Los datos se actualizarán progresivamente.")
+                .obtenidos(uexTotal)
+                .mensaje("La sincronización de la relación Usuario-Embarcación se ha iniciado en segundo plano ("
+                        + uexTotal + " usuarios " + (soloFaltantes ? "sin embarcación pendientes" : "a re-vincular")
+                        + "). Los datos se actualizarán progresivamente.")
                 .build();
     }
 
-    public void syncUsuarioEmbarcacionesInternal() {
-        log.info("Iniciando sincronización de usuario-embarcación en segundo plano...");
-        List<com.trazalga.api.models.UsuarioModel> usuarios = usuarioRepo.findAll();
-        int obt = 0, ins = 0, omit = 0;
+    /** Estado consultable del proceso en segundo plano. */
+    public Map<String, Object> getEstadoUsuarioEmbarcaciones() {
+        Map<String, Object> out = new HashMap<>();
+        boolean enCurso = uexEnCurso.get();
+        out.put("enCurso", enCurso);
+        out.put("total", uexTotal);
+        out.put("procesados", uexProcesados.get());
+        out.put("vinculados", uexVinculados.get());
+        out.put("embarcacionesCreadas", uexEmbarcacionesCreadas.get());
+        out.put("omitidos", uexOmitidos.get());
+        out.put("inicio", uexInicio);
+        out.put("fin", uexFin);
+        out.put("ultimoError", uexUltimoError);
+        out.put("mensaje", enCurso
+                ? "En curso: " + uexProcesados.get() + " de " + uexTotal + " usuarios procesados."
+                : (uexInicio == null
+                        ? "Sin ejecuciones desde el último reinicio."
+                        : "Finalizada: " + uexVinculados.get() + " vinculados, "
+                          + uexEmbarcacionesCreadas.get() + " embarcaciones creadas, "
+                          + uexOmitidos.get() + " omitidos de " + uexTotal + "."));
+        return out;
+    }
 
-        for (com.trazalga.api.models.UsuarioModel u : usuarios) {
-            if (u.getPerfil() == null) {
-                omit++;
-                continue;
-            }
-            Long pid = u.getPerfil().getId();
-            if (pid != 2 && pid != 9 && pid != 10) {
-                omit++;
-                continue;
+    private void syncUsuarioEmbarcacionesInternal(List<Object[]> usuarios) {
+        log.info("Iniciando sincronización de usuario-embarcación en segundo plano ({} usuarios)...", usuarios.size());
+
+        for (Object[] fila : usuarios) {
+            if (Thread.currentThread().isInterrupted()) {
+                log.warn("Sincronización usuario-embarcación interrumpida tras {} usuarios.", uexProcesados.get());
+                break;
             }
 
-            String rutStr = u.getRut();
+            Long usuarioId = ((Number) fila[0]).longValue();
+            String rutStr = fila[1] != null ? fila[1].toString() : null;
+            uexProcesados.incrementAndGet();
+
             if (rutStr == null) {
-                omit++;
+                uexOmitidos.incrementAndGet();
                 continue;
             }
             rutStr = rutStr.replace(".", "").trim();
@@ -534,87 +626,109 @@ public class SernapescaSyncService {
             try {
                 rutInt = Integer.parseInt(rutStr);
             } catch (NumberFormatException nfe) {
-                omit++;
+                uexOmitidos.incrementAndGet();
                 continue;
             }
 
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
+            if (!pausaApi()) {
+                break;
             }
-
             PescadorDto pescador = api.getPescadorPorRut(rutInt);
             if (pescador == null || pescador.getFolioRpa() == null) {
-                omit++;
+                uexOmitidos.incrementAndGet();
                 continue;
             }
 
-            Integer folioRpa = pescador.getFolioRpa();
-            
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
+            if (!pausaApi()) {
+                break;
             }
-
-            EmbarcacionDto dto = api.getEmbarcacionPorFolioRpa(folioRpa);
+            EmbarcacionDto dto = api.getEmbarcacionPorFolioRpa(pescador.getFolioRpa());
             if (dto == null) {
-                omit++;
+                uexOmitidos.incrementAndGet();
                 continue;
             }
 
-            obt++;
             try {
-                boolean isNew = self.saveUserVesselRelation(u.getId(), dto);
-                if (isNew) {
-                    ins++;
+                int resultado = self.saveUserVesselRelation(usuarioId, dto);
+                if (resultado >= 0) {
+                    uexVinculados.incrementAndGet();
+                    if (resultado == 1) {
+                        uexEmbarcacionesCreadas.incrementAndGet();
+                    }
+                } else {
+                    uexOmitidos.incrementAndGet();
                 }
             } catch (Exception ex) {
-                log.error("Error guardando relación de embarcación para el usuario con ID " + u.getId(), ex);
-                omit++;
+                log.error("Error guardando relación de embarcación para el usuario con ID " + usuarioId, ex);
+                uexUltimoError = "Usuario " + usuarioId + ": " + ex.getMessage();
+                uexOmitidos.incrementAndGet();
             }
         }
 
-        log.info("Sincronización de usuario-embarcación finalizada. Total procesados/obtenidos: {}, insertados/actualizados: {}, omitidos/errores: {}", obt, ins, omit);
+        log.info("Sincronización de usuario-embarcación finalizada. Procesados: {}, vinculados: {} ({} embarcaciones nuevas), omitidos: {}",
+                uexProcesados.get(), uexVinculados.get(), uexEmbarcacionesCreadas.get(), uexOmitidos.get());
     }
 
-    @Transactional
-    public boolean saveUserVesselRelation(Long userId, EmbarcacionDto dto) {
-        if (dto.getFolioRpa() == null || isBlank(dto.getNombreNave())) {
+    /** Pausa entre llamadas al API; devuelve false si el hilo fue interrumpido (abortar). */
+    private boolean pausaApi() {
+        try {
+            Thread.sleep(uexDelayMs);
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Sincronización usuario-embarcación interrumpida durante la pausa.");
             return false;
         }
-        
+    }
+
+    /**
+     * Vincula la embarcación al usuario (transacción propia por usuario, para que un
+     * fallo puntual no pierda el avance del resto).
+     *
+     * @return 1 si además se creó la embarcación, 0 si se vinculó una existente,
+     *         -1 si no se pudo vincular.
+     */
+    @Transactional
+    public int saveUserVesselRelation(Long userId, EmbarcacionDto dto) {
+        if (dto.getFolioRpa() == null || isBlank(dto.getNombreNave())) {
+            return -1;
+        }
+
         com.trazalga.api.models.UsuarioModel u = usuarioRepo.findById(userId).orElse(null);
         if (u == null) {
-            return false;
+            return -1;
         }
 
         String codigo = String.valueOf(dto.getFolioRpa()).trim();
         String nombreTrim = dto.getNombreNave().trim();
-        
+
         EmbarcacionModel emb = embarcacionRepo.findByCodigo(codigo).orElse(null);
-        boolean isNew = false;
+        boolean creada = false;
         if (emb == null) {
             emb = embarcacionRepo.findByNombre(nombreTrim).orElse(null);
         }
-        
+
         if (emb == null) {
             emb = new EmbarcacionModel()
                     .setNombre(truncate(nombreTrim, 100))
                     .setCodigo(truncate(codigo, 50));
             emb = embarcacionRepo.save(emb);
-            isNew = true;
+            creada = true;
         } else if (emb.getCodigo() == null) {
             emb.setCodigo(truncate(codigo, 50));
             emb = embarcacionRepo.save(emb);
         }
-        
+
+        // Si el usuario ya está vinculado exactamente a esta embarcación, no reescribir
+        if (u.getEmbarcaciones().size() == 1 && u.getEmbarcaciones().get(0).getId().equals(emb.getId())) {
+            return 0;
+        }
+
         u.getEmbarcaciones().clear();
         u.getEmbarcaciones().add(emb);
         usuarioRepo.save(u);
-        
-        return isNew;
+
+        return creada ? 1 : 0;
     }
 
     // ------------------------------------------------------------------

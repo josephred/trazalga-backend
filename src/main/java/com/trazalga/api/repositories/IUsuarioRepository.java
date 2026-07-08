@@ -39,4 +39,13 @@ public interface IUsuarioRepository extends JpaRepository<UsuarioModel, Long> {
         // 5. Verificar si existe un RUT antes de registrar
         boolean existsByRut(String rut);
 
+        // 6. Proyección (id, rut) de usuarios por perfil, para la sincronización
+        // usuario-embarcación (evita cargar entidades completas en un barrido largo)
+        @Query("SELECT u.id, u.rut FROM UsuarioModel u WHERE u.perfil.id IN :perfiles")
+        List<Object[]> findIdRutByPerfiles(@Param("perfiles") List<Long> perfiles);
+
+        // 7. Igual que la anterior, pero solo usuarios que aún no tienen embarcación vinculada
+        @Query("SELECT u.id, u.rut FROM UsuarioModel u WHERE u.perfil.id IN :perfiles AND u.embarcaciones IS EMPTY")
+        List<Object[]> findIdRutSinEmbarcacionByPerfiles(@Param("perfiles") List<Long> perfiles);
+
 }

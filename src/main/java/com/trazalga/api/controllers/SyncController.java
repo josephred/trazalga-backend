@@ -76,8 +76,16 @@ public class SyncController {
     }
 
     @PostMapping("/usuario-embarcacion")
-    @Operation(summary = "Pobla la relación usuario_embarcacion desde Sernapesca")
-    public SyncResult syncUsuarioEmbarcaciones() {
-        return syncService.syncUsuarioEmbarcaciones();
+    @Operation(summary = "Pobla la relación usuario_embarcacion desde Sernapesca (en segundo plano). "
+            + "Por defecto procesa solo usuarios sin embarcación; soloFaltantes=false re-vincula todos.")
+    public SyncResult syncUsuarioEmbarcaciones(
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "true") boolean soloFaltantes) {
+        return syncService.syncUsuarioEmbarcaciones(soloFaltantes);
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/usuario-embarcacion/estado")
+    @Operation(summary = "Estado y avance de la sincronización usuario_embarcacion en segundo plano")
+    public java.util.Map<String, Object> estadoUsuarioEmbarcaciones() {
+        return syncService.getEstadoUsuarioEmbarcaciones();
     }
 }
