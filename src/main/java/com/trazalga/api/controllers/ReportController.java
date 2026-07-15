@@ -413,7 +413,7 @@ public class ReportController {
 
         html.append("            <div class=\"card\">\n");
         html.append("                <span class=\"card-title\">Volumen Total</span>\n");
-        html.append("                <span class=\"card-value\">").append(String.format("%,.1f", totalVolume.doubleValue())).append(" Kg</span>\n");
+        html.append("                <span class=\"card-value\">").append(String.format("%,.0f", totalVolume.doubleValue())).append(" Kg</span>\n");
         html.append("                <span class=\"card-desc\">Suma de cantidades declaradas</span>\n");
         html.append("            </div>\n");
 
