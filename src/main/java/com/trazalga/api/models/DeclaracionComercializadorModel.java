@@ -35,6 +35,13 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = false)
     private Date fechaDeclaracion;
 
+    // Fecha en que ocurre el traslado físico de la carga. Nullable: si no viene
+    // (declaraciones antiguas o versiones previas de la app) se asume que el
+    // movimiento ocurre al momento de la declaración, como hasta ahora.
+    @Temporal(TemporalType.DATE)
+    @Column(nullable = true)
+    private Date fechaTraslado;
+
     @Column(nullable = false, length = 8)
     private String hora;
 

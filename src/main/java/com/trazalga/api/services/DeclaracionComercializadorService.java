@@ -83,6 +83,7 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionComercializadorModel.setFolioDesembarqueAc(request.getFolioDesembarqueAc());
         declaracionComercializadorModel.setFechaDeclaracion(request.getFechaDeclaracion());
+        declaracionComercializadorModel.setFechaTraslado(request.getFechaTraslado());
         declaracionComercializadorModel.setHora(request.getHora());
         declaracionComercializadorModel.setCodigoSernapesca(request.getCodigoSernapesca());
         declaracionComercializadorModel.setNombreComercializador(request.getNombreComercializador());
