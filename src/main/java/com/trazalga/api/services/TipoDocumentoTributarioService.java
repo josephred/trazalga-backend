@@ -17,18 +17,18 @@ public class TipoDocumentoTributarioService {
     @PostConstruct
     public void seedDefaults() {
         if (tipoDocumentoTributarioRepository.count() == 0) {
-            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder()
-                    .nombre("Guía de Despacho")
-                    .codigo("GD")
-                    .build());
-            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder()
-                    .nombre("Factura")
-                    .codigo("FC")
-                    .build());
-            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder()
-                    .nombre("Boleta")
-                    .codigo("BL")
-                    .build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(33L).nombre("Factura Electrónica").codigo("33").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(34L).nombre("Factura No Afecta o Exenta Electrónica").codigo("34").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(39L).nombre("Boleta Electrónica").codigo("39").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(41L).nombre("Boleta No Afecta o Exenta Electrónica").codigo("41").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(43L).nombre("Liquidación Factura Electrónica").codigo("43").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(46L).nombre("Factura de Compra Electrónica").codigo("46").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(52L).nombre("Guía de Despacho Electrónica").codigo("52").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(56L).nombre("Nota de Débito Electrónica").codigo("56").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(61L).nombre("Nota de Crédito Electrónica").codigo("61").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(110L).nombre("Factura de Exportación Electrónica").codigo("110").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(111L).nombre("Nota de Débito de Exportación Electrónica").codigo("111").build());
+            tipoDocumentoTributarioRepository.save(TipoDocumentoTributarioModel.builder().id(112L).nombre("Nota de Crédito de Exportación Electrónica").codigo("112").build());
         }
     }
 
