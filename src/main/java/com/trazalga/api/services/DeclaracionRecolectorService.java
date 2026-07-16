@@ -55,6 +55,9 @@ public class DeclaracionRecolectorService {
     private AlertaTriggerService alertaTriggerService;
 
     @Autowired
+    private GestionMensajeService gestionMensajeService;
+
+    @Autowired
     private jakarta.persistence.EntityManager entityManager;
 
     private void resolveDependencies(DeclaracionRecolectorModel model) {
@@ -201,6 +204,17 @@ public class DeclaracionRecolectorService {
             }
         }
         populateBuzos(updated);
+
+        // Notificar al destinatario que la declaración fue modificada
+        if (updated.getUsuarioDestinatario() != null && updated.getUsuarioDestinatario().getId() != null) {
+            gestionMensajeService.notificarModificacion(
+                "RECOLECTOR", updated.getId(),
+                updated.getUsuario() != null ? updated.getUsuario().getId() : null,
+                updated.getUsuarioDestinatario().getId(),
+                updated.getFolioOrigen()
+            );
+        }
+
         return updated;
     }
 

@@ -72,6 +72,9 @@ public class DeclaracionArmadorService {
     @Autowired
     private AlertaTriggerService alertaTriggerService;
 
+    @Autowired
+    private GestionMensajeService gestionMensajeService;
+
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
         
@@ -426,6 +429,17 @@ public class DeclaracionArmadorService {
         }
 
         populateBuzos(updatedDeclaracion);
+
+        // Notificar al destinatario que la declaración fue modificada
+        if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
+            gestionMensajeService.notificarModificacion(
+                "ARMADOR", updatedDeclaracion.getId(),
+                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                updatedDeclaracion.getUsuarioDestinatario().getId(),
+                updatedDeclaracion.getFolioOrigen()
+            );
+        }
+
         return updatedDeclaracion;
     }
 

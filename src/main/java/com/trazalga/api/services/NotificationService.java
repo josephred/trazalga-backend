@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class NotificationService {
@@ -58,24 +59,38 @@ public class NotificationService {
     }
 
     public void sendPushNotificationToUser(Long usuarioId, String title, String body) {
+        sendPushNotificationToUser(usuarioId, title, body, null);
+    }
+
+    /**
+     * Envía push notification con datos de navegación adicionales.
+     * El data map se incluye en el payload FCM para que el frontend pueda
+     * reaccionar según el tipo de notificación (ej: abrir modal de gestión).
+     */
+    public void sendPushNotificationToUser(Long usuarioId, String title, String body, Map<String, String> data) {
         List<DeviceTokenModel> tokens = deviceTokenRepository.findByUsuarioId(usuarioId);
         
         for (DeviceTokenModel deviceToken : tokens) {
             try {
                 if (FirebaseApp.getApps().isEmpty()) {
-                    System.out.println("MOCK FCM PUSH a " + deviceToken.getToken() + ": " + title + " - " + body);
+                    System.out.println("MOCK FCM PUSH a " + deviceToken.getToken() + ": " + title + " - " + body
+                            + (data != null ? " data=" + data : ""));
                     continue; // Mock fallback
                 }
 
-                Message message = Message.builder()
+                Message.Builder messageBuilder = Message.builder()
                         .setToken(deviceToken.getToken())
                         .setNotification(Notification.builder()
                                 .setTitle(title)
                                 .setBody(body)
-                                .build())
-                        .build();
+                                .build());
 
-                String response = FirebaseMessaging.getInstance().send(message);
+                // Agregar datos de navegación al payload
+                if (data != null && !data.isEmpty()) {
+                    messageBuilder.putAllData(data);
+                }
+
+                String response = FirebaseMessaging.getInstance().send(messageBuilder.build());
                 System.out.println("Successfully sent message: " + response);
             } catch (Exception e) {
                 System.out.println("Failed to send push: " + e.getMessage());

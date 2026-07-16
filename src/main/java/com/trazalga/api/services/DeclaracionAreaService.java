@@ -59,6 +59,9 @@ public class DeclaracionAreaService {
     @Autowired
     private AlertaTriggerService alertaTriggerService;
 
+    @Autowired
+    private GestionMensajeService gestionMensajeService;
+
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
         if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null) {
             if (declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
@@ -251,6 +254,17 @@ public class DeclaracionAreaService {
         }
 
         populateBuzos(updatedDeclaracion);
+
+        // Notificar al destinatario que la declaración fue modificada
+        if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
+            gestionMensajeService.notificarModificacion(
+                "AREA", updatedDeclaracion.getId(),
+                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                updatedDeclaracion.getUsuarioDestinatario().getId(),
+                updatedDeclaracion.getFolioOrigen()
+            );
+        }
+
         return updatedDeclaracion;
     }
 
