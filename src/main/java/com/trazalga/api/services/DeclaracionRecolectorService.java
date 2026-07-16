@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.DeclaracionBuzosModel;
@@ -83,6 +85,17 @@ public class DeclaracionRecolectorService {
     }
 
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+        if (declaracionRecolectorModel.getFechaDeclaracion() != null) {
+            if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel.getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            }
+            if (declaracionRecolectorModel.getPeriodoExtraccionInicio() != null && declaracionRecolectorModel.getPeriodoExtraccionInicio().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
+            }
+            if (declaracionRecolectorModel.getPeriodoExtraccionFin() != null && declaracionRecolectorModel.getPeriodoExtraccionFin().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
+            }
+        }
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         resolveDependencies(declaracionRecolectorModel);
@@ -124,6 +137,17 @@ public class DeclaracionRecolectorService {
     }
 
     public DeclaracionRecolectorModel updateById(DeclaracionRecolectorModel request, Long id){
+        if (request.getFechaDeclaracion() != null) {
+            if (request.getFechaExtraccion() != null && request.getFechaExtraccion().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            }
+            if (request.getPeriodoExtraccionInicio() != null && request.getPeriodoExtraccionInicio().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
+            }
+            if (request.getPeriodoExtraccionFin() != null && request.getPeriodoExtraccionFin().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
+            }
+        }
         DeclaracionRecolectorModel declaracionRecolectorModel = declaracionRecolectorRepository.findById(id).get();
         if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");

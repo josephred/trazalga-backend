@@ -1,16 +1,7 @@
 package com.trazalga.api.models;
 
 import java.util.Date;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Temporal;
-import jakarta.persistence.TemporalType;
-
+import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
 
@@ -28,8 +19,9 @@ public class DocumentoTributarioModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column
-    private String tipo;
+    @ManyToOne
+    @JoinColumn(name = "tipo_id", nullable = false)
+    private TipoDocumentoTributarioModel tipo;
 
     @Column
     private String numero;

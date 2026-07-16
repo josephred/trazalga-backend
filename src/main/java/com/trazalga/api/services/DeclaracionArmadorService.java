@@ -84,8 +84,13 @@ public class DeclaracionArmadorService {
         
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
-        declaracion.setFechaExtraccion(parseDate(request.getFechaExtraccion()));
-        declaracion.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
+        Date fechaExt = parseDate(request.getFechaExtraccion());
+        Date fechaDec = parseDate(request.getFechaDeclaracion());
+        if (fechaExt != null && fechaDec != null && fechaExt.after(fechaDec)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+        }
+        declaracion.setFechaExtraccion(fechaExt);
+        declaracion.setFechaDeclaracion(fechaDec);
         declaracion.setHora(request.getHora());
         
         if (request.getEmbarcacion() == null) {
@@ -271,8 +276,13 @@ public class DeclaracionArmadorService {
 
         declaracionArmadorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionArmadorModel.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
-        declaracionArmadorModel.setFechaExtraccion(parseDate(request.getFechaExtraccion()));
-        declaracionArmadorModel.setFechaDeclaracion(parseDate(request.getFechaDeclaracion()));
+        Date fechaExt = parseDate(request.getFechaExtraccion());
+        Date fechaDec = parseDate(request.getFechaDeclaracion());
+        if (fechaExt != null && fechaDec != null && fechaExt.after(fechaDec)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+        }
+        declaracionArmadorModel.setFechaExtraccion(fechaExt);
+        declaracionArmadorModel.setFechaDeclaracion(fechaDec);
         declaracionArmadorModel.setHora(request.getHora());
         
         if (request.getEmbarcacion() == null) {

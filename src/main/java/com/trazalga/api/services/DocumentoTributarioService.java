@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import com.trazalga.api.models.DocumentoTributarioModel;
 import com.trazalga.api.repositories.IDocumentoTributarioRepository;
@@ -20,6 +22,9 @@ public class DocumentoTributarioService {
     } 
 
     public DocumentoTributarioModel saveDocumentoTributario(DocumentoTributarioModel documentoTributario){
+        if (documentoTributario.getNumero() == null || !documentoTributario.getNumero().matches("^\\d+$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de documento tributario debe contener solo dígitos.");
+        }
         return documentoTributarioRepository.save(documentoTributario);
     }
 
@@ -28,6 +33,9 @@ public class DocumentoTributarioService {
     }
 
     public DocumentoTributarioModel updateById(DocumentoTributarioModel request,Long id){
+        if (request.getNumero() == null || !request.getNumero().matches("^\\d+$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de documento tributario debe contener solo dígitos.");
+        }
         DocumentoTributarioModel documentoTributario = documentoTributarioRepository.findById(id).get();
         documentoTributario.setTipo(request.getTipo());
         documentoTributario.setNumero(request.getNumero());

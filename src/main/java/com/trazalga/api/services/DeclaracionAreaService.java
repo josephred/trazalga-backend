@@ -16,6 +16,8 @@ import com.trazalga.api.repositories.DeclaracionBuzosRepository;
 import com.trazalga.api.models.DeclaracionBuzosModel;
 import com.trazalga.api.models.PerfilModel;
 import java.util.ArrayList;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @Service
 public class DeclaracionAreaService {
@@ -58,6 +60,11 @@ public class DeclaracionAreaService {
     private AlertaTriggerService alertaTriggerService;
 
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
+        if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null) {
+            if (declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            }
+        }
         sanearComposicion(declaracion);
         // Si la AMERB tiene datos, intentar encontrar la AMERB real en el servidor
         if (declaracion.getAmerb() != null) {
@@ -190,6 +197,11 @@ public class DeclaracionAreaService {
     }
 
     public DeclaracionAreaModel updateDeclaracion(Long id, DeclaracionAreaModel request) {
+        if (request.getFechaExtraccion() != null && request.getFechaDeclaracion() != null) {
+            if (request.getFechaExtraccion().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            }
+        }
         DeclaracionAreaModel declaracion = declaracionAreaRepository.findById(id).orElseThrow();
         if (declaracion.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
