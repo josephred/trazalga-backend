@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/gestion-mensaje")
-@CrossOrigin(origins = "*")
 public class GestionMensajeController {
 
     @Autowired
