@@ -16,7 +16,11 @@ import com.trazalga.api.models.DeclaracionRecolectorModel;
 public interface IDeclaracionRecolectorRepository extends JpaRepository<DeclaracionRecolectorModel, Long> {
     
     // Método personalizado para encontrar registros donde declaracion_destinatario_id es null para un usuario destinatario específico
-    List<DeclaracionRecolectorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Seleccionables por el destinatario: no consumidas y no rechazadas
+    // (estado NULL = declaraciones previas a la columna, equivalen a ENVIADA)
+    @Query("SELECT d FROM DeclaracionRecolectorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionRecolectorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 
     // Método para obtener todas las declaraciones del recolector por id de usuario
     ArrayList<DeclaracionRecolectorModel> findAllByUsuarioId(Long usuarioId);

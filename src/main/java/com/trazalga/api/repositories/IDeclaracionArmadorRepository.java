@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionArmadorModel;
@@ -14,7 +15,11 @@ import com.trazalga.api.models.DeclaracionArmadorModel;
 public interface IDeclaracionArmadorRepository extends JpaRepository<DeclaracionArmadorModel, Long> {
 
     // Método para obtener todas las declaraciones del armador donde la declaración de destino es nula
-    List<DeclaracionArmadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Seleccionables por el destinatario: no consumidas y no rechazadas
+    // (estado NULL = declaraciones previas a la columna, equivalen a ENVIADA)
+    @Query("SELECT d FROM DeclaracionArmadorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionArmadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 
     // Método para obtener todas las declaraciones del armador por ID de usuario
     ArrayList<DeclaracionArmadorModel> findAllByUsuarioId(Long usuarioId);

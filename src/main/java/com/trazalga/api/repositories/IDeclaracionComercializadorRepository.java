@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
@@ -28,5 +29,9 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
     List<DeclaracionComercializadorModel> findByUsuarioDestinatarioId(Long usuarioDestinatarioId);
 
     // Método personalizado para encontrar registros donde declaracion_destinatario_id es null para un usuario destinatario específico
-    List<DeclaracionComercializadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Seleccionables por el destinatario: no consumidas y no rechazadas
+    // (estado NULL = declaraciones previas a la columna, equivalen a ENVIADA)
+    @Query("SELECT d FROM DeclaracionComercializadorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionComercializadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 }

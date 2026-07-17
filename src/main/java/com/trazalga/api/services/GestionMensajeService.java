@@ -21,6 +21,9 @@ public class GestionMensajeService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private EstadoDeclaracionService estadoDeclaracionService;
+
     /**
      * Envía un nuevo mensaje de gestión y notifica al receptor vía push notification.
      */
@@ -50,6 +53,10 @@ public class GestionMensajeService {
                 .build();
 
         GestionMensajeModel saved = mensajeRepository.save(nuevoMensaje);
+
+        // Con la conversación abierta, la declaración pasa a estado NEGOCIACION
+        // (solo desde ENVIADA; un rechazo no se revierte por mensajes, solo por re-envío)
+        estadoDeclaracionService.marcarEnNegociacionSiEnviada(declaracionTipo, declaracionId);
 
         // Enviar push notification al receptor con datos de navegación
         String nombreEmisor = (emisor.getNombres() + " " + (emisor.getApellidop() != null ? emisor.getApellidop() : "")).trim();

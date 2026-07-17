@@ -114,6 +114,16 @@ public class DeclaracionArmadorModel {
     @Column(name = "peso_recepcionado", nullable = true)
     private Double pesoRecepcionado;
 
+    /**
+     * Estado del ciclo de negociación de la declaración:
+     *  ENVIADA (default) -> NEGOCIACION (al primer mensaje de gestión)
+     *  -> RECHAZADA (el destinatario la rechaza; sale de sus seleccionables)
+     *  -> NEGOCIACION (el emisor la corrige y la re-envía).
+     * El estado "consumida/procesada" NO vive aquí: se deriva de declaracionDestinatario.
+     */
+    @Column(nullable = true, length = 20)
+    private String estado;
+
     // Campo transitorio para recibir la lista de buzos del frontend (no se persiste en esta tabla)
     @Transient
     private List<BuzoModel> buzos;

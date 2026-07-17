@@ -3,6 +3,7 @@ package com.trazalga.api.repositories;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.trazalga.api.models.DeclaracionAreaModel;
 
@@ -27,5 +28,9 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
 
     // NUEVO MÉTODO AÑADIDO
     // Busca declaraciones por usuario destinatario donde aún no se ha creado una declaración de destino.
-    List<DeclaracionAreaModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Seleccionables por el destinatario: no consumidas y no rechazadas
+    // (estado NULL = declaraciones previas a la columna, equivalen a ENVIADA)
+    @Query("SELECT d FROM DeclaracionAreaModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionAreaModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 }
