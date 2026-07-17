@@ -8,6 +8,7 @@ import java.util.List;
 @Repository
 public interface DeviceTokenRepository extends JpaRepository<DeviceTokenModel, Long> {
     List<DeviceTokenModel> findByUsuarioId(Long usuarioId);
+    java.util.Optional<DeviceTokenModel> findByToken(String token);
     void deleteByToken(String token);
     boolean existsByToken(String token);
 }

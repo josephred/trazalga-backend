@@ -58,17 +58,30 @@ public class NotificationService {
     }
 
     public void saveToken(Long usuarioId, String token, String dispositivo) {
-        if (!deviceTokenRepository.existsByToken(token)) {
-            DeviceTokenModel deviceToken = DeviceTokenModel.builder()
-                    .usuarioId(usuarioId)
-                    .token(token)
-                    .dispositivo(dispositivo)
-                    .createdAt(new Date())
-                    .build();
-            deviceTokenRepository.save(deviceToken);
+        // El token FCM identifica al DISPOSITIVO. Si ya existe registrado a otro
+        // usuario (ej: alguien más inició sesión antes en este mismo teléfono),
+        // se reasigna: las notificaciones deben llegar al usuario con sesión activa.
+        DeviceTokenModel existente = deviceTokenRepository.findByToken(token).orElse(null);
+        if (existente != null) {
+            if (!usuarioId.equals(existente.getUsuarioId())) {
+                existente.setUsuarioId(usuarioId);
+                existente.setCreatedAt(new Date());
+                deviceTokenRepository.save(existente);
+            }
+            return;
         }
+        DeviceTokenModel deviceToken = DeviceTokenModel.builder()
+                .usuarioId(usuarioId)
+                .token(token)
+                .dispositivo(dispositivo)
+                .createdAt(new Date())
+                .build();
+        deviceTokenRepository.save(deviceToken);
     }
 
+    // @Transactional es obligatorio: los delete derivados de Spring Data
+    // fallan con TransactionRequiredException sin una transacción activa.
+    @org.springframework.transaction.annotation.Transactional
     public void removeToken(String token) {
         deviceTokenRepository.deleteByToken(token);
     }
@@ -83,6 +96,16 @@ public class NotificationService {
      * reaccionar según el tipo de notificación (ej: abrir modal de gestión).
      */
     public void sendPushNotificationToUser(Long usuarioId, String title, String body, Map<String, String> data) {
+        // Incluir siempre el destinatario en el payload: la app lo usa para descartar
+        // notificaciones dirigidas a un usuario distinto al de la sesión activa
+        // (posible con tokens antiguos en dispositivos compartidos).
+        Map<String, String> dataConReceptor = new java.util.HashMap<>();
+        if (data != null) {
+            dataConReceptor.putAll(data);
+        }
+        dataConReceptor.put("receptorId", String.valueOf(usuarioId));
+        data = dataConReceptor;
+
         List<DeviceTokenModel> tokens = deviceTokenRepository.findByUsuarioId(usuarioId);
         
         for (DeviceTokenModel deviceToken : tokens) {
