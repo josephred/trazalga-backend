@@ -12,6 +12,10 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+
 import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
@@ -23,21 +27,32 @@ public class NotificationService {
     @Autowired
     private DeviceTokenRepository deviceTokenRepository;
 
+    @Value("${trazalga.firebase.config-path}")
+    private String firebaseConfigPath;
+
+    @Autowired
+    private ResourceLoader resourceLoader;
+
     @PostConstruct
     public void initialize() {
         try {
-            InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("firebase-service-account.json");
-            if (serviceAccount != null && FirebaseApp.getApps().isEmpty()) {
-                FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                        .build();
-                FirebaseApp.initializeApp(options);
-                System.out.println("Firebase App initialized.");
-            } else if (serviceAccount == null) {
-                System.out.println("WARNING: firebase-service-account.json not found in resources.");
+            Resource resource = resourceLoader.getResource(firebaseConfigPath);
+            if (resource.exists()) {
+                try (InputStream serviceAccount = resource.getInputStream()) {
+                    if (FirebaseApp.getApps().isEmpty()) {
+                        FirebaseOptions options = FirebaseOptions.builder()
+                                .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                                .build();
+                        FirebaseApp.initializeApp(options);
+                        System.out.println("Firebase App initialized from: " + firebaseConfigPath);
+                    }
+                }
+            } else {
+                System.out.println("WARNING: Firebase config resource not found: " + firebaseConfigPath);
             }
             System.out.println("Notification Service Ready.");
         } catch (Exception e) {
+            System.out.println("ERROR: Failed to initialize Firebase.");
             e.printStackTrace();
         }
     }
