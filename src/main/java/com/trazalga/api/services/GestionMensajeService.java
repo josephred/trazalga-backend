@@ -61,6 +61,11 @@ public class GestionMensajeService {
         data.put("declaracionTipo", declaracionTipo);
         data.put("declaracionId", String.valueOf(declaracionId));
         data.put("emisorId", String.valueOf(emisorId));
+        // Perfil del receptor: el frontend lo necesita para navegar a la vista correcta
+        // (el dueño de la declaración ve su historial; el destinatario, sus asignadas)
+        if (receptor.getPerfil() != null) {
+            data.put("receptorPerfilId", String.valueOf(receptor.getPerfil().getId()));
+        }
 
         notificationService.sendPushNotificationToUser(receptorId, titulo, cuerpo, data);
 
@@ -112,20 +117,19 @@ public class GestionMensajeService {
                 .orElse("Un usuario");
 
         // Crear un mensaje automático en la conversación
-        if (modificadorOpt.isPresent() && destinatarioId != null) {
-            Optional<UsuarioModel> destinatarioOpt = usuarioRepository.findById(destinatarioId);
-            if (destinatarioOpt.isPresent()) {
-                GestionMensajeModel mensajeAuto = GestionMensajeModel.builder()
-                        .declaracionTipo(declaracionTipo)
-                        .declaracionId(declaracionId)
-                        .emisor(modificadorOpt.get())
-                        .receptor(destinatarioOpt.get())
-                        .mensaje("📝 Declaración modificada automáticamente por " + nombreModificador)
-                        .fechaEnvio(new Date())
-                        .leido(false)
-                        .build();
-                mensajeRepository.save(mensajeAuto);
-            }
+        Optional<UsuarioModel> destinatarioOpt = destinatarioId != null
+                ? usuarioRepository.findById(destinatarioId) : Optional.empty();
+        if (modificadorOpt.isPresent() && destinatarioOpt.isPresent()) {
+            GestionMensajeModel mensajeAuto = GestionMensajeModel.builder()
+                    .declaracionTipo(declaracionTipo)
+                    .declaracionId(declaracionId)
+                    .emisor(modificadorOpt.get())
+                    .receptor(destinatarioOpt.get())
+                    .mensaje("📝 Declaración modificada automáticamente por " + nombreModificador)
+                    .fechaEnvio(new Date())
+                    .leido(false)
+                    .build();
+            mensajeRepository.save(mensajeAuto);
         }
 
         // Enviar push notification
@@ -136,6 +140,12 @@ public class GestionMensajeService {
         data.put("type", "GESTION_MODIFICADA");
         data.put("declaracionTipo", declaracionTipo);
         data.put("declaracionId", String.valueOf(declaracionId));
+        // Perfil del receptor para que el frontend navegue a la vista correcta
+        destinatarioOpt.ifPresent(d -> {
+            if (d.getPerfil() != null) {
+                data.put("receptorPerfilId", String.valueOf(d.getPerfil().getId()));
+            }
+        });
 
         notificationService.sendPushNotificationToUser(destinatarioId, titulo, cuerpo, data);
     }
