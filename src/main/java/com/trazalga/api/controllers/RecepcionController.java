@@ -42,6 +42,11 @@ public class RecepcionController {
     @Autowired
     private IDeclaracionComercializadorRepository comercializadorRepository;
 
+    // El peso recepcionado es inmutable una vez registrado (requisito SERNAPESCA:
+    // "no permitir modificar peso enviado") para preservar la integridad fiscal.
+    private static final String YA_REGISTRADO =
+            "El peso recepcionado ya fue registrado y no puede modificarse.";
+
     public static class PesoRequest {
         public Double pesoRecepcionado;
     }
@@ -67,6 +72,9 @@ public class RecepcionController {
                 if (d.getDeclaracionDestinatario() == null) {
                     return ResponseEntity.badRequest().body("La declaración aún no ha sido recepcionada por un destinatario.");
                 }
+                if (d.getPesoRecepcionado() != null) {
+                    return ResponseEntity.status(409).body(YA_REGISTRADO);
+                }
                 d.setPesoRecepcionado(req.pesoRecepcionado);
                 recolectorRepository.save(d);
                 pesoDeclarado = d.getDesembarque() != null ? d.getDesembarque().doubleValue() : null;
@@ -78,6 +86,9 @@ public class RecepcionController {
                 DeclaracionArmadorModel d = opt.get();
                 if (d.getDeclaracionDestinatario() == null) {
                     return ResponseEntity.badRequest().body("La declaración aún no ha sido recepcionada por un destinatario.");
+                }
+                if (d.getPesoRecepcionado() != null) {
+                    return ResponseEntity.status(409).body(YA_REGISTRADO);
                 }
                 d.setPesoRecepcionado(req.pesoRecepcionado);
                 armadorRepository.save(d);
@@ -91,6 +102,9 @@ public class RecepcionController {
                 if (d.getDeclaracionDestinatario() == null) {
                     return ResponseEntity.badRequest().body("La declaración aún no ha sido recepcionada por un destinatario.");
                 }
+                if (d.getPesoRecepcionado() != null) {
+                    return ResponseEntity.status(409).body(YA_REGISTRADO);
+                }
                 d.setPesoRecepcionado(req.pesoRecepcionado);
                 areaRepository.save(d);
                 pesoDeclarado = d.getDesembarque();
@@ -102,6 +116,9 @@ public class RecepcionController {
                 DeclaracionComercializadorModel d = opt.get();
                 if (d.getDeclaracionDestinatario() == null) {
                     return ResponseEntity.badRequest().body("La declaración aún no ha sido recepcionada por un destinatario.");
+                }
+                if (d.getPesoRecepcionado() != null) {
+                    return ResponseEntity.status(409).body(YA_REGISTRADO);
                 }
                 d.setPesoRecepcionado(req.pesoRecepcionado);
                 comercializadorRepository.save(d);
