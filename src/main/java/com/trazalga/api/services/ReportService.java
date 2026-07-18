@@ -38,6 +38,10 @@ public class ReportService {
         return reportRepository.getCasosAbiertosDetalle(startDate, endDate);
     }
 
+    public java.util.Map<String, Object> getDobleOperacion(Date startDate, Date endDate, Double toleranciaPct) {
+        return reportRepository.getDobleOperacion(startDate, endDate, toleranciaPct);
+    }
+
     public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {
         return reportRepository.getVolumenPorEspecie(startDate, endDate, perfil);
     }

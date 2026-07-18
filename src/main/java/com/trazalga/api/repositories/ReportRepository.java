@@ -433,6 +433,82 @@ public class ReportRepository {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Indicador "Doble Operación" (AMERB #5): posibles duplicidades de captura del
+     * mismo actor y especie, el mismo día, en ALA (recolector/armador) y AMERB (area),
+     * con volúmenes dentro de una tolerancia. Solo lectura; para revisión del fiscalizador.
+     * El criterio (mismo día + volumen ±tolerancia) es una definición inicial pendiente
+     * de formalizar con SERNAPESCA; la tolerancia llega por parámetro (default 5%).
+     */
+    public java.util.Map<String, Object> getDobleOperacion(Date startDate, Date endDate, Double toleranciaPct) {
+        double tolerancia = (toleranciaPct != null && toleranciaPct >= 0) ? toleranciaPct : 5.0;
+
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND area.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND area.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND area.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT " +
+            "area.fecha_declaracion AS fecha, " +
+            "u.rut, u.nombres, u.apellidop, " +
+            "e.nombre AS especie, " +
+            "ala.tipo_ala, " +
+            "ala.id AS ala_id, ala.desembarque AS kg_ala, " +
+            "area.id AS area_id, area.desembarque AS kg_amerb, " +
+            "am.nombre AS amerb_nombre, " +
+            "ROUND(ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100, 1) AS variacion_pct " +
+            "FROM declaracion_area area " +
+            "INNER JOIN (" +
+            "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'RECOLECTOR' AS tipo_ala FROM declaracion_recolector " +
+            "    UNION ALL " +
+            "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'ARMADOR' AS tipo_ala FROM declaracion_armador " +
+            ") ala " +
+            "    ON ala.usuario_id = area.usuario_id " +
+            "    AND ala.especie_id = area.especie_id " +
+            "    AND ala.fecha_declaracion = area.fecha_declaracion " +
+            "    AND ala.desembarque > 0 " +
+            "    AND (ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100) <= :tolerancia " +
+            "INNER JOIN especie e ON e.id = area.especie_id " +
+            "INNER JOIN usuario u ON u.id = area.usuario_id " +
+            "LEFT JOIN amerb am ON am.id = area.amerb_id " +
+            "WHERE 1=1" + dateFilter + " " +
+            "ORDER BY area.fecha_declaracion DESC, u.rut";
+
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("tolerancia", tolerancia);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> rows = query.getResultList();
+
+        List<java.util.Map<String, Object>> detalle = rows.stream().map(row -> {
+            java.util.Map<String, Object> m = new java.util.HashMap<>();
+            m.put("fecha", row[0] != null ? row[0].toString() : "");
+            String actor = (row[2] != null ? row[2].toString() : "") + " " + (row[3] != null ? row[3].toString() : "");
+            m.put("actor", actor.trim());
+            m.put("rut", row[1] != null ? row[1].toString() : "");
+            m.put("especie", row[4] != null ? row[4].toString() : "");
+            m.put("tipoAla", row[5] != null ? row[5].toString() : "");
+            m.put("alaId", row[6] != null ? ((Number) row[6]).longValue() : null);
+            m.put("kgAla", row[7] != null ? ((Number) row[7]).doubleValue() : 0.0);
+            m.put("areaId", row[8] != null ? ((Number) row[8]).longValue() : null);
+            m.put("kgAmerb", row[9] != null ? ((Number) row[9]).doubleValue() : 0.0);
+            m.put("amerb", row[10] != null ? row[10].toString() : "");
+            m.put("variacionPct", row[11] != null ? ((Number) row[11]).doubleValue() : 0.0);
+            return m;
+        }).collect(Collectors.toList());
+
+        java.util.Map<String, Object> out = new java.util.HashMap<>();
+        out.put("toleranciaPct", tolerancia);
+        out.put("totalCoincidencias", detalle.size());
+        out.put("detalle", detalle);
+        return out;
+    }
+
     public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
         String dateFilter = "";
         if (startDate != null && endDate != null) {
