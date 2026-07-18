@@ -351,17 +351,26 @@ public class ReportRepository {
             dateFilter = " WHERE fecha_declaracion <= :endDate";
         }
 
-        // Base sobre declaraciones de origen (recolector/armador/área):
-        // total, volumen, actores distintos y casos de gestión abiertos (estado).
-        String sql = "SELECT COUNT(id) as total_declaraciones, COALESCE(SUM(desembarque), 0) as total_volumen, " +
+        // Base sobre todas las declaraciones para total y actores. 
+        // Volumen, inconsistencias y casos abiertos se mantienen enfocados en el origen.
+        String sql = "SELECT COUNT(id) as total_declaraciones, " +
+            "COALESCE(SUM(CASE WHEN is_origen = 1 THEN desembarque ELSE 0 END), 0) as total_volumen, " +
             "COUNT(DISTINCT usuario_id) as actores_distintos, " +
             "SUM(CASE WHEN estado IN ('NEGOCIACION','RECHAZADA') THEN 1 ELSE 0 END) as casos_abiertos, " +
             "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas FROM (" +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_recolector " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_armador " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_area " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_area " +
+            "    UNION ALL " +
+            "    SELECT id, cantidad as desembarque, fecha_declaracion, usuario_id, estado, 0 as is_origen FROM declaracion_comercializador " +
+            "    UNION ALL " +
+            "    SELECT id, cantidad as desembarque, fecha_ingreso_planta as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_abastecimiento " +
+            "    UNION ALL " +
+            "    SELECT id, cantidad_producto as desembarque, fecha_produccion as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_produccion " +
+            "    UNION ALL " +
+            "    SELECT id, cantidad as desembarque, fecha_declaracion_destino as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_destino " +
             ") as decl " + dateFilter;
 
         Query query = entityManager.createNativeQuery(sql);
