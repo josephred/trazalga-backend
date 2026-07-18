@@ -357,22 +357,26 @@ public class ReportRepository {
             "COALESCE(SUM(CASE WHEN is_origen = 1 THEN desembarque ELSE 0 END), 0) as total_volumen, " +
             "COUNT(DISTINCT usuario_id) as actores_distintos, " +
             "SUM(CASE WHEN estado IN ('NEGOCIACION','RECHAZADA') THEN 1 ELSE 0 END) as casos_abiertos, " +
-            "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas FROM (" +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_recolector " +
+            "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas, " +
+            "SUM(CASE WHEN tipo_decl = 1 THEN 1 ELSE 0 END) as total_recolector, " +
+            "SUM(CASE WHEN tipo_decl = 2 THEN 1 ELSE 0 END) as total_armador, " +
+            "SUM(CASE WHEN tipo_decl = 3 THEN 1 ELSE 0 END) as total_area, " +
+            "SUM(CASE WHEN tipo_decl = 4 THEN 1 ELSE 0 END) as total_comercializador FROM (" +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 1 as tipo_decl FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_armador " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 2 as tipo_decl FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen FROM declaracion_area " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 3 as tipo_decl FROM declaracion_area " +
             "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_declaracion, usuario_id, estado, 0 as is_origen FROM declaracion_comercializador " +
+            "    SELECT id, cantidad as desembarque, fecha_declaracion, usuario_id, estado, 0 as is_origen, 4 as tipo_decl FROM declaracion_comercializador " +
             "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_ingreso_planta as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_abastecimiento " +
+            "    SELECT id, cantidad as desembarque, fecha_ingreso_planta as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 5 as tipo_decl FROM declaracion_planta_abastecimiento " +
             "    UNION ALL " +
-            "    SELECT id, cantidad_producto as desembarque, fecha_produccion as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_produccion " +
+            "    SELECT id, cantidad_producto as desembarque, fecha_produccion as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 6 as tipo_decl FROM declaracion_planta_produccion " +
             "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_declaracion_destino as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen FROM declaracion_planta_destino " +
+            "    SELECT id, cantidad as desembarque, fecha_declaracion_destino as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 7 as tipo_decl FROM declaracion_planta_destino " +
             ") as decl " + dateFilter;
-
+            
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
@@ -383,6 +387,10 @@ public class ReportRepository {
         long actores = result[2] != null ? ((Number) result[2]).longValue() : 0;
         long casosAbiertos = result[3] != null ? ((Number) result[3]).longValue() : 0;
         long rechazadas = result[4] != null ? ((Number) result[4]).longValue() : 0;
+        long totalRecolector = result[5] != null ? ((Number) result[5]).longValue() : 0;
+        long totalArmador = result[6] != null ? ((Number) result[6]).longValue() : 0;
+        long totalArea = result[7] != null ? ((Number) result[7]).longValue() : 0;
+        long totalComercializador = result[8] != null ? ((Number) result[8]).longValue() : 0;
 
         // Métricas de riesgo, compuestas desde los indicadores ya existentes
         long enVeda = ((Number) getExtraccionVedaMetrics(startDate, endDate)
@@ -405,6 +413,10 @@ public class ReportRepository {
         map.put("casosAbiertos", casosAbiertos);
         map.put("alertasActivas", alertasActivas);
         map.put("inconsistenciasPct", inconsistenciasPct);
+        map.put("totalRecolector", totalRecolector);
+        map.put("totalArmador", totalArmador);
+        map.put("totalArea", totalArea);
+        map.put("totalComercializador", totalComercializador);
         return map;
     }
 
