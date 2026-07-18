@@ -784,6 +784,21 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/curva-snake")
+    public ResponseEntity<?> getCurvaSnake(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long amerbId,
+            @RequestParam(required = false) Long especieId) {
+        try {
+            return ResponseEntity.ok(reportService.getCurvaSnake(startDate, endDate, amerbId, especieId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo curva snake: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/trazabilidad/{tipo}/{id}")
     public ResponseEntity<?> getTrazabilidad(
             @PathVariable Integer tipo,

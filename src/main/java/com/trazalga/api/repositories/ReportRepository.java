@@ -341,6 +341,98 @@ public class ReportRepository {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Curva Snake acumulada (AMERB #2): serie temporal del volumen extraído en
+     * áreas de manejo, con suma acumulada por fecha ("curva snake" de explotación).
+     * Filtrable por AMERB y/o especie. Si existe una cuota AREA aplicable para la
+     * especie (priorizando la del AMERB específico), se devuelve como línea de
+     * referencia. Definición pendiente de formalizar con SERNAPESCA: eje = fecha,
+     * acumulado = suma corrida de desembarque; referencia = límite de la cuota.
+     */
+    public java.util.Map<String, Object> getCurvaSnake(Date startDate, Date endDate, Long amerbId, Long especieId) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND d.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND d.fecha_declaracion <= :endDate";
+        }
+        String amerbFilter = amerbId != null ? " AND d.amerb_id = :amerbId" : "";
+        String especieFilter = especieId != null ? " AND d.especie_id = :especieId" : "";
+
+        // 1. Serie diaria de volumen extraído en AMERB
+        String sql = "SELECT DATE(d.fecha_declaracion) as fecha, COALESCE(SUM(d.desembarque), 0) as vol " +
+            "FROM declaracion_area d WHERE 1=1" + dateFilter + amerbFilter + especieFilter + " " +
+            "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (amerbId != null) query.setParameter("amerbId", amerbId);
+        if (especieId != null) query.setParameter("especieId", especieId);
+
+        List<Object[]> rows = query.getResultList();
+        List<java.util.Map<String, Object>> serie = new java.util.ArrayList<>();
+        double acumulado = 0.0;
+        for (Object[] row : rows) {
+            double vol = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            acumulado += vol;
+            java.util.Map<String, Object> punto = new java.util.HashMap<>();
+            punto.put("fecha", row[0] != null ? row[0].toString() : "");
+            punto.put("volumenDiario", vol);
+            punto.put("acumulado", Math.round(acumulado * 100.0) / 100.0);
+            serie.add(punto);
+        }
+
+        // 2. Cuota de referencia (solo si se especifica especie), priorizando la del AMERB
+        Double limiteKg = null;
+        String cuotaPeriodo = null;
+        if (especieId != null) {
+            String cuotaCondAmerb = amerbId != null
+                    ? " AND (amerb_id = :amerbId OR amerb_id IS NULL)" : " AND amerb_id IS NULL";
+            String cuotaSql = "SELECT limite_kg, periodo FROM cuota_extraccion " +
+                "WHERE perfil = 'AREA' AND activo = 1 AND especie_id = :especieId" + cuotaCondAmerb + " " +
+                "ORDER BY (amerb_id IS NOT NULL) DESC LIMIT 1";
+            Query cq = entityManager.createNativeQuery(cuotaSql);
+            cq.setParameter("especieId", especieId);
+            if (amerbId != null) cq.setParameter("amerbId", amerbId);
+            List<Object[]> cuotaRows = cq.getResultList();
+            if (!cuotaRows.isEmpty()) {
+                Object[] cr = cuotaRows.get(0);
+                limiteKg = cr[0] != null ? ((Number) cr[0]).doubleValue() : null;
+                cuotaPeriodo = cr[1] != null ? cr[1].toString() : null;
+            }
+        }
+
+        // 3. Opciones de filtro: AMERBs y especies con declaraciones de área
+        List<java.util.Map<String, Object>> amerbsDisponibles = listarOpciones(
+            "SELECT DISTINCT a.id, a.nombre FROM declaracion_area d INNER JOIN amerb a ON a.id = d.amerb_id ORDER BY a.nombre");
+        List<java.util.Map<String, Object>> especiesDisponibles = listarOpciones(
+            "SELECT DISTINCT e.id, e.nombre FROM declaracion_area d INNER JOIN especie e ON e.id = d.especie_id ORDER BY e.nombre");
+
+        java.util.Map<String, Object> out = new java.util.HashMap<>();
+        out.put("serie", serie);
+        out.put("totalAcumulado", Math.round(acumulado * 100.0) / 100.0);
+        out.put("limiteKg", limiteKg);
+        out.put("cuotaPeriodo", cuotaPeriodo);
+        out.put("porcentajeCuota", (limiteKg != null && limiteKg > 0)
+                ? Math.round(acumulado / limiteKg * 1000.0) / 10.0 : null);
+        out.put("amerbsDisponibles", amerbsDisponibles);
+        out.put("especiesDisponibles", especiesDisponibles);
+        return out;
+    }
+
+    private List<java.util.Map<String, Object>> listarOpciones(String sql) {
+        List<Object[]> rows = entityManager.createNativeQuery(sql).getResultList();
+        return rows.stream().map(r -> {
+            java.util.Map<String, Object> m = new java.util.HashMap<>();
+            m.put("id", r[0] != null ? ((Number) r[0]).longValue() : null);
+            m.put("nombre", r[1] != null ? r[1].toString() : "");
+            return m;
+        }).collect(Collectors.toList());
+    }
+
     public java.util.Map<String, Object> getResumenGlobal(Date startDate, Date endDate) {
         String dateFilter = "";
         if (startDate != null && endDate != null) {

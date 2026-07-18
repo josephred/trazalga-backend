@@ -42,6 +42,10 @@ public class ReportService {
         return reportRepository.getVolumenPorEspecie(startDate, endDate, perfil);
     }
 
+    public java.util.Map<String, Object> getCurvaSnake(Date startDate, Date endDate, Long amerbId, Long especieId) {
+        return reportRepository.getCurvaSnake(startDate, endDate, amerbId, especieId);
+    }
+
     public java.util.Map<String, Object> getTiempoValidacionMetrics(Date startDate, Date endDate) {
         return reportRepository.getTiempoValidacionMetrics(startDate, endDate);
     }
