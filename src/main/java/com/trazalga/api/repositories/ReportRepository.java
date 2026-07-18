@@ -733,25 +733,63 @@ public class ReportRepository {
         }).collect(Collectors.toList());
     }
 
-    public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
+    private static class RawNode {
+        com.trazalga.api.dto.TrazabilidadNodoDTO dto;
+        String declaracionesSeleccionadas;
+        Long declaracionDestinatarioId;
+        String consumidaPorTipo;
+    }
+
+    private String getTipoString(Integer tipo) {
+        switch (tipo) {
+            case 1: return "RECOLECTOR";
+            case 2: return "ARMADOR";
+            case 3: return "AREA";
+            case 4: return "COMERCIALIZADOR";
+            case 5: return "PLANTA_ABASTECIMIENTO";
+            case 6: return "PLANTA_PRODUCCION";
+            case 7: return "PLANTA_DESTINO";
+            default: return "DESCONOCIDO";
+        }
+    }
+
+    private List<String> getPossibleParentTypes(String tipo) {
+        switch (tipo) {
+            case "COMERCIALIZADOR": 
+            case "PLANTA_ABASTECIMIENTO":
+                return java.util.Arrays.asList("RECOLECTOR", "ARMADOR", "AREA", "COMERCIALIZADOR");
+            case "PLANTA_PRODUCCION": 
+                return java.util.Arrays.asList("PLANTA_ABASTECIMIENTO");
+            case "PLANTA_DESTINO": 
+                return java.util.Arrays.asList("PLANTA_PRODUCCION", "PLANTA_ABASTECIMIENTO");
+            default: 
+                return new java.util.ArrayList<>();
+        }
+    }
+
+    private RawNode fetchRawNode(String tipoStr, Long id) {
         String tableName = "";
         String roleName = "";
         String dateCol = "fecha_declaracion";
         String amountCol = "desembarque";
         String folioCol = "folio_origen";
+        boolean hasSeleccionadas = false;
         
-        switch (tipo) {
-            case 1: tableName = "declaracion_recolector"; roleName = "Recolector"; break;
-            case 2: tableName = "declaracion_armador"; roleName = "Armador"; break;
-            case 3: tableName = "declaracion_area"; roleName = "Área de Manejo"; break;
-            case 4: tableName = "declaracion_comercializador"; roleName = "Comercializador"; amountCol = "cantidad"; break;
-            case 5: tableName = "declaracion_planta_abastecimiento"; roleName = "Planta Abastecimiento"; amountCol = "cantidad"; dateCol = "fecha_ingreso_planta"; folioCol = "folio_declaracion_a_pla"; break;
-            case 6: tableName = "declaracion_planta_produccion"; roleName = "Planta Producción"; amountCol = "cantidad_producto"; dateCol = "fecha_produccion"; folioCol = "folio_declaracion_p_pla"; break;
-            case 7: tableName = "declaracion_planta_destino"; roleName = "Planta Destino"; amountCol = "cantidad"; dateCol = "fecha_declaracion_destino"; folioCol = "folio_declaracion_destino"; break;
-            default: throw new IllegalArgumentException("Tipo inválido");
+        switch (tipoStr) {
+            case "RECOLECTOR": tableName = "declaracion_recolector"; roleName = "Recolector"; break;
+            case "ARMADOR": tableName = "declaracion_armador"; roleName = "Armador"; break;
+            case "AREA": tableName = "declaracion_area"; roleName = "Área de Manejo"; break;
+            case "COMERCIALIZADOR": tableName = "declaracion_comercializador"; roleName = "Comercializador"; amountCol = "cantidad"; hasSeleccionadas = true; break;
+            case "PLANTA_ABASTECIMIENTO": tableName = "declaracion_planta_abastecimiento"; roleName = "Planta Abastecimiento"; amountCol = "cantidad"; dateCol = "fecha_ingreso_planta"; folioCol = "folio_declaracion_a_pla"; hasSeleccionadas = true; break;
+            case "PLANTA_PRODUCCION": tableName = "declaracion_planta_produccion"; roleName = "Planta Producción"; amountCol = "cantidad_producto"; dateCol = "fecha_produccion"; folioCol = "folio_declaracion_p_pla"; hasSeleccionadas = true; break;
+            case "PLANTA_DESTINO": tableName = "declaracion_planta_destino"; roleName = "Planta Destino"; amountCol = "cantidad"; dateCol = "fecha_declaracion_destino"; folioCol = "folio_declaracion_destino"; hasSeleccionadas = true; break;
+            default: return null;
         }
 
-        String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol + " " +
+        String selCol = hasSeleccionadas ? "d.declaraciones_seleccionadas" : "NULL as declaraciones_seleccionadas";
+        
+        String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol + ", " +
+                     "d.declaracion_destinatario_id, d.consumida_por_tipo, " + selCol + " " +
                      "FROM " + tableName + " d " +
                      "INNER JOIN usuario u ON d.usuario_id = u.id " +
                      "WHERE d.id = :id";
@@ -760,28 +798,90 @@ public class ReportRepository {
         query.setParameter("id", id);
         List<Object[]> results = query.getResultList();
         
-        List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = new java.util.ArrayList<>();
+        if (results.isEmpty()) return null;
         
-        for (Object[] row : results) {
-            String actor = (row[1] != null ? row[1].toString() : "") + " " + (row[2] != null ? row[2].toString() : "");
-            Date d = null;
-            if (row[4] instanceof java.sql.Timestamp) d = new Date(((java.sql.Timestamp) row[4]).getTime());
-            else if (row[4] instanceof Date) d = (Date) row[4];
+        Object[] row = results.get(0);
+        String actor = (row[1] != null ? row[1].toString() : "") + " " + (row[2] != null ? row[2].toString() : "");
+        Date d = null;
+        if (row[4] instanceof java.sql.Timestamp) d = new Date(((java.sql.Timestamp) row[4]).getTime());
+        else if (row[4] instanceof Date) d = (Date) row[4];
+        
+        com.trazalga.api.dto.TrazabilidadNodoDTO dto = com.trazalga.api.dto.TrazabilidadNodoDTO.builder()
+            .idUnico(tipoStr + ":" + id)
+            .idDeclaracion(((Number)row[0]).longValue())
+            .tipoNodo(roleName)
+            .nombreActor(actor.trim())
+            .rutActor(row[3] != null ? row[3].toString() : "")
+            .fecha(d)
+            .cantidad(row[5] != null ? new java.math.BigDecimal(row[5].toString()) : java.math.BigDecimal.ZERO)
+            .descripcionEvento("Declaración de tipo " + roleName)
+            .folio(row[6] != null ? row[6].toString() : "")
+            .build();
             
-            nodos.add(com.trazalga.api.dto.TrazabilidadNodoDTO.builder()
-                .idDeclaracion(((Number)row[0]).longValue())
-                .tipoNodo(roleName)
-                .nombreActor(actor.trim())
-                .rutActor(row[3] != null ? row[3].toString() : "")
-                .fecha(d)
-                .cantidad(row[5] != null ? new java.math.BigDecimal(row[5].toString()) : java.math.BigDecimal.ZERO)
-                .descripcionEvento("Declaración de tipo " + roleName)
-                .folio(row[6] != null ? row[6].toString() : "")
-                .build());
+        RawNode raw = new RawNode();
+        raw.dto = dto;
+        raw.declaracionDestinatarioId = row[7] != null ? ((Number)row[7]).longValue() : null;
+        raw.consumidaPorTipo = row[8] != null ? row[8].toString() : null;
+        raw.declaracionesSeleccionadas = row[9] != null ? row[9].toString() : null;
+        
+        return raw;
+    }
+
+    public com.trazalga.api.dto.TrazabilidadResponseDTO getTrazabilidad(Integer tipo, Long id) {
+        java.util.Queue<String> queue = new java.util.LinkedList<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        
+        List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = new java.util.ArrayList<>();
+        List<com.trazalga.api.dto.TrazabilidadEdgeDTO> enlaces = new java.util.ArrayList<>();
+
+        String initialTipoStr = getTipoString(tipo);
+        String initialKey = initialTipoStr + ":" + id;
+        queue.add(initialKey);
+        visited.add(initialKey);
+
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            String[] parts = current.split(":");
+            String currTipo = parts[0];
+            Long currId = Long.parseLong(parts[1]);
+
+            RawNode raw = fetchRawNode(currTipo, currId);
+            if (raw == null) continue;
+
+            nodos.add(raw.dto);
+
+            // Forward edges (child)
+            if (raw.declaracionDestinatarioId != null && raw.consumidaPorTipo != null) {
+                String childKey = raw.consumidaPorTipo + ":" + raw.declaracionDestinatarioId;
+                enlaces.add(new com.trazalga.api.dto.TrazabilidadEdgeDTO(current, childKey));
+                if (!visited.contains(childKey)) {
+                    visited.add(childKey);
+                    queue.add(childKey);
+                }
+            }
+
+            // Backward edges (parents)
+            if (raw.declaracionesSeleccionadas != null && !raw.declaracionesSeleccionadas.isEmpty()) {
+                java.util.Map<String, List<Long>> parsed = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(raw.declaracionesSeleccionadas);
+                
+                List<String> possibleParentTypes = getPossibleParentTypes(currTipo);
+                for (String pType : possibleParentTypes) {
+                    List<Long> pIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(parsed, pType);
+                    for (Long pId : pIds) {
+                        String parentKey = pType + ":" + pId;
+                        enlaces.add(new com.trazalga.api.dto.TrazabilidadEdgeDTO(parentKey, current));
+                        if (!visited.contains(parentKey)) {
+                            visited.add(parentKey);
+                            queue.add(parentKey);
+                        }
+                    }
+                }
+            }
         }
         
-        // Idealmente, aquí se deben hacer más consultas hacia atrás y adelante
-        // para construir todo el árbol. Por ahora enviamos el nodo principal para conectar la UI.
-        return nodos;
+        java.util.Set<String> validNodeIds = nodos.stream().map(com.trazalga.api.dto.TrazabilidadNodoDTO::getIdUnico).collect(Collectors.toSet());
+        enlaces.removeIf(e -> !validNodeIds.contains(e.getSource()) || !validNodeIds.contains(e.getTarget()));
+
+        return new com.trazalga.api.dto.TrazabilidadResponseDTO(nodos, enlaces);
     }
 }

@@ -13,6 +13,7 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TrazabilidadNodoDTO {
+    private String idUnico; // ej. RECOLECTOR:1
     private String tipoNodo; // ej. RECOLECTOR, COMERCIALIZADOR, PLANTA_PRODUCCION
     private String nombreActor;
     private String rutActor;

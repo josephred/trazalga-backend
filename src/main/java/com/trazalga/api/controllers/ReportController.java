@@ -789,8 +789,8 @@ public class ReportController {
             @PathVariable Integer tipo,
             @PathVariable Long id) {
         try {
-            List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = reportService.getTrazabilidad(tipo, id);
-            return ResponseEntity.ok(nodos);
+            com.trazalga.api.dto.TrazabilidadResponseDTO res = reportService.getTrazabilidad(tipo, id);
+            return ResponseEntity.ok(res);
         } catch (Exception e) {
             System.err.println("Error obteniendo trazabilidad: " + e.getMessage());
             e.printStackTrace();

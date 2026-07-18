@@ -58,7 +58,7 @@ public class ReportService {
         return reportRepository.getVariacionPesoDetalle(startDate, endDate);
     }
 
-    public List<com.trazalga.api.dto.TrazabilidadNodoDTO> getTrazabilidad(Integer tipo, Long id) {
+    public com.trazalga.api.dto.TrazabilidadResponseDTO getTrazabilidad(Integer tipo, Long id) {
         return reportRepository.getTrazabilidad(tipo, id);
     }
 }
