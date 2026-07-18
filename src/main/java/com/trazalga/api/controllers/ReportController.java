@@ -704,6 +704,19 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/casos-abiertos")
+    public ResponseEntity<?> getCasosAbiertosDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+        try {
+            return ResponseEntity.ok(reportService.getCasosAbiertosDetalle(startDate, endDate));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de casos abiertos: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/variacion-peso")
     public ResponseEntity<?> getVariacionPeso(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,

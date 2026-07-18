@@ -218,7 +218,8 @@ public class ReportRepository {
             "    UNION ALL " +
             "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_area " +
+            // declaracion_area no tiene comuna_id: sin comuna solo aplican vedas nacionales (region_id NULL)
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, NULL as comuna_id FROM declaracion_area " +
             ") as decl " +
             "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
@@ -256,7 +257,8 @@ public class ReportRepository {
             "    UNION ALL " +
             "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'AREA' as tipo_perfil FROM declaracion_area " +
+            // declaracion_area no tiene comuna_id: sin comuna solo aplican vedas nacionales (region_id NULL)
+            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, NULL as comuna_id, 'AREA' as tipo_perfil FROM declaracion_area " +
             ") as decl " +
             "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
@@ -349,24 +351,51 @@ public class ReportRepository {
             dateFilter = " WHERE fecha_declaracion <= :endDate";
         }
 
-        String sql = "SELECT COUNT(id) as total_declaraciones, COALESCE(SUM(desembarque), 0) as total_volumen FROM (" +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_recolector " +
+        // Base sobre declaraciones de origen (recolector/armador/área):
+        // total, volumen, actores distintos y casos de gestión abiertos (estado).
+        String sql = "SELECT COUNT(id) as total_declaraciones, COALESCE(SUM(desembarque), 0) as total_volumen, " +
+            "COUNT(DISTINCT usuario_id) as actores_distintos, " +
+            "SUM(CASE WHEN estado IN ('NEGOCIACION','RECHAZADA') THEN 1 ELSE 0 END) as casos_abiertos, " +
+            "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas FROM (" +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_armador " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_armador " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_area " +
+            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado FROM declaracion_area " +
             ") as decl " + dateFilter;
-        
+
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
 
         Object[] result = (Object[]) query.getSingleResult();
-        
+
+        long total = result[0] != null ? ((Number) result[0]).longValue() : 0;
+        long actores = result[2] != null ? ((Number) result[2]).longValue() : 0;
+        long casosAbiertos = result[3] != null ? ((Number) result[3]).longValue() : 0;
+        long rechazadas = result[4] != null ? ((Number) result[4]).longValue() : 0;
+
+        // Métricas de riesgo, compuestas desde los indicadores ya existentes
+        long enVeda = ((Number) getExtraccionVedaMetrics(startDate, endDate)
+                .getOrDefault("declaracionesVeda", 0L)).longValue();
+        long fueraUmbralPeso = ((Number) getVariacionPesoMetrics(startDate, endDate, null)
+                .getOrDefault("fueraUmbral", 0L)).longValue();
+
+        // Alertas activas: incidentes críticos del período (extracción en veda + variación de peso
+        // fuera de umbral). El atraso de validación >48h se muestra en su propio widget y no se
+        // suma aquí para no dominar el KPI mientras el flujo de consumo esté poco usado.
+        long alertasActivas = enVeda + fueraUmbralPeso;
+        // Inconsistencias: declaraciones en veda o rechazadas, sobre el total del período
+        double inconsistenciasPct = total > 0
+                ? Math.round((enVeda + rechazadas) * 1000.0 / total) / 10.0 : 0.0;
+
         java.util.Map<String, Object> map = new java.util.HashMap<>();
-        map.put("declaracionesTotales", result[0] != null ? ((Number) result[0]).longValue() : 0);
+        map.put("declaracionesTotales", total);
         map.put("volumenTotal", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
-        
+        map.put("actoresFiscalizados", actores);
+        map.put("casosAbiertos", casosAbiertos);
+        map.put("alertasActivas", alertasActivas);
+        map.put("inconsistenciasPct", inconsistenciasPct);
         return map;
     }
 
@@ -620,6 +649,86 @@ public class ReportRepository {
             map.put("kgOrigen", row[6] != null ? ((Number) row[6]).doubleValue() : null);
             map.put("kgDestino", row[7] != null ? ((Number) row[7]).doubleValue() : null);
             map.put("variacionPct", row[8] != null ? ((Number) row[8]).doubleValue() : null);
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    public List<java.util.Map<String, Object>> getCasosAbiertosDetalle(Date startDate, Date endDate) {
+        String dateFilter = "";
+        if (startDate != null && endDate != null) {
+            dateFilter = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilter = " AND d.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilter = " AND d.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT d.id, 'RECOLECTOR' as tipo_perfil, d.folio_origen as folio, d.fecha_declaracion, d.estado, " +
+            "u.nombres as dec_nombres, u.apellidop as dec_apellidop, dest.nombres as dest_nombres, dest.apellidop as dest_apellidop, " +
+            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as motivo, " +
+            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as fecha_mensaje " +
+            "FROM declaracion_recolector d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
+            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+            "UNION ALL " +
+            "SELECT d.id, 'ARMADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
+            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
+            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
+            "FROM declaracion_armador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
+            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+            "UNION ALL " +
+            "SELECT d.id, 'AREA', d.folio_origen, d.fecha_declaracion, d.estado, " +
+            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
+            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
+            "FROM declaracion_area d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
+            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+            "UNION ALL " +
+            "SELECT d.id, 'COMERCIALIZADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
+            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
+            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
+            "FROM declaracion_comercializador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
+            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+            "ORDER BY fecha_mensaje DESC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> results = query.getResultList();
+
+        return results.stream().map(row -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", row[0]);
+            map.put("perfil", row[1]);
+            map.put("folio", row[2] != null ? row[2].toString() : "");
+            
+            Date dateVal = null;
+            if (row[3] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[3]).getTime());
+            } else if (row[3] instanceof Date) {
+                dateVal = (Date) row[3];
+            }
+            map.put("fecha", dateVal);
+            map.put("estado", row[4]);
+
+            String declarante = (row[5] != null ? row[5].toString() : "") + " " + (row[6] != null ? row[6].toString() : "");
+            map.put("declarante", declarante.trim());
+
+            String destinatario = (row[7] != null ? row[7].toString() : "") + " " + (row[8] != null ? row[8].toString() : "");
+            map.put("destinatario", destinatario.trim());
+
+            map.put("motivo", row[9] != null ? row[9].toString() : "Sin motivo registrado");
+            
+            Date fechaMsg = null;
+            if (row[10] instanceof java.sql.Timestamp) {
+                fechaMsg = new Date(((java.sql.Timestamp) row[10]).getTime());
+            } else if (row[10] instanceof Date) {
+                fechaMsg = (Date) row[10];
+            }
+            map.put("fechaMensaje", fechaMsg);
+            
             return map;
         }).collect(Collectors.toList());
     }

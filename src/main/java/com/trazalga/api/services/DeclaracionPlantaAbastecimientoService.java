@@ -14,7 +14,13 @@ import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
+import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
+import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
+import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 
 @Service
@@ -25,6 +31,15 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Autowired
     private IDeclaracionComercializadorRepository comercializadorRepository;
+
+    @Autowired
+    private IDeclaracionRecolectorRepository recolectorRepository;
+
+    @Autowired
+    private IDeclaracionArmadorRepository armadorRepository;
+
+    @Autowired
+    private IDeclaracionAreaRepository areaRepository;
 
     public List<DeclaracionPlantaAbastecimientoModel> getAllByUsuarioId(Long usuarioId) {
         return repository.findAllByUsuarioIdOrderByFechaIngresoPlantaDesc(usuarioId);
@@ -76,16 +91,48 @@ public class DeclaracionPlantaAbastecimientoService {
 
     private void marcarDeclaracionesComoConsumidas(String idsCSV, Long consumidaPorId, String tipo, Long usuarioDestinatarioId) {
         Map<String, List<Long>> sel = SeleccionTokens.parse(idsCSV);
-        List<Long> ids = SeleccionTokens.idsParaTipo(sel, "COMERCIALIZADOR");
+        
+        List<Long> comercializadorIds = SeleccionTokens.idsParaTipo(sel, "COMERCIALIZADOR");
+        if (!comercializadorIds.isEmpty()) {
+            for (DeclaracionComercializadorModel c : comercializadorRepository.findAllById(comercializadorIds)) {
+                if (c.getUsuarioDestinatario() != null && c.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && c.getDeclaracionDestinatario() == null) {
+                    c.setDeclaracionDestinatario(consumidaPorId);
+                    c.setConsumidaPorTipo(tipo);
+                    comercializadorRepository.save(c);
+                }
+            }
+        }
 
-        if (ids.isEmpty()) return;
+        List<Long> recolectorIds = SeleccionTokens.idsParaTipo(sel, "RECOLECTOR");
+        if (!recolectorIds.isEmpty()) {
+            for (DeclaracionRecolectorModel r : recolectorRepository.findAllById(recolectorIds)) {
+                if (r.getUsuarioDestinatario() != null && r.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && r.getDeclaracionDestinatario() == null) {
+                    r.setDeclaracionDestinatario(consumidaPorId);
+                    r.setConsumidaPorTipo(tipo);
+                    recolectorRepository.save(r);
+                }
+            }
+        }
 
-        List<DeclaracionComercializadorModel> comercializadores = comercializadorRepository.findAllById(ids);
-        for (DeclaracionComercializadorModel c : comercializadores) {
-            if (c.getUsuarioDestinatario() != null && c.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && c.getDeclaracionDestinatario() == null) {
-                c.setDeclaracionDestinatario(consumidaPorId);
-                c.setConsumidaPorTipo(tipo);
-                comercializadorRepository.save(c);
+        List<Long> armadorIds = SeleccionTokens.idsParaTipo(sel, "ARMADOR");
+        if (!armadorIds.isEmpty()) {
+            for (DeclaracionArmadorModel a : armadorRepository.findAllById(armadorIds)) {
+                if (a.getUsuarioDestinatario() != null && a.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && a.getDeclaracionDestinatario() == null) {
+                    a.setDeclaracionDestinatario(consumidaPorId);
+                    a.setConsumidaPorTipo(tipo);
+                    armadorRepository.save(a);
+                }
+            }
+        }
+
+        List<Long> areaIds = SeleccionTokens.idsParaTipo(sel, "AREA");
+        if (!areaIds.isEmpty()) {
+            for (DeclaracionAreaModel ar : areaRepository.findAllById(areaIds)) {
+                if (ar.getUsuarioDestinatario() != null && ar.getUsuarioDestinatario().getId().equals(usuarioDestinatarioId) && ar.getDeclaracionDestinatario() == null) {
+                    ar.setDeclaracionDestinatario(consumidaPorId);
+                    ar.setConsumidaPorTipo(tipo);
+                    areaRepository.save(ar);
+                }
             }
         }
     }

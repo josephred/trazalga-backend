@@ -34,6 +34,10 @@ public class ReportService {
         return reportRepository.getResumenGlobal(startDate, endDate);
     }
 
+    public List<java.util.Map<String, Object>> getCasosAbiertosDetalle(Date startDate, Date endDate) {
+        return reportRepository.getCasosAbiertosDetalle(startDate, endDate);
+    }
+
     public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {
         return reportRepository.getVolumenPorEspecie(startDate, endDate, perfil);
     }
