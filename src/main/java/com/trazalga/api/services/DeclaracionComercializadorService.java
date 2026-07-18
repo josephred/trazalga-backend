@@ -35,6 +35,51 @@ public class DeclaracionComercializadorService {
 
     @Autowired
     IDeclaracionAreaRepository areaRepository;
+
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
+    /**
+     * Detalle consolidado de una declaración de comercializador, derivado de las
+     * declaraciones de origen que consume: una línea por especie + humedad +
+     * composición con su total, como los ítems de un documento tributario.
+     * No se persiste: la fuente de verdad son las declaraciones consumidas.
+     */
+    public List<Map<String, Object>> getDetalleConsolidado(Long declaracionId) {
+        String sql = "SELECT e.nombre AS especie, h.nombre AS humedad, c.nombre AS composicion, "
+                + "COALESCE(SUM(o.desembarque), 0) AS total_kg, COUNT(*) AS docs "
+                + "FROM ("
+                + "  SELECT especie_id, humedad_estado_id, composicion_id, desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_recolector "
+                + "  UNION ALL "
+                + "  SELECT especie_id, humedad_estado_id, composicion_id, desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_armador "
+                + "  UNION ALL "
+                + "  SELECT especie_id, humedad_estado_id, composicion_id, desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_area "
+                + ") o "
+                + "INNER JOIN especie e ON e.id = o.especie_id "
+                + "LEFT JOIN humedad_estado h ON h.id = o.humedad_estado_id "
+                + "LEFT JOIN composicion c ON c.id = o.composicion_id "
+                + "WHERE o.declaracion_destinatario_id = :id AND o.consumida_por_tipo = 'COMERCIALIZADOR' "
+                + "GROUP BY e.nombre, h.nombre, c.nombre "
+                + "ORDER BY total_kg DESC";
+
+        jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("id", declaracionId);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] row : rows) {
+            Map<String, Object> linea = new java.util.HashMap<>();
+            linea.put("especie", row[0]);
+            linea.put("humedad", row[1]);
+            linea.put("composicion", row[2]);
+            linea.put("totalKg", row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+            linea.put("declaraciones", row[4] != null ? ((Number) row[4]).longValue() : 0);
+            out.add(linea);
+        }
+        return out;
+    }
     
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializador(){
         return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAll();

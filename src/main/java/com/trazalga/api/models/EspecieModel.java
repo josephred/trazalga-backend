@@ -30,4 +30,13 @@ public class EspecieModel {
     @Column
     private String descripcion;
 
+    /**
+     * Visibilidad en los selectores de la app. NULL o true = visible.
+     * Las especies/composiciones no vigentes se conservan en BD (por si el
+     * proyecto escala a otras pesquerías) pero ocultas de la vista.
+     */
+    @Column(nullable = true)
+    private Boolean activo;
+
+
 }

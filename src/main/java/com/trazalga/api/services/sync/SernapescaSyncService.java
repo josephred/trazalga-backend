@@ -252,6 +252,13 @@ public class SernapescaSyncService {
     // Especies (autorizadas para recolección de orilla)
     // ------------------------------------------------------------------
 
+    /**
+     * Especies vigentes de la pesquería actual (algas pardas): quedan visibles en
+     * los selectores. Las demás que traiga Sernapesca se crean OCULTAS (activo=false):
+     * disponibles en BD por si el proyecto escala a otras pesquerías, sin saturar la vista.
+     */
+    private static final Set<String> ESPECIES_VISIBLES = Set.of("HUIRO PALO", "HUIRO NEGRO", "HUIRO", "COCHAYUYO");
+
     @Transactional
     public SyncResult syncEspecies() {
         List<ComboIntDto> especies = api.getEspeciesAutorizadas();
@@ -271,7 +278,9 @@ public class SernapescaSyncService {
                 continue;
             }
             if (existentes.add(norm(es.getValor()))) {
-                nuevas.add(new EspecieModel().setNombre(es.getValor().trim()));
+                nuevas.add(new EspecieModel()
+                        .setNombre(es.getValor().trim())
+                        .setActivo(ESPECIES_VISIBLES.contains(norm(es.getValor()))));
                 ins++;
             } else {
                 omit++;

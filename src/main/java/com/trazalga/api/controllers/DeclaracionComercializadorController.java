@@ -86,4 +86,13 @@ public class DeclaracionComercializadorController {
         String lastFolioDesembarqueAc = declaracionComercializadorService.getLastFolioDesembarqueAc();
         return ResponseEntity.ok(lastFolioDesembarqueAc);
     }
+
+    /**
+     * Líneas consolidadas del documento (especie + humedad + composición con totales),
+     * derivadas de las declaraciones de origen que esta declaración consume.
+     */
+    @GetMapping(path = "/detalle-consolidado/{id}")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getDetalleConsolidado(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(declaracionComercializadorService.getDetalleConsolidado(id));
+    }
 }

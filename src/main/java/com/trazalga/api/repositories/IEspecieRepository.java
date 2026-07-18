@@ -8,5 +8,10 @@ import com.trazalga.api.models.EspecieModel;
 @Repository
 public interface IEspecieRepository extends JpaRepository<EspecieModel, Long> {
 
+    // Visibles en la app: NULL equivale a activo (filas previas al flag)
+    @org.springframework.data.jpa.repository.Query("SELECT x FROM EspecieModel x WHERE x.activo IS NULL OR x.activo = true")
+    java.util.List<EspecieModel> findVisibles();
+
+
     
 }

@@ -15,8 +15,11 @@ public class EspecieService {
     @Autowired
     IEspecieRepository especieRepository;
 
-    public ArrayList<EspecieModel> getEspecies(){
-        return (ArrayList<EspecieModel>) especieRepository.findAll();
+    public ArrayList<EspecieModel> getEspecies(boolean incluirOcultas){
+        if (incluirOcultas) {
+            return (ArrayList<EspecieModel>) especieRepository.findAll();
+        }
+        return new ArrayList<>(especieRepository.findVisibles());
     } 
 
     public EspecieModel saveEspecie(EspecieModel especie){
@@ -42,5 +45,12 @@ public class EspecieService {
         } catch(Exception e){
             return false;
         }
+    }
+
+    public EspecieModel setActivo(Long id, boolean activo) {
+        EspecieModel x = especieRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No existe id " + id));
+        x.setActivo(activo);
+        return especieRepository.save(x);
     }
 }

@@ -15,8 +15,11 @@ public class ComposicionService {
     @Autowired
     IComposicionRepository composicionRepository;
 
-    public ArrayList<ComposicionModel> getComposicions(){
-        return (ArrayList<ComposicionModel>) composicionRepository.findAll();
+    public ArrayList<ComposicionModel> getComposicions(boolean incluirOcultas){
+        if (incluirOcultas) {
+            return (ArrayList<ComposicionModel>) composicionRepository.findAll();
+        }
+        return new ArrayList<>(composicionRepository.findVisibles());
     } 
 
     public ComposicionModel saveComposicion(ComposicionModel composicion){
@@ -42,5 +45,12 @@ public class ComposicionService {
         } catch(Exception e){
             return false;
         }
+    }
+
+    public ComposicionModel setActivo(Long id, boolean activo) {
+        ComposicionModel x = composicionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No existe id " + id));
+        x.setActivo(activo);
+        return composicionRepository.save(x);
     }
 }

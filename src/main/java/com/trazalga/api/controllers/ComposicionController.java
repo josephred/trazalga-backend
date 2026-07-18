@@ -24,8 +24,17 @@ public class ComposicionController {
     private ComposicionService composicionService;
 
     @GetMapping
-    public ArrayList<ComposicionModel> getComposicions(){
-        return this.composicionService.getComposicions();
+    public ArrayList<ComposicionModel> getComposicions(
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "false") boolean todas){
+        // Por defecto solo las composiciones vigentes; ?todas=true incluye las ocultas
+        return this.composicionService.getComposicions(todas);
+    }
+
+    /** Muestra u oculta una composición de los selectores sin eliminarla de la BD. */
+    @org.springframework.web.bind.annotation.PutMapping(path = "/{id}/activo")
+    public ComposicionModel setActivo(@PathVariable("id") Long id,
+            @org.springframework.web.bind.annotation.RequestParam boolean activo) {
+        return this.composicionService.setActivo(id, activo);
     }
     
     @PostMapping

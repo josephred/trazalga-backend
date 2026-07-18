@@ -24,8 +24,17 @@ public class EspecieController {
     private EspecieService especieService;
 
     @GetMapping
-    public ArrayList<EspecieModel> getEspecies(){
-        return this.especieService.getEspecies();
+    public ArrayList<EspecieModel> getEspecies(
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "false") boolean todas){
+        // Por defecto solo las especies vigentes; ?todas=true incluye las ocultas (administración)
+        return this.especieService.getEspecies(todas);
+    }
+
+    /** Muestra u oculta una especie de los selectores sin eliminarla de la BD. */
+    @PutMapping(path = "/{id}/activo")
+    public EspecieModel setActivo(@PathVariable("id") Long id,
+            @org.springframework.web.bind.annotation.RequestParam boolean activo) {
+        return this.especieService.setActivo(id, activo);
     }
     
     @PostMapping
