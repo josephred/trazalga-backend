@@ -529,7 +529,9 @@ public class ReportRepository {
             "SUM(CASE WHEN tipo_decl = 1 THEN 1 ELSE 0 END) as total_recolector, " +
             "SUM(CASE WHEN tipo_decl = 2 THEN 1 ELSE 0 END) as total_armador, " +
             "SUM(CASE WHEN tipo_decl = 3 THEN 1 ELSE 0 END) as total_area, " +
-            "SUM(CASE WHEN tipo_decl = 4 THEN 1 ELSE 0 END) as total_comercializador FROM (" +
+            "SUM(CASE WHEN tipo_decl = 4 THEN 1 ELSE 0 END) as total_comercializador, " +
+            // Volumen comprado por el comercializador = suma de la cantidad de sus declaraciones
+            "COALESCE(SUM(CASE WHEN tipo_decl = 4 THEN desembarque ELSE 0 END), 0) as volumen_comprado FROM (" +
             "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 1 as tipo_decl FROM declaracion_recolector " +
             "    UNION ALL " +
             "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 2 as tipo_decl FROM declaracion_armador " +
@@ -585,6 +587,7 @@ public class ReportRepository {
         map.put("totalArmador", totalArmador);
         map.put("totalArea", totalArea);
         map.put("totalComercializador", totalComercializador);
+        map.put("volumenComprado", result[9] != null ? ((Number) result[9]).doubleValue() : 0.0);
         return map;
     }
 
