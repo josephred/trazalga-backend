@@ -50,6 +50,18 @@ public class DeclaracionRecolectorService {
         return list;
     }
 
+    // Variante para el formulario de edición: además de las no consumidas, incluye las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
+    public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+        if (consumidasPorId == null) {
+            return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        }
+        List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        list.forEach(this::populateBuzos);
+        return list;
+    }
+
 
     @Autowired
     private AlertaTriggerService alertaTriggerService;

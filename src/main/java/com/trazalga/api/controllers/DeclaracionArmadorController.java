@@ -65,8 +65,10 @@ public class DeclaracionArmadorController {
     @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
     public ResponseEntity<List<DeclaracionArmadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
-            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
+            @Parameter(description = "Al editar un documento consumidor ya guardado, incluye también las declaraciones que ese documento ya consumió")
+            @RequestParam(required = false) Long consumidasPorId) {
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 

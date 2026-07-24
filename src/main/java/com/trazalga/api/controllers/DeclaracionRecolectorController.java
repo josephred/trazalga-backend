@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/declaracionrecolector")
@@ -46,9 +47,13 @@ public class DeclaracionRecolectorController {
         return this.declaracionRecolectorService.getById(id);
     }
 
+    // consumidasPorId (opcional): al editar un documento consumidor ya guardado, incluye
+    // también las declaraciones que ese documento ya consumió (ver DeclaracionRecolectorService).
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
-    public ResponseEntity<List<DeclaracionRecolectorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionRecolectorModel> declaraciones = declaracionRecolectorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+    public ResponseEntity<List<DeclaracionRecolectorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            @PathVariable Long usuarioDestinatarioId,
+            @RequestParam(required = false) Long consumidasPorId) {
+        List<DeclaracionRecolectorModel> declaraciones = declaracionRecolectorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 

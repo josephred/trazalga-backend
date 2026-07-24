@@ -138,4 +138,13 @@ public class DeclaracionComercializadorModel {
 
     @Column(name = "declaraciones_seleccionadas", length = 1000) // Aumentar longitud si pueden ser muchos IDs
     private String declaracionesSeleccionadas;
+
+    // Snapshot (JSON) del resumen consolidado del documento (líneas por especie +
+    // humedad + composición con sus totales), calculado y congelado al momento de
+    // guardar/editar la declaración. Es un respaldo histórico: si más tarde se edita
+    // o anula una declaración de origen que este documento consumió, este resumen NO
+    // cambia (a diferencia del cálculo en vivo). Nullable: declaraciones antiguas sin
+    // snapshot recurren al cálculo en vivo (ver DeclaracionComercializadorService).
+    @Column(name = "resumen_documento", columnDefinition = "TEXT")
+    private String resumenDocumento;
 }

@@ -37,9 +37,13 @@ public class DeclaracionAreaController {
     }
     
     // NUEVO ENDPOINT AÑADIDO
+    // consumidasPorId (opcional): al editar un documento consumidor ya guardado, incluye
+    // también las declaraciones que ese documento ya consumió (ver DeclaracionAreaService).
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
-    public ResponseEntity<List<DeclaracionAreaModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionAreaModel> declaraciones = declaracionAreaService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+    public ResponseEntity<List<DeclaracionAreaModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            @PathVariable Long usuarioDestinatarioId,
+            @RequestParam(required = false) Long consumidasPorId) {
+        List<DeclaracionAreaModel> declaraciones = declaracionAreaService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 

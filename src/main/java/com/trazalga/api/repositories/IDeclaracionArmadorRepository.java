@@ -21,6 +21,14 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
             + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
     List<DeclaracionArmadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 
+    // Igual que el anterior, pero al EDITAR un documento consumidor ya guardado también
+    // se deben incluir las declaraciones que ese mismo documento ya consumió (para que
+    // el formulario pueda re-mostrarlas marcadas y recalcular el resumen consolidado).
+    @Query("SELECT d FROM DeclaracionArmadorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND (d.declaracionDestinatario IS NULL OR d.declaracionDestinatario = :consumidaPorId) "
+            + "AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionArmadorModel> findAsignadasParaEditar(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId, @Param("consumidaPorId") Long consumidaPorId);
+
     // Método para obtener todas las declaraciones del armador por ID de usuario
     ArrayList<DeclaracionArmadorModel> findAllByUsuarioId(Long usuarioId);
 

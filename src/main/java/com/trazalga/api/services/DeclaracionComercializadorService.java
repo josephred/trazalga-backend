@@ -39,13 +39,34 @@ public class DeclaracionComercializadorService {
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
     /**
-     * Detalle consolidado de una declaración de comercializador, derivado de las
-     * declaraciones de origen que consume: una línea por especie + humedad +
-     * composición con su total, como los ítems de un documento tributario.
-     * No se persiste: la fuente de verdad son las declaraciones consumidas.
+     * Detalle consolidado de una declaración de comercializador: una línea por
+     * especie + humedad + composición con su total, como los ítems de un documento
+     * tributario. Lee primero el snapshot persistido (resumenDocumento, congelado al
+     * guardar/editar); si la declaración es anterior a esta funcionalidad y no tiene
+     * snapshot, recurre al cálculo en vivo desde las declaraciones de origen consumidas.
      */
     public List<Map<String, Object>> getDetalleConsolidado(Long declaracionId) {
+        Optional<DeclaracionComercializadorModel> opt = declaracionComercializadorRepository.findById(declaracionId);
+        if (opt.isPresent() && opt.get().getResumenDocumento() != null && !opt.get().getResumenDocumento().isBlank()) {
+            try {
+                return JSON.readValue(opt.get().getResumenDocumento(),
+                        JSON.getTypeFactory().constructCollectionType(List.class, Map.class));
+            } catch (Exception e) {
+                // Snapshot corrupto/ilegible: no es crítico, recalcular en vivo como respaldo
+            }
+        }
+        return calcularDetalleConsolidado(declaracionId);
+    }
+
+    /**
+     * Cálculo en vivo del detalle consolidado, agrupando las declaraciones de origen
+     * que esta declaración consume. Es la fuente que se congela en resumenDocumento
+     * justo después de marcar las declaraciones como consumidas (guardar/editar).
+     */
+    private List<Map<String, Object>> calcularDetalleConsolidado(Long declaracionId) {
         String sql = "SELECT e.nombre AS especie, h.nombre AS humedad, c.nombre AS composicion, "
                 + "COALESCE(SUM(o.desembarque), 0) AS total_kg, COUNT(*) AS docs "
                 + "FROM ("
@@ -80,7 +101,27 @@ public class DeclaracionComercializadorService {
         }
         return out;
     }
-    
+
+    /**
+     * Recalcula el detalle consolidado y lo congela en resumenDocumento. Se llama
+     * justo después de marcar las declaraciones seleccionadas como consumidas (guardar
+     * o editar), momento en que declaracion_destinatario_id ya apunta a este documento.
+     */
+    private void congelarResumenDocumento(Long declaracionId) {
+        try {
+            List<Map<String, Object>> detalle = calcularDetalleConsolidado(declaracionId);
+            String json = JSON.writeValueAsString(detalle);
+            declaracionComercializadorRepository.findById(declaracionId).ifPresent(d -> {
+                d.setResumenDocumento(json);
+                declaracionComercializadorRepository.save(d);
+            });
+        } catch (Exception e) {
+            // No bloquear el guardado de la declaración por un fallo al congelar el resumen;
+            // getDetalleConsolidado recurre al cálculo en vivo si no queda snapshot.
+            System.err.println("No se pudo congelar el resumen del documento " + declaracionId + ": " + e.getMessage());
+        }
+    }
+
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializador(){
         return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAll();
         // return (ArrayList<DeclaracionComercializadorModel>) declaracionComercializadorRepository.findAllOrderByCampoEspecificoDesc();
@@ -100,11 +141,12 @@ public class DeclaracionComercializadorService {
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
-                saved.getDeclaracionesSeleccionadas(), 
-                saved.getId(), 
-                "COMERCIALIZADOR", 
+                saved.getDeclaracionesSeleccionadas(),
+                saved.getId(),
+                "COMERCIALIZADOR",
                 saved.getUsuario().getId()
             );
+            congelarResumenDocumento(saved.getId());
         }
         return saved;
     }
@@ -165,11 +207,16 @@ public class DeclaracionComercializadorService {
         }
         if (request.getDeclaracionesSeleccionadas() != null && !request.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
-                request.getDeclaracionesSeleccionadas(), 
-                id, 
-                "COMERCIALIZADOR", 
+                request.getDeclaracionesSeleccionadas(),
+                id,
+                "COMERCIALIZADOR",
                 declaracionComercializadorModel.getUsuario().getId()
             );
+            congelarResumenDocumento(id);
+        } else {
+            // Sin líneas seleccionadas tras la edición: no dejar un snapshot obsoleto
+            declaracionComercializadorModel.setResumenDocumento(null);
+            declaracionComercializadorRepository.save(declaracionComercializadorModel);
         }
 
         return declaracionComercializadorModel;

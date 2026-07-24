@@ -69,6 +69,18 @@ public class DeclaracionArmadorService {
         return declaraciones;
     }
 
+    // Variante para el formulario de edición: además de las no consumidas, incluye las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
+    public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+        if (consumidasPorId == null) {
+            return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        }
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        declaraciones.forEach(this::populateBuzos);
+        return declaraciones;
+    }
+
     @Autowired
     private AlertaTriggerService alertaTriggerService;
 
