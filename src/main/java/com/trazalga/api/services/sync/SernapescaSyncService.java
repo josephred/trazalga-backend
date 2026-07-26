@@ -69,6 +69,10 @@ public class SernapescaSyncService {
     @Value("${trazalga.sync.buzos.regiones:4}")
     private String regionesBuzosCsv;
 
+    /** Códigos de región (CSV) a sincronizar para embarcaciones. Por defecto solo la 4 (Coquimbo). */
+    @Value("${trazalga.sync.embarcaciones.regiones:4}")
+    private String regionesEmbarcacionesCsv;
+
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
     private SernapescaSyncService self;
@@ -307,17 +311,16 @@ public class SernapescaSyncService {
 
     @Transactional
     public SyncResult syncEmbarcaciones() {
-        Set<String> codigos = new HashSet<>();
-        Set<String> nombres = new HashSet<>();
+        Map<String, EmbarcacionModel> existentePorCodigo = new HashMap<>();
         for (EmbarcacionModel e : embarcacionRepo.findAll()) {
             if (e.getCodigo() != null) {
-                codigos.add(e.getCodigo());
+                existentePorCodigo.put(e.getCodigo(), e);
             }
-            nombres.add(norm(e.getNombre()));
         }
         List<EmbarcacionModel> nuevas = new ArrayList<>();
-        int obt = 0, ins = 0, omit = 0;
-        for (Integer cod : codigosRegiones()) {
+        List<EmbarcacionModel> actualizadas = new ArrayList<>();
+        int obt = 0, ins = 0, act = 0, omit = 0;
+        for (Integer cod : regionesEmbarcaciones()) {
             for (EmbarcacionDto d : api.getEmbarcacionesPorRegion(cod)) {
                 obt++;
                 if (d.getFolioRpa() == null || isBlank(d.getNombreNave())) {
@@ -326,17 +329,49 @@ public class SernapescaSyncService {
                 }
                 String codigo = String.valueOf(d.getFolioRpa());
                 String nombre = d.getNombreNave().trim();
-                if (!codigos.add(codigo) || !nombres.add(norm(nombre))) {
-                    omit++; // ya existe (por código o por nombre único)
+
+                // El identificador confiable es el código (folioRpa): el nombre de nave NO es
+                // único a nivel nacional, dos embarcaciones de regiones distintas pueden
+                // compartirlo (ver EmbarcacionModel), así que ya no se usa para deduplicar.
+                EmbarcacionModel existente = existentePorCodigo.get(codigo);
+                if (existente != null) {
+                    if (existente.getCodigoRegion() == null) {
+                        existente.setCodigoRegion(cod);
+                        actualizadas.add(existente);
+                        act++;
+                    } else {
+                        omit++;
+                    }
                     continue;
                 }
-                nuevas.add(new EmbarcacionModel().setNombre(nombre).setCodigo(codigo));
+                EmbarcacionModel nueva = new EmbarcacionModel().setNombre(nombre).setCodigo(codigo).setCodigoRegion(cod);
+                nuevas.add(nueva);
+                existentePorCodigo.put(codigo, nueva);
                 ins++;
             }
         }
         embarcacionRepo.saveAll(nuevas);
+        embarcacionRepo.saveAll(actualizadas);
         return SyncResult.builder().entidad("embarcacion").ok(true)
-                .obtenidos(obt).insertados(ins).actualizados(0).omitidos(omit).build();
+                .obtenidos(obt).insertados(ins).actualizados(act).omitidos(omit).build();
+    }
+
+    /** Códigos de región a sincronizar para embarcaciones (configurable; por defecto solo la 4). */
+    private List<Integer> regionesEmbarcaciones() {
+        List<Integer> out = new ArrayList<>();
+        if (regionesEmbarcacionesCsv != null) {
+            for (String s : regionesEmbarcacionesCsv.split(",")) {
+                String t = s.trim();
+                if (!t.isEmpty()) {
+                    try {
+                        out.add(Integer.parseInt(t));
+                    } catch (NumberFormatException e) {
+                        log.warn("Código de región inválido en trazalga.sync.embarcaciones.regiones: '{}'", t);
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------

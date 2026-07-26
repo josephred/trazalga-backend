@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -20,7 +21,11 @@ public class EmbarcacionService {
 
        public ArrayList<EmbarcacionModel> getEmbarcaciones(){
         return (ArrayList<EmbarcacionModel>) embarcacionRepository.findAll();
-    } 
+    }
+
+    public List<EmbarcacionModel> getByRegion(Integer codigoRegion){
+        return embarcacionRepository.findByCodigoRegion(codigoRegion);
+    }
 
     public EmbarcacionModel saveEmbarcacion(EmbarcacionModel embarcacion){
         return embarcacionRepository.save(embarcacion);

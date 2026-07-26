@@ -122,7 +122,7 @@ public class DeclaracionArmadorService {
             embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
-            embarcacion = embarcacionRepository.findByNombre(request.getEmbarcacion().getNombre()).orElse(null);
+            embarcacion = embarcacionRepository.findFirstByNombre(request.getEmbarcacion().getNombre()).orElse(null);
         }
         if (embarcacion == null) {
             if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
@@ -314,7 +314,7 @@ public class DeclaracionArmadorService {
             embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
-            embarcacion = embarcacionRepository.findByNombre(request.getEmbarcacion().getNombre()).orElse(null);
+            embarcacion = embarcacionRepository.findFirstByNombre(request.getEmbarcacion().getNombre()).orElse(null);
         }
         if (embarcacion == null) {
             if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {

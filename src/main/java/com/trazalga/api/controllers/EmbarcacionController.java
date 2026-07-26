@@ -1,6 +1,7 @@
 package com.trazalga.api.controllers;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,12 @@ public class EmbarcacionController {
     public ArrayList<EmbarcacionModel> getEmbarcaciones(){
         return this.embarcacionService.getEmbarcaciones();
     }
-    
+
+    @GetMapping(path = "/por-region/{codigo}")
+    public List<EmbarcacionModel> getEmbarcacionesPorRegion(@PathVariable("codigo") Integer codigo){
+        return this.embarcacionService.getByRegion(codigo);
+    }
+
     @PostMapping
     public EmbarcacionModel saveEmbarcacion(@RequestBody EmbarcacionModel embarcacion) {       
         return this.embarcacionService.saveEmbarcacion(embarcacion);
