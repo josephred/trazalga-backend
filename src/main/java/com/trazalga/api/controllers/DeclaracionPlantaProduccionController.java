@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/declaracion-planta-produccion")
+@RequestMapping({"/api/declaracion-planta-produccion", "/declaracionplantaproduccion"})
 @Tag(name = "Planta - Producción", description = "Operaciones para las declaraciones de producción de la planta")
 public class DeclaracionPlantaProduccionController {
 
@@ -27,6 +27,24 @@ public class DeclaracionPlantaProduccionController {
     public ResponseEntity<DeclaracionPlantaProduccionModel> createDeclaracion(@RequestBody DeclaracionPlantaProduccionModel declaracion) {
         DeclaracionPlantaProduccionModel nuevaDeclaracion = service.save(declaracion);
         return new ResponseEntity<>(nuevaDeclaracion, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Actualizar una declaración de producción existente")
+    public ResponseEntity<DeclaracionPlantaProduccionModel> updateDeclaracion(@RequestBody DeclaracionPlantaProduccionModel request, @PathVariable("id") Long id) {
+        DeclaracionPlantaProduccionModel actualizada = service.updateById(request, id);
+        return ResponseEntity.ok(actualizada);
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar una declaración de producción")
+    public ResponseEntity<String> deleteDeclaracion(@PathVariable("id") Long id) {
+        boolean ok = service.deleteById(id);
+        if (ok) {
+            return ResponseEntity.ok("Declaracion " + id + " eliminada");
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ERROR al eliminar");
+        }
     }
 
     @GetMapping("/usuario/{usuarioId}")
@@ -49,8 +67,9 @@ public class DeclaracionPlantaProduccionController {
                description = "Devuelve una lista de declaraciones de producción de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
     @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
     public ResponseEntity<List<DeclaracionPlantaProduccionModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
-            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionPlantaProduccionModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
+            @RequestParam(value = "consumidasPorId", required = false) Long consumidasPorId) {
+        List<DeclaracionPlantaProduccionModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 }
