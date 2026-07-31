@@ -12,9 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/declaracion-planta-abastecimiento")
+@RequestMapping({"/api/declaracion-planta-abastecimiento", "/declaracionplantaabastecimiento"})
 @Tag(name = "Planta - Abastecimiento", description = "Operaciones para las declaraciones de abastecimiento de la planta")
 public class DeclaracionPlantaAbastecimientoController {
 
@@ -27,6 +28,24 @@ public class DeclaracionPlantaAbastecimientoController {
     public ResponseEntity<DeclaracionPlantaAbastecimientoModel> createDeclaracion(@RequestBody DeclaracionPlantaAbastecimientoModel declaracion) {
         DeclaracionPlantaAbastecimientoModel nuevaDeclaracion = service.save(declaracion);
         return new ResponseEntity<>(nuevaDeclaracion, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Actualizar una declaración de abastecimiento existente")
+    public ResponseEntity<DeclaracionPlantaAbastecimientoModel> updateDeclaracion(@RequestBody DeclaracionPlantaAbastecimientoModel request, @PathVariable("id") Long id) {
+        DeclaracionPlantaAbastecimientoModel actualizada = service.updateById(request, id);
+        return ResponseEntity.ok(actualizada);
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar una declaración de abastecimiento")
+    public ResponseEntity<String> deleteDeclaracion(@PathVariable("id") Long id) {
+        boolean ok = service.deleteById(id);
+        if (ok) {
+            return ResponseEntity.ok("Declaracion " + id + " eliminada");
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ERROR al eliminar");
+        }
     }
 
     @GetMapping("/usuario/{usuarioId}")
@@ -45,12 +64,17 @@ public class DeclaracionPlantaAbastecimientoController {
     }
 
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
-    @Operation(summary = "Obtener declaraciones de abastecimiento pendientes para un destinatario",
-               description = "Devuelve una lista de declaraciones de abastecimiento de planta que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
-    @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
+    @Operation(summary = "Obtener declaraciones de abastecimiento pendientes para un destinatario")
     public ResponseEntity<List<DeclaracionPlantaAbastecimientoModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
-            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionPlantaAbastecimientoModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+            @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
+            @RequestParam(value = "consumidasPorId", required = false) Long consumidasPorId) {
+        List<DeclaracionPlantaAbastecimientoModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
+    }
+
+    @GetMapping("/detalle-consolidado/{id}")
+    @Operation(summary = "Obtener el detalle consolidado (líneas de documento) de una declaración de abastecimiento")
+    public ResponseEntity<List<Map<String, Object>>> getDetalleConsolidado(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(service.getDetalleConsolidado(id));
     }
 }

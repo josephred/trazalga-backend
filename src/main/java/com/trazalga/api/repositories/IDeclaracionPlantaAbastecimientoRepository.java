@@ -19,4 +19,7 @@ public interface IDeclaracionPlantaAbastecimientoRepository extends JpaRepositor
 
     // Método para obtener declaraciones pendientes para un destinatario
     List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+
+    // Método para obtener declaraciones consumidas por una declaración específica
+    List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(Long usuarioDestinatarioId, Long declaracionDestinatarioId);
 }
