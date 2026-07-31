@@ -3,6 +3,7 @@ package com.trazalga.api.repositories;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,9 +18,16 @@ public interface IDeclaracionPlantaAbastecimientoRepository extends JpaRepositor
     @Query("SELECT d.folioDeclaracionAPla FROM DeclaracionPlantaAbastecimientoModel d ORDER BY d.id DESC")
     List<String> findLastFolioDeclaracionAPla();
 
-    // Método para obtener declaraciones pendientes para un destinatario
-    List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
+    // Seleccionables por el destinatario: no consumidas y no rechazadas
+    // (estado NULL = declaraciones previas a la columna, equivalen a ENVIADA)
+    @Query("SELECT d FROM DeclaracionPlantaAbastecimientoModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
 
-    // Método para obtener declaraciones consumidas por una declaración específica
-    List<DeclaracionPlantaAbastecimientoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(Long usuarioDestinatarioId, Long declaracionDestinatarioId);
+    // Igual que la anterior, pero incluye además las que ya consumió el documento :consumidaPorId
+    // (al editar ese documento el formulario debe re-mostrarlas marcadas y recalcular el resumen).
+    @Query("SELECT d FROM DeclaracionPlantaAbastecimientoModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND (d.declaracionDestinatario IS NULL OR d.declaracionDestinatario = :consumidaPorId) "
+            + "AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionPlantaAbastecimientoModel> findAsignadasParaEditar(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId, @Param("consumidaPorId") Long consumidaPorId);
 }

@@ -159,6 +159,16 @@ public class DeclaracionComercializadorService {
         return declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
     }
 
+    // Variante para el formulario de edición: además de las no consumidas, incluye las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
+    public List<DeclaracionComercializadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+        if (consumidasPorId == null) {
+            return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+        }
+        return declaracionComercializadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+    }
+
     @Transactional
     public DeclaracionComercializadorModel updateById(DeclaracionComercializadorModel request, Long id){
         DeclaracionComercializadorModel declaracionComercializadorModel = declaracionComercializadorRepository.findById(id).get();

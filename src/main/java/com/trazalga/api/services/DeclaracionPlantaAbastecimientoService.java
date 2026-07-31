@@ -222,14 +222,10 @@ public class DeclaracionPlantaAbastecimientoService {
     }
 
     public List<DeclaracionPlantaAbastecimientoModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
-        List<DeclaracionPlantaAbastecimientoModel> libres = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
-        if (consumidasPorId != null) {
-            List<DeclaracionPlantaAbastecimientoModel> consumidasPorEsta = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(usuarioDestinatarioId, consumidasPorId);
-            List<DeclaracionPlantaAbastecimientoModel> combinadas = new ArrayList<>(libres);
-            combinadas.addAll(consumidasPorEsta);
-            return combinadas;
+        if (consumidasPorId == null) {
+            return repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         }
-        return libres;
+        return repository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
     }
 
     private String generarFolio() {

@@ -27,13 +27,22 @@ public class EstadoDeclaracionService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    /** Tablas cuyas declaraciones pueden negociarse/rechazarse. */
+    /**
+     * Tablas cuyas declaraciones pueden negociarse/rechazarse.
+     *
+     * Requisito para agregar un tipo aquí: su tabla debe tener la columna `estado`
+     * (además de usuario_id, usuario_destinatario_id, declaracion_destinatario_id y
+     * folio_origen, que usa obtenerInfo). Hoy declaracion_planta_produccion y
+     * declaracion_planta_destino NO la tienen, por eso quedan fuera: incluirlas
+     * provocaría un "Unknown column 'estado'" en vez del no-op actual.
+     */
     private static String tabla(String tipo) {
         switch (tipo == null ? "" : tipo.toUpperCase()) {
             case "RECOLECTOR": return "declaracion_recolector";
             case "ARMADOR": return "declaracion_armador";
             case "AREA": return "declaracion_area";
             case "COMERCIALIZADOR": return "declaracion_comercializador";
+            case "PLANTA_ABASTECIMIENTO": return "declaracion_planta_abastecimiento";
             default: throw new IllegalArgumentException("Tipo de declaración inválido: " + tipo);
         }
     }
@@ -84,7 +93,8 @@ public class EstadoDeclaracionService {
             query.setParameter("id", id);
             query.executeUpdate();
         } catch (IllegalArgumentException e) {
-            // Mensajes sobre tipos no negociables (ej. plantas): no hay estado que cambiar
+            // Mensajes sobre tipos no negociables (planta producción/destino, sin columna
+            // `estado`): la conversación se guarda igual, solo no hay estado que cambiar.
         }
     }
 }

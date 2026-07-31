@@ -34,4 +34,11 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
     @Query("SELECT d FROM DeclaracionComercializadorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
             + "AND d.declaracionDestinatario IS NULL AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
     List<DeclaracionComercializadorModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId);
+
+    // Igual que la anterior, pero incluye además las que ya consumió el documento :consumidaPorId
+    // (al editar ese documento el formulario debe re-mostrarlas marcadas y recalcular el resumen).
+    @Query("SELECT d FROM DeclaracionComercializadorModel d WHERE d.usuarioDestinatario.id = :usuarioDestinatarioId "
+            + "AND (d.declaracionDestinatario IS NULL OR d.declaracionDestinatario = :consumidaPorId) "
+            + "AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
+    List<DeclaracionComercializadorModel> findAsignadasParaEditar(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId, @Param("consumidaPorId") Long consumidaPorId);
 }

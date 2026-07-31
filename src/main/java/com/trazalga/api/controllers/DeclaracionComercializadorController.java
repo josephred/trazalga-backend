@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 
 
@@ -54,9 +55,13 @@ public class DeclaracionComercializadorController {
         return this.declaracionComercializadorService.getById(id);
     }
     
+    // consumidasPorId (opcional): al editar un documento consumidor ya guardado, incluye
+    // también las declaraciones que ese documento ya consumió (ver DeclaracionComercializadorService).
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
-    public ResponseEntity<List<DeclaracionComercializadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(@PathVariable Long usuarioDestinatarioId) {
-        List<DeclaracionComercializadorModel> declaraciones = declaracionComercializadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
+    public ResponseEntity<List<DeclaracionComercializadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            @PathVariable Long usuarioDestinatarioId,
+            @RequestParam(required = false) Long consumidasPorId) {
+        List<DeclaracionComercializadorModel> declaraciones = declaracionComercializadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 
