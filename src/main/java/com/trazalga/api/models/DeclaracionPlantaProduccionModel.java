@@ -25,24 +25,28 @@ public class DeclaracionPlantaProduccionModel {
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = true, length = 50)
     private String folioOrigen;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = true, length = 50)
     private String folioDeclaracionPpla; // P-PLA
 
     @Temporal(TemporalType.DATE)
     @Column(nullable = false)
     private Date fechaProduccion;
 
+    @Temporal(TemporalType.DATE)
+    @Column(nullable = true)
+    private Date fechaTraslado;
+
     @Column(nullable = false, length = 8)
     private String hora;
 
     // --- Campos de Identificación (Normativa) ---
-    @Column(name = "nombre_planta", nullable = false)
+    @Column(name = "nombre_planta", nullable = true)
     private String nombrePlanta;
 
-    @Column(name = "codigo_sernapesca", nullable = false, length = 50)
+    @Column(name = "codigo_sernapesca", nullable = true, length = 50)
     private String codigoSernapesca;
 
     // --- Georreferencia ---
@@ -53,31 +57,56 @@ public class DeclaracionPlantaProduccionModel {
     private Double longitud;
 
     // --- ENTRADA (INPUT) ---
-    // Qué entra a la máquina
     @ManyToOne
     @JoinColumn(name = "materia_prima_especie_id", nullable = false)
     private EspecieModel materiaPrimaEspecie;
 
-    // Si la materia prima ya era un producto intermedio (opcional)
     @ManyToOne
     @JoinColumn(name = "materia_prima_producto_id", nullable = true)
     private ProductoModel materiaPrimaProducto;
 
     @ManyToOne
     @JoinColumn(name = "humedad_estado_id", nullable = false)
-    private HumedadEstadoModel humedadEstado; // Humedad con la que entra a proceso
+    private HumedadEstadoModel humedadEstado;
+
+    @Column(name = "humedad_higrometro", precision = 5, scale = 2)
+    private BigDecimal humedadHigrometro;
 
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal cantidadMateriaPrima; // Cuántos Kg entran
+    private BigDecimal cantidadMateriaPrima;
 
     // --- SALIDA (OUTPUT) ---
-    // Qué sale de la máquina (MEJORA CRÍTICA)
     @ManyToOne
     @JoinColumn(name = "producto_resultante_id", nullable = false)
     private ProductoModel productoResultante;
 
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal cantidadProducto; // Cuántos Kg salen
+    private BigDecimal cantidadProducto;
+
+    // --- Documentos Tributarios (Origen y Destino) ---
+    private String documentoTributarioOrigenTipo;
+    private String documentoTributarioOrigenNumero;
+    @Temporal(TemporalType.DATE)
+    private Date documentoTributarioOrigenFecha;
+
+    private String documentoTributarioDestinoTipo;
+    private String documentoTributarioDestinoNumero;
+    @Temporal(TemporalType.DATE)
+    private Date documentoTributarioDestinoFecha;
+
+    // --- Datos de Transporte ---
+    private String vehiculoTransporte;
+    private String choferTransporte;
+    private String patente;
+
+    @Column(name = "rut_chofer")
+    private String rutChofer;
+
+    @Column(name = "placa_patente")
+    private String placaPatente;
+
+    @Column(name = "placa_patente_carro")
+    private String placaPatenteCarro;
 
     // --- Trazabilidad ---
     @ManyToOne
@@ -90,7 +119,12 @@ public class DeclaracionPlantaProduccionModel {
     @Column(name = "consumida_por_tipo", length = 50)
     private String consumidaPorTipo;
 
-    // IDs de las declaraciones de Abastecimiento que se usaron para esta producción
+    @Column(nullable = true, length = 20)
+    private String estado;
+
     @Column(name = "declaraciones_seleccionadas", length = 1000)
     private String declaracionesSeleccionadas;
+
+    @Column(name = "resumen_documento", columnDefinition = "TEXT")
+    private String resumenDocumento;
 }

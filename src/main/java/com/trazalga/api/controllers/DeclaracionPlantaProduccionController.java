@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping({"/api/declaracion-planta-produccion", "/declaracionplantaproduccion"})
@@ -71,5 +72,11 @@ public class DeclaracionPlantaProduccionController {
             @RequestParam(value = "consumidasPorId", required = false) Long consumidasPorId) {
         List<DeclaracionPlantaProduccionModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
+    }
+
+    @GetMapping("/detalle-consolidado/{id}")
+    @Operation(summary = "Obtener el detalle consolidado (líneas de documento) de una declaración de producción")
+    public ResponseEntity<List<Map<String, Object>>> getDetalleConsolidado(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(service.getDetalleConsolidado(id));
     }
 }
