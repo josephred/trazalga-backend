@@ -21,5 +21,5 @@ public interface IDeclaracionPlantaProduccionRepository extends JpaRepository<De
     List<DeclaracionPlantaProduccionModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 
     // Método para obtener declaraciones consumidas por una declaración específica
-    List<DeclaracionPlantaProduccionModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(Long usuarioDestinatarioId, Long declaracionDestinatarioId);
+    List<DeclaracionPlantaProduccionModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatario(Long usuarioDestinatarioId, Long declaracionDestinatario);
 }

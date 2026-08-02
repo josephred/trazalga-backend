@@ -203,7 +203,7 @@ public class DeclaracionPlantaProduccionService {
     public List<DeclaracionPlantaProduccionModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
         List<DeclaracionPlantaProduccionModel> libres = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         if (consumidasPorId != null) {
-            List<DeclaracionPlantaProduccionModel> consumidasPorEsta = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(usuarioDestinatarioId, consumidasPorId);
+            List<DeclaracionPlantaProduccionModel> consumidasPorEsta = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatario(usuarioDestinatarioId, consumidasPorId);
             List<DeclaracionPlantaProduccionModel> combinadas = new ArrayList<>(libres);
             combinadas.addAll(consumidasPorEsta);
             return combinadas;

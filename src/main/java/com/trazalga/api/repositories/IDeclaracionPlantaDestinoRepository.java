@@ -19,5 +19,5 @@ public interface IDeclaracionPlantaDestinoRepository extends JpaRepository<Decla
 
     List<DeclaracionPlantaDestinoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 
-    List<DeclaracionPlantaDestinoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioId(Long usuarioDestinatarioId, Long declaracionDestinatarioId);
+    List<DeclaracionPlantaDestinoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatario(Long usuarioDestinatarioId, Long declaracionDestinatario);
 }
