@@ -749,7 +749,7 @@ public class SernapescaSyncService {
         EmbarcacionModel emb = embarcacionRepo.findByCodigo(codigo).orElse(null);
         boolean creada = false;
         if (emb == null) {
-            emb = embarcacionRepo.findByNombre(nombreTrim).orElse(null);
+            emb = embarcacionRepo.findFirstByNombre(nombreTrim).orElse(null);
         }
 
         if (emb == null) {

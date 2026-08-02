@@ -13,6 +13,10 @@ public interface IEmbarcacionRepository extends JpaRepository<EmbarcacionModel, 
     // que la consulta falle si hay más de una embarcación con el mismo nombre.
     Optional<EmbarcacionModel> findFirstByNombre(String nombre);
 
+    default Optional<EmbarcacionModel> findByNombre(String nombre) {
+        return findFirstByNombre(nombre);
+    }
+
     List<EmbarcacionModel> findByCodigoRegion(Integer codigoRegion);
 }
 
