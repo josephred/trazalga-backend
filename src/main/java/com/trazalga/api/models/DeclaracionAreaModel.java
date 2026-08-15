@@ -21,7 +21,7 @@ public class DeclaracionAreaModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "clave", "fechaCreacion", "correo", "estado"})
     private UsuarioModel usuario;
@@ -47,18 +47,18 @@ public class DeclaracionAreaModel {
     private String codigoSernapescaAmerb;
 
     // Relación con la AMERB (Área de Manejo y Explotación de Recursos Bentónicos)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "amerb_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private AmerbModel amerb;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caleta_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private CaletaModel caleta;
 
     // Relación con la especie declarada
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private EspecieModel especie;
@@ -79,19 +79,19 @@ public class DeclaracionAreaModel {
     private String codigoDestinatario;
 
     // Relación con el destinatario de la declaración
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "clave", "fechaCreacion", "correo", "estado"})
     private UsuarioModel usuarioDestinatario;
 
     // Relación con la composición de fronda
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "composicion_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ComposicionModel composicion;
 
     // Relación con el estado de humedad
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private HumedadEstadoModel humedadEstado;
@@ -103,12 +103,12 @@ public class DeclaracionAreaModel {
     @Column(nullable = true)
     private Double longitud;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "embarcacion_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private EmbarcacionModel embarcacion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "buzo_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private BuzoModel buzo;

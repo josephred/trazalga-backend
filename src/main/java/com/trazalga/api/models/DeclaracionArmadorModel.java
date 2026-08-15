@@ -21,7 +21,7 @@ public class DeclaracionArmadorModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
@@ -46,7 +46,7 @@ public class DeclaracionArmadorModel {
     @Column(name = "codigo_sernapesca_embarcacion", nullable = true, length = 50)
     private String codigoSernapescaEmbarcacion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "embarcacion_id", nullable = false)
     private EmbarcacionModel embarcacion;
 
@@ -54,7 +54,7 @@ public class DeclaracionArmadorModel {
     @Column(name = "codigo_sernapesca_buzo", nullable = true, length = 50)
     private String codigoSernapescaBuzo;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "buzo_id", nullable = false)
     private BuzoModel buzo;
 
@@ -72,28 +72,28 @@ public class DeclaracionArmadorModel {
     @Column(name = "codigo_destinatario", nullable = true, length = 20)
     private String codigoDestinatario;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = false)
     private UsuarioModel usuarioDestinatario;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caleta_id", nullable = false)
     private CaletaModel caleta;
 
     // CAMPO FALTANTE AÑADIDO (para la comuna, derivada de la caleta)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id", nullable = true)
     private ComunaModel comuna;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
     private EspecieModel especie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 

@@ -19,7 +19,7 @@ public class DocumentoTributarioModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipo_id", nullable = false)
     private TipoDocumentoTributarioModel tipo;
 

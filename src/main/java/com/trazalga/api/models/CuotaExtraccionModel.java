@@ -2,6 +2,7 @@ package com.trazalga.api.models;
 
 import java.util.Date;
 
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -37,22 +38,22 @@ public class CuotaExtraccionModel {
     private String perfil;
 
     // Especie afectada (nullable = null means applies to any especie)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = true)
     private EspecieModel especie;
 
     // Región (nullable = null means applies to any region)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
     // Actor específico (nullable = null means applies to any actor of the perfil)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = true)
     private UsuarioModel usuario;
 
     // Área de manejo específica (nullable = null means applies to any AMERB; only relevant for perfil AREA)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "amerb_id", nullable = true)
     private AmerbModel amerb;
 

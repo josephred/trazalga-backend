@@ -21,7 +21,7 @@ public class DeclaracionPlantaAbastecimientoModel {
     private Long id;
 
     // Usuario que representa la planta que realiza la declaración (El que recibe)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
@@ -57,15 +57,15 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(nullable = true)
     private Double longitud;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
     private EspecieModel especie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
@@ -113,7 +113,7 @@ public class DeclaracionPlantaAbastecimientoModel {
     private String placaPatenteCarro;
 
     // Relación con el usuario destinatario (Comercializador, Planta, etc.)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = true)
     private UsuarioModel usuarioDestinatario;
 

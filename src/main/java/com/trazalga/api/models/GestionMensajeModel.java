@@ -34,13 +34,13 @@ public class GestionMensajeModel {
     private Long declaracionId;
 
     /** Usuario que envía el mensaje. */
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "emisor_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "clave", "fechaCreacion", "correo", "estado"})
     private UsuarioModel emisor;
 
     /** Usuario que recibe el mensaje. */
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receptor_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "clave", "fechaCreacion", "correo", "estado"})
     private UsuarioModel receptor;

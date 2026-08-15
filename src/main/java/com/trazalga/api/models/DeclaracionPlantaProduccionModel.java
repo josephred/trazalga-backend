@@ -21,7 +21,7 @@ public class DeclaracionPlantaProduccionModel {
     private Long id;
 
     // Usuario que representa la planta (quien declara)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
@@ -57,15 +57,15 @@ public class DeclaracionPlantaProduccionModel {
     private Double longitud;
 
     // --- ENTRADA (INPUT) ---
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "materia_prima_especie_id", nullable = false)
     private EspecieModel materiaPrimaEspecie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "materia_prima_producto_id", nullable = true)
     private ProductoModel materiaPrimaProducto;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
@@ -76,7 +76,7 @@ public class DeclaracionPlantaProduccionModel {
     private BigDecimal cantidadMateriaPrima;
 
     // --- SALIDA (OUTPUT) ---
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "producto_resultante_id", nullable = false)
     private ProductoModel productoResultante;
 
@@ -109,7 +109,7 @@ public class DeclaracionPlantaProduccionModel {
     private String placaPatenteCarro;
 
     // --- Trazabilidad ---
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = true)
     private UsuarioModel usuarioDestinatario;
 

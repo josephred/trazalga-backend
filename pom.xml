@@ -48,7 +48,29 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<optional>true</optional> 
+			<optional>true</optional>
+		</dependency>
+
+		<!--
+		  AÑADIDO PARA PRUEBAS DE ESTRÉS (rama perf/stress-tests)
+
+		  Al pasar las 68 relaciones @ManyToOne a FetchType.LAZY, Jackson
+		  intenta serializar proxies no inicializados fuera de la transacción
+		  (open-in-view=false) y lanza LazyInitializationException -> HTTP 500.
+
+		  Este módulo evita la excepción: las relaciones no cargadas se
+		  serializan como null en vez de reventar.
+
+		  ⚠️ Un null aquí NO es un dato faltante: es una relación que faltó
+		  incluir en el @EntityGraph de la consulta. Ver JacksonConfig.java.
+
+		  Sin <version>: la gestiona el BOM de Jackson que trae Spring Boot.
+		  Si Maven pide una versión explícita, usa la misma de jackson-core
+		  (mvn dependency:tree | grep jackson-core).
+		-->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-hibernate6</artifactId>
 		</dependency>
 
 		<dependency>

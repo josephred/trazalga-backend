@@ -21,7 +21,7 @@ public class DeclaracionPlantaDestinoModel {
     private Long id;
 
     // Usuario que representa la planta que realiza la declaración (El remitente)
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
@@ -64,11 +64,11 @@ public class DeclaracionPlantaDestinoModel {
     private Double longitud;
 
     // --- Detalles del Producto ---
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
     private EspecieModel especie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "producto_id", nullable = false)
     private ProductoModel producto;
 
@@ -114,7 +114,7 @@ public class DeclaracionPlantaDestinoModel {
     private String codigoSernapescaDestino;
 
     // Relación opcional si el destinatario es usuario del sistema
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = true)
     private UsuarioModel usuarioDestinatario;
 

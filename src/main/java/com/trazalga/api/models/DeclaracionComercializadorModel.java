@@ -21,7 +21,7 @@ public class DeclaracionComercializadorModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioModel usuario;
 
@@ -58,15 +58,15 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = true)
     private Double longitud;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
     private EspecieModel especie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
@@ -110,7 +110,7 @@ public class DeclaracionComercializadorModel {
     @Column(nullable = false)
     private String nombreDestinatario;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = false)
     private UsuarioModel usuarioDestinatario;
 

@@ -34,11 +34,11 @@ public class UsuarioModel {
     @Column(name = "fecha_creacion", updatable = false)
     private Date fechaCreacion;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "perfil_id")
     private PerfilModel perfil;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id")
     private ComunaModel comuna;
 

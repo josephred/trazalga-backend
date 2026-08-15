@@ -1,5 +1,6 @@
 package com.trazalga.api.models;
 
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,15 +29,15 @@ public class CaletaModel {
     @Column
     private String nombre;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id") // Nombre de la columna que almacenará la clave foránea
     private RegionModel region;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id")
     private ComunaModel comuna;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "varadero_id")
     private VaraderoModel varadero;
 

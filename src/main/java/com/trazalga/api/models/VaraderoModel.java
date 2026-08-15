@@ -1,5 +1,6 @@
 package com.trazalga.api.models;
 
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -54,7 +55,7 @@ public class VaraderoModel {
     private Double longitud; // Equivalente a la columna "LONG" en el excel
 
     // Relación numérica con la tabla de comunas
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id")
     private ComunaModel comuna;
 

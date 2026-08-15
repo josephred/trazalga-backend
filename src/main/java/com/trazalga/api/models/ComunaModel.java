@@ -30,7 +30,7 @@ public class ComunaModel {
     @Column
     private String nombre;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id") // Nombre de la columna que almacenará la clave foránea
     private RegionModel region;
 
