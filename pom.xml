@@ -108,6 +108,24 @@
 			<version>9.2.0</version>
 		</dependency>
 
+		<!--
+		  AÑADIDO PARA PRUEBAS DE ESTRÉS (rama perf/stress-tests)
+
+		  Sin este starter, las propiedades management.* del perfil perf no
+		  hacen nada y /actuator/** devuelve 404: los endpoints no existen.
+
+		  Expone heap de la JVM, estado del pool HikariCP, pausas de GC y
+		  métricas HTTP — que es de dónde lee scripts/04_snapshot_metrics.sh
+		  para correlacionar la latencia con el consumo de recursos.
+
+		  ⚠️ En producción, restringir la exposición:
+		     management.endpoints.web.exposure.include=health
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>
