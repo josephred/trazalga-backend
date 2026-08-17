@@ -15,7 +15,7 @@ public class AuthService {
     private JwtUtils jwtUtils;
 
     public String validarCredenciales(String rut, String claveEnviada) {
-        UsuarioModel usuario = usuarioRepo.findByRut(rut)
+        UsuarioModel usuario = usuarioRepo.findByRutWithDetails(rut)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         // Comparación en texto plano (según solicitud)
