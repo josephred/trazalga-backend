@@ -16,15 +16,26 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 
+import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
-@RequestMapping("/comuna")
+@RequestMapping({"/comuna", "/api/comunas"})
 public class ComunaController {
 
     @Autowired
     private ComunaService comunaService;
 
     @GetMapping
-    public ArrayList<ComunaModel> getComunas(){
+    public List<ComunaModel> getComunas(
+            @RequestParam(name = "regionId", required = false) Long regionId,
+            @RequestParam(name = "provinciaId", required = false) Long provinciaId) {
+        if (provinciaId != null) {
+            return this.comunaService.getByProvincia(provinciaId);
+        }
+        if (regionId != null) {
+            return this.comunaService.getByRegion(regionId);
+        }
         return this.comunaService.getComunas();
     }
     

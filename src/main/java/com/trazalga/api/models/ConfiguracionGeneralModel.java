@@ -21,9 +21,12 @@ public class ConfiguracionGeneralModel {
     @Column(name = "clave", unique = true, nullable = false, length = 100)
     private String clave;
 
-    @Column(name = "valor", nullable = false, length = 255)
+    @Column(name = "valor", nullable = false, length = 1000)
     private String valor;
 
     @Column(name = "descripcion", length = 255)
     private String descripcion;
+
+    @Column(name = "categoria", length = 50)
+    private String categoria;
 }

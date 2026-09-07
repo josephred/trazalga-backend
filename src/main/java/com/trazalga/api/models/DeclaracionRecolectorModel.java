@@ -100,6 +100,12 @@ public class DeclaracionRecolectorModel {
     @Column(precision = 10, scale = 2)
     private BigDecimal captura; // Calculado por el backend
 
+    @Column(name = "factor_aplicado", precision = 8, scale = 4)
+    private BigDecimal factorAplicado;
+
+    @Column(name = "factor_conversion_id")
+    private Long factorConversionId;
+
     @Column(name = "tasa_diaria_recoleccion", precision = 10, scale = 3)
     private BigDecimal tasaDiariaRecoleccion;
 

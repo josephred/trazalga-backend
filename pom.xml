@@ -126,6 +126,30 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
+		<!--
+		  Caché de resultados de reportes.
+
+		  MOTIVO MEDIDO: las consultas de reportes examinan entre 173.000 y
+		  500.000 filas para devolver 1 a 4 filas de agregados, y cuestan
+		  ~1,14 s de CPU cada una (medido dos veces, con 1,8% de discrepancia).
+		  Con 2 cores eso fija el techo del sistema en ~7 req/s.
+
+		  Ningún índice arregla un SUM() sobre toda la tabla: hay que leer las
+		  filas para sumarlas. La única salida es NO volver a leerlas, y estos
+		  agregados son ideales para caché porque el histórico no cambia.
+
+		  Caffeine en vez de Redis: no hay segundo servidor, y un caché en
+		  proceso no añade infraestructura ni latencia de red.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>

@@ -33,7 +33,7 @@ public class CuotaExtraccionModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Perfil: e.g. "RECOLECTOR" or "ARMADOR"
+    // Perfil: e.g. "RECOLECTOR", "ARMADOR" o "AREA"
     @Column(nullable = false)
     private String perfil;
 
@@ -47,6 +47,16 @@ public class CuotaExtraccionModel {
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
+    // Provincia (nullable = null means applies to any provincia)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "provincia_id", nullable = true)
+    private ProvinciaModel provincia;
+
+    // Comuna (nullable = null means applies to any comuna)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comuna_id", nullable = true)
+    private ComunaModel comuna;
+
     // Actor específico (nullable = null means applies to any actor of the perfil)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = true)
@@ -57,24 +67,69 @@ public class CuotaExtraccionModel {
     @JoinColumn(name = "amerb_id", nullable = true)
     private AmerbModel amerb;
 
-    // Periodo: "DIARIO" o "MENSUAL"
+    // Método de extracción específico
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "extraccion_tipo_id", nullable = true)
+    private ExtraccionTipoModel extraccionTipo;
+
+    // Estado de humedad en que está expresado el límite (nullable = ya expresado en metrica)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "humedad_estado_id", nullable = true)
+    private HumedadEstadoModel humedadEstado;
+
+    // Nivel de agregación territorial / personal: COMUNA | PROVINCIA | REGION | INDIVIDUAL
+    @Column(name = "nivel_agregacion", nullable = false, length = 20)
+    @Builder.Default
+    private String nivelAgregacion = "COMUNA";
+
+    // Métrica evaluada: CAPTURA | DESEMBARQUE
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String metrica = "CAPTURA";
+
+    // Si es plantilla para asignación individual
+    @Column(name = "es_plantilla", nullable = false)
+    @Builder.Default
+    private Boolean esPlantilla = false;
+
+    // Periodo: "DIARIO", "MENSUAL", "ANUAL", etc.
     @Column(nullable = false)
     private String periodo;
 
     // Límite en kilogramos
-    @Column(nullable = false)
+    @Column(name = "limite_kg", nullable = false)
     private Double limiteKg;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "fecha_inicio", nullable = true)
+    private Date fechaInicio;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "fecha_fin", nullable = true)
+    private Date fechaFin;
+
+    @Column(length = 100)
+    private String resolucion;
+
+    // Estado administrativo de la cuota: ABIERTA | CERRADA
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String estado = "ABIERTA";
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "fecha_cierre", nullable = true)
+    private Date fechaCierre;
 
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Date createdAt;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private Date updatedAt;
 
     @PrePersist

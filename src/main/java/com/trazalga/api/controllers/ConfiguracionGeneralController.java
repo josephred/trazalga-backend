@@ -15,8 +15,16 @@ public class ConfiguracionGeneralController {
     private ConfiguracionGeneralService service;
 
     @GetMapping
-    public ResponseEntity<List<ConfiguracionGeneralModel>> getAll() {
+    public ResponseEntity<List<ConfiguracionGeneralModel>> getAll(@RequestParam(required = false) String categoria) {
+        if (categoria != null && !categoria.isBlank()) {
+            return ResponseEntity.ok(service.getByCategoria(categoria));
+        }
         return ResponseEntity.ok(service.getAll());
+    }
+
+    @GetMapping("/categoria/{categoria}")
+    public ResponseEntity<List<ConfiguracionGeneralModel>> getByCategoria(@PathVariable String categoria) {
+        return ResponseEntity.ok(service.getByCategoria(categoria));
     }
 
     @GetMapping("/{clave}")

@@ -3,13 +3,19 @@ package com.trazalga.api.controllers;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trazalga.api.models.DeclaracionComercializadorModel;
+import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.services.DeclaracionComercializadorService;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,9 +26,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
-
-
-
 @RestController
 @RequestMapping("/declaracioncomercializador")
 public class DeclaracionComercializadorController {
@@ -30,9 +33,36 @@ public class DeclaracionComercializadorController {
     @Autowired
     private DeclaracionComercializadorService declaracionComercializadorService;
 
+    @Autowired
+    private IDeclaracionComercializadorRepository declaracionComercializadorRepository;
+
     @GetMapping
-    public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializador() {
-        return this.declaracionComercializadorService.getDeclaracionesComercializador();
+    public ResponseEntity<?> getDeclaracionesComercializador(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "50") Integer size,
+            @RequestParam(required = false, defaultValue = "false") Boolean conTotal) {
+        if (page == null) {
+            return ResponseEntity.ok(this.declaracionComercializadorService.getDeclaracionesComercializador());
+        }
+        int tamano = Math.min(size, 200);
+        Pageable conExtra = PageRequest.of(page, tamano + 1, Sort.by(Sort.Direction.DESC, "fechaDeclaracion"));
+
+        List<Long> ids = declaracionComercializadorRepository.findIdsPaginados(conExtra);
+        boolean hayMas = ids.size() > tamano;
+        if (hayMas) {
+            ids = ids.subList(0, tamano);
+        }
+
+        List<DeclaracionComercializadorModel> datos = ids.isEmpty()
+                ? List.of()
+                : declaracionComercializadorRepository.findByIdInOrderByFechaDeclaracionDesc(ids);
+
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("content", datos);
+        respuesta.put("page", page);
+        respuesta.put("size", tamano);
+        respuesta.put("hasNext", hayMas);
+        return ResponseEntity.ok(respuesta);
     }
         
     @GetMapping(path = "/usuario/{usuarioId}")

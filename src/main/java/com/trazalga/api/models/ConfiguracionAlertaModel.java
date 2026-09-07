@@ -29,4 +29,7 @@ public class ConfiguracionAlertaModel {
 
     @Column(name = "activo", nullable = false)
     private Boolean activo;
+
+    @Column(name = "parametros_json", columnDefinition = "TEXT")
+    private String parametrosJson;
 }

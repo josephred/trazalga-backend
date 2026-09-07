@@ -21,8 +21,16 @@ public class AmerbModel {
     @Column(nullable = false, length = 100)
     private String nombre;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = true, length = 50)
     private String region;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id", nullable = true)
+    private RegionModel regionModel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comuna_id", nullable = true)
+    private ComunaModel comuna;
 
     @Column(nullable = true, length = 255)
     private String ubicacion; // Puede ser una referencia a coordenadas o una dirección.

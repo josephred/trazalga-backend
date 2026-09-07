@@ -39,16 +39,31 @@ public class VedaEspecieModel {
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
-    @Column(name = "fecha_inicio", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "extraccion_tipo_id", nullable = true)
+    private ExtraccionTipoModel extraccionTipo;
+
+    @Column(name = "recurrencia_anual", nullable = false)
+    @Builder.Default
+    private Boolean recurrenciaAnual = false;
+
+    @Column(name = "meses_veda", length = 40)
+    private String mesesVeda;
+
+    @Column(name = "fecha_inicio", nullable = true)
     @Temporal(TemporalType.DATE)
     private Date fechaInicio;
 
-    @Column(name = "fecha_fin", nullable = false)
+    @Column(name = "fecha_fin", nullable = true)
     @Temporal(TemporalType.DATE)
     private Date fechaFin;
 
     @Column(name = "resolucion")
     private String resolucion;
+
+    @Column(name = "activo", nullable = false)
+    @Builder.Default
+    private Boolean activo = true;
 
     @Column(name = "observacion", columnDefinition = "TEXT")
     private String observacion;

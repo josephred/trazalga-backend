@@ -21,4 +21,6 @@ public interface VedaEspecieRepository extends JpaRepository<VedaEspecieModel, L
     @Query("SELECT v FROM VedaEspecieModel v WHERE v.fechaInicio <= :endDate AND v.fechaFin >= :startDate")
     List<VedaEspecieModel> findVedasEnRango(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
 
+    List<VedaEspecieModel> findByActivoTrue();
+
 }

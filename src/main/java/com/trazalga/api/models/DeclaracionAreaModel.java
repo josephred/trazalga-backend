@@ -1,5 +1,6 @@
 package com.trazalga.api.models;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import jakarta.persistence.*;
@@ -95,6 +96,17 @@ public class DeclaracionAreaModel {
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private HumedadEstadoModel humedadEstado;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "extraccion_tipo_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private ExtraccionTipoModel extraccionTipo;
+
+    @Column(name = "factor_aplicado", precision = 8, scale = 4)
+    private BigDecimal factorAplicado;
+
+    @Column(name = "factor_conversion_id")
+    private Long factorConversionId;
 
     // Georreferencia (latitud y longitud)
     @Column(nullable = true)

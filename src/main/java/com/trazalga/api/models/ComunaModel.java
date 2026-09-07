@@ -34,4 +34,8 @@ public class ComunaModel {
     @JoinColumn(name = "region_id") // Nombre de la columna que almacenará la clave foránea
     private RegionModel region;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "provincia_id")
+    private ProvinciaModel provincia;
+
 }

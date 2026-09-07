@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,14 @@ public class ComunaService {
     public ArrayList<ComunaModel> getComunas(){
         return (ArrayList<ComunaModel>) comunaRepository.findAll();
     } 
+
+    public List<ComunaModel> getByRegion(Long regionId){
+        return comunaRepository.findByRegionId(regionId);
+    }
+
+    public List<ComunaModel> getByProvincia(Long provinciaId){
+        return comunaRepository.findByProvinciaId(provinciaId);
+    }
 
     public ComunaModel saveComuna(ComunaModel comuna){
         return comunaRepository.save(comuna);
