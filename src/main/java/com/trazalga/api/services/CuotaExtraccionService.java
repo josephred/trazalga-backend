@@ -804,7 +804,7 @@ public class CuotaExtraccionService {
         }
 
         BigDecimal limiteEfectivo = calcularLimiteEfectivo(cuota, now);
-        BigDecimal consumido = calcularConsumoAcumulado(cuota, start, end, now);
+        BigDecimal consumido = calcularConsumoAcumulado(cuota, now);
         BigDecimal disponible = limiteEfectivo.subtract(consumido);
         if (disponible.compareTo(BigDecimal.ZERO) < 0) disponible = BigDecimal.ZERO;
 
