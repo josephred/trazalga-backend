@@ -827,6 +827,109 @@ public class ReportController {
         }
     }
 
+    // =========================================================================
+    // FASE 4 — ENDPOINTS DE INDICADORES Y TRAZABILIDAD POR LOTE
+    // =========================================================================
+
+    @GetMapping("/trazabilidad-lote")
+    public ResponseEntity<?> getTrazabilidadLote(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Double umbral) {
+        try {
+            return ResponseEntity.ok(reportService.getTrazabilidadLoteMetrics(startDate, endDate, umbral));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo trazabilidad por lote: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/trazabilidad-lote-detalle")
+    public ResponseEntity<?> getTrazabilidadLoteDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) String semaforo) {
+        try {
+            return ResponseEntity.ok(reportService.getTrazabilidadLoteDetalle(startDate, endDate, semaforo));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de trazabilidad por lote: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/desembarque-fisico")
+    public ResponseEntity<?> getDesembarqueFisico(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long comunaId,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
+        try {
+            return ResponseEntity.ok(reportService.getDesembarqueFisicoMetrics(startDate, endDate, especieId, comunaId, regionId, perfil));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo desembarque físico: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/desembarque-fisico-detalle")
+    public ResponseEntity<?> getDesembarqueFisicoDetalle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long comunaId,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
+        try {
+            return ResponseEntity.ok(reportService.getDesembarqueFisicoDetalle(startDate, endDate, especieId, comunaId, regionId, perfil));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo detalle de desembarque físico: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/captura-corregida")
+    public ResponseEntity<?> getCapturaCorregida(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId) {
+        try {
+            return ResponseEntity.ok(reportService.getCapturaCorregidaMetrics(startDate, endDate, especieId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo captura corregida: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/limite-extraccion-diario")
+    public ResponseEntity<?> getLimiteExtraccionDiario(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fecha) {
+        try {
+            return ResponseEntity.ok(reportService.getLimiteExtraccionDiarioMetrics(fecha));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo límite de extracción diario: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/retencion-bodega")
+    public ResponseEntity<?> getRetencionBodega() {
+        try {
+            return ResponseEntity.ok(reportService.getRetencionBodegaMetrics());
+        } catch (Exception e) {
+            System.err.println("Error obteniendo retención en bodega: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping(value = "/usuarios", produces = MediaType.TEXT_HTML_VALUE)
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<String> getUsuariosHtml(

@@ -145,4 +145,88 @@ public class ReportService {
     public com.trazalga.api.dto.TrazabilidadResponseDTO getTrazabilidad(Integer tipo, Long id) {
         return reportRepository.getTrazabilidad(tipo, id);
     }
+
+    // =========================================================================
+    // FASE 4 — INDICADORES Y TRAZABILIDAD POR LOTE (folio_origen)
+    // =========================================================================
+
+    private final ConfiguracionGeneralService configService;
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate, Double umbralVariacion) {
+        double umbral = umbralVariacion != null ? umbralVariacion : configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
+        double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
+        double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
+        int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
+        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
+        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
+        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+
+        return reportRepository.getTrazabilidadLoteMetrics(
+                startDate, endDate, umbral, mermaMinHumedo, mermaMaxSeco,
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(Date startDate, Date endDate, String semaforo) {
+        double umbral = configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
+        double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
+        double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
+        int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
+        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
+        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
+        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+
+        return reportRepository.getTrazabilidadLoteDetalle(
+                startDate, endDate, semaforo, umbral, mermaMinHumedo, mermaMaxSeco,
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+        double umbralAtipico = configService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
+        boolean fRecolector = configService.getBoolean("desembarque_fuente_recolector_activa", true);
+        boolean fArmador = configService.getBoolean("desembarque_fuente_armador_activa", true);
+        boolean fArea = configService.getBoolean("desembarque_fuente_area_activa", true);
+
+        return reportRepository.getDesembarqueFisicoMetrics(
+                startDate, endDate, especieId, comunaId, regionId, perfil,
+                umbralAtipico, fRecolector, fArmador, fArea);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+        double umbralAtipico = configService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
+        boolean fRecolector = configService.getBoolean("desembarque_fuente_recolector_activa", true);
+        boolean fArmador = configService.getBoolean("desembarque_fuente_armador_activa", true);
+        boolean fArea = configService.getBoolean("desembarque_fuente_area_activa", true);
+
+        return reportRepository.getDesembarqueFisicoDetalle(
+                startDate, endDate, especieId, comunaId, regionId, perfil,
+                umbralAtipico, fRecolector, fArmador, fArea);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getCapturaCorregidaMetrics(Date startDate, Date endDate, Long especieId) {
+        return reportRepository.getCapturaCorregidaMetrics(startDate, endDate, especieId);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getLimiteExtraccionDiarioMetrics(Date fecha) {
+        return reportRepository.getLimiteExtraccionDiarioMetrics(fecha);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getRetencionBodegaMetrics() {
+        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
+        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
+        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+
+        return reportRepository.getRetencionBodegaMetrics(diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+    }
 }
