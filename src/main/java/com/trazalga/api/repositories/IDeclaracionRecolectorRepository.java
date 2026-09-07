@@ -66,4 +66,20 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
 
     @EntityGraph(attributePaths = {"usuario", "caleta", "especie", "comuna", "extraccionTipo", "composicion", "humedadEstado", "usuarioDestinatario"})
     List<DeclaracionRecolectorModel> findByIdInOrderByFechaDeclaracionDesc(List<Long> ids);
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionRecolectorModel d " +
+           "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    BigDecimal sumDesembarqueByUsuarioAndFecha(
+            @Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionRecolectorModel d " +
+           "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    BigDecimal sumCapturaByUsuarioAndFecha(
+            @Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
 }

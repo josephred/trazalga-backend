@@ -1,5 +1,6 @@
 package com.trazalga.api.repositories;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -56,6 +57,57 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
 
     @EntityGraph(attributePaths = {"usuario", "embarcacion", "buzo", "usuarioDestinatario", "caleta", "comuna", "especie", "composicion", "humedadEstado"})
     Slice<DeclaracionArmadorModel> findSliceBy(Pageable pageable);
+
+    @Query("SELECT d.id FROM DeclaracionArmadorModel d ORDER BY d.fechaDeclaracion DESC")
+    List<Long> findAllIds();
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.embarcacion.id = :embarcacionId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    BigDecimal sumDesembarqueByEmbarcacionAndFecha(
+            @Param("embarcacionId") Long embarcacionId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.embarcacion.id = :embarcacionId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByEmbarcacionAndFecha(
+            @Param("embarcacionId") Long embarcacionId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    BigDecimal sumDesembarqueByUsuarioAndFecha(
+            @Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByUsuarioAndFecha(
+            @Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.buzo.id = :buzoId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    BigDecimal sumDesembarqueByBuzoAndFecha(
+            @Param("buzoId") Long buzoId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionArmadorModel d " +
+           "WHERE d.buzo.id = :buzoId AND (:especieId IS NULL OR d.especie.id = :especieId) " +
+           "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByBuzoAndFecha(
+            @Param("buzoId") Long buzoId,
+            @Param("especieId") Long especieId,
+            @Param("fecha") Date fecha);
 
     @Query("SELECT d.id FROM DeclaracionArmadorModel d ORDER BY d.fechaDeclaracion DESC")
     List<Long> findIdsPaginados(Pageable pageable);

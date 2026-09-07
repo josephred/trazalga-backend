@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.trazalga.api.dto.CalculoCapturaResult;
+import com.trazalga.api.dto.ContextoDeclaracion;
+import com.trazalga.api.dto.ResultadoValidacion;
 import com.trazalga.api.models.*;
 import com.trazalga.api.repositories.*;
 
@@ -49,7 +52,16 @@ public class DeclaracionArmadorService {
     private IComunaRepository comunaRepository;
 
     @Autowired
+    private IExtraccionTipoRepository extraccionTipoRepository;
+
+    @Autowired
     private DeclaracionBuzosRepository declaracionBuzosRepository;
+
+    @Autowired
+    private ValidacionDeclaracionService validacionDeclaracionService;
+
+    @Autowired
+    private CapturaService capturaService;
     
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmador() {
         ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAll();
@@ -214,8 +226,47 @@ public class DeclaracionArmadorService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad especificado no existe."));
         declaracion.setHumedadEstado(humedadEstado);
         
-        declaracion.setLatitud(request.getLatitud());
-        declaracion.setLongitud(request.getLongitud());
+        if (request.getExtraccionTipo() != null && request.getExtraccionTipo().getId() != null) {
+            extraccionTipoRepository.findById(request.getExtraccionTipo().getId())
+                    .ifPresent(declaracion::setExtraccionTipo);
+        }
+
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
+        Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
+                ? declaracion.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = declaracion.getComuna() != null ? declaracion.getComuna().getId() : null;
+        Long regionId = null;
+        if (declaracion.getComuna() != null && declaracion.getComuna().getRegion() != null) {
+            regionId = declaracion.getComuna().getRegion().getId();
+        } else if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
+            regionId = declaracion.getCaleta().getComuna().getRegion().getId();
+        }
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("ARMADOR")
+                .usuarioId(declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null)
+                .buzoId(declaracion.getBuzo() != null ? declaracion.getBuzo().getId() : null)
+                .embarcacionId(declaracion.getEmbarcacion() != null ? declaracion.getEmbarcacion().getId() : null)
+                .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
+                .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracion.getFechaExtraccion())
+                .fechaDeclaracion(declaracion.getFechaDeclaracion())
+                .desembarqueKg(declaracion.getDesembarque())
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
+        }
+
+        // El servidor es la única autoridad de cálculo: ignora request.captura
+        declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
+        declaracion.setFactorAplicado(resVal.getFactorAplicado());
+        declaracion.setFactorConversionId(resVal.getFactorConversionId());
         
         DeclaracionArmadorModel savedDeclaracion = declaracionArmadorRepository.save(declaracion);
 
@@ -255,14 +306,10 @@ public class DeclaracionArmadorService {
 
         populateBuzos(savedDeclaracion);
         
-        // Trigger Alertas
-        alertaTriggerService.evaluarDeclaracion(
-            savedDeclaracion.getEspecie() != null ? savedDeclaracion.getEspecie().getId() : null,
-            savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
-            savedDeclaracion.getComuna() != null && savedDeclaracion.getComuna().getRegion() != null ? savedDeclaracion.getComuna().getRegion().getId() : null,
-            savedDeclaracion.getDesembarque() != null ? savedDeclaracion.getDesembarque().doubleValue() : 0.0,
-            "ARMADOR"
-        );
+        // Procesar marcas de fiscalización y alertas push
+        alertaTriggerService.procesarMarcas("ARMADOR", savedDeclaracion.getId(),
+                savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
+                resVal.getMarcas());
         
         return savedDeclaracion;
     }
@@ -357,7 +404,25 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setBuzo(buzo);
         
         declaracionArmadorModel.setDesembarque(parseBigDecimal(request.getDesembarque()));
-        declaracionArmadorModel.setCaptura(request.getCaptura());
+
+        if (request.getExtraccionTipo() != null && request.getExtraccionTipo().getId() != null) {
+            extraccionTipoRepository.findById(request.getExtraccionTipo().getId())
+                    .ifPresent(declaracionArmadorModel::setExtraccionTipo);
+        }
+
+        CalculoCapturaResult capRes = capturaService.calcular(
+                declaracionArmadorModel.getEspecie() != null ? declaracionArmadorModel.getEspecie().getId() : (request.getEspecie() != null ? request.getEspecie().getId() : null),
+                declaracionArmadorModel.getHumedadEstado() != null ? declaracionArmadorModel.getHumedadEstado().getId() : (request.getHumedadEstado() != null ? request.getHumedadEstado().getId() : null),
+                declaracionArmadorModel.getFechaExtraccion(),
+                declaracionArmadorModel.getDesembarque());
+        if (capRes.isExitoso()) {
+            declaracionArmadorModel.setCaptura(capRes.getCaptura().doubleValue());
+            declaracionArmadorModel.setFactorAplicado(capRes.getFactorAplicado());
+            declaracionArmadorModel.setFactorConversionId(capRes.getFactorConversionId());
+        } else if (request.getCaptura() != null) {
+            declaracionArmadorModel.setCaptura(request.getCaptura());
+        }
+
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());
         
         if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {

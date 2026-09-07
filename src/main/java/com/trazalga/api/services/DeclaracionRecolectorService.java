@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import com.trazalga.api.dto.CalculoCapturaResult;
+import com.trazalga.api.dto.ContextoDeclaracion;
+import com.trazalga.api.dto.ResultadoValidacion;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.DeclaracionBuzosModel;
 import com.trazalga.api.models.PerfilModel;
@@ -31,6 +34,12 @@ public class DeclaracionRecolectorService {
 
     @Autowired
     private IBuzoRepository buzoRepository;
+
+    @Autowired
+    private ValidacionDeclaracionService validacionDeclaracionService;
+
+    @Autowired
+    private CapturaService capturaService;
     
     public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolector(){
         ArrayList<DeclaracionRecolectorModel> list = (ArrayList<DeclaracionRecolectorModel>) declaracionRecolectorRepository.findAll();
@@ -114,6 +123,38 @@ public class DeclaracionRecolectorService {
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         resolveDependencies(declaracionRecolectorModel);
+
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
+        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
+                ? declaracionRecolectorModel.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null ? declaracionRecolectorModel.getComuna().getId() : null;
+        Long regionId = (declaracionRecolectorModel.getComuna() != null && declaracionRecolectorModel.getComuna().getRegion() != null)
+                ? declaracionRecolectorModel.getComuna().getRegion().getId() : null;
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("RECOLECTOR")
+                .usuarioId(declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null)
+                .especieId(declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null)
+                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null ? declaracionRecolectorModel.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracionRecolectorModel.getFechaExtraccion())
+                .fechaDeclaracion(declaracionRecolectorModel.getFechaDeclaracion())
+                .desembarqueKg(declaracionRecolectorModel.getDesembarque())
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
+        }
+
+        // El servidor es la única autoridad de cálculo: ignora request.captura
+        declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
+        declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
+        declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
+
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
 
         // Guardar buzos
@@ -133,14 +174,10 @@ public class DeclaracionRecolectorService {
         }
         populateBuzos(saved);
         
-        // Trigger Alertas
-        alertaTriggerService.evaluarDeclaracion(
-            saved.getEspecie() != null ? saved.getEspecie().getId() : null,
-            saved.getUsuario() != null ? saved.getUsuario().getId() : null,
-            saved.getComuna() != null && saved.getComuna().getRegion() != null ? saved.getComuna().getRegion().getId() : null,
-            saved.getDesembarque() != null ? saved.getDesembarque().doubleValue() : 0.0,
-            "RECOLECTOR"
-        );
+        // Procesar marcas de fiscalización y notificaciones push
+        alertaTriggerService.procesarMarcas("RECOLECTOR", saved.getId(),
+                saved.getUsuario() != null ? saved.getUsuario().getId() : null,
+                resVal.getMarcas());
         
         return saved;
     }
@@ -189,7 +226,19 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setHumedadEstado(request.getHumedadEstado());
         declaracionRecolectorModel.setHumedad(request.getHumedad());
         declaracionRecolectorModel.setDesembarque(request.getDesembarque());
-        declaracionRecolectorModel.setCaptura(request.getCaptura());
+
+        // Recalcular captura con autoridad del servidor
+        CalculoCapturaResult capRes = capturaService.calcular(
+                declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null,
+                declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null,
+                declaracionRecolectorModel.getFechaExtraccion(),
+                declaracionRecolectorModel.getDesembarque());
+        if (capRes.isExitoso()) {
+            declaracionRecolectorModel.setCaptura(capRes.getCaptura());
+            declaracionRecolectorModel.setFactorAplicado(capRes.getFactorAplicado());
+            declaracionRecolectorModel.setFactorConversionId(capRes.getFactorConversionId());
+        }
+
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
         

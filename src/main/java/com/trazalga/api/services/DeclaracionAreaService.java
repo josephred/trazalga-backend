@@ -1,9 +1,13 @@
 package com.trazalga.api.services;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.trazalga.api.dto.CalculoCapturaResult;
+import com.trazalga.api.dto.ContextoDeclaracion;
+import com.trazalga.api.dto.ResultadoValidacion;
 import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.models.AmerbModel;
 import com.trazalga.api.models.EmbarcacionModel;
@@ -12,6 +16,7 @@ import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.repositories.IAmerbRepository;
 import com.trazalga.api.repositories.IEmbarcacionRepository;
 import com.trazalga.api.repositories.IBuzoRepository;
+import com.trazalga.api.repositories.IExtraccionTipoRepository;
 import com.trazalga.api.repositories.DeclaracionBuzosRepository;
 import com.trazalga.api.models.DeclaracionBuzosModel;
 import com.trazalga.api.models.PerfilModel;
@@ -35,7 +40,16 @@ public class DeclaracionAreaService {
     private IBuzoRepository buzoRepository;
 
     @Autowired
+    private IExtraccionTipoRepository extraccionTipoRepository;
+
+    @Autowired
     private DeclaracionBuzosRepository declaracionBuzosRepository;
+
+    @Autowired
+    private ValidacionDeclaracionService validacionDeclaracionService;
+
+    @Autowired
+    private CapturaService capturaService;
 
     public List<DeclaracionAreaModel> getAllDeclaraciones() {
         List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findAll();
@@ -172,6 +186,67 @@ public class DeclaracionAreaService {
             }
         }
 
+        // Manejar extraccionTipo si viene en la declaracion
+        if (declaracion.getExtraccionTipo() != null && declaracion.getExtraccionTipo().getId() != null) {
+            extraccionTipoRepository.findById(declaracion.getExtraccionTipo().getId())
+                    .ifPresent(declaracion::setExtraccionTipo);
+        }
+
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
+        Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
+                ? declaracion.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = null;
+        Long regionId = null;
+
+        if (declaracion.getAmerb() != null) {
+            if (declaracion.getAmerb().getComuna() != null) {
+                comunaDesembarqueId = declaracion.getAmerb().getComuna().getId();
+                if (declaracion.getAmerb().getComuna().getRegion() != null) {
+                    regionId = declaracion.getAmerb().getComuna().getRegion().getId();
+                }
+            }
+            if (regionId == null && declaracion.getAmerb().getRegionModel() != null) {
+                regionId = declaracion.getAmerb().getRegionModel().getId();
+            }
+        }
+        if (regionId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
+            regionId = declaracion.getCaleta().getComuna().getRegion().getId();
+        }
+        if (comunaDesembarqueId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null) {
+            comunaDesembarqueId = declaracion.getCaleta().getComuna().getId();
+        }
+
+        BigDecimal desembarqueBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : BigDecimal.ZERO;
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("AREA")
+                .usuarioId(declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null)
+                .buzoId(declaracion.getBuzo() != null ? declaracion.getBuzo().getId() : null)
+                .embarcacionId(declaracion.getEmbarcacion() != null ? declaracion.getEmbarcacion().getId() : null)
+                .amerbId(declaracion.getAmerb() != null ? declaracion.getAmerb().getId() : null)
+                .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
+                .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracion.getFechaExtraccion())
+                .fechaDeclaracion(declaracion.getFechaDeclaracion())
+                .desembarqueKg(desembarqueBd)
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
+        }
+
+        // El servidor es la única autoridad de cálculo: ignora declaracion.captura previa
+        if (resVal.getCapturaCalculada() != null) {
+            declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
+        }
+        declaracion.setFactorAplicado(resVal.getFactorAplicado());
+        declaracion.setFactorConversionId(resVal.getFactorConversionId());
+
         DeclaracionAreaModel savedDeclaracion = declaracionAreaRepository.save(declaracion);
 
         // Guardar los buzos asociados en la tabla declaracion_buzos
@@ -193,14 +268,10 @@ public class DeclaracionAreaService {
 
         populateBuzos(savedDeclaracion);
         
-        // Trigger Alertas
-        alertaTriggerService.evaluarDeclaracion(
-            savedDeclaracion.getEspecie() != null ? savedDeclaracion.getEspecie().getId() : null,
-            savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
-            savedDeclaracion.getCaleta() != null && savedDeclaracion.getCaleta().getRegion() != null ? savedDeclaracion.getCaleta().getRegion().getId() : null,
-            savedDeclaracion.getDesembarque() != null ? savedDeclaracion.getDesembarque().doubleValue() : 0.0,
-            "AREA"
-        );
+        // Procesar marcas de fiscalización y alertas push
+        alertaTriggerService.procesarMarcas("AREA", savedDeclaracion.getId(),
+                savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
+                resVal.getMarcas());
         
         return savedDeclaracion;
     }
@@ -229,13 +300,30 @@ public class DeclaracionAreaService {
         declaracion.setHora(request.getHora());
         declaracion.setAmerb(request.getAmerb());
         declaracion.setEspecie(request.getEspecie());
-        declaracion.setCaptura(request.getCaptura());
+        declaracion.setHumedadEstado(request.getHumedadEstado());
         declaracion.setDesembarque(request.getDesembarque());
+        if (request.getExtraccionTipo() != null && request.getExtraccionTipo().getId() != null) {
+            extraccionTipoRepository.findById(request.getExtraccionTipo().getId())
+                    .ifPresent(declaracion::setExtraccionTipo);
+        }
+
+        BigDecimal desBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : null;
+        CalculoCapturaResult capRes = capturaService.calcular(
+                declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null,
+                declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null,
+                declaracion.getFechaExtraccion(),
+                desBd);
+        if (capRes.isExitoso()) {
+            declaracion.setCaptura(capRes.getCaptura().doubleValue());
+            declaracion.setFactorAplicado(capRes.getFactorAplicado());
+            declaracion.setFactorConversionId(capRes.getFactorConversionId());
+        } else if (request.getCaptura() != null) {
+            declaracion.setCaptura(request.getCaptura());
+        }
         declaracion.setTipoDestinatario(request.getTipoDestinatario());
         declaracion.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracion.setComposicion(request.getComposicion());
         sanearComposicion(declaracion);
-        declaracion.setHumedadEstado(request.getHumedadEstado());
         declaracion.setLatitud(request.getLatitud());
         declaracion.setLongitud(request.getLongitud());
         declaracion.setEmbarcacion(request.getEmbarcacion());
