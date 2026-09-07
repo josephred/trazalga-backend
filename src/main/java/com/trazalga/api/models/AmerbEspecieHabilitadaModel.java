@@ -1,5 +1,6 @@
 package com.trazalga.api.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -20,10 +21,12 @@ public class AmerbEspecieHabilitadaModel {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "amerb_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private AmerbModel amerb;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especie_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private EspecieModel especie;
 
     @Column(length = 100)

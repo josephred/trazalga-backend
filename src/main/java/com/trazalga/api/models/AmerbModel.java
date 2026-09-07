@@ -1,6 +1,7 @@
 package com.trazalga.api.models;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 import lombok.experimental.Accessors;
 
@@ -26,10 +27,12 @@ public class AmerbModel {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private RegionModel regionModel;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ComunaModel comuna;
 
     @Column(nullable = true, length = 255)
