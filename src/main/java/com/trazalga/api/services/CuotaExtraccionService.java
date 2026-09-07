@@ -783,6 +783,59 @@ public class CuotaExtraccionService {
         return limiteEfectivo;
     }
 
+    public java.util.Map<String, Object> getConsumoCuota(Long id) {
+        CuotaExtraccionModel cuota = cuotaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
+        Date now = new Date();
+        LocalDate nowLocal = now.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate start, end;
+        if (cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
+            start = cuota.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            end = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        } else if ("MENSUAL".equalsIgnoreCase(cuota.getPeriodo())) {
+            start = nowLocal.withDayOfMonth(1);
+            end = nowLocal.withDayOfMonth(nowLocal.lengthOfMonth());
+        } else if ("ANUAL".equalsIgnoreCase(cuota.getPeriodo())) {
+            start = nowLocal.withDayOfYear(1);
+            end = nowLocal.withDayOfYear(nowLocal.lengthOfYear());
+        } else {
+            start = nowLocal;
+            end = nowLocal;
+        }
+
+        BigDecimal limiteEfectivo = calcularLimiteEfectivo(cuota, now);
+        BigDecimal consumido = calcularConsumoAcumulado(cuota, start, end, now);
+        BigDecimal disponible = limiteEfectivo.subtract(consumido);
+        if (disponible.compareTo(BigDecimal.ZERO) < 0) disponible = BigDecimal.ZERO;
+
+        BigDecimal pctConsumido = BigDecimal.ZERO;
+        BigDecimal pctRestante = BigDecimal.ZERO;
+        if (limiteEfectivo.compareTo(BigDecimal.ZERO) > 0) {
+            pctConsumido = consumido.multiply(BigDecimal.valueOf(100)).divide(limiteEfectivo, 2, RoundingMode.HALF_UP);
+            pctRestante = disponible.multiply(BigDecimal.valueOf(100)).divide(limiteEfectivo, 2, RoundingMode.HALF_UP);
+        }
+
+        java.util.Map<String, Object> res = new java.util.HashMap<>();
+        res.put("cuotaId", cuota.getId());
+        res.put("limiteKg", cuota.getLimiteKg());
+        res.put("limiteEfectivoKg", limiteEfectivo);
+        res.put("consumidoKg", consumido);
+        res.put("disponibleKg", disponible);
+        res.put("pctConsumido", pctConsumido);
+        res.put("pctRestante", pctRestante);
+        res.put("estado", cuota.getEstado());
+        res.put("fechaCierre", cuota.getFechaCierre());
+        return res;
+    }
+
+    public CuotaExtraccionModel cerrarCuota(Long id) {
+        CuotaExtraccionModel c = cuotaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
+        c.setEstado("CERRADA");
+        c.setFechaCierre(new Date());
+        return cuotaRepository.save(c);
+    }
+
     public static class QuotaCheckResult {
         private boolean allowed;
         private String message;

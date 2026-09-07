@@ -24,6 +24,9 @@ public class VedaEspecieService {
     @Autowired
     private IRegionRepository regionRepository;
 
+    @Autowired
+    private com.trazalga.api.repositories.IExtraccionTipoRepository extraccionTipoRepository;
+
     public List<VedaEspecieModel> getAll() {
         return vedaRepository.findAll();
     }
@@ -48,26 +51,35 @@ public class VedaEspecieService {
             veda.setRegion(regionRepository.findById(veda.getRegion().getId())
                 .orElseThrow(() -> new IllegalArgumentException("La región indicada no existe.")));
         }
+        if (veda.getExtraccionTipo() != null && veda.getExtraccionTipo().getId() != null) {
+            veda.setExtraccionTipo(extraccionTipoRepository.findById(veda.getExtraccionTipo().getId())
+                .orElse(null));
+        }
     }
 
     /**
-     * Reglas de configuración: especie y rango de fechas obligatorios, y el rango
-     * debe ser coherente (una veda con inicio > fin jamás coincidiría en las
-     * consultas de vigencia y quedaría "muda" en el sistema).
+     * Reglas de configuración: especie obligatoria. Si es recurrencia anual,
+     * exige meses_veda; si es por fechas, exige fechaInicio y fechaFin coherentes.
      */
     private void validar(VedaEspecieModel veda) {
         if (veda.getEspecie() == null || veda.getEspecie().getId() == null) {
             throw new IllegalArgumentException("La veda debe indicar la especie afectada.");
         }
-        if (veda.getFechaInicio() == null || veda.getFechaFin() == null) {
-            throw new IllegalArgumentException("La veda debe indicar fecha de inicio y fecha de término.");
-        }
-        if (veda.getFechaInicio().after(veda.getFechaFin())) {
-            throw new IllegalArgumentException("La fecha de inicio de la veda no puede ser posterior a la fecha de término.");
+        if (Boolean.TRUE.equals(veda.getRecurrenciaAnual())) {
+            if (veda.getMesesVeda() == null || veda.getMesesVeda().trim().isEmpty()) {
+                throw new IllegalArgumentException("Para vedas con recurrencia anual, debe seleccionar al menos un mes en veda.");
+            }
+        } else {
+            if (veda.getFechaInicio() == null || veda.getFechaFin() == null) {
+                throw new IllegalArgumentException("La veda debe indicar fecha de inicio y fecha de término.");
+            }
+            if (veda.getFechaInicio().after(veda.getFechaFin())) {
+                throw new IllegalArgumentException("La fecha de inicio de la veda no puede ser posterior a la fecha de término.");
+            }
         }
     }
 
-    /** Datos maestros recortados (especies y regiones) para los selects del mantenedor de vedas. */
+    /** Datos maestros (especies, regiones y tipos de extracción) para los selects del mantenedor de vedas. */
     public java.util.Map<String, Object> getMaestros() {
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("especies", especieRepository.findAll().stream()
@@ -75,6 +87,9 @@ public class VedaEspecieService {
             .toList());
         out.put("regiones", regionRepository.findAll().stream()
             .map(r -> java.util.Map.of("id", r.getId(), "nombre", r.getNombre() != null ? r.getNombre() : ""))
+            .toList());
+        out.put("extraccionTipos", extraccionTipoRepository.findAll().stream()
+            .map(et -> java.util.Map.of("id", et.getId(), "nombre", et.getNombre() != null ? et.getNombre() : ""))
             .toList());
         return out;
     }

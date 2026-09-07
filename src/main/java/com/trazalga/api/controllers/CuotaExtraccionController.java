@@ -81,6 +81,16 @@ public class CuotaExtraccionController {
         return "ERROR al eliminar cuota";
     }
 
+    @PutMapping(path = "/{id}/cerrar")
+    public CuotaExtraccionModel cerrar(@PathVariable("id") Long id) {
+        return cuotaService.cerrarCuota(id);
+    }
+
+    @GetMapping(path = "/{id}/consumo")
+    public Map<String, Object> getConsumo(@PathVariable("id") Long id) {
+        return cuotaService.getConsumoCuota(id);
+    }
+
     // DTO simple para validación de declaración
     public static class ValidateDeclarationRequest {
         public Long usuarioId;
