@@ -4,8 +4,10 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
+import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,7 +62,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
  */
 @Configuration
 @EnableCaching
-public class CacheConfig {
+public class CacheConfig implements CachingConfigurer {
 
     /** Caché de métricas: resultados pequeños (1 a 4 filas de agregados). */
     public static final String CACHE_METRICAS = "reportesMetricas";
@@ -70,6 +72,31 @@ public class CacheConfig {
 
     /** Caché de trazabilidad: recorre el grafo de declaraciones. */
     public static final String CACHE_TRAZABILIDAD = "trazabilidad";
+
+    /**
+     * Generador de claves que incluye el nombre del método para evitar colisiones
+     * entre métodos distintos que comparten el mismo nombre de caché
+     * (por ejemplo: getResumenGlobal vs getExtraccionVedaMetrics vs getTiempoValidacionMetrics).
+     */
+    @Override
+    @Bean
+    public KeyGenerator keyGenerator() {
+        return (target, method, params) -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append(method.getName());
+            for (Object param : params) {
+                sb.append('_');
+                if (param == null) {
+                    sb.append("null");
+                } else if (param instanceof java.util.Date) {
+                    sb.append(((java.util.Date) param).getTime());
+                } else {
+                    sb.append(param);
+                }
+            }
+            return sb.toString();
+        };
+    }
 
     /**
      * Ventana de obsolescencia aceptada.
