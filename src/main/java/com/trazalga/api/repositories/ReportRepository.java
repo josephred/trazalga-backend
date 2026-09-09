@@ -1863,7 +1863,7 @@ public class ReportRepository {
         double limiteConToleranciaGlobal = limiteOficialGlobal * (1.0 + (toleranciaGlobal / 100.0));
 
         // 2. Consultar faenas del día agrupadas por embarcación, especie, método y región
-        String sqlArmador = "SELECT emb.id, emb.nombre, emb.matricula, e.id as especie_id, e.nombre as especie, " +
+        String sqlArmador = "SELECT emb.id, emb.nombre, emb.codigo, e.id as especie_id, e.nombre as especie, " +
             "ext.id as extraccion_tipo_id, ext.nombre as metodo, " +
             "cal.region_id as region_id, SUM(a.desembarque) as kg_total " +
             "FROM declaracion_armador a " +
@@ -1872,7 +1872,7 @@ public class ReportRepository {
             "LEFT JOIN extraccion_tipo ext ON a.extraccion_tipo_id = ext.id " +
             "LEFT JOIN caleta cal ON a.caleta_id = cal.id " +
             "WHERE a.fecha_declaracion = :fecha " +
-            "GROUP BY emb.id, emb.nombre, emb.matricula, e.id, e.nombre, ext.id, ext.nombre, cal.region_id";
+            "GROUP BY emb.id, emb.nombre, emb.codigo, e.id, e.nombre, ext.id, ext.nombre, cal.region_id";
 
         Query qArm = entityManager.createNativeQuery(sqlArmador);
         qArm.setParameter("fecha", targetDate);

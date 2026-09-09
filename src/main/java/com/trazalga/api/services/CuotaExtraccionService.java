@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.models.ComunaModel;
@@ -38,6 +39,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
 @Service
+@Transactional(readOnly = true)
 public class CuotaExtraccionService {
 
     @Autowired
@@ -93,6 +95,7 @@ public class CuotaExtraccionService {
         return cuotaRepository.findById(id);
     }
 
+    @Transactional
     public CuotaExtraccionModel save(CuotaExtraccionModel cuota) {
         resolverReferencias(cuota);
         validarDatosBasicos(cuota);
@@ -101,6 +104,7 @@ public class CuotaExtraccionService {
         return cuotaRepository.save(cuota);
     }
 
+    @Transactional
     public CuotaExtraccionModel update(Long id, CuotaExtraccionModel request) {
         CuotaExtraccionModel cuota = cuotaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Cuota no encontrada con ID: " + id));
@@ -134,6 +138,7 @@ public class CuotaExtraccionService {
         return cuotaRepository.save(cuota);
     }
 
+    @Transactional
     public boolean delete(Long id) {
         try {
             cuotaRepository.deleteById(id);
