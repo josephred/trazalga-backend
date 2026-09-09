@@ -52,19 +52,23 @@ public class MacrozonaService {
         cacheRegionMacrozonas.clear();
     }
 
+    @Transactional(readOnly = true)
     public List<MacrozonaDTO> getAll() {
         List<MacrozonaModel> list = macrozonaRepository.findAll();
         return list.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MacrozonaModel> getActivas() {
         return macrozonaRepository.findByActivoTrue();
     }
 
+    @Transactional(readOnly = true)
     public Optional<MacrozonaDTO> getById(Long id) {
         return macrozonaRepository.findById(id).map(this::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public Optional<MacrozonaModel> getModelById(Long id) {
         return macrozonaRepository.findById(id);
     }
@@ -213,9 +217,9 @@ public class MacrozonaService {
         List<MacrozonaRegionDTO> regDTOs = listReg.stream().map(mr -> MacrozonaRegionDTO.builder()
                 .id(mr.getId())
                 .macrozonaId(model.getId())
-                .regionId(mr.getRegion().getId())
-                .regionNombre(mr.getRegion().getNombre())
-                .regionCodigo(mr.getRegion().getCodigo())
+                .regionId(mr.getRegion() != null ? mr.getRegion().getId() : null)
+                .regionNombre(mr.getRegion() != null ? mr.getRegion().getNombre() : null)
+                .regionCodigo(mr.getRegion() != null ? mr.getRegion().getCodigo() : null)
                 .vigenciaInicio(mr.getVigenciaInicio())
                 .vigenciaFin(mr.getVigenciaFin())
                 .build()).collect(Collectors.toList());
@@ -224,7 +228,8 @@ public class MacrozonaService {
         Date ahora = new Date();
         List<Long> activeRegionIds = listReg.stream()
                 .filter(mr -> mr.getVigenciaFin() == null || mr.getVigenciaFin().after(ahora))
-                .map(mr -> mr.getRegion().getId())
+                .map(mr -> mr.getRegion() != null ? mr.getRegion().getId() : null)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
 
         return MacrozonaDTO.builder()
