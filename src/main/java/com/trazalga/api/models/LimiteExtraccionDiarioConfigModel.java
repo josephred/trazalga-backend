@@ -36,6 +36,10 @@ public class LimiteExtraccionDiarioConfigModel {
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "macrozona_id", nullable = true)
+    private MacrozonaModel macrozona;
+
     @Column(name = "perfil_aplicable", nullable = false, length = 50)
     @Builder.Default
     private String perfilAplicable = "ARMADOR";

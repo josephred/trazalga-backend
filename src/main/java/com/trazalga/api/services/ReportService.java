@@ -154,6 +154,7 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate, Double umbralVariacion) {
+        boolean bioPerdidaActivo = configService.getBoolean("bio_perdida_activo", true);
         double umbral = umbralVariacion != null ? umbralVariacion : configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
         double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
         double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
@@ -163,13 +164,16 @@ public class ReportService {
         int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
         String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
 
-        return reportRepository.getTrazabilidadLoteMetrics(
+        java.util.Map<String, Object> res = reportRepository.getTrazabilidadLoteMetrics(
                 startDate, endDate, umbral, mermaMinHumedo, mermaMaxSeco,
-                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos, bioPerdidaActivo);
+        res.put("bioPerdidaActivo", bioPerdidaActivo);
+        return res;
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(Date startDate, Date endDate, String semaforo) {
+        boolean bioPerdidaActivo = configService.getBoolean("bio_perdida_activo", true);
         double umbral = configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
         double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
         double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
@@ -181,33 +185,49 @@ public class ReportService {
 
         return reportRepository.getTrazabilidadLoteDetalle(
                 startDate, endDate, semaforo, umbral, mermaMinHumedo, mermaMaxSeco,
-                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos, bioPerdidaActivo);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
-            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
+            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String agruparPor, String perfil) {
         double umbralAtipico = configService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
         boolean fRecolector = configService.getBoolean("desembarque_fuente_recolector_activa", true);
         boolean fArmador = configService.getBoolean("desembarque_fuente_armador_activa", true);
         boolean fArea = configService.getBoolean("desembarque_fuente_area_activa", true);
 
         return reportRepository.getDesembarqueFisicoMetrics(
-                startDate, endDate, especieId, comunaId, regionId, perfil,
+                startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId, agruparPor, perfil,
                 umbralAtipico, fRecolector, fArmador, fArea);
+    }
+
+    public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+        return getDesembarqueFisicoMetrics(startDate, endDate, especieId, comunaId, regionId,
+                null, null, null, null, "ESPECIE", perfil);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
-            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
+            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil) {
         double umbralAtipico = configService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
         boolean fRecolector = configService.getBoolean("desembarque_fuente_recolector_activa", true);
         boolean fArmador = configService.getBoolean("desembarque_fuente_armador_activa", true);
         boolean fArea = configService.getBoolean("desembarque_fuente_area_activa", true);
 
         return reportRepository.getDesembarqueFisicoDetalle(
-                startDate, endDate, especieId, comunaId, regionId, perfil,
+                startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId, perfil,
                 umbralAtipico, fRecolector, fArmador, fArea);
+    }
+
+    public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil) {
+        return getDesembarqueFisicoDetalle(startDate, endDate, especieId, comunaId, regionId,
+                null, null, null, null, perfil);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
@@ -222,11 +242,34 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getRetencionBodegaMetrics() {
+        boolean activo = configService.getBoolean("retencion_bodega_activo", true);
         int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
         int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
         int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
         String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
 
-        return reportRepository.getRetencionBodegaMetrics(diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+        if (!activo) {
+            java.util.Map<String, Object> disabled = new java.util.HashMap<>();
+            disabled.put("activo", false);
+            disabled.put("controlDesactivado", true);
+            disabled.put("mensaje", "Control de retención en bodega desactivado en Administración");
+            disabled.put("totalLotesEnBodega", 0);
+            disabled.put("totalKgEnBodega", 0.0);
+            disabled.put("diasAmarilla", diasAmarilla);
+            disabled.put("diasNaranja", diasNaranja);
+            disabled.put("diasRoja", diasRoja);
+            disabled.put("estadosSujetos", estadosSujetos);
+            disabled.put("semaforoVerde", 0L);
+            disabled.put("semaforoAmarillo", 0L);
+            disabled.put("semaforoNaranja", 0L);
+            disabled.put("semaforoRojo", 0L);
+            disabled.put("lotes", java.util.Collections.emptyList());
+            return disabled;
+        }
+
+        java.util.Map<String, Object> metrics = reportRepository.getRetencionBodegaMetrics(diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+        metrics.put("activo", true);
+        metrics.put("controlDesactivado", false);
+        return metrics;
     }
 }

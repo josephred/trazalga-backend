@@ -19,6 +19,14 @@ public class CaletaService {
         return (ArrayList<CaletaModel>) caletaRepository.findAll();
     } 
 
+    public java.util.List<CaletaModel> getByComuna(Long comunaId){
+        return caletaRepository.findByComunaId(comunaId);
+    }
+
+    public java.util.List<CaletaModel> getByRegion(Long regionId){
+        return caletaRepository.findByRegionId(regionId);
+    }
+
     public CaletaModel saveCaleta(CaletaModel caleta){
         return caletaRepository.save(caleta);
     }

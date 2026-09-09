@@ -47,6 +47,11 @@ public class CuotaExtraccionModel {
     @JoinColumn(name = "region_id", nullable = true)
     private RegionModel region;
 
+    // Macrozona (nullable = null means applies to any macrozona)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "macrozona_id", nullable = true)
+    private MacrozonaModel macrozona;
+
     // Provincia (nullable = null means applies to any provincia)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provincia_id", nullable = true)

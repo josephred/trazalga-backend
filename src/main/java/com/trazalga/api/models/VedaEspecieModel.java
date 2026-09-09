@@ -40,6 +40,10 @@ public class VedaEspecieModel {
     private RegionModel region;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "macrozona_id", nullable = true)
+    private MacrozonaModel macrozona;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "extraccion_tipo_id", nullable = true)
     private ExtraccionTipoModel extraccionTipo;
 

@@ -1180,7 +1180,7 @@ public class ReportRepository {
             Date startDate, Date endDate, String semaforoFiltro,
             Double umbralVariacion, Double mermaMinHumedo, Double mermaMaxSeco,
             int diasMinHumedo, int diasAmarilla, int diasNaranja, int diasRoja,
-            String estadosSujetos) {
+            String estadosSujetos, boolean bioPerdidaActivo) {
 
         String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC LIMIT 200";
         Query query = entityManager.createNativeQuery(sql);
@@ -1243,23 +1243,25 @@ public class ReportRepository {
                 }
             }
 
-            // Alerta de merma biológica
+            // Alerta de merma biológica (sólo si el interruptor maestro bio_perdida_activo está encendido)
             boolean alertaMerma = false;
             String motivoMerma = null;
-            String humUpper = humedadOrigen.toUpperCase();
-            if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
-                if (diasTranscurridos >= diasMinHumedo) {
-                    if (deltaPct > -mermaMinHumedo) {
-                        alertaMerma = true;
-                        motivoMerma = String.format("Merma húmeda biológicamente inconsistente tras %d días (variación: %.1f%%, min esperado: -%.1f%%)",
-                                diasTranscurridos, deltaPct, mermaMinHumedo);
+            if (bioPerdidaActivo) {
+                String humUpper = humedadOrigen.toUpperCase();
+                if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
+                    if (diasTranscurridos >= diasMinHumedo) {
+                        if (deltaPct > -mermaMinHumedo) {
+                            alertaMerma = true;
+                            motivoMerma = String.format("Merma húmeda biológicamente inconsistente tras %d días (variación: %.1f%%, min esperado: -%.1f%%)",
+                                    diasTranscurridos, deltaPct, mermaMinHumedo);
+                        }
                     }
-                }
-            } else if (humUpper.contains("SEC")) {
-                if (deltaPct < -mermaMaxSeco) {
-                    alertaMerma = true;
-                    motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (variación: %.1f%%, máx: -%.1f%%)",
-                            deltaPct, mermaMaxSeco);
+                } else if (humUpper.contains("SEC")) {
+                    if (deltaPct < -mermaMaxSeco) {
+                        alertaMerma = true;
+                        motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (variación: %.1f%%, máx: -%.1f%%)",
+                                deltaPct, mermaMaxSeco);
+                    }
                 }
             }
 
@@ -1300,17 +1302,26 @@ public class ReportRepository {
         return list;
     }
 
+    public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(
+            Date startDate, Date endDate, String semaforoFiltro,
+            Double umbralVariacion, Double mermaMinHumedo, Double mermaMaxSeco,
+            int diasMinHumedo, int diasAmarilla, int diasNaranja, int diasRoja,
+            String estadosSujetos) {
+        return getTrazabilidadLoteDetalle(startDate, endDate, semaforoFiltro, umbralVariacion, mermaMinHumedo, mermaMaxSeco,
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos, true);
+    }
+
     public java.util.Map<String, Object> getTrazabilidadLoteMetrics(
             Date startDate, Date endDate,
             Double umbralVariacion, Double mermaMinHumedo, Double mermaMaxSeco,
             int diasMinHumedo, int diasAmarilla, int diasNaranja, int diasRoja,
-            String estadosSujetos) {
+            String estadosSujetos, boolean bioPerdidaActivo) {
 
         List<java.util.Map<String, Object>> detalle = getTrazabilidadLoteDetalle(
                 startDate, endDate, null,
                 umbralVariacion, mermaMinHumedo, mermaMaxSeco,
                 diasMinHumedo, diasAmarilla, diasNaranja, diasRoja,
-                estadosSujetos);
+                estadosSujetos, bioPerdidaActivo);
 
         long totalLotes = detalle.size();
         double sumKgOrigen = 0;
@@ -1351,15 +1362,26 @@ public class ReportRepository {
         metrics.put("alertasMerma", alertasMerma);
         metrics.put("alertasVariacion", alertasVariacion);
         metrics.put("umbralVariacionPct", umbralVariacion);
+        metrics.put("bioPerdidaActivo", bioPerdidaActivo);
 
         return metrics;
+    }
+
+    public java.util.Map<String, Object> getTrazabilidadLoteMetrics(
+            Date startDate, Date endDate,
+            Double umbralVariacion, Double mermaMinHumedo, Double mermaMaxSeco,
+            int diasMinHumedo, int diasAmarilla, int diasNaranja, int diasRoja,
+            String estadosSujetos) {
+        return getTrazabilidadLoteMetrics(startDate, endDate, umbralVariacion, mermaMinHumedo, mermaMaxSeco,
+                diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos, true);
     }
 
     // =========================================================================
     // INDICADOR 1 — DESEMBARQUE FÍSICO
     // =========================================================================
 
-    private String sqlDesembarqueFisicoBase(Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil,
+    private String sqlDesembarqueFisicoBase(Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
+                                           Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil,
                                            boolean fRecolector, boolean fArmador, boolean fArea) {
         StringBuilder sb = new StringBuilder();
         boolean first = true;
@@ -1368,20 +1390,29 @@ public class ReportRepository {
             sb.append("SELECT r.id, 'RECOLECTOR' as perfil, r.folio_origen as folio, r.fecha_declaracion as fecha, r.hora, ")
               .append("r.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("c.nombre as comuna, prov.nombre as provincia, reg.nombre as region ")
+              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
               .append("FROM declaracion_recolector r ")
               .append("INNER JOIN usuario u ON r.usuario_id = u.id ")
               .append("INNER JOIN especie e ON r.especie_id = e.id ")
               .append("LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id ")
-              .append("LEFT JOIN comuna c ON r.comuna_id = c.id ")
+              .append("LEFT JOIN caleta cal ON r.caleta_id = cal.id ")
+              .append("LEFT JOIN comuna c ON COALESCE(r.comuna_id, cal.comuna_id) = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON c.region_id = reg.id ")
+              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
               .append("WHERE 1=1 ");
             if (startDate != null) sb.append("AND r.fecha_declaracion >= :startDate ");
             if (endDate != null) sb.append("AND r.fecha_declaracion <= :endDate ");
             if (especieId != null) sb.append("AND r.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND r.comuna_id = :comunaId ");
-            if (regionId != null) sb.append("AND c.region_id = :regionId ");
+            if (comunaId != null) sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null) sb.append("AND reg.id = :regionId ");
+            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+            if (macrozonaId != null) {
+                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+            }
             first = false;
         }
 
@@ -1390,7 +1421,9 @@ public class ReportRepository {
             sb.append("SELECT a.id, 'ARMADOR' as perfil, a.folio_origen as folio, a.fecha_declaracion as fecha, a.hora, ")
               .append("a.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("c.nombre as comuna, prov.nombre as provincia, reg.nombre as region ")
+              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
               .append("FROM declaracion_armador a ")
               .append("INNER JOIN usuario u ON a.usuario_id = u.id ")
               .append("INNER JOIN especie e ON a.especie_id = e.id ")
@@ -1398,13 +1431,19 @@ public class ReportRepository {
               .append("LEFT JOIN caleta cal ON a.caleta_id = cal.id ")
               .append("LEFT JOIN comuna c ON cal.comuna_id = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON c.region_id = reg.id ")
+              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
               .append("WHERE 1=1 ");
             if (startDate != null) sb.append("AND a.fecha_declaracion >= :startDate ");
             if (endDate != null) sb.append("AND a.fecha_declaracion <= :endDate ");
             if (especieId != null) sb.append("AND a.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND cal.comuna_id = :comunaId ");
-            if (regionId != null) sb.append("AND c.region_id = :regionId ");
+            if (comunaId != null) sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null) sb.append("AND reg.id = :regionId ");
+            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+            if (macrozonaId != null) {
+                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+            }
             first = false;
         }
 
@@ -1413,39 +1452,64 @@ public class ReportRepository {
             sb.append("SELECT ar.id, 'AREA' as perfil, ar.folio_origen as folio, ar.fecha_declaracion as fecha, ar.hora, ")
               .append("ar.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("c.nombre as comuna, prov.nombre as provincia, reg.nombre as region ")
+              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
               .append("FROM declaracion_area ar ")
               .append("INNER JOIN usuario u ON ar.usuario_id = u.id ")
               .append("INNER JOIN especie e ON ar.especie_id = e.id ")
               .append("LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id ")
+              .append("LEFT JOIN caleta cal ON ar.caleta_id = cal.id ")
               .append("LEFT JOIN amerb am ON ar.amerb_id = am.id ")
-              .append("LEFT JOIN comuna c ON am.comuna_id = c.id ")
+              .append("LEFT JOIN comuna c ON COALESCE(am.comuna_id, cal.comuna_id) = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON c.region_id = reg.id ")
+              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
               .append("WHERE 1=1 ");
             if (startDate != null) sb.append("AND ar.fecha_declaracion >= :startDate ");
             if (endDate != null) sb.append("AND ar.fecha_declaracion <= :endDate ");
             if (especieId != null) sb.append("AND ar.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND am.comuna_id = :comunaId ");
-            if (regionId != null) sb.append("AND c.region_id = :regionId ");
+            if (comunaId != null) sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null) sb.append("AND reg.id = :regionId ");
+            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+            if (macrozonaId != null) {
+                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+            }
         }
 
         return sb.length() > 0 ? sb.toString() : "SELECT 1 WHERE 1=0";
     }
 
-    public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
-            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil,
-            Double umbralAtipico, boolean fRecolector, boolean fArmador, boolean fArea) {
-
-        String sql = "SELECT * FROM (" + sqlDesembarqueFisicoBase(startDate, endDate, especieId, comunaId, regionId, perfil, fRecolector, fArmador, fArea) +
-                     ") as t ORDER BY fecha DESC, id DESC LIMIT 200";
-
-        Query query = entityManager.createNativeQuery(sql);
+    private void bindDesembarqueFisicoParams(Query query, Date startDate, Date endDate, Long especieId,
+                                            Long comunaId, Long regionId, Long provinciaId, Long caletaId,
+                                            Long usuarioId, Long macrozonaId) {
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
         if (especieId != null) query.setParameter("especieId", especieId);
         if (comunaId != null) query.setParameter("comunaId", comunaId);
         if (regionId != null) query.setParameter("regionId", regionId);
+        if (provinciaId != null) query.setParameter("provinciaId", provinciaId);
+        if (caletaId != null) query.setParameter("caletaId", caletaId);
+        if (usuarioId != null) query.setParameter("usuarioId", usuarioId);
+        if (macrozonaId != null) query.setParameter("macrozonaId", macrozonaId);
+    }
+
+    public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
+            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil,
+            Double umbralAtipico, boolean fRecolector, boolean fArmador, boolean fArea) {
+
+        String baseSql = sqlDesembarqueFisicoBase(
+                startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId, perfil,
+                fRecolector, fArmador, fArea);
+
+        String sql = "SELECT * FROM (" + baseSql + ") as t ORDER BY fecha DESC, id DESC LIMIT 200";
+
+        Query query = entityManager.createNativeQuery(sql);
+        bindDesembarqueFisicoParams(query, startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId);
 
         List<Object[]> results = query.getResultList();
         List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
@@ -1467,6 +1531,13 @@ public class ReportRepository {
             map.put("comuna", row[10] != null ? row[10] : "—");
             map.put("provincia", row[11] != null ? row[11] : "—");
             map.put("region", row[12] != null ? row[12] : "—");
+            map.put("caleta", row[13] != null ? row[13] : "—");
+            map.put("usuarioId", row[14]);
+            map.put("caletaId", row[15]);
+            map.put("comunaId", row[16]);
+            map.put("provinciaId", row[17]);
+            map.put("regionId", row[18]);
+            map.put("especieId", row[19]);
             map.put("esAtipico", kg > threshold);
             list.add(map);
         }
@@ -1474,23 +1545,44 @@ public class ReportRepository {
         return list;
     }
 
-    public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
+    public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
             Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil,
             Double umbralAtipico, boolean fRecolector, boolean fArmador, boolean fArea) {
+        return getDesembarqueFisicoDetalle(startDate, endDate, especieId, comunaId, regionId,
+                null, null, null, null, perfil, umbralAtipico, fRecolector, fArmador, fArea);
+    }
 
-        String sql = "SELECT especie, COALESCE(comuna, 'Sin Comuna'), DATE_FORMAT(fecha, '%Y-%m-%d'), SUM(kg), COUNT(*), " +
-                     "SUM(CASE WHEN kg > :umbral THEN 1 ELSE 0 END), SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END) " +
-                     "FROM (" + sqlDesembarqueFisicoBase(startDate, endDate, especieId, comunaId, regionId, perfil, fRecolector, fArmador, fArea) +
-                     ") as t GROUP BY especie, comuna, DATE_FORMAT(fecha, '%Y-%m-%d')";
+    public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
+            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String agruparPor, String perfil,
+            Double umbralAtipico, boolean fRecolector, boolean fArmador, boolean fArea) {
+
+        String baseSql = sqlDesembarqueFisicoBase(
+                startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId, perfil,
+                fRecolector, fArmador, fArea);
+
+        String sql = "SELECT " +
+                     "especie, " +
+                     "comuna, " +
+                     "provincia, " +
+                     "region, " +
+                     "caleta, " +
+                     "actor, " +
+                     "rut, " +
+                     "DATE_FORMAT(fecha, '%Y-%m-%d'), " +
+                     "SUM(kg), " +
+                     "COUNT(*), " +
+                     "SUM(CASE WHEN kg > :umbral THEN 1 ELSE 0 END), " +
+                     "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END) " +
+                     "FROM (" + baseSql + ") as t " +
+                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d')";
 
         double threshold = umbralAtipico != null ? umbralAtipico : 5000.0;
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("umbral", threshold);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
-        if (especieId != null) query.setParameter("especieId", especieId);
-        if (comunaId != null) query.setParameter("comunaId", comunaId);
-        if (regionId != null) query.setParameter("regionId", regionId);
+        bindDesembarqueFisicoParams(query, startDate, endDate, especieId, comunaId, regionId,
+                provinciaId, caletaId, usuarioId, macrozonaId);
 
         List<Object[]> rows = query.getResultList();
 
@@ -1499,44 +1591,88 @@ public class ReportRepository {
         long totalAtipicos = 0;
         double volumenAtipico = 0;
 
-        java.util.Map<String, Double> porEspecieMap = new java.util.HashMap<>();
-        java.util.Map<String, Double> porComunaMap = new java.util.HashMap<>();
+        class Agregado {
+            double kg = 0;
+            long count = 0;
+            long atip = 0;
+            double volAtip = 0;
+        }
+
+        java.util.Map<String, Agregado> porEspecieMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porCaletaMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porRecolectorMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porComunaMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porProvinciaMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porRegionMap = new java.util.HashMap<>();
         java.util.Map<String, Double> porFechaMap = new java.util.TreeMap<>();
 
         for (Object[] r : rows) {
             String esp = r[0] != null ? r[0].toString() : "Otros";
-            String com = r[1] != null ? r[1].toString() : "Otros";
-            String fec = r[2] != null ? r[2].toString() : "Fecha no def";
-            double kg = r[3] != null ? ((Number) r[3]).doubleValue() : 0.0;
-            long count = r[4] != null ? ((Number) r[4]).longValue() : 0;
-            long atip = r[5] != null ? ((Number) r[5]).longValue() : 0;
-            double volAtip = r[6] != null ? ((Number) r[6]).doubleValue() : 0.0;
+            String com = r[1] != null ? r[1].toString() : "Sin Comuna";
+            String prov = r[2] != null ? r[2].toString() : "Sin Provincia";
+            String reg = r[3] != null ? r[3].toString() : "Sin Región";
+            String cal = r[4] != null ? r[4].toString() : "Sin Caleta";
+            String act = r[5] != null ? r[5].toString() : "Anónimo";
+            String rut = r[6] != null ? r[6].toString() : "";
+            String fec = r[7] != null ? r[7].toString() : "Fecha no def";
+            double kg = r[8] != null ? ((Number) r[8]).doubleValue() : 0.0;
+            long count = r[9] != null ? ((Number) r[9]).longValue() : 0;
+            long atip = r[10] != null ? ((Number) r[10]).longValue() : 0;
+            double volAtip = r[11] != null ? ((Number) r[11]).doubleValue() : 0.0;
 
             totalKg += kg;
             totalDeclaraciones += count;
             totalAtipicos += atip;
             volumenAtipico += volAtip;
 
-            porEspecieMap.put(esp, porEspecieMap.getOrDefault(esp, 0.0) + kg);
-            porComunaMap.put(com, porComunaMap.getOrDefault(com, 0.0) + kg);
+            String actorEtiqueta = (rut != null && !rut.isEmpty()) ? act + " (" + rut + ")" : act;
+
+            Agregado agEsp = porEspecieMap.computeIfAbsent(esp, k -> new Agregado());
+            agEsp.kg += kg; agEsp.count += count; agEsp.atip += atip; agEsp.volAtip += volAtip;
+
+            Agregado agCal = porCaletaMap.computeIfAbsent(cal, k -> new Agregado());
+            agCal.kg += kg; agCal.count += count; agCal.atip += atip; agCal.volAtip += volAtip;
+
+            Agregado agRec = porRecolectorMap.computeIfAbsent(actorEtiqueta, k -> new Agregado());
+            agRec.kg += kg; agRec.count += count; agRec.atip += atip; agRec.volAtip += volAtip;
+
+            Agregado agCom = porComunaMap.computeIfAbsent(com, k -> new Agregado());
+            agCom.kg += kg; agCom.count += count; agCom.atip += atip; agCom.volAtip += volAtip;
+
+            Agregado agProv = porProvinciaMap.computeIfAbsent(prov, k -> new Agregado());
+            agProv.kg += kg; agProv.count += count; agProv.atip += atip; agProv.volAtip += volAtip;
+
+            Agregado agReg = porRegionMap.computeIfAbsent(reg, k -> new Agregado());
+            agReg.kg += kg; agReg.count += count; agReg.atip += atip; agReg.volAtip += volAtip;
+
             porFechaMap.put(fec, porFechaMap.getOrDefault(fec, 0.0) + kg);
+        }
+
         final double finalTotalKg = totalKg;
 
-        List<java.util.Map<String, Object>> porEspecieList = porEspecieMap.entrySet().stream().map(e -> {
-            java.util.Map<String, Object> m = new java.util.HashMap<>();
-            m.put("especie", e.getKey());
-            m.put("totalKg", Math.round(e.getValue() * 100.0) / 100.0);
-            m.put("porcentaje", finalTotalKg > 0 ? Math.round((e.getValue() / finalTotalKg) * 1000.0) / 10.0 : 0.0);
-            return m;
-        }).collect(Collectors.toList());
+        java.util.function.BiFunction<String, java.util.Map<String, Agregado>, List<java.util.Map<String, Object>>> toListHelper =
+                (propName, map) -> map.entrySet().stream()
+                        .map(e -> {
+                            java.util.Map<String, Object> m = new java.util.HashMap<>();
+                            m.put(propName, e.getKey());
+                            m.put("grupo", e.getKey());
+                            m.put("totalKg", Math.round(e.getValue().kg * 100.0) / 100.0);
+                            m.put("totalDeclaraciones", e.getValue().count);
+                            m.put("promedioDeclaracionKg", e.getValue().count > 0 ? Math.round((e.getValue().kg / e.getValue().count) * 100.0) / 100.0 : 0.0);
+                            m.put("declaracionesAtipicas", e.getValue().atip);
+                            m.put("volumenAtipicoKg", Math.round(e.getValue().volAtip * 100.0) / 100.0);
+                            m.put("porcentaje", finalTotalKg > 0 ? Math.round((e.getValue().kg / finalTotalKg) * 1000.0) / 10.0 : 0.0);
+                            return m;
+                        })
+                        .sorted((a, b) -> Double.compare(((Number) b.get("totalKg")).doubleValue(), ((Number) a.get("totalKg")).doubleValue()))
+                        .collect(Collectors.toList());
 
-        List<java.util.Map<String, Object>> porComunaList = porComunaMap.entrySet().stream().map(e -> {
-            java.util.Map<String, Object> m = new java.util.HashMap<>();
-            m.put("comuna", e.getKey());
-            m.put("totalKg", Math.round(e.getValue() * 100.0) / 100.0);
-            m.put("porcentaje", finalTotalKg > 0 ? Math.round((e.getValue() / finalTotalKg) * 1000.0) / 10.0 : 0.0);
-            return m;
-        }).collect(Collectors.toList());
+        List<java.util.Map<String, Object>> porEspecieList = toListHelper.apply("especie", porEspecieMap);
+        List<java.util.Map<String, Object>> porCaletaList = toListHelper.apply("caleta", porCaletaMap);
+        List<java.util.Map<String, Object>> porRecolectorList = toListHelper.apply("recolector", porRecolectorMap);
+        List<java.util.Map<String, Object>> porComunaList = toListHelper.apply("comuna", porComunaMap);
+        List<java.util.Map<String, Object>> porProvinciaList = toListHelper.apply("provincia", porProvinciaMap);
+        List<java.util.Map<String, Object>> porRegionList = toListHelper.apply("region", porRegionMap);
 
         List<java.util.Map<String, Object>> porFechaList = porFechaMap.entrySet().stream().map(e -> {
             java.util.Map<String, Object> m = new java.util.HashMap<>();
@@ -1545,6 +1681,32 @@ public class ReportRepository {
             return m;
         }).collect(Collectors.toList());
 
+        String modoAgrupacion = (agruparPor != null && !agruparPor.isBlank()) ? agruparPor.toUpperCase() : "ESPECIE";
+        List<java.util.Map<String, Object>> datosAgrupados;
+        switch (modoAgrupacion) {
+            case "CALETA":
+                datosAgrupados = porCaletaList;
+                break;
+            case "RECOLECTOR":
+            case "PERSONA":
+                datosAgrupados = porRecolectorList;
+                break;
+            case "COMUNA":
+                datosAgrupados = porComunaList;
+                break;
+            case "PROVINCIA":
+                datosAgrupados = porProvinciaList;
+                break;
+            case "REGION":
+                datosAgrupados = porRegionList;
+                break;
+            case "ESPECIE":
+            default:
+                modoAgrupacion = "ESPECIE";
+                datosAgrupados = porEspecieList;
+                break;
+        }
+
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalKg * 100.0) / 100.0);
         out.put("totalDeclaraciones", totalDeclaraciones);
@@ -1552,11 +1714,24 @@ public class ReportRepository {
         out.put("declaracionesAtipicas", totalAtipicos);
         out.put("volumenAtipicoKg", Math.round(volumenAtipico * 100.0) / 100.0);
         out.put("umbralAtipicoKg", threshold);
+        out.put("agruparPor", modoAgrupacion);
+        out.put("datosAgrupados", datosAgrupados);
         out.put("porEspecie", porEspecieList);
+        out.put("porCaleta", porCaletaList);
+        out.put("porRecolector", porRecolectorList);
         out.put("porComuna", porComunaList);
+        out.put("porProvincia", porProvinciaList);
+        out.put("porRegion", porRegionList);
         out.put("porFecha", porFechaList);
 
         return out;
+    }
+
+    public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
+            Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId, String perfil,
+            Double umbralAtipico, boolean fRecolector, boolean fArmador, boolean fArea) {
+        return getDesembarqueFisicoMetrics(startDate, endDate, especieId, comunaId, regionId,
+                null, null, null, null, "ESPECIE", perfil, umbralAtipico, fRecolector, fArmador, fArea);
     }
 
     // =========================================================================
@@ -1648,38 +1823,56 @@ public class ReportRepository {
     public java.util.Map<String, Object> getLimiteExtraccionDiarioMetrics(Date fecha) {
         Date targetDate = fecha != null ? fecha : new Date();
 
-        // Obtener la regla LED activa más representativa
-        String sqlRegla = "SELECT id, nombre_regla, limite_kg, margen_tolerancia_pct, modo_accion, unidad_agregacion " +
-                          "FROM limite_extraccion_diario_config WHERE activo = true ORDER BY id ASC LIMIT 1";
-        Query qRegla = entityManager.createNativeQuery(sqlRegla);
-        List<Object[]> reglas = qRegla.getResultList();
+        // 1. Obtener todas las reglas LED activas y vigentes
+        String sqlReglas = "SELECT id, nombre_regla, limite_kg, margen_tolerancia_pct, modo_accion, unidad_agregacion, " +
+                           "especie_id, extraccion_tipo_id, region_id, perfil_aplicable " +
+                           "FROM limite_extraccion_diario_config WHERE activo = true " +
+                           "AND (vigencia_inicio IS NULL OR vigencia_inicio <= :fecha) " +
+                           "AND (vigencia_fin IS NULL OR vigencia_fin >= :fecha) " +
+                           "ORDER BY id ASC";
+        Query qReglas = entityManager.createNativeQuery(sqlReglas);
+        qReglas.setParameter("fecha", targetDate);
+        List<Object[]> listaReglas = qReglas.getResultList();
 
-        double limiteOficial = 2000.0;
-        double tolerancia = 0.0;
-        String modoAccion = "BLOQUEO_DECLARACION";
-        String unidadAgregacion = "EMBARCACION";
-        String nombreRegla = "Límite Oficial Diario";
-
-        if (!reglas.isEmpty()) {
-            Object[] reg = reglas.get(0);
-            nombreRegla = reg[1] != null ? reg[1].toString() : nombreRegla;
-            limiteOficial = reg[2] != null ? ((Number) reg[2]).doubleValue() : 2000.0;
-            tolerancia = reg[3] != null ? ((Number) reg[3]).doubleValue() : 0.0;
-            modoAccion = reg[4] != null ? reg[4].toString() : modoAccion;
-            unidadAgregacion = reg[5] != null ? reg[5].toString() : unidadAgregacion;
+        if (listaReglas.isEmpty()) {
+            java.util.Map<String, Object> outVacio = new java.util.HashMap<>();
+            outVacio.put("fecha", targetDate);
+            outVacio.put("sinReglaConfigurada", true);
+            outVacio.put("nombreRegla", "Sin regla LED configurada");
+            outVacio.put("limiteOficialKg", null);
+            outVacio.put("toleranciaPct", 0.0);
+            outVacio.put("limiteConToleranciaKg", null);
+            outVacio.put("modoAccion", "INACTIVO");
+            outVacio.put("unidadAgregacion", "EMBARCACION");
+            outVacio.put("totalMonitoreados", 0);
+            outVacio.put("dentroLimite", 0);
+            outVacio.put("advertencia", 0);
+            outVacio.put("enTolerancia", 0);
+            outVacio.put("excedidos", 0);
+            outVacio.put("detalle", java.util.Collections.emptyList());
+            return outVacio;
         }
 
-        double limiteConTolerancia = limiteOficial * (1.0 + (tolerancia / 100.0));
+        // Regla representativa para la cabecera
+        Object[] reglaCabecera = listaReglas.get(0);
+        String nombreReglaGlobal = reglaCabecera[1] != null ? reglaCabecera[1].toString() : "Límite Oficial Diario";
+        double limiteOficialGlobal = reglaCabecera[2] != null ? ((Number) reglaCabecera[2]).doubleValue() : 0.0;
+        double toleranciaGlobal = reglaCabecera[3] != null ? ((Number) reglaCabecera[3]).doubleValue() : 0.0;
+        String modoAccionGlobal = reglaCabecera[4] != null ? reglaCabecera[4].toString() : "SOLO_ALERTA";
+        String unidadAgregacionGlobal = reglaCabecera[5] != null ? reglaCabecera[5].toString() : "EMBARCACION";
+        double limiteConToleranciaGlobal = limiteOficialGlobal * (1.0 + (toleranciaGlobal / 100.0));
 
-        // Consultar faenas del día agrupadas por embarcación
-        String sqlArmador = "SELECT emb.id, emb.nombre, emb.matricula, e.nombre as especie, " +
-            "COALESCE(ext.nombre, 'Barreteado') as metodo, SUM(a.desembarque) as kg_total " +
+        // 2. Consultar faenas del día agrupadas por embarcación, especie, método y región
+        String sqlArmador = "SELECT emb.id, emb.nombre, emb.matricula, e.id as especie_id, e.nombre as especie, " +
+            "ext.id as extraccion_tipo_id, ext.nombre as metodo, " +
+            "cal.region_id as region_id, SUM(a.desembarque) as kg_total " +
             "FROM declaracion_armador a " +
             "INNER JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
             "INNER JOIN especie e ON a.especie_id = e.id " +
             "LEFT JOIN extraccion_tipo ext ON a.extraccion_tipo_id = ext.id " +
+            "LEFT JOIN caleta cal ON a.caleta_id = cal.id " +
             "WHERE a.fecha_declaracion = :fecha " +
-            "GROUP BY emb.id, emb.nombre, emb.matricula, e.nombre, ext.nombre";
+            "GROUP BY emb.id, emb.nombre, emb.matricula, e.id, e.nombre, ext.id, ext.nombre, cal.region_id";
 
         Query qArm = entityManager.createNativeQuery(sqlArmador);
         qArm.setParameter("fecha", targetDate);
@@ -1694,16 +1887,63 @@ public class ReportRepository {
         for (Object[] r : rows) {
             String embNom = r[1] != null ? r[1].toString() : "Embarcación " + r[0];
             String mat = r[2] != null ? r[2].toString() : "—";
-            String esp = r[3] != null ? r[3].toString() : "—";
-            String met = r[4] != null ? r[4].toString() : "—";
-            double kg = r[5] != null ? ((Number) r[5]).doubleValue() : 0.0;
+            Long espId = r[3] != null ? ((Number) r[3]).longValue() : null;
+            String esp = r[4] != null ? r[4].toString() : "—";
+            Long extId = r[5] != null ? ((Number) r[5]).longValue() : null;
+            String met = r[6] != null ? r[6].toString() : "No especificado";
+            Long regId = r[7] != null ? ((Number) r[7]).longValue() : null;
+            double kg = r[8] != null ? ((Number) r[8]).doubleValue() : 0.0;
 
-            double pct = limiteOficial > 0 ? (kg / limiteOficial) * 100.0 : 0.0;
+            // Buscar la regla más específica aplicable a esta faena
+            Object[] reglaEspecifica = null;
+            int mejorScore = -1;
+
+            for (Object[] reg : listaReglas) {
+                Long rEspId = reg[6] != null ? ((Number) reg[6]).longValue() : null;
+                Long rExtId = reg[7] != null ? ((Number) reg[7]).longValue() : null;
+                Long rRegId = reg[8] != null ? ((Number) reg[8]).longValue() : null;
+                String rPerfil = reg[9] != null ? reg[9].toString() : null;
+
+                if (rPerfil != null && !"TODOS".equalsIgnoreCase(rPerfil) && !"ARMADOR".equalsIgnoreCase(rPerfil)) {
+                    continue;
+                }
+                if (rEspId != null && (espId == null || !rEspId.equals(espId))) {
+                    continue;
+                }
+                if (rExtId != null && (extId == null || !rExtId.equals(extId))) {
+                    continue;
+                }
+                if (rRegId != null && (regId == null || !rRegId.equals(regId))) {
+                    continue;
+                }
+
+                int score = (rEspId != null ? 4 : 0) + (rExtId != null ? 2 : 0) + (rRegId != null ? 1 : 0);
+                if (score > mejorScore) {
+                    mejorScore = score;
+                    reglaEspecifica = reg;
+                }
+            }
+
+            double limKg = limiteOficialGlobal;
+            double tolPct = toleranciaGlobal;
+            String modo = modoAccionGlobal;
+            String nomRegla = nombreReglaGlobal;
+
+            if (reglaEspecifica != null) {
+                nomRegla = reglaEspecifica[1] != null ? reglaEspecifica[1].toString() : nomRegla;
+                limKg = reglaEspecifica[2] != null ? ((Number) reglaEspecifica[2]).doubleValue() : limKg;
+                tolPct = reglaEspecifica[3] != null ? ((Number) reglaEspecifica[3]).doubleValue() : tolPct;
+                modo = reglaEspecifica[4] != null ? reglaEspecifica[4].toString() : modo;
+            }
+
+            double limConTol = limKg * (1.0 + (tolPct / 100.0));
+            double pct = limKg > 0 ? (kg / limKg) * 100.0 : 0.0;
+
             String estado;
-            if (kg > limiteConTolerancia) {
+            if (kg > limConTol) {
                 estado = "EXCEDIDO";
                 excedidos++;
-            } else if (kg > limiteOficial) {
+            } else if (kg > limKg) {
                 estado = "EN_TOLERANCIA";
                 enTolerancia++;
             } else if (pct >= 80.0) {
@@ -1721,22 +1961,24 @@ public class ReportRepository {
             item.put("especie", esp);
             item.put("metodo", met);
             item.put("kgDesembarcados", Math.round(kg * 100.0) / 100.0);
-            item.put("limiteKg", limiteOficial);
-            item.put("limiteConToleranciaKg", Math.round(limiteConTolerancia * 100.0) / 100.0);
+            item.put("limiteKg", limKg);
+            item.put("limiteConToleranciaKg", Math.round(limConTol * 100.0) / 100.0);
             item.put("porcentajeConsumido", Math.round(pct * 10.0) / 10.0);
             item.put("estado", estado);
-            item.put("modoAccion", modoAccion);
+            item.put("modoAccion", modo);
+            item.put("nombreRegla", nomRegla);
             detalle.add(item);
         }
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("fecha", targetDate);
-        out.put("nombreRegla", nombreRegla);
-        out.put("limiteOficialKg", limiteOficial);
-        out.put("toleranciaPct", tolerancia);
-        out.put("limiteConToleranciaKg", Math.round(limiteConTolerancia * 100.0) / 100.0);
-        out.put("modoAccion", modoAccion);
-        out.put("unidadAgregacion", unidadAgregacion);
+        out.put("sinReglaConfigurada", false);
+        out.put("nombreRegla", nombreReglaGlobal);
+        out.put("limiteOficialKg", limiteOficialGlobal);
+        out.put("toleranciaPct", toleranciaGlobal);
+        out.put("limiteConToleranciaKg", Math.round(limiteConToleranciaGlobal * 100.0) / 100.0);
+        out.put("modoAccion", modoAccionGlobal);
+        out.put("unidadAgregacion", unidadAgregacionGlobal);
         out.put("totalMonitoreados", detalle.size());
         out.put("dentroLimite", dentro);
         out.put("advertencia", advertencia);

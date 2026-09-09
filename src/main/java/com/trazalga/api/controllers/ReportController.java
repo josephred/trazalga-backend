@@ -866,9 +866,16 @@ public class ReportController {
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long provinciaId,
+            @RequestParam(required = false) Long caletaId,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) Long macrozonaId,
+            @RequestParam(required = false, defaultValue = "ESPECIE") String agruparPor,
             @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
         try {
-            return ResponseEntity.ok(reportService.getDesembarqueFisicoMetrics(startDate, endDate, especieId, comunaId, regionId, perfil));
+            return ResponseEntity.ok(reportService.getDesembarqueFisicoMetrics(
+                    startDate, endDate, especieId, comunaId, regionId,
+                    provinciaId, caletaId, usuarioId, macrozonaId, agruparPor, perfil));
         } catch (Exception e) {
             System.err.println("Error obteniendo desembarque físico: " + e.getMessage());
             e.printStackTrace();
@@ -883,9 +890,15 @@ public class ReportController {
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long provinciaId,
+            @RequestParam(required = false) Long caletaId,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) Long macrozonaId,
             @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
         try {
-            return ResponseEntity.ok(reportService.getDesembarqueFisicoDetalle(startDate, endDate, especieId, comunaId, regionId, perfil));
+            return ResponseEntity.ok(reportService.getDesembarqueFisicoDetalle(
+                    startDate, endDate, especieId, comunaId, regionId,
+                    provinciaId, caletaId, usuarioId, macrozonaId, perfil));
         } catch (Exception e) {
             System.err.println("Error obteniendo detalle de desembarque físico: " + e.getMessage());
             e.printStackTrace();

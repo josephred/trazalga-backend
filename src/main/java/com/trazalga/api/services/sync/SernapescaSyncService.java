@@ -127,8 +127,14 @@ public class SernapescaSyncService {
         List<RegionTreeDto> tree = api.getRegionComunaCaleta();
 
         Map<String, RegionModel> regionByName = new HashMap<>();
+        Map<String, RegionModel> regionByCode = new HashMap<>();
         for (RegionModel r : regionRepo.findAll()) {
-            regionByName.put(norm(r.getNombre()), r);
+            if (r.getNombre() != null) {
+                regionByName.put(norm(r.getNombre()), r);
+            }
+            if (r.getCodigo() != null && !r.getCodigo().trim().isEmpty()) {
+                regionByCode.put(r.getCodigo().trim(), r);
+            }
         }
         Map<String, ComunaModel> comunaByKey = new HashMap<>();
         for (ComunaModel c : comunaRepo.findAll()) {
@@ -139,7 +145,7 @@ public class SernapescaSyncService {
             caletaByKey.put(comunaKey(c.getNombre(), c.getRegion() != null ? c.getRegion().getId() : null), c);
         }
 
-        int regObt = 0, regIns = 0, regOmit = 0;
+        int regObt = 0, regIns = 0, regUpd = 0, regOmit = 0;
         int comObt = 0, comIns = 0, comOmit = 0;
         int calObt = 0, calIns = 0, calOmit = 0;
         List<ComunaModel> nuevasComunas = new ArrayList<>();
@@ -150,13 +156,34 @@ public class SernapescaSyncService {
                 continue;
             }
             regObt++;
-            RegionModel region = regionByName.get(norm(rt.getNombreRegion()));
+            String codStr = rt.getCodRegion() != null ? String.valueOf(rt.getCodRegion()) : null;
+            RegionModel region = (codStr != null) ? regionByCode.get(codStr) : null;
             if (region == null) {
-                region = regionRepo.save(new RegionModel().setNombre(rt.getNombreRegion().trim()));
+                region = regionByName.get(norm(rt.getNombreRegion()));
+            }
+
+            if (region == null) {
+                region = regionRepo.save(new RegionModel().setNombre(rt.getNombreRegion().trim()).setCodigo(codStr));
                 regionByName.put(norm(region.getNombre()), region);
+                if (codStr != null) {
+                    regionByCode.put(codStr, region);
+                }
                 regIns++;
             } else {
-                regOmit++;
+                boolean actualizado = false;
+                if (codStr != null && (region.getCodigo() == null || !codStr.equals(region.getCodigo()))) {
+                    region.setCodigo(codStr);
+                    actualizado = true;
+                }
+                if (actualizado) {
+                    regionRepo.save(region);
+                    if (codStr != null) {
+                        regionByCode.put(codStr, region);
+                    }
+                    regUpd++;
+                } else {
+                    regOmit++;
+                }
             }
 
             if (rt.getComunas() == null) {
@@ -215,7 +242,7 @@ public class SernapescaSyncService {
 
         List<SyncResult> out = new ArrayList<>();
         out.add(SyncResult.builder().entidad("region").ok(true)
-                .obtenidos(regObt).insertados(regIns).actualizados(0).omitidos(regOmit).build());
+                .obtenidos(regObt).insertados(regIns).actualizados(regUpd).omitidos(regOmit).build());
         out.add(SyncResult.builder().entidad("comuna").ok(true)
                 .obtenidos(comObt).insertados(comIns).actualizados(0).omitidos(comOmit).build());
         out.add(SyncResult.builder().entidad("caleta").ok(true)

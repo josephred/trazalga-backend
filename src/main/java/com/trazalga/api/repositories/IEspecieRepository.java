@@ -12,6 +12,7 @@ public interface IEspecieRepository extends JpaRepository<EspecieModel, Long> {
     @org.springframework.data.jpa.repository.Query("SELECT x FROM EspecieModel x WHERE x.activo IS NULL OR x.activo = true")
     java.util.List<EspecieModel> findVisibles();
 
+    java.util.Optional<EspecieModel> findByNombreIgnoreCase(String nombre);
 
-    
+    java.util.List<EspecieModel> findByNombreContainingIgnoreCase(String nombre);
 }

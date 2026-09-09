@@ -8,5 +8,7 @@ import com.trazalga.api.models.HumedadEstadoModel;
 @Repository
 public interface IHumedadEstadoRepository extends JpaRepository<HumedadEstadoModel, Long> {
 
-    
+    java.util.Optional<HumedadEstadoModel> findByNombreIgnoreCase(String nombre);
+
+    java.util.List<HumedadEstadoModel> findByNombreContainingIgnoreCase(String nombre);
 }

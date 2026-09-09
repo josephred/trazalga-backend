@@ -27,7 +27,7 @@ import com.trazalga.api.services.UsuarioService;
 
 
 @RestController
-@RequestMapping("/usuario")
+@RequestMapping({"/usuario", "/api/usuarios"})
 public class UsuarioController {
     
     @Autowired

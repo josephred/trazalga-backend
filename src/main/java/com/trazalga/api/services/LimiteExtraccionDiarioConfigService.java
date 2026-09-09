@@ -1,12 +1,17 @@
 package com.trazalga.api.services;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.trazalga.api.models.EspecieModel;
+import com.trazalga.api.models.ExtraccionTipoModel;
 import com.trazalga.api.models.LimiteExtraccionDiarioConfigModel;
 import com.trazalga.api.repositories.IEspecieRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
@@ -14,6 +19,7 @@ import com.trazalga.api.repositories.ILimiteExtraccionDiarioConfigRepository;
 import com.trazalga.api.repositories.IRegionRepository;
 
 @Service
+@Slf4j
 public class LimiteExtraccionDiarioConfigService {
 
     @Autowired
@@ -27,6 +33,81 @@ public class LimiteExtraccionDiarioConfigService {
 
     @Autowired
     private IRegionRepository regionRepository;
+
+    @PostConstruct
+    public void initBootstrap() {
+        try {
+            long totalEspecies = especieRepository.count();
+            long totalTipos = extraccionTipoRepository.count();
+
+            if (totalEspecies == 0 || totalTipos == 0) {
+                log.warn("Catálogo de especies o tipos de extracción no disponible aún. Se pospone bootstrap de reglas LED.");
+                return;
+            }
+
+            EspecieModel huiroPalo = buscarEspeciePorNombre("Huiro palo");
+            ExtraccionTipoModel barreteado = buscarExtraccionTipoPorNombre("Barreteado");
+
+            if (huiroPalo == null || barreteado == null) {
+                log.warn("No se encontró especie 'Huiro palo' o tipo 'Barreteado' para regla LED oficial. Se pospone.");
+                return;
+            }
+
+            boolean yaExiste = repository.findAll().stream().anyMatch(r ->
+                    "LED Oficial Huiro Palo Barreteado".equalsIgnoreCase(r.getNombreRegla()) ||
+                    (Boolean.TRUE.equals(r.getActivo()) &&
+                     r.getEspecie() != null && huiroPalo.getId().equals(r.getEspecie().getId()) &&
+                     r.getExtraccionTipo() != null && barreteado.getId().equals(r.getExtraccionTipo().getId()) &&
+                     r.getRegion() == null &&
+                     "ARMADOR".equalsIgnoreCase(r.getPerfilAplicable())));
+
+            if (!yaExiste) {
+                LimiteExtraccionDiarioConfigModel regla = LimiteExtraccionDiarioConfigModel.builder()
+                        .nombreRegla("LED Oficial Huiro Palo Barreteado")
+                        .especie(huiroPalo)
+                        .extraccionTipo(barreteado)
+                        .region(null)
+                        .macrozona(null)
+                        .perfilAplicable("ARMADOR")
+                        .unidadAgregacion("EMBARCACION")
+                        .metrica("DESEMBARQUE")
+                        .limiteKg(new BigDecimal("2000.00"))
+                        .margenToleranciaPct(BigDecimal.ZERO)
+                        .modoAccion("SOLO_ALERTA")
+                        .activo(true)
+                        .build();
+
+                repository.save(regla);
+                log.info("Sembrada regla LED oficial: '{}' (2000 kg/día, Embarcación, Desembarque)", regla.getNombreRegla());
+            }
+        } catch (Exception e) {
+            log.error("Error ejecutando bootstrap de regla LED oficial: {}", e.getMessage(), e);
+        }
+    }
+
+    private EspecieModel buscarEspeciePorNombre(String clave) {
+        String target = normalizar(clave);
+        return especieRepository.findAll().stream()
+                .filter(e -> normalizar(e.getNombre()).contains(target))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ExtraccionTipoModel buscarExtraccionTipoPorNombre(String clave) {
+        String target = normalizar(clave);
+        return extraccionTipoRepository.findAll().stream()
+                .filter(ext -> normalizar(ext.getNombre()).contains(target))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String normalizar(String s) {
+        if (s == null) return "";
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .trim()
+                .toLowerCase();
+    }
 
     public List<LimiteExtraccionDiarioConfigModel> getAll() {
         return repository.findAll();

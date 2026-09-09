@@ -65,9 +65,10 @@ public class AlertaProgramadaTask {
         log.info("Finalizada revisión programada diaria.");
     }
 
-    private void revisarCuotas(Date hoy, LocalDate hoyLocal) {
+    void revisarCuotas(Date hoy, LocalDate hoyLocal) {
         double umbralRestantePct = parseDouble(configuracionGeneralService.getValor("cuota_umbral_restante_pct", "10.0"), 10.0);
         int diasPreviosExpiracion = parseInt(configuracionGeneralService.getValor("cuota_dias_previos_expiracion", "5"), 5);
+        double desvioVelocidadPct = parseDouble(configuracionGeneralService.getValor("cuota_desvio_velocidad_pct", "25.0"), 25.0);
 
         List<CuotaExtraccionModel> cuotasActivas = cuotaRepository.findByActivoTrue();
 
@@ -88,8 +89,11 @@ public class AlertaProgramadaTask {
             String alcance = cuotaExtraccionService.describirAlcance(cuota);
             String especieNombre = (cuota.getEspecie() != null) ? cuota.getEspecie().getNombre() : "General";
 
+            boolean alertaUmbralDisparada = false;
+
             // 1. Umbral de saldo restante
             if (saldo.compareTo(BigDecimal.ZERO) <= 0) {
+                alertaUmbralDisparada = true;
                 String titulo = "Alerta Crítica: Cuota Agotada";
                 String mensaje = String.format("La cuota de %s (%s) ha alcanzado o superado su límite: %.2f kg de %.2f kg.",
                         alcance, especieNombre, consumo, limite);
@@ -97,6 +101,7 @@ public class AlertaProgramadaTask {
             } else {
                 double pctRestante = saldo.divide(limite, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
                 if (pctRestante <= umbralRestantePct) {
+                    alertaUmbralDisparada = true;
                     String titulo = "Aviso de Cuota Próxima al Límite";
                     String mensaje = String.format("La cuota de %s (%s) tiene solo %.1f%% de saldo restante (%.2f kg disponibles de %.2f kg).",
                             alcance, especieNombre, pctRestante, saldo, limite);
@@ -115,6 +120,74 @@ public class AlertaProgramadaTask {
                     notificar(cuota.getUsuario() != null ? cuota.getUsuario().getId() : null, titulo, mensaje);
                 }
             }
+
+            // 3. Velocidad / Ritmo de Consumo (cuota_desvio_velocidad_pct)
+            if (!alertaUmbralDisparada) {
+                evaluarVelocidadConsumo(cuota, hoyLocal, limite, consumo, saldo, alcance, especieNombre, desvioVelocidadPct);
+            }
+        }
+    }
+
+    void evaluarVelocidadConsumo(CuotaExtraccionModel cuota, LocalDate hoyLocal, BigDecimal limite, BigDecimal consumo,
+                                  BigDecimal saldo, String alcance, String especieNombre, double desvioVelocidadTolerancia) {
+        String periodo = cuota.getPeriodo() != null ? cuota.getPeriodo().trim().toUpperCase() : "";
+        if (!periodo.equals("MENSUAL") && !periodo.equals("ANUAL") && !periodo.equals("BIANUAL")) {
+            return;
+        }
+
+        LocalDate start, end;
+        if (cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
+            start = cuota.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            end = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        } else if (periodo.equals("MENSUAL")) {
+            start = hoyLocal.withDayOfMonth(1);
+            end = hoyLocal.withDayOfMonth(hoyLocal.lengthOfMonth());
+        } else if (periodo.equals("ANUAL")) {
+            start = hoyLocal.withDayOfYear(1);
+            end = hoyLocal.withDayOfYear(hoyLocal.lengthOfYear());
+        } else {
+            return;
+        }
+
+        if (end.isBefore(start) || hoyLocal.isBefore(start)) {
+            return;
+        }
+
+        long diasTotales = ChronoUnit.DAYS.between(start, end) + 1;
+        if (diasTotales <= 0) {
+            return;
+        }
+
+        long diasTranscurridos = ChronoUnit.DAYS.between(start, hoyLocal) + 1;
+        if (diasTranscurridos > diasTotales) {
+            diasTranscurridos = diasTotales;
+        }
+
+        double pctTiempo = ((double) diasTranscurridos / (double) diasTotales) * 100.0;
+        if (pctTiempo < 10.0) {
+            // Evitar falsos positivos en los primeros días del periodo
+            return;
+        }
+
+        double pctConsumo = (consumo.doubleValue() / limite.doubleValue()) * 100.0;
+        double desvio = pctConsumo - pctTiempo;
+
+        if (desvio > desvioVelocidadTolerancia) {
+            double consumoPorDia = consumo.doubleValue() / (double) diasTranscurridos;
+            String estimacionAgotamiento;
+            if (consumoPorDia > 0 && saldo.doubleValue() > 0) {
+                long diasParaAgotar = (long) Math.ceil(saldo.doubleValue() / consumoPorDia);
+                LocalDate fechaEstimada = hoyLocal.plusDays(diasParaAgotar);
+                estimacionAgotamiento = "el " + fechaEstimada;
+            } else {
+                estimacionAgotamiento = "en los próximos días";
+            }
+
+            String titulo = "Alerta de Ritmo de Consumo: Cuota Acelerada";
+            String mensaje = String.format("La cuota de %s (%s) va al %.0f%% de consumo con sólo el %.0f%% del periodo transcurrido (desvío de %.0f puntos, tolerancia %.0f). A este ritmo se agotará %s, antes del fin del período (%s).",
+                    alcance, especieNombre, pctConsumo, pctTiempo, desvio, desvioVelocidadTolerancia, estimacionAgotamiento, end);
+
+            notificar(cuota.getUsuario() != null ? cuota.getUsuario().getId() : null, titulo, mensaje);
         }
     }
 

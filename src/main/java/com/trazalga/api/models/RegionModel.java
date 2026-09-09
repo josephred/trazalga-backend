@@ -27,4 +27,7 @@ public class RegionModel {
     @Column
     private String nombre;
 
+    @Column(length = 20)
+    private String codigo;
+
 }

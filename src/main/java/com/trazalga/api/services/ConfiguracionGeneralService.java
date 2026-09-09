@@ -117,10 +117,26 @@ public class ConfiguracionGeneralService {
         return Boolean.parseBoolean(val);
     }
 
+    @Autowired(required = false)
+    private org.springframework.cache.CacheManager cacheManager;
+
     public ConfiguracionGeneralModel updateConfig(String clave, String nuevoValor) {
         ConfiguracionGeneralModel config = repository.findByClave(clave)
                 .orElseThrow(() -> new IllegalArgumentException("Configuración no encontrada: " + clave));
         config.setValor(nuevoValor);
-        return repository.save(config);
+        ConfiguracionGeneralModel saved = repository.save(config);
+
+        if (cacheManager != null) {
+            try {
+                for (String cacheName : cacheManager.getCacheNames()) {
+                    org.springframework.cache.Cache cache = cacheManager.getCache(cacheName);
+                    if (cache != null) {
+                        cache.clear();
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return saved;
     }
 }

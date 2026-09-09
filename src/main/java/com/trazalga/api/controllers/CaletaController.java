@@ -15,16 +15,25 @@ import com.trazalga.api.services.CaletaService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
-@RequestMapping("/caleta")
+@RequestMapping({"/caleta", "/api/caletas"})
 public class CaletaController {
 
     @Autowired
     private CaletaService caletaService;
 
     @GetMapping
-    public ArrayList<CaletaModel> getCaletas(){
+    public java.util.List<CaletaModel> getCaletas(
+            @RequestParam(name = "comunaId", required = false) Long comunaId,
+            @RequestParam(name = "regionId", required = false) Long regionId){
+        if (comunaId != null) {
+            return this.caletaService.getByComuna(comunaId);
+        }
+        if (regionId != null) {
+            return this.caletaService.getByRegion(regionId);
+        }
         return this.caletaService.getCaletas();
     }
     

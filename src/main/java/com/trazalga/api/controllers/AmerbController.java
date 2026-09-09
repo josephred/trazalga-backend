@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/amerb")
+@RequestMapping({"/amerb", "/api/amerbs"})
 public class AmerbController {
 
     @Autowired

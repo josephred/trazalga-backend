@@ -360,3 +360,17 @@ PREPARE stmt FROM @sql_idx_dc_fol; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @idx_dpa_fol = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'trazalga' AND TABLE_NAME = 'declaracion_planta_abastecimiento' AND INDEX_NAME = 'ix_dpa_folio');
 SET @sql_idx_dpa_fol = IF(@idx_dpa_fol = 0, 'CREATE INDEX ix_dpa_folio ON declaracion_planta_abastecimiento (folio_origen);', 'SELECT 1;');
 PREPARE stmt FROM @sql_idx_dpa_fol; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Índices para agrupaciones y filtros de caleta (T7)
+SET @idx_dr_cal = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'trazalga' AND TABLE_NAME = 'declaracion_recolector' AND INDEX_NAME = 'ix_dr_caleta_fecha');
+SET @sql_idx_dr_cal = IF(@idx_dr_cal = 0, 'CREATE INDEX ix_dr_caleta_fecha ON declaracion_recolector (caleta_id, fecha_declaracion);', 'SELECT 1;');
+PREPARE stmt FROM @sql_idx_dr_cal; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_da_cal = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'trazalga' AND TABLE_NAME = 'declaracion_armador' AND INDEX_NAME = 'ix_da_caleta_fecha');
+SET @sql_idx_da_cal = IF(@idx_da_cal = 0, 'CREATE INDEX ix_da_caleta_fecha ON declaracion_armador (caleta_id, fecha_declaracion);', 'SELECT 1;');
+PREPARE stmt FROM @sql_idx_da_cal; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_dar_cal = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'trazalga' AND TABLE_NAME = 'declaracion_area' AND INDEX_NAME = 'ix_dar_caleta_fecha');
+SET @sql_idx_dar_cal = IF(@idx_dar_cal = 0, 'CREATE INDEX ix_dar_caleta_fecha ON declaracion_area (caleta_id, fecha_declaracion);', 'SELECT 1;');
+PREPARE stmt FROM @sql_idx_dar_cal; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+

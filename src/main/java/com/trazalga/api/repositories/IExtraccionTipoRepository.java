@@ -8,5 +8,7 @@ import com.trazalga.api.models.ExtraccionTipoModel;
 @Repository
 public interface IExtraccionTipoRepository extends JpaRepository<ExtraccionTipoModel, Long> {
 
-    
+    java.util.Optional<ExtraccionTipoModel> findByNombreIgnoreCase(String nombre);
+
+    java.util.List<ExtraccionTipoModel> findByNombreContainingIgnoreCase(String nombre);
 }

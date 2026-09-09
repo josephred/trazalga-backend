@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
-@RequestMapping("/especie")
+@RequestMapping({"/especie", "/api/especies"})
 public class EspecieController {
 
     @Autowired

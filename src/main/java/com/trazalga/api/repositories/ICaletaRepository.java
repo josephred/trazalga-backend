@@ -7,6 +7,6 @@ import com.trazalga.api.models.CaletaModel;
 
 @Repository
 public interface ICaletaRepository extends JpaRepository<CaletaModel, Long> {
-
-    
+    java.util.List<CaletaModel> findByComunaId(Long comunaId);
+    java.util.List<CaletaModel> findByRegionId(Long regionId);
 }
