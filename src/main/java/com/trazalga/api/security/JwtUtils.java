@@ -45,10 +45,23 @@ public class JwtUtils {
         return extractClaim(token, Claims::getSubject);
     }
 
+    // 2.1 Extraer el Perfil del token
+    public String extractPerfil(String token) {
+        return extractClaim(token, claims -> (String) claims.get("perfil"));
+    }
+
     // 3. Validar si el token es correcto y no ha expirado
     public Boolean validateToken(String token, String rut) {
         final String tokenRut = extractRut(token);
         return (tokenRut.equals(rut) && !isTokenExpired(token));
+    }
+
+    public Boolean validateToken(String token) {
+        try {
+            return !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // Métodos de apoyo internos

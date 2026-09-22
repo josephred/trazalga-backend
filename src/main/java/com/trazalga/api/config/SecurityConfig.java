@@ -1,119 +1,83 @@
 package com.trazalga.api.config;
 
+import java.util.Arrays;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.trazalga.api.security.JwtRequestFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Autowired
+    private JwtRequestFilter jwtRequestFilter;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.disable()) // Deshabilitar CORS para pruebas o configurar correctamente
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll() // ABRIMOS TODO PARA PROBAR
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\": \"No autorizado\", \"message\": \"" + authException.getMessage() + "\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\": \"Acceso denegado\", \"message\": \"Se requiere perfil Administrador.\"}");
+                        })
                 )
-                .httpBasic(basic -> basic.disable()) // ESTO ELIMINA LA VENTANITA
+                .authorizeHttpRequests(auth -> auth
+                        // 1. Opciones CORS preflight siempre permitidas
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 2. Endpoints críticos protegidos con perfil ADMINISTRADOR (R0.2)
+                        .requestMatchers(HttpMethod.POST, "/api/factores-conversion/recalcular-historico", "/factorconversion/recalcular-historico").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
+
+                        // 3. Rutas de autenticación
+                        .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+
+                        // 4. Todo lo demás por ahora permitido para compatibilidad operativa
+                        .anyRequest().permitAll()
+                )
+                .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable());
+
+        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 }
-
-// package com.trazalga.api.config;
-
-// import org.springframework.context.annotation.Bean;
-// import org.springframework.context.annotation.Configuration;
-// import org.springframework.security.config.Customizer;
-// import
-// org.springframework.security.config.annotation.web.builders.HttpSecurity;
-// import
-// org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-// import org.springframework.security.config.http.SessionCreationPolicy;
-// import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-// import org.springframework.security.web.SecurityFilterChain;
-// import org.springframework.web.cors.CorsConfiguration;
-// import org.springframework.web.cors.CorsConfigurationSource;
-// import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-// import java.util.Arrays;
-
-// @Configuration
-// @EnableWebSecurity
-// public class SecurityConfig {
-
-// @Bean
-// public BCryptPasswordEncoder passwordEncoder() {
-// return new BCryptPasswordEncoder();
-// }
-
-// @Bean
-// public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-// http
-// .cors(Customizer.withDefaults())
-// .csrf(csrf -> csrf.disable())
-// // 1. DESACTIVAR la sesión (obligatorio para APIs con JWT)
-// .sessionManagement(session ->
-// session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-// .authorizeHttpRequests(auth -> auth
-// // Rutas de autenticación
-// .requestMatchers("/api/auth/**", "/api/stress-test/**").permitAll()
-
-// // Rutas maestras (permitimos raíz y subrutas)
-// .requestMatchers(
-// "/comuna", "/comuna/**",
-// "/extracciontipo", "/extracciontipo/**",
-// "/especie", "/especie/**",
-// "/composicion", "/composicion/**",
-// "/caleta", "/caleta/**",
-// "/humedadestado", "/humedadestado/**",
-// "/perfil", "/perfil/**",
-// "/usuario", "/usuario/**",
-// "/region", "/region/**",
-// "/embarcacion", "/embarcacion/**",
-// "/buzo", "/buzo/**",
-// "/amerb", "/amerb/**",
-// "/patente", "/patente/**",
-// "/planta", "/planta/**",
-// "/producto", "/producto/**",
-// "/declaracionrecolector/**",
-// "/declaracionarmador/**",
-// "/declaracionarea/**",
-// "/declaracioncomercializador/**",
-// "/declaracionplantaabastecimiento/**",
-// "/declaracionplantaproduccion/**",
-// "/declaracionplantadestino/**")
-// .permitAll()
-
-// .anyRequest().authenticated())
-// // 2. DESACTIVAR explícitamente Basic Auth y Form Login para que no salga la
-// // ventana
-// .httpBasic(basic -> basic.disable())
-// .formLogin(form -> form.disable());
-
-// return http.build();
-// }
-
-// @Bean
-// public CorsConfigurationSource corsConfigurationSource() {
-// CorsConfiguration configuration = new CorsConfiguration();
-// configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-// configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE",
-// "OPTIONS", "HEAD"));
-// configuration.setAllowedHeaders(Arrays.asList("Authorization",
-// "Content-Type", "X-Requested-With", "Accept"));
-// configuration.setAllowCredentials(true);
-
-// UrlBasedCorsConfigurationSource source = new
-// UrlBasedCorsConfigurationSource();
-// source.registerCorsConfiguration("/**", configuration);
-// return source;
-// }
-// }
