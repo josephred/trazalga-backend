@@ -1807,10 +1807,14 @@ public class ReportRepository {
             desglose.add(item);
         }
 
+        double factorPond = totalDesembarque > 0 ? (totalCaptura / totalDesembarque) : 1.0;
+        double factorPondRedondeado = Math.round(factorPond * 1000.0) / 1000.0;
+
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalDesembarque * 100.0) / 100.0);
         out.put("totalCapturaKg", Math.round(totalCaptura * 100.0) / 100.0);
-        out.put("factorPromedioGlobal", totalDesembarque > 0 ? Math.round((totalCaptura / totalDesembarque) * 1000.0) / 100.0 : 1.0);
+        out.put("factorPonderadoGlobal", factorPondRedondeado);
+        out.put("factorPromedioGlobal", factorPondRedondeado);
         out.put("desglose", desglose);
 
         return out;

@@ -317,8 +317,8 @@ public class DeclaracionAreaService {
             declaracion.setCaptura(capRes.getCaptura().doubleValue());
             declaracion.setFactorAplicado(capRes.getFactorAplicado());
             declaracion.setFactorConversionId(capRes.getFactorConversionId());
-        } else if (request.getCaptura() != null) {
-            declaracion.setCaptura(request.getCaptura());
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
         }
         declaracion.setTipoDestinatario(request.getTipoDestinatario());
         declaracion.setUsuarioDestinatario(request.getUsuarioDestinatario());

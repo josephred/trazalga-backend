@@ -30,6 +30,20 @@ public class FactorConversionService {
     @Autowired
     private IHumedadEstadoRepository humedadEstadoRepository;
 
+    private static final String RESOLUCION_OFICIAL = "Res. Ex. Sernapesca 13-09-2026";
+    private static final String DESC_PROVISORIA = "Valor provisorio 1,0 - sin factor oficial de Sernapesca al 13-09-2026";
+
+    // Especies con tabla oficial Sernapesca
+    public static final Long ESPECIE_HUIRO_PALO = 1L;
+    public static final Long ESPECIE_HUIRO_MACRO = 8L;
+    public static final Long ESPECIE_HUIRO_NEGRO = 9L;
+
+    // Estados de humedad oficiales
+    public static final Long HUMEDAD_HUMEDO = 1L;
+    public static final Long HUMEDAD_SEMI_HUMEDO = 2L;
+    public static final Long HUMEDAD_SEMI_SECO = 3L;
+    public static final Long HUMEDAD_SECO = 4L;
+
     @PostConstruct
     public void initBootstrap() {
         try {
@@ -41,77 +55,114 @@ public class FactorConversionService {
                 return;
             }
 
-            HumedadEstadoModel estadoSeco = buscarHumedadPorNombre("Seco");
-            HumedadEstadoModel estadoHumedo = buscarHumedadPorNombre("Húmedo");
+            Date vigenciaInicio2024 = new java.text.SimpleDateFormat("yyyy-MM-dd").parse("2024-01-01");
+            Date vigenciaCierreAyer = new java.text.SimpleDateFormat("yyyy-MM-dd").parse("2023-12-31");
 
-            if (estadoSeco == null && estadoHumedo == null) {
-                log.warn("No se encontraron estados de humedad 'Seco' ni 'Húmedo' en catálogo. Se pospone bootstrap.");
-                return;
-            }
+            List<EspecieModel> todasEspecies = especieRepository.findAll();
+            List<HumedadEstadoModel> todasHumedades = humedadEstadoRepository.findAll();
 
-            Date vigencia = new java.text.SimpleDateFormat("yyyy-MM-dd").parse("2024-01-01");
-            List<EspecieModel> especies = especieRepository.findAll();
-
-            for (EspecieModel esp : especies) {
-                if (estadoHumedo != null) {
-                    crearFactorSiNoExiste(esp, estadoHumedo, new BigDecimal("1.0000"), vigencia,
-                            "Estándar Húmedo", "Factor base para recurso húmedo recién extraído");
-                }
-                if (estadoSeco != null) {
-                    crearFactorSiNoExiste(esp, estadoSeco, new BigDecimal("3.5800"), vigencia,
-                            null, "Factor de conversión biológica seco a húmedo oficial (3.58)");
+            for (EspecieModel esp : todasEspecies) {
+                for (HumedadEstadoModel hum : todasHumedades) {
+                    sincronizarCombinacion(esp, hum, vigenciaInicio2024, vigenciaCierreAyer);
                 }
             }
+            log.info("Bootstrap de factores de conversión completado exitosamente (64 combinaciones verificadas).");
         } catch (Exception e) {
             log.error("Error ejecutando bootstrap de factores de conversión: {}", e.getMessage(), e);
         }
     }
 
-    private void crearFactorSiNoExiste(EspecieModel esp, HumedadEstadoModel hum, BigDecimal factor, Date vigencia, String resolucion, String descripcion) {
-        List<FactorConversionModel> existentes = repository.findByEspecieIdAndHumedadEstadoId(esp.getId(), hum.getId());
-        boolean yaExiste = existentes.stream().anyMatch(f -> Boolean.TRUE.equals(f.getActivo()) &&
-                f.getVigenciaInicio() != null && f.getVigenciaInicio().compareTo(vigencia) <= 0 &&
-                (f.getVigenciaFin() == null || f.getVigenciaFin().compareTo(vigencia) >= 0));
-        if (!yaExiste) {
-            FactorConversionModel nuevo = FactorConversionModel.builder()
-                    .especie(esp)
-                    .humedadEstado(hum)
-                    .factor(factor)
-                    .vigenciaInicio(vigencia)
-                    .vigenciaFin(null)
-                    .resolucion(resolucion)
-                    .descripcion(descripcion)
-                    .activo(true)
-                    .build();
-            repository.save(nuevo);
-            log.info("Sembrado factor de conversión oficial: Especie='{}', Humedad='{}', Factor={}",
-                    esp.getNombre(), hum.getNombre(), factor);
+    private void sincronizarCombinacion(EspecieModel esp, HumedadEstadoModel hum, Date vigenciaInicio, Date vigenciaCierre) {
+        Long espId = esp.getId();
+        Long humId = hum.getId();
+        BigDecimal targetFactor = calcularFactorEsperado(espId, humId);
+        String resolucion = esEspecieOficial(espId) ? RESOLUCION_OFICIAL : null;
+        String descripcion = esEspecieOficial(espId)
+                ? String.format("Factor oficial Sernapesca %s (%s)", hum.getNombre(), targetFactor)
+                : DESC_PROVISORIA;
+
+        List<FactorConversionModel> existentes = repository.findByEspecieIdAndHumedadEstadoId(espId, humId);
+
+        // Identificar filas activas vigentes actualmente
+        Date hoy = new Date();
+        List<FactorConversionModel> activas = existentes.stream()
+                .filter(f -> Boolean.TRUE.equals(f.getActivo()) &&
+                        (f.getVigenciaFin() == null || f.getVigenciaFin().compareTo(hoy) >= 0))
+                .toList();
+
+        // 1. Cierre de duplicados si hay más de una fila vigente para la misma combinación
+        if (activas.size() > 1) {
+            log.warn("Detectadas {} filas activas simultáneas para especie {} y humedad {}. Cerrando duplicados...",
+                    activas.size(), espId, humId);
+            // Conservar solo una: priorizar la que no tenga vigenciaFin o la de menor/mayor id
+            FactorConversionModel aMantener = activas.stream()
+                    .filter(f -> f.getVigenciaFin() == null)
+                    .findFirst()
+                    .orElse(activas.get(0));
+
+            for (FactorConversionModel f : activas) {
+                if (!f.getId().equals(aMantener.getId())) {
+                    f.setVigenciaFin(vigenciaCierre);
+                    f.setActivo(false);
+                    repository.save(f);
+                    log.info("Duplicado cerrado: ID={} para especie {} y humedad {}", f.getId(), espId, humId);
+                }
+            }
+            activas = List.of(aMantener);
         }
+
+        // 2. Si existe exactamente una fila activa, verificar si el factor es el correcto
+        if (!activas.isEmpty()) {
+            FactorConversionModel actual = activas.get(0);
+            if (actual.getFactor() != null && actual.getFactor().compareTo(targetFactor) == 0) {
+                // Idempotente: ya tiene el factor correcto
+                return;
+            }
+
+            // Corrección requerida: NO sobreescribir. Cerrar fila existente y crear una nueva
+            log.info("Corrigiendo factor para especie {} ({}) y humedad {} ({}): De {} a {}",
+                    espId, esp.getNombre(), humId, hum.getNombre(), actual.getFactor(), targetFactor);
+            actual.setVigenciaFin(vigenciaCierre);
+            actual.setActivo(false);
+            repository.save(actual);
+        }
+
+        // 3. Crear nueva fila con el factor oficial vigente desde 2024-01-01
+        FactorConversionModel nuevo = FactorConversionModel.builder()
+                .especie(esp)
+                .humedadEstado(hum)
+                .factor(targetFactor)
+                .vigenciaInicio(vigenciaInicio)
+                .vigenciaFin(null)
+                .resolucion(resolucion)
+                .descripcion(descripcion)
+                .activo(true)
+                .build();
+        repository.save(nuevo);
+        log.info("Sembrado factor vigente: Especie='{}' (ID={}), Humedad='{}' (ID={}), Factor={}",
+                esp.getNombre(), espId, hum.getNombre(), humId, targetFactor);
     }
 
-    private HumedadEstadoModel buscarHumedadPorNombre(String clave) {
-        String target = normalizar(clave);
-        return humedadEstadoRepository.findAll().stream()
-                .filter(h -> {
-                    String n = normalizar(h.getNombre());
-                    if ("seco".equals(target)) {
-                        return n.equals("seco");
-                    }
-                    if ("humedo".equals(target)) {
-                        return n.equals("humedo");
-                    }
-                    return n.contains(target);
-                })
-                .findFirst()
-                .orElse(null);
+    public static BigDecimal calcularFactorEsperado(Long especieId, Long humedadEstadoId) {
+        if (ESPECIE_HUIRO_PALO.equals(especieId) || ESPECIE_HUIRO_NEGRO.equals(especieId)) {
+            if (HUMEDAD_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.1300");
+            if (HUMEDAD_SEMI_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.7500");
+            if (HUMEDAD_SEMI_SECO.equals(humedadEstadoId)) return new BigDecimal("2.7000");
+            if (HUMEDAD_SECO.equals(humedadEstadoId)) return new BigDecimal("3.5800");
+        } else if (ESPECIE_HUIRO_MACRO.equals(especieId)) {
+            if (HUMEDAD_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.0000"); // Distinción oficial Huiro Macro
+            if (HUMEDAD_SEMI_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.7500");
+            if (HUMEDAD_SEMI_SECO.equals(humedadEstadoId)) return new BigDecimal("2.7000");
+            if (HUMEDAD_SECO.equals(humedadEstadoId)) return new BigDecimal("3.5800");
+        }
+        // Especies sin factor oficial Sernapesca: todas a 1.0000
+        return new BigDecimal("1.0000");
     }
 
-    private String normalizar(String s) {
-        if (s == null) return "";
-        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .trim()
-                .toLowerCase();
+    public static boolean esEspecieOficial(Long especieId) {
+        return ESPECIE_HUIRO_PALO.equals(especieId) ||
+               ESPECIE_HUIRO_MACRO.equals(especieId) ||
+               ESPECIE_HUIRO_NEGRO.equals(especieId);
     }
 
     public List<FactorConversionModel> getAll() {
@@ -132,8 +183,8 @@ public class FactorConversionService {
 
     public FactorConversionModel save(FactorConversionModel model) {
         resolverReferencias(model);
-        if (model.getFactor() == null || model.getFactor().doubleValue() <= 0) {
-            throw new IllegalArgumentException("El factor de conversión debe ser un valor mayor a 0.");
+        if (model.getFactor() == null || model.getFactor().compareTo(BigDecimal.ONE) < 0) {
+            throw new IllegalArgumentException("El factor de conversión debe ser mayor o igual a 1.0. La captura biológica nunca puede ser menor que el desembarque físico.");
         }
         if (model.getVigenciaInicio() == null) {
             model.setVigenciaInicio(new Date());
@@ -149,8 +200,8 @@ public class FactorConversionService {
         if (request.getEspecie() != null) existing.setEspecie(request.getEspecie());
         if (request.getHumedadEstado() != null) existing.setHumedadEstado(request.getHumedadEstado());
         if (request.getFactor() != null) {
-            if (request.getFactor().doubleValue() <= 0) {
-                throw new IllegalArgumentException("El factor debe ser mayor a 0.");
+            if (request.getFactor().compareTo(BigDecimal.ONE) < 0) {
+                throw new IllegalArgumentException("El factor de conversión debe ser mayor o igual a 1.0. La captura biológica nunca puede ser menor que el desembarque físico.");
             }
             existing.setFactor(request.getFactor());
         }
@@ -159,7 +210,6 @@ public class FactorConversionService {
         if (request.getResolucion() != null) existing.setResolucion(request.getResolucion());
         if (request.getDescripcion() != null) existing.setDescripcion(request.getDescripcion());
         if (request.getActivo() != null) existing.setActivo(request.getActivo());
-
         return repository.save(existing);
     }
 

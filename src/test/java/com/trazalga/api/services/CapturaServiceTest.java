@@ -90,4 +90,36 @@ public class CapturaServiceTest {
         assertFalse(result.isExitoso());
         assertTrue(result.getMensaje().contains("mayor o igual a 0"));
     }
+
+    @Test
+    void testCalcularCapturaIgualADesembarqueValidoConFactorUno() {
+        FactorConversionModel factorUno = new FactorConversionModel();
+        factorUno.setId(8L);
+        factorUno.setFactor(new BigDecimal("1.0000")); // Caso Huiro Macro Húmedo
+
+        when(factorConversionService.findFactorVigente(eq(8L), eq(1L), any(Date.class)))
+                .thenReturn(Optional.of(factorUno));
+
+        CalculoCapturaResult result = capturaService.calcular(8L, 1L, new Date(), new BigDecimal("1000.00"));
+
+        assertTrue(result.isExitoso());
+        assertEquals(new BigDecimal("1000.00"), result.getCaptura());
+        assertEquals(new BigDecimal("1.0000"), result.getFactorAplicado());
+    }
+
+    @Test
+    void testInvarianteRechazaCapturaMenorQueDesembarque() {
+        FactorConversionModel factorMenorQueUno = new FactorConversionModel();
+        factorMenorQueUno.setId(99L);
+        factorMenorQueUno.setFactor(new BigDecimal("0.8500")); // Factor anómalo < 1
+
+        when(factorConversionService.findFactorVigente(eq(1L), eq(2L), any(Date.class)))
+                .thenReturn(Optional.of(factorMenorQueUno));
+
+        CalculoCapturaResult result = capturaService.calcular(1L, 2L, new Date(), new BigDecimal("1000.00"));
+
+        assertFalse(result.isExitoso());
+        assertNotNull(result.getMensaje());
+        assertTrue(result.getMensaje().contains("no puede ser menor que el desembarque físico"));
+    }
 }

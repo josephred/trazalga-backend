@@ -419,8 +419,8 @@ public class DeclaracionArmadorService {
             declaracionArmadorModel.setCaptura(capRes.getCaptura().doubleValue());
             declaracionArmadorModel.setFactorAplicado(capRes.getFactorAplicado());
             declaracionArmadorModel.setFactorConversionId(capRes.getFactorConversionId());
-        } else if (request.getCaptura() != null) {
-            declaracionArmadorModel.setCaptura(request.getCaptura());
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
         }
 
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());

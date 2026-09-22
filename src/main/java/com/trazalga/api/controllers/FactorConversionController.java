@@ -18,6 +18,14 @@ public class FactorConversionController {
     @Autowired
     private FactorConversionService service;
 
+    @Autowired
+    private com.trazalga.api.services.RecalculoCapturaService recalculoCapturaService;
+
+    @PostMapping("/recalcular-historico")
+    public ResponseEntity<?> recalcularHistorico(@RequestParam(required = false, defaultValue = "true") boolean dryRun) {
+        return ResponseEntity.ok(recalculoCapturaService.recalcularHistorico(dryRun));
+    }
+
     @GetMapping
     public List<FactorConversionModel> getAll(@RequestParam(required = false, defaultValue = "false") boolean soloActivos) {
         return soloActivos ? service.getActivos() : service.getAll();

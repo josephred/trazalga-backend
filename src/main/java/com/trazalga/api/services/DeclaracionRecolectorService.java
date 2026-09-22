@@ -237,6 +237,8 @@ public class DeclaracionRecolectorService {
             declaracionRecolectorModel.setCaptura(capRes.getCaptura());
             declaracionRecolectorModel.setFactorAplicado(capRes.getFactorAplicado());
             declaracionRecolectorModel.setFactorConversionId(capRes.getFactorConversionId());
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
         }
 
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());

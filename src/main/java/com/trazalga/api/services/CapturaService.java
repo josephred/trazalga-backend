@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.Date;
 import java.util.Optional;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +13,7 @@ import com.trazalga.api.dto.CalculoCapturaResult;
 import com.trazalga.api.models.FactorConversionModel;
 
 @Service
+@Slf4j
 public class CapturaService {
 
     @Autowired
@@ -60,6 +62,17 @@ public class CapturaService {
         }
 
         BigDecimal captura = desembarqueKg.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+
+        // Invariante: captura >= desembarque. La captura biológica nunca puede ser menor que el desembarque físico.
+        if (captura.compareTo(desembarqueKg) < 0) {
+            log.error("Violación de invariante de captura biológica: captura calculada ({} kg) es MENOR que el desembarque ({} kg). Especie ID={}, Humedad ID={}, Fecha={}, Factor={}",
+                    captura, desembarqueKg, especieId, humedadEstadoId, fecha, factor);
+            return CalculoCapturaResult.builder()
+                    .exitoso(false)
+                    .mensaje(String.format("Error de consistencia: la captura biológica calculada (%s kg) no puede ser menor que el desembarque físico (%s kg). Factor resuelto: %s",
+                            captura, desembarqueKg, factor))
+                    .build();
+        }
 
         return CalculoCapturaResult.builder()
                 .exitoso(true)
