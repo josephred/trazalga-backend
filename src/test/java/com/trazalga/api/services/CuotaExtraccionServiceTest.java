@@ -259,6 +259,7 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setLimiteKg(50000.0);
         cMacrozona.setMetrica("CAPTURA");
         cMacrozona.setEstado("ABIERTA");
+        cMacrozona.setNivelAgregacion("MACROZONA");
         cMacrozona.setActivo(true);
 
         when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cComuna, cMacrozona));
@@ -307,6 +308,7 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setLimiteKg(50000.0);
         cMacrozona.setMetrica("CAPTURA");
         cMacrozona.setEstado("ABIERTA");
+        cMacrozona.setNivelAgregacion("MACROZONA");
         cMacrozona.setActivo(true);
 
         when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cMacrozona));
@@ -453,5 +455,62 @@ public class CuotaExtraccionServiceTest {
         });
 
         assertTrue(ex.getMessage().contains("Métrica inválida"));
+    }
+
+    @Test
+    void testValidarDatosBasicos_NivelAgregacionVacio_LanzaExcepcion() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setPerfil("RECOLECTOR");
+        c.setPeriodo("MENSUAL");
+        c.setLimiteKg(1000.0);
+        c.setNivelAgregacion("   ");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            cuotaExtraccionService.save(c);
+        });
+
+        assertTrue(ex.getMessage().contains("El nivel de agregación de la cuota es obligatorio"));
+    }
+
+    @Test
+    void testValidarDatosBasicos_NivelAgregacionInvalido_LanzaExcepcion() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setPerfil("RECOLECTOR");
+        c.setPeriodo("MENSUAL");
+        c.setLimiteKg(1000.0);
+        c.setNivelAgregacion("INVENTADO");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            cuotaExtraccionService.save(c);
+        });
+
+        assertTrue(ex.getMessage().contains("Nivel de agregación inválido"));
+    }
+
+    @Test
+    void testConstruirFiltroTerritorial_NivelDesconocido_LanzaIllegalStateException() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setId(99L);
+        c.setNivelAgregacion("DESCONOCIDO");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            cuotaExtraccionService.construirFiltroTerritorial(c, "declaracion_recolector", null);
+        });
+
+        assertTrue(ex.getMessage().contains("Nivel de agregación territorial desconocido"));
+    }
+
+    @Test
+    void testConstruirFiltroTerritorial_ComunaSinEntidadComuna_LanzaIllegalStateException() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setId(101L);
+        c.setNivelAgregacion("COMUNA");
+        c.setComuna(null);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            cuotaExtraccionService.construirFiltroTerritorial(c, "declaracion_recolector", null);
+        });
+
+        assertTrue(ex.getMessage().contains("sin comuna asociada"));
     }
 }

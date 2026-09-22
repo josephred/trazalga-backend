@@ -576,6 +576,24 @@ public class CuotaExtraccionService {
         if (cuota.getPerfil() == null || cuota.getPerfil().isBlank()) {
             throw new IllegalArgumentException("El perfil de la cuota es obligatorio.");
         }
+        if (cuota.getNivelAgregacion() == null || cuota.getNivelAgregacion().trim().isEmpty()) {
+            throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL).");
+        }
+        String nivelNorm = cuota.getNivelAgregacion().trim().toUpperCase();
+        if (!java.util.Set.of("COMUNA", "PROVINCIA", "REGION", "MACROZONA", "INDIVIDUAL", "NACIONAL").contains(nivelNorm)) {
+            throw new IllegalArgumentException("Nivel de agregación inválido: " + cuota.getNivelAgregacion() + ". Los valores permitidos son COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL.");
+        }
+        cuota.setNivelAgregacion(nivelNorm);
+
+        if (cuota.getEstado() == null || cuota.getEstado().trim().isEmpty()) {
+            cuota.setEstado("ABIERTA");
+        } else {
+            String estNorm = cuota.getEstado().trim().toUpperCase();
+            if (!java.util.Set.of("ABIERTA", "CERRADA").contains(estNorm)) {
+                throw new IllegalArgumentException("Estado de cuota inválido: " + cuota.getEstado() + ". Los valores permitidos son ABIERTA o CERRADA.");
+            }
+            cuota.setEstado(estNorm);
+        }
         // Regla normativa Sernapesca (T3):
         // Por defecto las cuotas se descuentan obligatoriamente en CAPTURA biológica corregida.
         // La métrica DESEMBARQUE sólo se permite si la resolución técnica de Subpesca lo explicita expresamente.
@@ -800,7 +818,17 @@ public class CuotaExtraccionService {
         Map<String, Object> params = new HashMap<>();
 
         boolean esPlantilla = Boolean.TRUE.equals(cuota.getEsPlantilla());
-        String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase() : "COMUNA";
+        String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase().trim() : null;
+
+        if (nivelAgregacion == null || ("COMUNA".equals(nivelAgregacion) && cuota.getComuna() == null)) {
+            if (cuota.getMacrozona() != null) nivelAgregacion = "MACROZONA";
+            else if (cuota.getRegion() != null) nivelAgregacion = "REGION";
+            else if (cuota.getProvincia() != null) nivelAgregacion = "PROVINCIA";
+            else if (cuota.getUsuario() != null) nivelAgregacion = "INDIVIDUAL";
+            else if (cuota.getAmerb() != null) nivelAgregacion = "AREA";
+            else if (cuota.getComuna() != null) nivelAgregacion = "COMUNA";
+            else nivelAgregacion = (nivelAgregacion != null ? nivelAgregacion : "COMUNA");
+        }
 
         if (esPlantilla || "INDIVIDUAL".equals(nivelAgregacion) || cuota.getUsuario() != null) {
             sql.append("WHERE d.usuario_id = :filtroUsuarioId ");
@@ -811,45 +839,73 @@ public class CuotaExtraccionService {
             params.put("filtroAmerbId", cuota.getAmerb().getId());
         } else if ("declaracion_recolector".equals(tableName)) {
             sql.append("JOIN usuario u ON d.usuario_id = u.id ");
-            if ("COMUNA".equals(nivelAgregacion) && cuota.getComuna() != null) {
+            if ("COMUNA".equals(nivelAgregacion)) {
+                if (cuota.getComuna() == null) {
+                    throw new IllegalStateException("Cuota nivel COMUNA sin comuna asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("WHERE u.comuna_id = :filtroComunaId ");
                 params.put("filtroComunaId", cuota.getComuna().getId());
-            } else if ("PROVINCIA".equals(nivelAgregacion) && cuota.getProvincia() != null) {
+            } else if ("PROVINCIA".equals(nivelAgregacion)) {
+                if (cuota.getProvincia() == null) {
+                    throw new IllegalStateException("Cuota nivel PROVINCIA sin provincia asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON u.comuna_id = c.id WHERE c.provincia_id = :filtroProvinciaId ");
                 params.put("filtroProvinciaId", cuota.getProvincia().getId());
-            } else if ("REGION".equals(nivelAgregacion) && cuota.getRegion() != null) {
+            } else if ("REGION".equals(nivelAgregacion)) {
+                if (cuota.getRegion() == null) {
+                    throw new IllegalStateException("Cuota nivel REGION sin región asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON u.comuna_id = c.id WHERE c.region_id = :filtroRegionId ");
                 params.put("filtroRegionId", cuota.getRegion().getId());
-            } else if ("MACROZONA".equals(nivelAgregacion) && cuota.getMacrozona() != null) {
+            } else if ("MACROZONA".equals(nivelAgregacion)) {
+                if (cuota.getMacrozona() == null) {
+                    throw new IllegalStateException("Cuota nivel MACROZONA sin macrozona asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON u.comuna_id = c.id ")
                    .append("JOIN macrozona_region mr ON c.region_id = mr.region_id ")
                    .append("  AND (mr.vigencia_inicio IS NULL OR d.fecha_declaracion >= mr.vigencia_inicio) ")
                    .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
-            } else {
+            } else if ("NACIONAL".equals(nivelAgregacion)) {
                 sql.append("WHERE 1=1 ");
+            } else {
+                throw new IllegalStateException("Nivel de agregación territorial desconocido: " + nivelAgregacion + " en cuota id=" + cuota.getId());
             }
         } else {
             // declaracion_armador o declaracion_area territorial
-            if ("COMUNA".equals(nivelAgregacion) && cuota.getComuna() != null) {
+            if ("COMUNA".equals(nivelAgregacion)) {
+                if (cuota.getComuna() == null) {
+                    throw new IllegalStateException("Cuota nivel COMUNA sin comuna asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("WHERE d.comuna_id = :filtroComunaId ");
                 params.put("filtroComunaId", cuota.getComuna().getId());
-            } else if ("PROVINCIA".equals(nivelAgregacion) && cuota.getProvincia() != null) {
+            } else if ("PROVINCIA".equals(nivelAgregacion)) {
+                if (cuota.getProvincia() == null) {
+                    throw new IllegalStateException("Cuota nivel PROVINCIA sin provincia asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON d.comuna_id = c.id WHERE c.provincia_id = :filtroProvinciaId ");
                 params.put("filtroProvinciaId", cuota.getProvincia().getId());
-            } else if ("REGION".equals(nivelAgregacion) && cuota.getRegion() != null) {
+            } else if ("REGION".equals(nivelAgregacion)) {
+                if (cuota.getRegion() == null) {
+                    throw new IllegalStateException("Cuota nivel REGION sin región asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON d.comuna_id = c.id WHERE c.region_id = :filtroRegionId ");
                 params.put("filtroRegionId", cuota.getRegion().getId());
-            } else if ("MACROZONA".equals(nivelAgregacion) && cuota.getMacrozona() != null) {
+            } else if ("MACROZONA".equals(nivelAgregacion)) {
+                if (cuota.getMacrozona() == null) {
+                    throw new IllegalStateException("Cuota nivel MACROZONA sin macrozona asociada (id=" + cuota.getId() + ")");
+                }
                 sql.append("JOIN comuna c ON d.comuna_id = c.id ")
                    .append("JOIN macrozona_region mr ON c.region_id = mr.region_id ")
                    .append("  AND (mr.vigencia_inicio IS NULL OR d.fecha_declaracion >= mr.vigencia_inicio) ")
                    .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
-            } else {
+            } else if ("NACIONAL".equals(nivelAgregacion)) {
                 sql.append("WHERE 1=1 ");
+            } else {
+                throw new IllegalStateException("Nivel de agregación territorial desconocido: " + nivelAgregacion + " en cuota id=" + cuota.getId());
             }
         }
 
