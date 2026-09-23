@@ -28,8 +28,9 @@ public class JwtUtils {
         Map<String, Object> claims = new HashMap<>();
         // Guardamos datos útiles dentro del token
         claims.put("rut", usuario.getRut());
-        claims.put("perfil", usuario.getPerfil().getNombre());
+        claims.put("perfil", usuario.getPerfil() != null ? usuario.getPerfil().getNombre() : null);
         claims.put("nombre", usuario.getNombres());
+        claims.put("usuarioId", usuario.getId());
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -48,6 +49,22 @@ public class JwtUtils {
     // 2.1 Extraer el Perfil del token
     public String extractPerfil(String token) {
         return extractClaim(token, claims -> (String) claims.get("perfil"));
+    }
+
+    // 2.2 Extraer el Nombre del token
+    public String extractNombre(String token) {
+        return extractClaim(token, claims -> (String) claims.get("nombre"));
+    }
+
+    // 2.3 Extraer el usuarioId del token
+    public Long extractUsuarioId(String token) {
+        return extractClaim(token, claims -> {
+            Object id = claims.get("usuarioId");
+            if (id instanceof Number) {
+                return ((Number) id).longValue();
+            }
+            return null;
+        });
     }
 
     // 3. Validar si el token es correcto y no ha expirado

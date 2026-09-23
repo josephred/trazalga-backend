@@ -92,4 +92,56 @@ public class SecurityRecalculoTest {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")),
                 "El token de perfil no administrador NO debe otorgar ROLE_ADMIN");
     }
+
+    @Test
+    void testRequestWithFiscalizadorToken_grantsFiscalizadorRole() throws ServletException, IOException {
+        String token = "valid-fisc-jwt-token";
+        String rut = "222-2";
+
+        when(jwtUtils.extractRut(token)).thenReturn(rut);
+        when(jwtUtils.validateToken(token)).thenReturn(true);
+        when(jwtUtils.extractPerfil(token)).thenReturn("FISCALIZADOR");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + token);
+        request.setRequestURI("/api/declaracion-marcas/1/resolver");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        jwtRequestFilter.doFilter(request, response, chain);
+
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_FISCALIZADOR")),
+                "El token de perfil FISCALIZADOR debe otorgar ROLE_FISCALIZADOR");
+        assertFalse(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")),
+                "El token de perfil FISCALIZADOR NO debe otorgar ROLE_ADMIN");
+    }
+
+    @Test
+    void testRequestWithAuditorToken_grantsAuditorRole() throws ServletException, IOException {
+        String token = "valid-auditor-jwt-token";
+        String rut = "333-3";
+
+        when(jwtUtils.extractRut(token)).thenReturn(rut);
+        when(jwtUtils.validateToken(token)).thenReturn(true);
+        when(jwtUtils.extractPerfil(token)).thenReturn("AUDITOR");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + token);
+        request.setRequestURI("/api/reportes/desembarque-fisico");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        jwtRequestFilter.doFilter(request, response, chain);
+
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_AUDITOR")),
+                "El token de perfil AUDITOR debe otorgar ROLE_AUDITOR");
+        assertFalse(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")),
+                "El token de perfil AUDITOR NO debe otorgar ROLE_ADMIN");
+    }
 }

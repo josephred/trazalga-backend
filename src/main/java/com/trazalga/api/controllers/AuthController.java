@@ -26,9 +26,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        // Le pide al servicio que valide al usuario
-        String token = authService.validarCredenciales(request.getRut(), request.getClave());
-        return ResponseEntity.ok(new AuthResponse(token));
+        AuthResponse response = authService.login(request.getRut(), request.getClave());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register")

@@ -41,23 +41,50 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.setContentType("application/json");
-                            response.getWriter().write("{\"error\": \"Acceso denegado\", \"message\": \"Se requiere perfil Administrador.\"}");
+                            response.getWriter().write("{\"error\": \"Acceso denegado\", \"message\": \"No tiene permisos suficientes para realizar esta acción.\"}");
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
                         // 1. Opciones CORS preflight siempre permitidas
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 2. Endpoints críticos protegidos con perfil ADMINISTRADOR (R0.2)
+                        // 2. Rutas públicas de autenticación
+                        .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+
+                        // 3. Endpoint de usuario actual
+                        .requestMatchers("/api/usuarios/me", "/usuario/me").authenticated()
+
+                        // 4. Endpoints normativos de configuración y administración: solo ADMINISTRADOR
                         .requestMatchers(HttpMethod.POST, "/api/factores-conversion/recalcular-historico", "/factorconversion/recalcular-historico").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/configuracion-general/**", "/configuraciongeneral/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/limites-extraccion-diario/**", "/limiteextracciondiario/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/limites-extraccion-diario/**", "/limiteextracciondiario/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/limites-extraccion-diario/**", "/limiteextracciondiario/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/vedas/**", "/veda/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/vedas/**", "/veda/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/vedas/**", "/veda/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/macrozonas/**", "/macrozona/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/macrozonas/**", "/macrozona/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/macrozonas/**", "/macrozona/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
 
-                        // 3. Rutas de autenticación
-                        .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+                        // 5. Resolución de hallazgos: ADMINISTRADOR o FISCALIZADOR
+                        .requestMatchers(HttpMethod.PUT, "/api/declaracion-marcas/*/resolver", "/declaracion-marcas/*/resolver", "/api/declaracion-marcas/**/resolver").hasAnyRole("ADMIN", "FISCALIZADOR")
 
-                        // 4. Todo lo demás por ahora permitido para compatibilidad operativa
+                        // 6. Todo lo demás por ahora permitido para compatibilidad operativa
                         .anyRequest().permitAll()
                 )
                 .httpBasic(basic -> basic.disable())

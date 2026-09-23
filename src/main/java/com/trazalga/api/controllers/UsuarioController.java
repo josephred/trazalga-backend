@@ -56,6 +56,25 @@ public class UsuarioController {
     }
 
 
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado"));
+        }
+        try {
+            UsuarioModel usuario = usuarioService.getByRut(authentication.getName());
+            Map<String, Object> resp = new java.util.HashMap<>();
+            resp.put("id", usuario.getId());
+            resp.put("nombre", usuario.getNombres());
+            resp.put("rut", usuario.getRut());
+            resp.put("perfil", usuario.getPerfil() != null ? usuario.getPerfil().getNombre() : null);
+            resp.put("regionId", usuario.getComuna() != null && usuario.getComuna().getRegion() != null ? usuario.getComuna().getRegion().getId() : null);
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Usuario no encontrado"));
+        }
+    }
+
     @GetMapping(path = "/{id}")
     public Optional<UsuarioModel> getUsuarioById(@PathVariable("id") Long id) {
         return this.usuarioService.getById(id);

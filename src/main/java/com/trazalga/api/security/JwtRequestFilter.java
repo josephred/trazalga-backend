@@ -54,6 +54,10 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                     String norm = perfil.trim().toUpperCase();
                     if (norm.contains("ADMIN") || norm.contains("ADMINISTRADOR")) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                    } else if (norm.contains("FISC") || norm.contains("FISCALIZADOR")) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_FISCALIZADOR"));
+                    } else if (norm.contains("AUDIT") || norm.contains("AUDITOR")) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_AUDITOR"));
                     }
                 }
 
