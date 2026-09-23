@@ -801,22 +801,38 @@ public class ReportRepository {
     }
 
     // Indicador "Variación de peso" (posible adulteración).
-    // Dos niveles de conciliación:
-    //  - PESAJE: peso_recepcionado registrado por el receptor vs lo declarado en origen (por transacción).
-    //  - DOCUMENTO: cantidad del documento receptor vs suma de lo declarado en los documentos que consume
-    //    (origen→comercializador y comercializador→planta abastecimiento).
+    // Dos poblaciones separadas:
+    //  - PESAJE: Pesaje físico en romana o báscula (vinculante para fiscalización).
+    //  - DOCUMENTO: Conciliación documental / cruce de guías (origen→comercializador y comercializador→planta).
     private static final String SQL_PESAJES =
         "SELECT decl.tipo_registro, decl.eslabon, decl.fecha, u.nombres, u.apellidop, e.nombre as especie, " +
         "decl.kg_declarado as kg_origen, decl.peso_recepcionado as kg_destino, " +
-        "ROUND((decl.peso_recepcionado - decl.kg_declarado) / decl.kg_declarado * 100, 1) as pct " +
+        "ROUND((decl.peso_recepcionado - decl.kg_declarado) / decl.kg_declarado * 100, 1) as pct, " +
+        "decl.voucher_romana_numero " +
         "FROM (" +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion as fecha, desembarque as kg_declarado, peso_recepcionado, 'PESAJE' as tipo_registro, 'RECOLECTOR' as eslabon FROM declaracion_recolector " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion as fecha, desembarque as kg_declarado, peso_recepcionado, NULL as voucher_romana_numero, 'PESAJE' as tipo_registro, 'RECOLECTOR' as eslabon FROM declaracion_recolector " +
         "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, 'PESAJE', 'ARMADOR' FROM declaracion_armador " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'ARMADOR' FROM declaracion_armador " +
         "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, 'PESAJE', 'AREA' FROM declaracion_area " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'AREA' FROM declaracion_area " +
         "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, cantidad, peso_recepcionado, 'PESAJE', 'COMERCIALIZADOR' FROM declaracion_comercializador " +
+        "    SELECT id, especie_id, usuario_id, fecha_declaracion, cantidad, peso_recepcionado, NULL, 'PESAJE', 'COMERCIALIZADOR' FROM declaracion_comercializador " +
+        "    UNION ALL " +
+        "    SELECT p.id, p.especie_id, p.usuario_id, p.fecha_ingreso_planta, " +
+        "           COALESCE(c_sum.tot_orig, p.cantidad), " +
+        "           p.peso_romana_kg, " +
+        "           p.voucher_romana_numero, " +
+        "           'PESAJE', 'PLANTA' " +
+        "    FROM declaracion_planta_abastecimiento p " +
+        "    LEFT JOIN (" +
+        "        SELECT declaracion_destinatario_id, SUM(cantidad) as tot_orig " +
+        "        FROM declaracion_comercializador " +
+        "        WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+        "        GROUP BY declaracion_destinatario_id " +
+        "    ) c_sum ON c_sum.declaracion_destinatario_id = p.id " +
+        "    WHERE p.peso_romana_kg IS NOT NULL " +
+        "      AND p.voucher_romana_numero IS NOT NULL " +
+        "      AND TRIM(p.voucher_romana_numero) <> '' " +
         ") as decl " +
         "INNER JOIN especie e ON decl.especie_id = e.id " +
         "INNER JOIN usuario u ON decl.usuario_id = u.id " +
@@ -833,7 +849,8 @@ public class ReportRepository {
         "SELECT 'DOCUMENTO' as tipo_registro, 'ORIGEN-COMERCIALIZADOR' as eslabon, c.fecha_declaracion as fecha, " +
         "u.nombres, u.apellidop, e.nombre as especie, " +
         "SUM(o.desembarque) as kg_origen, c.cantidad as kg_destino, " +
-        "ROUND((c.cantidad - SUM(o.desembarque)) / SUM(o.desembarque) * 100, 1) as pct " +
+        "ROUND((c.cantidad - SUM(o.desembarque)) / SUM(o.desembarque) * 100, 1) as pct, " +
+        "NULL as voucher_romana_numero " +
         "FROM declaracion_comercializador c " +
         "INNER JOIN (" + SQL_ORIGENES_KG + ") as o " +
         "    ON o.declaracion_destinatario_id = c.id AND o.consumida_por_tipo = 'COMERCIALIZADOR' " +
@@ -847,13 +864,15 @@ public class ReportRepository {
         "SELECT 'DOCUMENTO' as tipo_registro, 'COMERCIALIZADOR-PLANTA' as eslabon, p.fecha_ingreso_planta as fecha, " +
         "u.nombres, u.apellidop, e.nombre as especie, " +
         "SUM(c2.cantidad) as kg_origen, p.cantidad as kg_destino, " +
-        "ROUND((p.cantidad - SUM(c2.cantidad)) / SUM(c2.cantidad) * 100, 1) as pct " +
+        "ROUND((p.cantidad - SUM(c2.cantidad)) / SUM(c2.cantidad) * 100, 1) as pct, " +
+        "NULL as voucher_romana_numero " +
         "FROM declaracion_planta_abastecimiento p " +
         "INNER JOIN declaracion_comercializador c2 " +
         "    ON c2.declaracion_destinatario_id = p.id AND c2.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
         "INNER JOIN especie e ON p.especie_id = e.id " +
         "INNER JOIN usuario u ON p.usuario_id = u.id " +
         "WHERE 1=1 %s " +
+        "  AND (p.peso_romana_kg IS NULL OR p.voucher_romana_numero IS NULL OR TRIM(p.voucher_romana_numero) = '') " +
         "GROUP BY p.id, p.cantidad, p.fecha_ingreso_planta, u.nombres, u.apellidop, e.nombre " +
         "HAVING SUM(c2.cantidad) > 0";
 
@@ -883,10 +902,15 @@ public class ReportRepository {
     public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
         double umbral = umbralPct != null ? umbralPct : 5.0;
 
-        String sql = "SELECT COUNT(*), AVG(ABS(t.pct)), " +
+        String sql = "SELECT COUNT(*), " +
+            "AVG(ABS(t.pct)), " +
             "SUM(CASE WHEN ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
             "SUM(CASE WHEN t.tipo_registro = 'PESAJE' THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN 1 ELSE 0 END) " +
+            "AVG(CASE WHEN t.tipo_registro = 'PESAJE' THEN ABS(t.pct) ELSE NULL END), " +
+            "SUM(CASE WHEN t.tipo_registro = 'PESAJE' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN 1 ELSE 0 END), " +
+            "AVG(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN ABS(t.pct) ELSE NULL END), " +
+            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END) " +
             "FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t";
 
         Query query = entityManager.createNativeQuery(sql);
@@ -896,13 +920,45 @@ public class ReportRepository {
 
         Object[] result = (Object[]) query.getSingleResult();
 
+        long totalConciliaciones = result[0] != null ? ((Number) result[0]).longValue() : 0L;
+        Double promedioTotal = result[1] != null ? Math.round(((Number) result[1]).doubleValue() * 10.0) / 10.0 : 0.0;
+        long fueraUmbralTotal = result[2] != null ? ((Number) result[2]).longValue() : 0L;
+
+        long totalPesajes = result[3] != null ? ((Number) result[3]).longValue() : 0L;
+        Double promedioPesajes = result[4] != null ? Math.round(((Number) result[4]).doubleValue() * 10.0) / 10.0 : (totalPesajes > 0 ? 0.0 : null);
+        long fueraUmbralPesajes = result[5] != null ? ((Number) result[5]).longValue() : 0L;
+
+        long totalDocumentos = result[6] != null ? ((Number) result[6]).longValue() : 0L;
+        Double promedioDocumentos = result[7] != null ? Math.round(((Number) result[7]).doubleValue() * 10.0) / 10.0 : (totalDocumentos > 0 ? 0.0 : null);
+        long fueraUmbralDocumentos = result[8] != null ? ((Number) result[8]).longValue() : 0L;
+
+        java.util.Map<String, Object> pesajeMap = new java.util.HashMap<>();
+        pesajeMap.put("total", totalPesajes);
+        pesajeMap.put("promedioVariacionPct", promedioPesajes);
+        pesajeMap.put("fueraUmbral", fueraUmbralPesajes);
+
+        java.util.Map<String, Object> docMap = new java.util.HashMap<>();
+        docMap.put("total", totalDocumentos);
+        docMap.put("promedioVariacionPct", promedioDocumentos);
+        docMap.put("fueraUmbral", fueraUmbralDocumentos);
+
+        java.util.Map<String, Object> consolidadoMap = new java.util.HashMap<>();
+        consolidadoMap.put("totalConciliaciones", totalConciliaciones);
+        consolidadoMap.put("promedioVariacionPct", promedioTotal);
+        consolidadoMap.put("fueraUmbral", fueraUmbralTotal);
+
         java.util.Map<String, Object> map = new java.util.HashMap<>();
         map.put("umbralPct", umbral);
-        map.put("totalConciliaciones", result[0] != null ? ((Number) result[0]).longValue() : 0);
-        map.put("promedioVariacionPct", result[1] != null ? Math.round(((Number) result[1]).doubleValue() * 10.0) / 10.0 : null);
-        map.put("fueraUmbral", result[2] != null ? ((Number) result[2]).longValue() : 0);
-        map.put("pesajes", result[3] != null ? ((Number) result[3]).longValue() : 0);
-        map.put("documentos", result[4] != null ? ((Number) result[4]).longValue() : 0);
+        map.put("totalConciliaciones", totalConciliaciones);
+        map.put("promedioVariacionPct", promedioTotal);
+        map.put("fueraUmbral", fueraUmbralTotal);
+        map.put("pesajes", totalPesajes);
+        map.put("documentos", totalDocumentos);
+
+        map.put("pesaje", pesajeMap);
+        map.put("documental", docMap);
+        map.put("consolidado", consolidadoMap);
+
         return map;
     }
 
@@ -935,6 +991,7 @@ public class ReportRepository {
             map.put("kgOrigen", row[6] != null ? ((Number) row[6]).doubleValue() : null);
             map.put("kgDestino", row[7] != null ? ((Number) row[7]).doubleValue() : null);
             map.put("variacionPct", row[8] != null ? ((Number) row[8]).doubleValue() : null);
+            map.put("voucherRomanaNumero", row.length > 9 && row[9] != null ? row[9].toString() : null);
             return map;
         }).collect(Collectors.toList());
     }
@@ -1340,18 +1397,21 @@ public class ReportRepository {
             // Alerta de merma biológica (sólo si el interruptor maestro bio_perdida_activo está encendido)
             boolean alertaMerma = false;
             String motivoMerma = null;
-            if (bioPerdidaActivo) {
-                String humUpper = humedadOrigen.toUpperCase();
-                if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
-                    if (diasTranscurridos >= diasMinHumedo) {
-                        if (deltaPct > -mermaMinHumedo) {
-                            alertaMerma = true;
-                            motivoMerma = String.format("Merma húmeda biológicamente inconsistente tras %d días (variación: %.1f%%, min esperado: -%.1f%%)",
-                                    diasTranscurridos, deltaPct, mermaMinHumedo);
-                        }
+            String inconsistenciaBiologica = "NINGUNA";
+            String humUpper = humedadOrigen != null ? humedadOrigen.toUpperCase() : "";
+            if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
+                if (diasTranscurridos >= diasMinHumedo && deltaPct > -mermaMinHumedo) {
+                    inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
+                    if (bioPerdidaActivo) {
+                        alertaMerma = true;
+                        motivoMerma = String.format("Merma húmeda biológicamente inconsistente tras %d días (variación: %.1f%%, min esperado: -%.1f%%)",
+                                diasTranscurridos, deltaPct, mermaMinHumedo);
                     }
-                } else if (humUpper.contains("SEC")) {
-                    if (deltaPct < -mermaMaxSeco) {
+                }
+            } else if (humUpper.contains("SEC")) {
+                if (deltaPct < -mermaMaxSeco) {
+                    inconsistenciaBiologica = "SECO_MERMA_EXCESIVA";
+                    if (bioPerdidaActivo) {
                         alertaMerma = true;
                         motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (variación: %.1f%%, máx: -%.1f%%)",
                                 deltaPct, mermaMaxSeco);
@@ -1389,6 +1449,7 @@ public class ReportRepository {
             map.put("alertaMerma", alertaMerma);
             map.put("motivoMerma", motivoMerma);
             map.put("alertaVariacion", alertaVariacion);
+            map.put("inconsistenciaBiologica", inconsistenciaBiologica);
 
             list.add(map);
         }

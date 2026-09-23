@@ -44,6 +44,7 @@ public class ConfiguracionGeneralService {
 
         // 5. Cadena de Custodia / Variación de peso
         createIfNotExist("variacion_peso_umbral_general_pct", "5.0", "Tolerancia general de variación entre eslabones en porcentaje", "CADENA");
+        createIfNotExist("variacion_peso_exige_voucher", "true", "Exige voucher de pesaje en romana para registrar recepción en planta", "CADENA");
         createIfNotExist("retencion_bodega_activo", "true", "Habilita el control de días de retención en bodega", "CADENA");
         createIfNotExist("retencion_bodega_dias_amarilla", "3", "Días de retención para alerta amarilla preventiva", "CADENA");
         createIfNotExist("retencion_bodega_dias_naranja", "5", "Días de retención para alerta naranja crítica", "CADENA");

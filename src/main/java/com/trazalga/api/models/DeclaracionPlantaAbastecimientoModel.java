@@ -126,6 +126,20 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "peso_recepcionado", nullable = true)
     private Double pesoRecepcionado;
 
+    // --- Pesaje Físico en Romana (R6.2) ---
+    @Column(name = "voucher_romana_numero", length = 50)
+    private String voucherRomanaNumero;
+
+    @Column(name = "voucher_romana_adjunto", length = 255)
+    private String voucherRomanaAdjunto;
+
+    @Column(name = "peso_romana_kg", precision = 12, scale = 2)
+    private BigDecimal pesoRomanaKg;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "fecha_pesaje")
+    private Date fechaPesaje;
+
     @Column(nullable = true, length = 20)
     private String estado;
 

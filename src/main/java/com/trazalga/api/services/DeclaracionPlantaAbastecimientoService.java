@@ -5,6 +5,7 @@ import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -41,6 +42,9 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Autowired
     private IDeclaracionAreaRepository areaRepository;
+
+    @Autowired
+    private ConfiguracionGeneralService configuracionGeneralService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -121,6 +125,7 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Transactional
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
+        validarVoucherRomana(declaracion);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
         }
@@ -151,6 +156,7 @@ public class DeclaracionPlantaAbastecimientoService {
         if (model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        validarVoucherRomana(request);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
         model.setFolioOrigen(request.getFolioOrigen());
@@ -167,6 +173,10 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setHumedadEstado(request.getHumedadEstado());
         model.setHumedadHigrometro(request.getHumedadHigrometro());
         model.setCantidad(request.getCantidad());
+        model.setVoucherRomanaNumero(request.getVoucherRomanaNumero());
+        model.setVoucherRomanaAdjunto(request.getVoucherRomanaAdjunto());
+        model.setPesoRomanaKg(request.getPesoRomanaKg());
+        model.setFechaPesaje(request.getFechaPesaje());
         model.setDocumentoTributarioOrigenTipo(request.getDocumentoTributarioOrigenTipo());
         model.setDocumentoTributarioOrigenNumero(request.getDocumentoTributarioOrigenNumero());
         model.setDocumentoTributarioOrigenFecha(request.getDocumentoTributarioOrigenFecha());
@@ -202,6 +212,20 @@ public class DeclaracionPlantaAbastecimientoService {
         }
 
         return model;
+    }
+
+    private void validarVoucherRomana(DeclaracionPlantaAbastecimientoModel model) {
+        if (configuracionGeneralService == null || model == null) return;
+        boolean exigeVoucher = configuracionGeneralService.getBoolean("variacion_peso_exige_voucher", true);
+        if (exigeVoucher) {
+            boolean tieneVoucher = model.getVoucherRomanaNumero() != null && !model.getVoucherRomanaNumero().trim().isEmpty();
+            boolean tienePesoRomana = model.getPesoRomanaKg() != null && model.getPesoRomanaKg().compareTo(BigDecimal.ZERO) > 0;
+            if (!tieneVoucher || !tienePesoRomana) {
+                throw new IllegalArgumentException(
+                    "El registro de recepción en planta exige número de voucher y peso en romana según la normativa vigente (variacion_peso_exige_voucher=true)."
+                );
+            }
+        }
     }
 
     @Transactional
