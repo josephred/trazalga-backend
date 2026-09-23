@@ -1,6 +1,8 @@
 package com.trazalga.api.services;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,12 +65,12 @@ public class AlertaTriggerService {
                     notificarAlerta(usuarioDeclaradorId, "Declaración Post-Cierre de Cuota", m.getDetalle());
                 }
                 case "LED_EXCEDIDO" -> {
-                    Map<String, String> data = new java.util.HashMap<>();
+                    Map<String, String> data = new HashMap<>();
                     data.put("tipo", "LED_EXCEDIDO");
                     data.put("marca", "LED_EXCEDIDO");
                     data.put("enlace", "/alertas?marca=LED_EXCEDIDO");
-                    if (m.getDeclaracionId() != null) {
-                        data.put("declaracionId", String.valueOf(m.getDeclaracionId()));
+                    if (declaracionId != null) {
+                        data.put("declaracionId", String.valueOf(declaracionId));
                     }
 
                     // R4.5: Notificar al perfil fiscalizador con enlace a la vista de hallazgos
