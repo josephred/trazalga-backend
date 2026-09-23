@@ -71,7 +71,7 @@ public class LimiteExtraccionDiarioConfigBootstrapTest {
         assertEquals("DESEMBARQUE", saved.getMetrica());
         assertEquals(new BigDecimal("2000.00"), saved.getLimiteKg());
         assertEquals(BigDecimal.ZERO, saved.getMargenToleranciaPct());
-        assertEquals("SOLO_ALERTA", saved.getModoAccion());
+        assertEquals("ALERTA_FISCALIZACION", saved.getModoAccion());
         assertNull(saved.getRegion()); // Nacional
     }
 

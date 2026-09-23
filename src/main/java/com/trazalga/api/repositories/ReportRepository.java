@@ -1576,6 +1576,14 @@ public class ReportRepository {
     // =========================================================================
     // INDICADOR 1 — DESEMBARQUE FÍSICO
     // =========================================================================
+    // NOTA ARQUITECTÓNICA DE IMPUTACIÓN TERRITORIAL (R1.3 / R3.6):
+    // El Desembarque Físico se imputa exclusivamente a la caleta y comuna física donde
+    // ocurrió la descarga real en playa/muelle (reflejando la presión biológica extractiva
+    // sobre el ecosistema costero específico).
+    // A diferencia de esto, el consumo de cuotas de extracción para recolectores de orilla
+    // y buzos (Indicador 3) se imputa a la comuna de inscripción en el Registro Pesquero
+    // Artesanal (RPA) de Sernapesca (resguardando los derechos territoriales de la organización/caleta base).
+    // Para armadores y AMERB, el consumo sigue la caleta base de la nave o el área decretada.
 
     private String sqlDesembarqueFisicoBase(Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
                                            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil,
@@ -1589,7 +1597,8 @@ public class ReportRepository {
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
               .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mr.activo = true AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_recolector r ")
               .append("INNER JOIN usuario u ON r.usuario_id = u.id ")
               .append("INNER JOIN especie e ON r.especie_id = e.id ")
@@ -1620,7 +1629,8 @@ public class ReportRepository {
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
               .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mr.activo = true AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_armador a ")
               .append("INNER JOIN usuario u ON a.usuario_id = u.id ")
               .append("INNER JOIN especie e ON a.especie_id = e.id ")
@@ -1651,7 +1661,8 @@ public class ReportRepository {
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
               .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id ")
+              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mr.activo = true AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_area ar ")
               .append("INNER JOIN usuario u ON ar.usuario_id = u.id ")
               .append("INNER JOIN especie e ON ar.especie_id = e.id ")
@@ -1771,9 +1782,10 @@ public class ReportRepository {
                      "SUM(kg), " +
                      "COUNT(*), " +
                      "SUM(CASE WHEN kg > :umbral THEN 1 ELSE 0 END), " +
-                     "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END) " +
+                     "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END), " +
+                     "macrozona " +
                      "FROM (" + baseSql + ") as t " +
-                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d')";
+                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d'), macrozona";
 
         double threshold = umbralAtipico != null ? umbralAtipico : 5000.0;
         Query query = entityManager.createNativeQuery(sql);
@@ -1801,6 +1813,7 @@ public class ReportRepository {
         java.util.Map<String, Agregado> porComunaMap = new java.util.HashMap<>();
         java.util.Map<String, Agregado> porProvinciaMap = new java.util.HashMap<>();
         java.util.Map<String, Agregado> porRegionMap = new java.util.HashMap<>();
+        java.util.Map<String, Agregado> porMacrozonaMap = new java.util.HashMap<>();
         java.util.Map<String, Double> porFechaMap = new java.util.TreeMap<>();
 
         for (Object[] r : rows) {
@@ -1816,6 +1829,7 @@ public class ReportRepository {
             long count = r[9] != null ? ((Number) r[9]).longValue() : 0;
             long atip = r[10] != null ? ((Number) r[10]).longValue() : 0;
             double volAtip = r[11] != null ? ((Number) r[11]).doubleValue() : 0.0;
+            String mz = (r.length > 12 && r[12] != null) ? r[12].toString() : "Sin Macrozona";
 
             totalKg += kg;
             totalDeclaraciones += count;
@@ -1841,6 +1855,9 @@ public class ReportRepository {
 
             Agregado agReg = porRegionMap.computeIfAbsent(reg, k -> new Agregado());
             agReg.kg += kg; agReg.count += count; agReg.atip += atip; agReg.volAtip += volAtip;
+
+            Agregado agMz = porMacrozonaMap.computeIfAbsent(mz, k -> new Agregado());
+            agMz.kg += kg; agMz.count += count; agMz.atip += atip; agMz.volAtip += volAtip;
 
             porFechaMap.put(fec, porFechaMap.getOrDefault(fec, 0.0) + kg);
         }
@@ -1870,6 +1887,7 @@ public class ReportRepository {
         List<java.util.Map<String, Object>> porComunaList = toListHelper.apply("comuna", porComunaMap);
         List<java.util.Map<String, Object>> porProvinciaList = toListHelper.apply("provincia", porProvinciaMap);
         List<java.util.Map<String, Object>> porRegionList = toListHelper.apply("region", porRegionMap);
+        List<java.util.Map<String, Object>> porMacrozonaList = toListHelper.apply("macrozona", porMacrozonaMap);
 
         List<java.util.Map<String, Object>> porFechaList = porFechaMap.entrySet().stream().map(e -> {
             java.util.Map<String, Object> m = new java.util.HashMap<>();
@@ -1881,6 +1899,9 @@ public class ReportRepository {
         String modoAgrupacion = (agruparPor != null && !agruparPor.isBlank()) ? agruparPor.toUpperCase() : "ESPECIE";
         List<java.util.Map<String, Object>> datosAgrupados;
         switch (modoAgrupacion) {
+            case "MACROZONA":
+                datosAgrupados = porMacrozonaList;
+                break;
             case "CALETA":
                 datosAgrupados = porCaletaList;
                 break;
@@ -1919,6 +1940,7 @@ public class ReportRepository {
         out.put("porComuna", porComunaList);
         out.put("porProvincia", porProvinciaList);
         out.put("porRegion", porRegionList);
+        out.put("porMacrozona", porMacrozonaList);
         out.put("porFecha", porFechaList);
 
         return out;

@@ -63,7 +63,19 @@ public class AlertaTriggerService {
                     notificarAlerta(usuarioDeclaradorId, "Declaración Post-Cierre de Cuota", m.getDetalle());
                 }
                 case "LED_EXCEDIDO" -> {
-                    notificarAlerta(usuarioDeclaradorId, "Alerta Límite Diario (LED) Superado", m.getDetalle());
+                    Map<String, String> data = new java.util.HashMap<>();
+                    data.put("tipo", "LED_EXCEDIDO");
+                    data.put("marca", "LED_EXCEDIDO");
+                    data.put("enlace", "/alertas?marca=LED_EXCEDIDO");
+                    if (m.getDeclaracionId() != null) {
+                        data.put("declaracionId", String.valueOf(m.getDeclaracionId()));
+                    }
+
+                    // R4.5: Notificar al perfil fiscalizador con enlace a la vista de hallazgos
+                    notificationService.notificarFiscalizadores(null, "Alerta Límite Diario (LED) Superado", m.getDetalle(), data);
+                    if (usuarioDeclaradorId != null) {
+                        notificationService.sendPushNotificationToUser(usuarioDeclaradorId, "Alerta Límite Diario (LED) Superado", m.getDetalle(), data);
+                    }
                 }
                 case "DESEMBARQUE_ATIPICO" -> {
                     notificarSoloAdmins("Aviso de Desembarque Atípico", m.getDetalle());

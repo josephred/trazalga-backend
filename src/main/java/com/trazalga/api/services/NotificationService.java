@@ -7,7 +7,9 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import com.trazalga.api.models.DeviceTokenModel;
+import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.DeviceTokenRepository;
+import com.trazalga.api.repositories.IUsuarioRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,12 +22,16 @@ import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class NotificationService {
 
     @Autowired
     private DeviceTokenRepository deviceTokenRepository;
+
+    @Autowired(required = false)
+    private IUsuarioRepository usuarioRepository;
 
     @Value("${trazalga.firebase.config-path}")
     private String firebaseConfigPath;
@@ -133,6 +139,47 @@ public class NotificationService {
             } catch (Exception e) {
                 System.out.println("Failed to send push: " + e.getMessage());
             }
+        }
+    }
+
+    /**
+     * R4.5: Envía notificación al perfil fiscalizador de la región de la faena ante un hallazgo o marca (ej: LED_EXCEDIDO).
+     * Incluye datos de navegación con enlace a la vista de hallazgos (/alertas?marca=LED_EXCEDIDO).
+     */
+    public void notificarFiscalizadores(Long regionId, String titulo, String mensaje, Map<String, String> data) {
+        if (usuarioRepository == null) {
+            System.out.println("NotificationService: usuarioRepository no disponible para notificar fiscalizadores.");
+            return;
+        }
+
+        Map<String, String> payload = new java.util.HashMap<>();
+        if (data != null) {
+            payload.putAll(data);
+        }
+        if (!payload.containsKey("enlace")) {
+            payload.put("enlace", "/alertas?marca=LED_EXCEDIDO");
+        }
+        if (!payload.containsKey("tipo")) {
+            payload.put("tipo", "HALLAZGO_FISCALIZACION");
+        }
+
+        List<UsuarioModel> destinatarios = usuarioRepository.findAll().stream()
+                .filter(u -> u.getPerfil() != null && (
+                        u.getPerfil().getNombre().toUpperCase().contains("FISCALIZADOR") ||
+                        u.getPerfil().getNombre().toUpperCase().contains("SERNAPESCA") ||
+                        u.getPerfil().getNombre().toUpperCase().contains("ADMIN")
+                ))
+                .filter(u -> {
+                    if (regionId == null) return true;
+                    if (u.getComuna() != null && u.getComuna().getRegion() != null) {
+                        return regionId.equals(u.getComuna().getRegion().getId());
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        for (UsuarioModel fiscalizador : destinatarios) {
+            sendPushNotificationToUser(fiscalizador.getId(), titulo, mensaje, payload);
         }
     }
 }

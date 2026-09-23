@@ -73,7 +73,7 @@ public class LimiteExtraccionDiarioConfigService {
                         .metrica("DESEMBARQUE")
                         .limiteKg(new BigDecimal("2000.00"))
                         .margenToleranciaPct(BigDecimal.ZERO)
-                        .modoAccion("SOLO_ALERTA")
+                        .modoAccion("ALERTA_FISCALIZACION")
                         .activo(true)
                         .build();
 

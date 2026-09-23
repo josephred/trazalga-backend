@@ -53,9 +53,13 @@ public class IndicadoresMetadataCatalogTest {
     void testCatalog_AllRequiredConfigKeys_AreSeededInBackend() {
         service.initDefaults();
 
-        // Parámetros normativos requeridos por los 9 indicadores
+        // Parámetros normativos requeridos por los 9 indicadores (33 claves oficiales)
         Set<String> requiredKeys = Set.of(
+                "desembarque_unidad_base",
                 "desembarque_umbral_atipico_kg",
+                "desembarque_fuente_recolector_activa",
+                "desembarque_fuente_armador_activa",
+                "desembarque_fuente_area_activa",
                 "captura_politica_sin_factor",
                 "captura_factor_default",
                 "cuota_umbral_restante_pct",
