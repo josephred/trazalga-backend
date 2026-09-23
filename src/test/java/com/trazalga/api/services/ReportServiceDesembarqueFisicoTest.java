@@ -174,4 +174,37 @@ public class ReportServiceDesembarqueFisicoTest {
                 5000.0, true, true, true
         );
     }
+
+    @Test
+    void testGetDesembarqueFisicoMetrics_AgruparPorMacrozona_InvocaRepositorioConMacrozona() {
+        Date inicio = new Date();
+        Date fin = new Date();
+        String agruparPor = "MACROZONA";
+
+        Map<String, Object> mockResult = new HashMap<>();
+        mockResult.put("totalDesembarqueKg", 45000.0);
+        mockResult.put("totalDeclaraciones", 80L);
+        mockResult.put("agrupadoPor", "MACROZONA");
+
+        when(reportRepository.getDesembarqueFisicoMetrics(
+                inicio, fin, null, null, null,
+                null, null, null, null, "MACROZONA", null,
+                5000.0, true, true, true
+        )).thenReturn(mockResult);
+
+        Map<String, Object> result = reportService.getDesembarqueFisicoMetrics(
+                inicio, fin, null, null, null,
+                null, null, null, null, agruparPor, null
+        );
+
+        assertNotNull(result);
+        assertEquals(45000.0, result.get("totalDesembarqueKg"));
+        assertEquals("MACROZONA", result.get("agrupadoPor"));
+        verify(reportRepository, times(1)).getDesembarqueFisicoMetrics(
+                inicio, fin, null, null, null,
+                null, null, null, null, "MACROZONA", null,
+                5000.0, true, true, true
+        );
+    }
 }
+
