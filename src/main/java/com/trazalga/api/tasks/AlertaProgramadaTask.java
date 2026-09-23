@@ -212,21 +212,32 @@ public class AlertaProgramadaTask {
                 }
             }
 
-            // Veda con recurrencia anual: aviso previo al cambio de mes
+            // Veda con recurrencia anual: aviso previo al cambio de mes (transición de no-veda a veda)
             if (Boolean.TRUE.equals(veda.getRecurrenciaAnual()) && veda.getMesesVeda() != null && !veda.getMesesVeda().trim().isEmpty()) {
                 LocalDate proximoMes = hoyLocal.plusMonths(1).withDayOfMonth(1);
                 long diasHastaProximoMes = ChronoUnit.DAYS.between(hoyLocal, proximoMes);
                 if (diasHastaProximoMes >= 0 && diasHastaProximoMes <= diasAvisoVeda) {
+                    int mesActual = hoyLocal.getMonthValue();
                     int numProximoMes = proximoMes.getMonthValue();
+
+                    boolean mesActualEnVeda = Arrays.stream(veda.getMesesVeda().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .anyMatch(s -> s.equals(String.valueOf(mesActual)));
+
                     boolean iniciaVeda = Arrays.stream(veda.getMesesVeda().split(","))
                             .map(String::trim)
                             .filter(s -> !s.isEmpty())
                             .anyMatch(s -> s.equals(String.valueOf(numProximoMes)));
 
-                    if (iniciaVeda) {
+                    if (!mesActualEnVeda && iniciaVeda) {
                         String titulo = "Aviso Previo de Inicio de Veda Anual";
-                        String mensaje = String.format("La veda anual para %s iniciará el %s (en %d días).",
-                                especieNombre, proximoMes, diasHastaProximoMes);
+                        String resInfo = (veda.getResolucion() != null && !veda.getResolucion().trim().isEmpty())
+                                ? " según Res. " + veda.getResolucion() : "";
+                        String metodoInfo = (veda.getExtraccionTipo() != null)
+                                ? " para " + veda.getExtraccionTipo().getNombre() : "";
+                        String mensaje = String.format("La veda anual para %s%s iniciará el %s (en %d días)%s.",
+                                especieNombre, metodoInfo, proximoMes, diasHastaProximoMes, resInfo);
                         notificarSoloAdmins(titulo, mensaje);
                     }
                 }

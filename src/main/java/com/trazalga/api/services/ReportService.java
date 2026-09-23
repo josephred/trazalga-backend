@@ -66,12 +66,22 @@ public class ReportService {
     /** Medido: 4.251 ms de media, 173.221 filas examinadas por ejecución. */
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
-        return reportRepository.getExtraccionVedaMetrics(startDate, endDate);
+        return getExtraccionVedaMetrics(startDate, endDate, null, null);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId, Long regionId) {
+        return reportRepository.getExtraccionVedaMetrics(startDate, endDate, especieId, regionId);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate) {
-        return reportRepository.getExtraccionVedaDetalle(startDate, endDate);
+        return getExtraccionVedaDetalle(startDate, endDate, null, null);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId, Long regionId) {
+        return reportRepository.getExtraccionVedaDetalle(startDate, endDate, especieId, regionId);
     }
 
     /**
@@ -238,6 +248,11 @@ public class ReportService {
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getLimiteExtraccionDiarioMetrics(Date fecha) {
         return reportRepository.getLimiteExtraccionDiarioMetrics(fecha);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId, Long embarcacionId) {
+        return reportRepository.getLedHallazgos(startDate, endDate, regionId, embarcacionId);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)

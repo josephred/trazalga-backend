@@ -201,35 +201,68 @@ public class ReportRepository {
     }
 
     public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate) {
-        String dateFilter = "";
+        return getExtraccionVedaMetrics(startDate, endDate, null, null);
+    }
+
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId, Long regionId) {
+        StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
-            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
         } else if (startDate != null) {
-            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) >= :startDate");
         } else if (endDate != null) {
-            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) <= :endDate");
+        }
+
+        if (especieId != null) {
+            filterBuilder.append(" AND decl.especie_id = :especieId");
+        }
+
+        if (regionId != null) {
+            filterBuilder.append(" AND COALESCE(c.region_id, cal.region_id, am.region_id) = :regionId");
         }
 
         String sql = "SELECT " +
-            "COUNT(decl.id) as total_declaraciones_veda, " +
-            "COALESCE(SUM(decl.desembarque), 0) as total_kg_veda " +
+            "COUNT(*) as total_declaraciones_veda, " +
+            "COALESCE(SUM(sub.desembarque), 0) as total_kg_veda " +
             "FROM (" +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, comuna_id FROM declaracion_armador " +
-            "    UNION ALL " +
-            // declaracion_area no tiene comuna_id: sin comuna solo aplican vedas nacionales (region_id NULL)
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, NULL as comuna_id FROM declaracion_area " +
-            ") as decl " +
-            "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
-            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
-            "    AND (v.region_id IS NULL OR v.region_id = c.region_id) " +
-            "WHERE 1=1" + dateFilter;
+            "    SELECT decl.id, decl.tipo_perfil, decl.desembarque " +
+            "    FROM (" +
+            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+            "        UNION ALL " +
+            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+            "        UNION ALL " +
+            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil FROM declaracion_area " +
+            "    ) as decl " +
+            "    LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
+            "    LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
+            "    LEFT JOIN amerb am ON decl.amerb_id = am.id " +
+            "    INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+            "        AND (v.activo = true OR v.activo = 1) " +
+            "        AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
+            "        AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
+            "        AND ( " +
+            "            ((v.recurrencia_anual = true OR v.recurrencia_anual = 1) " +
+            "             AND v.meses_veda IS NOT NULL " +
+            "             AND ( " +
+            "                 CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
+            "                 OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
+            "             )) " +
+            "            OR " +
+            "            ((v.recurrencia_anual = false OR v.recurrencia_anual = 0 OR v.recurrencia_anual IS NULL) " +
+            "             AND v.fecha_inicio IS NOT NULL " +
+            "             AND v.fecha_fin IS NOT NULL " +
+            "             AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
+            "        ) " +
+            "    WHERE 1=1" + filterBuilder.toString() + " " +
+            "    GROUP BY decl.id, decl.tipo_perfil, decl.desembarque " +
+            ") sub";
         
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
+        if (especieId != null) query.setParameter("especieId", especieId);
+        if (regionId != null) query.setParameter("regionId", regionId);
 
         Object[] result = (Object[]) query.getSingleResult();
         
@@ -241,36 +274,82 @@ public class ReportRepository {
     }
 
     public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate) {
-        String dateFilter = "";
+        return getExtraccionVedaDetalle(startDate, endDate, null, null);
+    }
+
+    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId, Long regionId) {
+        StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
-            dateFilter = " AND decl.fecha_declaracion BETWEEN :startDate AND :endDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
         } else if (startDate != null) {
-            dateFilter = " AND decl.fecha_declaracion >= :startDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) >= :startDate");
         } else if (endDate != null) {
-            dateFilter = " AND decl.fecha_declaracion <= :endDate";
+            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) <= :endDate");
         }
 
-        String sql = "SELECT decl.id, decl.tipo_perfil, decl.fecha_declaracion, decl.desembarque, " +
-            "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop " +
+        if (especieId != null) {
+            filterBuilder.append(" AND decl.especie_id = :especieId");
+        }
+
+        if (regionId != null) {
+            filterBuilder.append(" AND COALESCE(c.region_id, cal.region_id, am.region_id) = :regionId");
+        }
+
+        String sql = "SELECT " +
+            "decl.id, decl.tipo_perfil, decl.folio, " +
+            "COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) as fecha_faena, " +
+            "decl.desembarque, " +
+            "e.nombre as especie_nombre, " +
+            "COALESCE(ext.nombre, 'No especificado') as metodo_nombre, " +
+            "u.rut as declarante_rut, " +
+            "CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as declarante_nombre, " +
+            "COALESCE(cal.nombre, '—') as caleta_nombre, " +
+            "COALESCE(c.nombre, '—') as comuna_nombre, " +
+            "COALESCE(reg.nombre, '—') as region_nombre, " +
+            "MIN(v.id) as resolucion_id, " +
+            "MIN(COALESCE(v.resolucion, 'Subpesca')) as resolucion_nombre, " +
+            "MIN(COALESCE(v.observacion, '')) as observacion " +
             "FROM (" +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
+            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_ro, CONCAT('DR-', id)) as folio FROM declaracion_recolector " +
             "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, comuna_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
+            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_da, CONCAT('DA-', id)) as folio FROM declaracion_armador " +
             "    UNION ALL " +
-            // declaracion_area no tiene comuna_id: sin comuna solo aplican vedas nacionales (region_id NULL)
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, usuario_id, NULL as comuna_id, 'AREA' as tipo_perfil FROM declaracion_area " +
+            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_amerb, CONCAT('DAM-', id)) as folio FROM declaracion_area " +
             ") as decl " +
-            "LEFT JOIN comuna c ON decl.comuna_id = c.id " +
-            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "    AND decl.fecha_declaracion BETWEEN v.fecha_inicio AND v.fecha_fin " +
-            "    AND (v.region_id IS NULL OR v.region_id = c.region_id) " +
+            "LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
+            "LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
+            "LEFT JOIN amerb am ON decl.amerb_id = am.id " +
+            "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id, am.region_id) " +
             "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "LEFT JOIN extraccion_tipo ext ON decl.extraccion_tipo_id = ext.id " +
             "INNER JOIN usuario u ON decl.usuario_id = u.id " +
-            "WHERE 1=1" + dateFilter + " ORDER BY decl.fecha_declaracion DESC";
-        
+            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+            "    AND (v.activo = true OR v.activo = 1) " +
+            "    AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
+            "    AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
+            "    AND ( " +
+            "        ((v.recurrencia_anual = true OR v.recurrencia_anual = 1) " +
+            "         AND v.meses_veda IS NOT NULL " +
+            "         AND ( " +
+            "             CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
+            "             OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
+            "         )) " +
+            "        OR " +
+            "        ((v.recurrencia_anual = false OR v.recurrencia_anual = 0 OR v.recurrencia_anual IS NULL) " +
+            "         AND v.fecha_inicio IS NOT NULL " +
+            "         AND v.fecha_fin IS NOT NULL " +
+            "         AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
+            "    ) " +
+            "WHERE 1=1" + filterBuilder.toString() + " " +
+            "GROUP BY decl.id, decl.tipo_perfil, decl.folio, decl.fecha_extraccion, decl.fecha_declaracion, decl.desembarque, " +
+            "e.nombre, ext.nombre, u.rut, u.nombres, u.apellidop, cal.nombre, c.nombre, reg.nombre " +
+            "ORDER BY COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) DESC, decl.id DESC";
+
         Query query = entityManager.createNativeQuery(sql);
         if (startDate != null) query.setParameter("startDate", startDate);
         if (endDate != null) query.setParameter("endDate", endDate);
+        if (especieId != null) query.setParameter("especieId", especieId);
+        if (regionId != null) query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
         
@@ -278,19 +357,34 @@ public class ReportRepository {
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", row[0]);
             map.put("perfil", row[1]);
+            map.put("tipoDeclaracion", row[1]);
+            map.put("folio", row[2] != null ? row[2].toString() : ("FAENA-" + row[0]));
             
             Date dateVal = null;
-            if (row[2] instanceof java.sql.Timestamp) {
-                dateVal = new Date(((java.sql.Timestamp) row[2]).getTime());
-            } else if (row[2] instanceof Date) {
-                dateVal = (Date) row[2];
+            if (row[3] instanceof java.sql.Timestamp) {
+                dateVal = new Date(((java.sql.Timestamp) row[3]).getTime());
+            } else if (row[3] instanceof Date) {
+                dateVal = (Date) row[3];
             }
             map.put("fecha", dateVal);
-            map.put("kg", row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
-            map.put("especie", row[4]);
+            map.put("fechaExtraccion", dateVal);
+            map.put("kg", row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
+            map.put("kilos", row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
+            map.put("especie", row[5] != null ? row[5].toString() : "—");
+            map.put("metodo", row[6] != null ? row[6].toString() : "No especificado");
             
-            String nombreActor = (row[6] != null ? row[6].toString() : "") + " " + (row[7] != null ? row[7].toString() : "");
-            map.put("actor", row[5] + " - " + nombreActor.trim());
+            String rut = row[7] != null ? row[7].toString() : "";
+            String nombre = row[8] != null ? row[8].toString().trim() : "";
+            map.put("rut", rut);
+            map.put("nombreDeclarante", nombre);
+            map.put("actor", rut + (nombre.isEmpty() ? "" : " - " + nombre));
+            
+            map.put("caleta", row[9] != null ? row[9].toString() : "—");
+            map.put("comuna", row[10] != null ? row[10].toString() : "—");
+            map.put("region", row[11] != null ? row[11].toString() : "—");
+            map.put("resolucionId", row[12] != null ? ((Number) row[12]).longValue() : null);
+            map.put("resolucion", row[13] != null ? row[13].toString() : "Subpesca");
+            map.put("observacion", row[14] != null ? row[14].toString() : "");
             
             return map;
         }).collect(Collectors.toList());
@@ -1869,14 +1963,15 @@ public class ReportRepository {
         // 2. Consultar faenas del día agrupadas por embarcación, especie, método y región
         String sqlArmador = "SELECT emb.id, emb.nombre, emb.codigo, e.id as especie_id, e.nombre as especie, " +
             "ext.id as extraccion_tipo_id, ext.nombre as metodo, " +
-            "cal.region_id as region_id, SUM(a.desembarque) as kg_total " +
+            "COALESCE(c.region_id, cal.region_id) as region_id, SUM(a.desembarque) as kg_total " +
             "FROM declaracion_armador a " +
             "INNER JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
             "INNER JOIN especie e ON a.especie_id = e.id " +
             "LEFT JOIN extraccion_tipo ext ON a.extraccion_tipo_id = ext.id " +
             "LEFT JOIN caleta cal ON a.caleta_id = cal.id " +
+            "LEFT JOIN comuna c ON COALESCE(a.comuna_id, cal.comuna_id) = c.id " +
             "WHERE a.fecha_declaracion = :fecha " +
-            "GROUP BY emb.id, emb.nombre, emb.codigo, e.id, e.nombre, ext.id, ext.nombre, cal.region_id";
+            "GROUP BY emb.id, emb.nombre, emb.codigo, e.id, e.nombre, ext.id, ext.nombre, COALESCE(c.region_id, cal.region_id)";
 
         Query qArm = entityManager.createNativeQuery(sqlArmador);
         qArm.setParameter("fecha", targetDate);
@@ -1928,23 +2023,27 @@ public class ReportRepository {
                 }
             }
 
-            double limKg = limiteOficialGlobal;
-            double tolPct = toleranciaGlobal;
-            String modo = modoAccionGlobal;
-            String nomRegla = nombreReglaGlobal;
+            double limKg = 0.0;
+            double tolPct = 0.0;
+            String modo = "INACTIVO";
+            String nomRegla = "Sin regla configurada";
+            boolean sinRegla = true;
 
             if (reglaEspecifica != null) {
-                nomRegla = reglaEspecifica[1] != null ? reglaEspecifica[1].toString() : nomRegla;
-                limKg = reglaEspecifica[2] != null ? ((Number) reglaEspecifica[2]).doubleValue() : limKg;
-                tolPct = reglaEspecifica[3] != null ? ((Number) reglaEspecifica[3]).doubleValue() : tolPct;
-                modo = reglaEspecifica[4] != null ? reglaEspecifica[4].toString() : modo;
+                sinRegla = false;
+                nomRegla = reglaEspecifica[1] != null ? reglaEspecifica[1].toString() : nombreReglaGlobal;
+                limKg = reglaEspecifica[2] != null ? ((Number) reglaEspecifica[2]).doubleValue() : 0.0;
+                tolPct = reglaEspecifica[3] != null ? ((Number) reglaEspecifica[3]).doubleValue() : 0.0;
+                modo = reglaEspecifica[4] != null ? reglaEspecifica[4].toString() : "SOLO_ALERTA";
             }
 
             double limConTol = limKg * (1.0 + (tolPct / 100.0));
             double pct = limKg > 0 ? (kg / limKg) * 100.0 : 0.0;
 
             String estado;
-            if (kg > limConTol) {
+            if (sinRegla) {
+                estado = "SIN_REGLA";
+            } else if (kg > limConTol) {
                 estado = "EXCEDIDO";
                 excedidos++;
             } else if (kg > limKg) {
@@ -1965,12 +2064,13 @@ public class ReportRepository {
             item.put("especie", esp);
             item.put("metodo", met);
             item.put("kgDesembarcados", Math.round(kg * 100.0) / 100.0);
-            item.put("limiteKg", limKg);
-            item.put("limiteConToleranciaKg", Math.round(limConTol * 100.0) / 100.0);
-            item.put("porcentajeConsumido", Math.round(pct * 10.0) / 10.0);
+            item.put("limiteKg", sinRegla ? null : limKg);
+            item.put("limiteConToleranciaKg", sinRegla ? null : Math.round(limConTol * 100.0) / 100.0);
+            item.put("porcentajeConsumido", sinRegla ? 0.0 : Math.round(pct * 10.0) / 10.0);
             item.put("estado", estado);
             item.put("modoAccion", modo);
             item.put("nombreRegla", nomRegla);
+            item.put("sinReglaAplicable", sinRegla);
             detalle.add(item);
         }
 
@@ -1991,6 +2091,186 @@ public class ReportRepository {
         out.put("detalle", detalle);
 
         return out;
+    }
+
+    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId, Long embarcacionId) {
+        StringBuilder filterBuilder = new StringBuilder();
+        if (startDate != null && endDate != null) {
+            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) BETWEEN :startDate AND :endDate");
+        } else if (startDate != null) {
+            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) >= :startDate");
+        } else if (endDate != null) {
+            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) <= :endDate");
+        }
+
+        if (regionId != null) {
+            filterBuilder.append(" AND COALESCE(c.region_id, cal.region_id) = :regionId");
+        }
+
+        if (embarcacionId != null) {
+            filterBuilder.append(" AND emb.id = :embarcacionId");
+        }
+
+        String sql = "SELECT " +
+            "dm.id as marca_id, " +
+            "dm.declaracion_tipo, " +
+            "dm.declaracion_id, " +
+            "dm.detalle, " +
+            "dm.regla_id, " +
+            "dm.resuelta, " +
+            "dm.created_at, " +
+            "da.folio_origen, " +
+            "da.folio_desembarque_da, " +
+            "da.fecha_declaracion, " +
+            "da.desembarque as kg_desembarque, " +
+            "emb.id as emb_id, " +
+            "emb.nombre as emb_nombre, " +
+            "emb.codigo as emb_codigo, " +
+            "u.id as usr_id, " +
+            "u.rut as usr_rut, " +
+            "u.nombres as usr_nombres, " +
+            "u.apellidop as usr_apellidop, " +
+            "cal.id as cal_id, " +
+            "cal.nombre as cal_nombre, " +
+            "c.nombre as com_nombre, " +
+            "reg.id as reg_id, " +
+            "reg.nombre as reg_nombre, " +
+            "cfg.nombre_regla, " +
+            "cfg.limite_kg as regla_limite_kg, " +
+            "cfg.margen_tolerancia_pct as regla_tolerancia_pct " +
+            "FROM declaracion_marca dm " +
+            "LEFT JOIN declaracion_armador da ON dm.declaracion_tipo = 'ARMADOR' AND dm.declaracion_id = da.id " +
+            "LEFT JOIN embarcacion emb ON da.embarcacion_id = emb.id " +
+            "LEFT JOIN usuario u ON da.usuario_id = u.id " +
+            "LEFT JOIN caleta cal ON da.caleta_id = cal.id " +
+            "LEFT JOIN comuna c ON COALESCE(da.comuna_id, cal.comuna_id) = c.id " +
+            "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id) " +
+            "LEFT JOIN limite_extraccion_diario_config cfg ON dm.regla_id = cfg.id " +
+            "WHERE dm.marca = 'LED_EXCEDIDO' " + filterBuilder.toString() + " " +
+            "ORDER BY dm.id DESC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (regionId != null) query.setParameter("regionId", regionId);
+        if (embarcacionId != null) query.setParameter("embarcacionId", embarcacionId);
+
+        List<Object[]> rows = query.getResultList();
+
+        java.util.regex.Pattern regexDetalle = java.util.regex.Pattern.compile(
+            "Embarcación\\s+([^—]+?)\\s+—\\s+armador\\s+([^—]+?)\\s+—\\s+([0-9-]+):\\s+([0-9.,]+)\\s+kg acumulados sobre límite de\\s+([0-9.,]+)\\s+kg\\s+\\(exceso\\s+([0-9.,]+)\\s+kg(?:,\\s+([0-9.,]+)%)?\\)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+
+        List<java.util.Map<String, Object>> hallazgos = new java.util.ArrayList<>();
+
+        for (Object[] r : rows) {
+            Long marcaId = ((Number) r[0]).longValue();
+            String decTipo = r[1] != null ? r[1].toString() : "ARMADOR";
+            Long decId = r[2] != null ? ((Number) r[2]).longValue() : null;
+            String detalleStr = r[3] != null ? r[3].toString() : "";
+            Long reglaId = r[4] != null ? ((Number) r[4]).longValue() : null;
+            Boolean resuelta = r[5] != null && (((Number) r[5]).intValue() == 1 || Boolean.TRUE.equals(r[5]));
+            Date createdAt = null;
+            if (r[6] instanceof java.sql.Timestamp) createdAt = new Date(((java.sql.Timestamp) r[6]).getTime());
+            else if (r[6] instanceof Date) createdAt = (Date) r[6];
+
+            String daFolioOrig = r[7] != null ? r[7].toString() : null;
+            String daFolioDa = r[8] != null ? r[8].toString() : null;
+            Date daFecha = null;
+            if (r[9] instanceof java.sql.Timestamp) daFecha = new Date(((java.sql.Timestamp) r[9]).getTime());
+            else if (r[9] instanceof Date) daFecha = (Date) r[9];
+
+            Double daDesembarque = r[10] != null ? ((Number) r[10]).doubleValue() : null;
+            Long embId = r[11] != null ? ((Number) r[11]).longValue() : null;
+            String embNom = r[12] != null ? r[12].toString() : null;
+            String embCod = r[13] != null ? r[13].toString() : null;
+
+            String usrRut = r[15] != null ? r[15].toString() : null;
+            String usrNom = r[16] != null ? r[16].toString() : "";
+            String usrApe = r[17] != null ? r[17].toString() : "";
+            String armadorNomCompleto = (usrNom + " " + usrApe).trim();
+
+            String calNombre = r[19] != null ? r[19].toString() : null;
+            String comNombre = r[20] != null ? r[20].toString() : null;
+            String regNombre = r[22] != null ? r[22].toString() : null;
+            String regNombreRegla = r[23] != null ? r[23].toString() : null;
+            Double reglaLimiteKg = r[24] != null ? ((Number) r[24]).doubleValue() : null;
+
+            // Variables a consolidar
+            String folio = decId != null ? (daFolioOrig != null ? daFolioOrig : (daFolioDa != null ? daFolioDa : "DA-" + decId)) : "BLOQUEADO (Intento)";
+            String embarcacion = embNom != null ? embNom : (embCod != null ? embCod : null);
+            String matricula = embCod != null ? embCod : null;
+            String armador = !armadorNomCompleto.isEmpty() ? (usrRut != null ? usrRut + " - " + armadorNomCompleto : armadorNomCompleto) : usrRut;
+            String rut = usrRut;
+            Date fecha = daFecha != null ? daFecha : createdAt;
+            Double kgDia = daDesembarque;
+            Double limite = reglaLimiteKg;
+            Double exceso = null;
+            Double excesoPct = null;
+            String nombreRegla = regNombreRegla != null ? regNombreRegla : "Límite Oficial Diario";
+
+            // Si hay datos parseables en detalleStr (especialmente valioso para intentos bloqueados)
+            if (detalleStr != null && !detalleStr.isEmpty()) {
+                java.util.regex.Matcher m = regexDetalle.matcher(detalleStr);
+                if (m.find()) {
+                    if (matricula == null || matricula.equals("—")) matricula = m.group(1).trim();
+                    if (embarcacion == null || embarcacion.equals("N/A")) embarcacion = m.group(1).trim();
+                    if (rut == null) rut = m.group(2).trim();
+                    if (armador == null) armador = m.group(2).trim();
+                    if (kgDia == null) {
+                        try { kgDia = Double.parseDouble(m.group(4).replace(",", ".")); } catch (Exception ignored) {}
+                    }
+                    if (limite == null) {
+                        try { limite = Double.parseDouble(m.group(5).replace(",", ".")); } catch (Exception ignored) {}
+                    }
+                    if (m.group(6) != null) {
+                        try { exceso = Double.parseDouble(m.group(6).replace(",", ".")); } catch (Exception ignored) {}
+                    }
+                    if (m.group(7) != null) {
+                        try { excesoPct = Double.parseDouble(m.group(7).replace(",", ".")); } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            if (kgDia == null) kgDia = 0.0;
+            if (limite == null) limite = 2000.0;
+            if (exceso == null) exceso = Math.max(0.0, kgDia - limite);
+            if (excesoPct == null) excesoPct = limite > 0 ? (exceso / limite) * 100.0 : 0.0;
+
+            java.util.Map<String, Object> h = new java.util.HashMap<>();
+            h.put("marcaId", marcaId);
+            h.put("declaracionId", decId);
+            h.put("declaracionTipo", decTipo);
+            h.put("folio", folio);
+            h.put("embarcacion", embarcacion != null ? embarcacion : "—");
+            h.put("matricula", matricula != null ? matricula : "—");
+            h.put("embarcacionId", embId);
+            h.put("armador", armador != null ? armador : "—");
+            h.put("rut", rut != null ? rut : "—");
+            h.put("caleta", calNombre != null ? calNombre : "—");
+            h.put("comuna", comNombre != null ? comNombre : "—");
+            h.put("region", regNombre != null ? regNombre : "—");
+            h.put("fecha", fecha);
+            h.put("kgDia", Math.round(kgDia * 100.0) / 100.0);
+            h.put("limiteKg", Math.round(limite * 100.0) / 100.0);
+            h.put("excesoKg", Math.round(exceso * 100.0) / 100.0);
+            h.put("excesoPct", Math.round(excesoPct * 10.0) / 10.0);
+            h.put("nombreRegla", nombreRegla);
+            h.put("reglaId", reglaId);
+            h.put("resuelta", resuelta);
+            h.put("detalle", detalleStr);
+
+            hallazgos.add(h);
+        }
+
+        // Ordenar por exceso descendente según criterio de aceptación de R4.2
+        hallazgos.sort((a, b) -> Double.compare(
+            ((Number) b.getOrDefault("excesoKg", 0.0)).doubleValue(),
+            ((Number) a.getOrDefault("excesoKg", 0.0)).doubleValue()
+        ));
+
+        return hallazgos;
     }
 
     // =========================================================================

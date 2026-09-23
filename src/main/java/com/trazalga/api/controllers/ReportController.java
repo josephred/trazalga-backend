@@ -668,9 +668,11 @@ public class ReportController {
     @GetMapping("/extraccion-veda")
     public ResponseEntity<?> getExtraccionVedaMetrics(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long regionId) {
         try {
-            return ResponseEntity.ok(reportService.getExtraccionVedaMetrics(startDate, endDate));
+            return ResponseEntity.ok(reportService.getExtraccionVedaMetrics(startDate, endDate, especieId, regionId));
         } catch (Exception e) {
             System.err.println("Error obteniendo indicadores de veda: " + e.getMessage());
             e.printStackTrace();
@@ -681,9 +683,11 @@ public class ReportController {
     @GetMapping("/extraccion-veda-detalle")
     public ResponseEntity<?> getExtraccionVedaDetalle(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long regionId) {
         try {
-            return ResponseEntity.ok(reportService.getExtraccionVedaDetalle(startDate, endDate));
+            return ResponseEntity.ok(reportService.getExtraccionVedaDetalle(startDate, endDate, especieId, regionId));
         } catch (Exception e) {
             System.err.println("Error obteniendo detalle de veda: " + e.getMessage());
             e.printStackTrace();
@@ -927,6 +931,21 @@ public class ReportController {
             return ResponseEntity.ok(reportService.getLimiteExtraccionDiarioMetrics(fecha));
         } catch (Exception e) {
             System.err.println("Error obteniendo límite de extracción diario: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/led-hallazgos")
+    public ResponseEntity<?> getLedHallazgos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long embarcacionId) {
+        try {
+            return ResponseEntity.ok(reportService.getLedHallazgos(startDate, endDate, regionId, embarcacionId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo hallazgos de límite de extracción diario: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
