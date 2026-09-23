@@ -1270,13 +1270,14 @@ public class ReportRepository {
             "orig.folio_origen, orig.eslabon_origen, orig.actor_origen, orig.rut_origen, orig.especie, " +
             "orig.humedad_origen, orig.fecha_origen, orig.kg_origen, orig.captura_origen, orig.factor_aplicado, " +
             "orig.embarcacion, c.kg_comercializador, c.fecha_comercializador, c.actor_comercializador, " +
-            "p.kg_planta, p.fecha_planta, p.actor_planta " +
+            "p.kg_planta, p.fecha_planta, p.actor_planta, orig.marcas_activas " +
             "FROM (" +
             "    SELECT 'RECOLECTOR' as eslabon_origen, r.folio_origen, MIN(r.fecha_declaracion) as fecha_origen, " +
             "    SUM(r.desembarque) as kg_origen, SUM(r.captura) as captura_origen, MAX(r.factor_aplicado) as factor_aplicado, " +
             "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
             "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, NULL as embarcacion " +
+            "    MAX(u.rut) as rut_origen, NULL as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(r.id) AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_recolector r " +
             "    INNER JOIN usuario u ON r.usuario_id = u.id " +
             "    INNER JOIN especie e ON r.especie_id = e.id " +
@@ -1288,7 +1289,8 @@ public class ReportRepository {
             "    SUM(a.desembarque) as kg_origen, SUM(a.captura) as captura_origen, MAX(a.factor_aplicado) as factor_aplicado, " +
             "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
             "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, MAX(emb.nombre) as embarcacion " +
+            "    MAX(u.rut) as rut_origen, MAX(emb.nombre) as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(a.id) AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_armador a " +
             "    INNER JOIN usuario u ON a.usuario_id = u.id " +
             "    INNER JOIN especie e ON a.especie_id = e.id " +
@@ -1301,7 +1303,8 @@ public class ReportRepository {
             "    SUM(ar.desembarque) as kg_origen, SUM(ar.captura) as captura_origen, MAX(ar.factor_aplicado) as factor_aplicado, " +
             "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
             "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, NULL as embarcacion " +
+            "    MAX(u.rut) as rut_origen, NULL as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(ar.id) AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_area ar " +
             "    INNER JOIN usuario u ON ar.usuario_id = u.id " +
             "    INNER JOIN especie e ON ar.especie_id = e.id " +
@@ -1362,6 +1365,16 @@ public class ReportRepository {
             Double kgPlanta = row[14] != null ? ((Number) row[14]).doubleValue() : null;
             Date fechaPlanta = toReportDate(row[15]);
             String actorPlanta = row[16] != null ? row[16].toString() : null;
+            String marcasStr = row.length > 17 && row[17] != null ? row[17].toString() : null;
+            List<String> marcasActivas = new java.util.ArrayList<>();
+            if (marcasStr != null && !marcasStr.trim().isEmpty()) {
+                for (String m : marcasStr.split(",")) {
+                    String clean = m.trim();
+                    if (!clean.isEmpty() && !marcasActivas.contains(clean)) {
+                        marcasActivas.add(clean);
+                    }
+                }
+            }
 
             double kgDestino = kgPlanta != null ? kgPlanta : (kgComercializador != null ? kgComercializador : kgOrigen);
             double deltaKg = kgDestino - kgOrigen;
@@ -1474,6 +1487,7 @@ public class ReportRepository {
             map.put("alertaVariacion", alertaVariacion);
             map.put("inconsistenciaBiologica", inconsistenciaBiologica);
             map.put("severidadBiologica", severidadBiologica);
+            map.put("marcasActivas", marcasActivas);
 
             list.add(map);
         }

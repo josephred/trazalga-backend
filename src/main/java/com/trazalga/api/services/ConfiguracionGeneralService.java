@@ -54,6 +54,16 @@ public class ConfiguracionGeneralService {
         createIfNotExist("bio_humedo_dias_minimos_transito", "3", "Días desde los que se exige evaporación en recurso húmedo", "CADENA");
         createIfNotExist("bio_humedo_merma_minima_pct", "5.0", "Merma mínima esperada en húmedo tras los días mínimos", "CADENA");
         createIfNotExist("bio_seco_merma_maxima_pct", "3.0", "Merma máxima tolerable en recurso seco", "CADENA");
+
+        // INDICADOR 9 — PERFILADOR DE RIESGO DE FISCALIZACIÓN (R9.1)
+        createIfNotExist("riesgo_activo", "true", "Interruptor maestro del perfilador de riesgo", "RIESGO");
+        createIfNotExist("riesgo_variacion_amarillo_pct", "5.0", "Umbral de variación de peso para riesgo amarillo moderado", "RIESGO");
+        createIfNotExist("riesgo_variacion_rojo_pct", "10.0", "Umbral de variación de peso para riesgo rojo severo", "RIESGO");
+        createIfNotExist("riesgo_dias_amarillo", "3", "Días de retención en bodega que ameritan seguimiento (amarillo)", "RIESGO");
+        createIfNotExist("riesgo_dias_rojo", "7", "Días de retención en bodega para nivel crítico (rojo)", "RIESGO");
+        createIfNotExist("riesgo_escala_humedo_sin_merma", "ROJO", "Nivel al que escala la inconsistencia biológica grave", "RIESGO");
+        createIfNotExist("riesgo_agravante_veda_niveles", "1", "Niveles que incrementa una marca activa EN_VEDA", "RIESGO");
+        createIfNotExist("riesgo_agravante_led_niveles", "1", "Niveles que incrementa una marca activa LED_EXCEDIDO", "RIESGO");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

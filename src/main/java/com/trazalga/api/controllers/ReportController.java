@@ -8,6 +8,7 @@ import com.trazalga.api.models.PerfilModel;
 import com.trazalga.api.repositories.IPerfilRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.ReportService;
+import com.trazalga.api.services.PerfiladorRiesgoService;
 import com.trazalga.api.services.sync.SernapescaApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,6 +31,7 @@ import java.util.Map;
 public class ReportController {
 
     private final ReportService reportService;
+    private final PerfiladorRiesgoService perfiladorRiesgoService;
     private final IUsuarioRepository usuarioRepository;
     private final IPerfilRepository perfilRepository;
     private final SernapescaApiClient sernapescaApiClient;
@@ -860,6 +862,22 @@ public class ReportController {
             System.err.println("Error obteniendo detalle de trazabilidad por lote: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/perfilador-riesgo")
+    public ResponseEntity<?> getPerfiladorRiesgo(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long actorId,
+            @RequestParam(required = false) String nivel) {
+        try {
+            return ResponseEntity.ok(perfiladorRiesgoService.evaluarRiesgo(startDate, endDate, regionId, actorId, nivel));
+        } catch (Exception e) {
+            System.err.println("Error ejecutando perfilador de riesgo: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno en perfilador de riesgo: " + e.getMessage());
         }
     }
 
