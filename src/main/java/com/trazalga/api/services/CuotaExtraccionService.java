@@ -1077,6 +1077,7 @@ public class CuotaExtraccionService {
                 .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
         c.setEstado("CERRADA");
         c.setFechaCierre(new Date());
+        c.setMotivoCierre("ADMINISTRATIVO");
         return cuotaRepository.save(c);
     }
 

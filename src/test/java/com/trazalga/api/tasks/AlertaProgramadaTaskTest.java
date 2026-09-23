@@ -214,4 +214,80 @@ public class AlertaProgramadaTaskTest {
                 contains("tolerancia 10")
         );
     }
+
+    @Test
+    void testCierreAutomatico_Agotamiento_BloqueoDeclaracion_CierraCuotaConAgotamiento() {
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        LocalDate end = LocalDate.of(2026, 12, 31);
+        Date fechaInicio = Date.from(start.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date fechaFin = Date.from(end.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        CuotaExtraccionModel cuota = CuotaExtraccionModel.builder()
+                .id(100L)
+                .especie(huiroPalo)
+                .periodo("ANUAL")
+                .limiteKg(1000.0)
+                .fechaInicio(fechaInicio)
+                .fechaFin(fechaFin)
+                .activo(true)
+                .esPlantilla(false)
+                .modoAccion("BLOQUEO_DECLARACION")
+                .estado("ABIERTA")
+                .build();
+
+        LocalDate hoyLocal = LocalDate.of(2026, 6, 1);
+        Date hoy = Date.from(hoyLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        when(cuotaRepository.findByActivoTrue()).thenReturn(Collections.singletonList(cuota));
+        when(cuotaExtraccionService.calcularLimiteEfectivo(eq(cuota), any(Date.class))).thenReturn(BigDecimal.valueOf(1000.0));
+        // Consumo supera el 100% (1050 kg)
+        when(cuotaExtraccionService.calcularConsumoAcumulado(eq(cuota), any(Date.class))).thenReturn(BigDecimal.valueOf(1050.0));
+        when(cuotaExtraccionService.describirAlcance(cuota)).thenReturn("Nacional");
+
+        task.revisarCuotas(hoy, hoyLocal);
+
+        // Verifica que se guardó el cierre automático
+        verify(cuotaRepository).save(cuota);
+        org.junit.jupiter.api.Assertions.assertEquals("CERRADA", cuota.getEstado());
+        org.junit.jupiter.api.Assertions.assertEquals("AGOTAMIENTO", cuota.getMotivoCierre());
+        org.junit.jupiter.api.Assertions.assertEquals(hoy, cuota.getFechaCierreAutomatico());
+    }
+
+    @Test
+    void testCierreAutomatico_Agotamiento_SoloAlerta_NoCierraCuota() {
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        LocalDate end = LocalDate.of(2026, 12, 31);
+        Date fechaInicio = Date.from(start.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date fechaFin = Date.from(end.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        CuotaExtraccionModel cuota = CuotaExtraccionModel.builder()
+                .id(101L)
+                .especie(huiroPalo)
+                .periodo("ANUAL")
+                .limiteKg(1000.0)
+                .fechaInicio(fechaInicio)
+                .fechaFin(fechaFin)
+                .activo(true)
+                .esPlantilla(false)
+                .modoAccion("SOLO_ALERTA")
+                .estado("ABIERTA")
+                .build();
+
+        LocalDate hoyLocal = LocalDate.of(2026, 6, 1);
+        Date hoy = Date.from(hoyLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        when(cuotaRepository.findByActivoTrue()).thenReturn(Collections.singletonList(cuota));
+        when(cuotaExtraccionService.calcularLimiteEfectivo(eq(cuota), any(Date.class))).thenReturn(BigDecimal.valueOf(1000.0));
+        // Consumo supera el 100% (1050 kg)
+        when(cuotaExtraccionService.calcularConsumoAcumulado(eq(cuota), any(Date.class))).thenReturn(BigDecimal.valueOf(1050.0));
+        when(cuotaExtraccionService.describirAlcance(cuota)).thenReturn("Nacional");
+
+        task.revisarCuotas(hoy, hoyLocal);
+
+        // Verifica que NO se guardó ningún cierre automático
+        verify(cuotaRepository, never()).save(any(CuotaExtraccionModel.class));
+        org.junit.jupiter.api.Assertions.assertEquals("ABIERTA", cuota.getEstado());
+        org.junit.jupiter.api.Assertions.assertNull(cuota.getMotivoCierre());
+        org.junit.jupiter.api.Assertions.assertNull(cuota.getFechaCierreAutomatico());
+    }
 }

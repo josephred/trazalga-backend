@@ -130,6 +130,13 @@ public class CuotaExtraccionModel {
     @Column(name = "fecha_cierre", nullable = true)
     private Date fechaCierre;
 
+    @Temporal(TemporalType.DATE)
+    @Column(name = "fecha_cierre_automatico", nullable = true)
+    private Date fechaCierreAutomatico;
+
+    @Column(name = "motivo_cierre", nullable = true, length = 30)
+    private String motivoCierre; // AGOTAMIENTO | ADMINISTRATIVO | VENCIMIENTO
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;

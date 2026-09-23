@@ -98,6 +98,15 @@ public class AlertaProgramadaTask {
                 String mensaje = String.format("La cuota de %s (%s) ha alcanzado o superado su límite: %.2f kg de %.2f kg.",
                         alcance, especieNombre, consumo, limite);
                 notificar(cuota.getUsuario() != null ? cuota.getUsuario().getId() : null, titulo, mensaje);
+
+                // R3.3: Cierre automático por agotamiento solo si modoAccion = BLOQUEO_DECLARACION
+                if ("BLOQUEO_DECLARACION".equalsIgnoreCase(cuota.getModoAccion()) && !"CERRADA".equalsIgnoreCase(cuota.getEstado())) {
+                    cuota.setEstado("CERRADA");
+                    cuota.setFechaCierreAutomatico(hoy);
+                    cuota.setMotivoCierre("AGOTAMIENTO");
+                    cuotaRepository.save(cuota);
+                    log.info("Cuota ID {} cerrada automáticamente por AGOTAMIENTO en modo BLOQUEO_DECLARACION.", cuota.getId());
+                }
             } else {
                 double pctRestante = saldo.divide(limite, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
                 if (pctRestante <= umbralRestantePct) {

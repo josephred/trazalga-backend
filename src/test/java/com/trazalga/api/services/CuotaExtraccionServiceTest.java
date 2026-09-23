@@ -546,4 +546,20 @@ public class CuotaExtraccionServiceTest {
 
         assertTrue(ex.getMessage().contains("sin comuna asociada"));
     }
+
+    @Test
+    void testCerrarCuota_MarcaCerradaYMotivoAdministrativo() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setId(10L);
+        c.setEstado("ABIERTA");
+
+        when(cuotaRepository.findById(10L)).thenReturn(java.util.Optional.of(c));
+        when(cuotaRepository.save(any(CuotaExtraccionModel.class))).thenAnswer(i -> i.getArgument(0));
+
+        CuotaExtraccionModel res = cuotaExtraccionService.cerrarCuota(10L);
+
+        assertEquals("CERRADA", res.getEstado());
+        assertNotNull(res.getFechaCierre());
+        assertEquals("ADMINISTRATIVO", res.getMotivoCierre());
+    }
 }
