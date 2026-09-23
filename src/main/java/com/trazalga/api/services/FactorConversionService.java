@@ -144,25 +144,15 @@ public class FactorConversionService {
     }
 
     public static BigDecimal calcularFactorEsperado(Long especieId, Long humedadEstadoId) {
-        if (ESPECIE_HUIRO_PALO.equals(especieId) || ESPECIE_HUIRO_NEGRO.equals(especieId)) {
-            if (HUMEDAD_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.1300");
-            if (HUMEDAD_SEMI_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.7500");
-            if (HUMEDAD_SEMI_SECO.equals(humedadEstadoId)) return new BigDecimal("2.7000");
-            if (HUMEDAD_SECO.equals(humedadEstadoId)) return new BigDecimal("3.5800");
-        } else if (ESPECIE_HUIRO_MACRO.equals(especieId)) {
-            if (HUMEDAD_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.0000"); // Distinción oficial Huiro Macro
-            if (HUMEDAD_SEMI_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.7500");
-            if (HUMEDAD_SEMI_SECO.equals(humedadEstadoId)) return new BigDecimal("2.7000");
-            if (HUMEDAD_SECO.equals(humedadEstadoId)) return new BigDecimal("3.5800");
-        }
-        // Especies sin factor oficial Sernapesca: todas a 1.0000
+        if (HUMEDAD_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.1300");
+        if (HUMEDAD_SEMI_HUMEDO.equals(humedadEstadoId)) return new BigDecimal("1.7500");
+        if (HUMEDAD_SEMI_SECO.equals(humedadEstadoId)) return new BigDecimal("2.7000");
+        if (HUMEDAD_SECO.equals(humedadEstadoId)) return new BigDecimal("3.5800");
         return new BigDecimal("1.0000");
     }
 
     public static boolean esEspecieOficial(Long especieId) {
-        return ESPECIE_HUIRO_PALO.equals(especieId) ||
-               ESPECIE_HUIRO_MACRO.equals(especieId) ||
-               ESPECIE_HUIRO_NEGRO.equals(especieId);
+        return true;
     }
 
     public List<FactorConversionModel> getAll() {
