@@ -260,13 +260,12 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setMetrica("CAPTURA");
         cMacrozona.setEstado("ABIERTA");
         cMacrozona.setNivelAgregacion("MACROZONA");
+        cMacrozona.setModoAccion("BLOQUEO_DECLARACION");
         cMacrozona.setActivo(true);
 
         when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cComuna, cMacrozona));
         when(comunaRepository.findById(4101L)).thenReturn(Optional.of(comunaLaSerena));
         when(macrozonaService.isRegionInMacrozona(eq(10L), eq(4L), any(Date.class))).thenReturn(true);
-        when(configuracionGeneralService.getValor(eq("cuota_accion_exceso_limite"), anyString()))
-                .thenReturn("BLOQUEO_DECLARACION");
 
         // Mock queries for consumption:
         // Comunal consumed: 1.000 kg (10%)
@@ -295,6 +294,40 @@ public class CuotaExtraccionServiceTest {
         assertNotNull(res.getCuotaAplicada(), "Debe citar la cuota que causó el bloqueo");
         assertEquals(102L, res.getCuotaAplicada().getId(), "La cuota causante del bloqueo debe ser la de Macrozona");
         assertTrue(res.getMensaje().contains("Macrozona Zona Norte"), "El mensaje debe indicar la cuota macrozonal sobrepasada");
+    }
+
+    @Test
+    void testEvaluacionConcurrente_ModoAccionSoloAlerta_PermiteConMarca() {
+        CuotaExtraccionModel cMacrozona = new CuotaExtraccionModel();
+        cMacrozona.setId(102L);
+        cMacrozona.setPerfil("RECOLECTOR");
+        cMacrozona.setEspecie(especieHuiro);
+        cMacrozona.setMacrozona(macrozonaNorte);
+        cMacrozona.setPeriodo("MENSUAL");
+        cMacrozona.setLimiteKg(50000.0);
+        cMacrozona.setMetrica("CAPTURA");
+        cMacrozona.setEstado("ABIERTA");
+        cMacrozona.setNivelAgregacion("MACROZONA");
+        cMacrozona.setModoAccion("SOLO_ALERTA");
+        cMacrozona.setActivo(true);
+
+        when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cMacrozona));
+        when(comunaRepository.findById(4101L)).thenReturn(Optional.of(comunaLaSerena));
+        when(macrozonaService.isRegionInMacrozona(eq(10L), eq(4L), any(Date.class))).thenReturn(true);
+
+        Query queryMacrozona = mock(Query.class);
+        when(queryMacrozona.getSingleResult()).thenReturn("75000.00"); // 150% consumo
+        when(entityManager.createNativeQuery(anyString())).thenReturn(queryMacrozona);
+
+        EvaluacionCuotaResult res = cuotaExtraccionService.evaluarCuotaDeclaracion(
+                "RECOLECTOR", 55L, null, 1L, null, 4101L,
+                null, new Date(), new BigDecimal("1000.00"), new BigDecimal("1000.00"));
+
+        assertTrue(res.isPermite(), "En SOLO_ALERTA debe permitir la declaración");
+        assertFalse(res.isBloquear(), "No debe bloquear");
+        assertEquals("CUOTA_EXCEDIDA", res.getMarca(), "Debe marcar CUOTA_EXCEDIDA");
+        assertNotNull(res.getCuotaAplicada());
+        assertTrue(res.getMensaje().contains("consumo"), "Debe detallar el sobreconsumo");
     }
 
     @Test

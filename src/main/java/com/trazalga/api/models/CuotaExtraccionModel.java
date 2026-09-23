@@ -97,6 +97,11 @@ public class CuotaExtraccionModel {
     @Builder.Default
     private Boolean esPlantilla = false;
 
+    // Modo de acción: SOLO_ALERTA | BLOQUEO_DECLARACION
+    @Column(name = "modo_accion", nullable = false, length = 30)
+    @Builder.Default
+    private String modoAccion = "SOLO_ALERTA";
+
     // Periodo: "DIARIO", "MENSUAL", "ANUAL", etc.
     @Column(nullable = false)
     private String periodo;

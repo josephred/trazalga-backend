@@ -260,6 +260,9 @@ public class DeclaracionArmadorService {
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
         if (resVal.esRechazado()) {
+            alertaTriggerService.procesarMarcas("ARMADOR", null,
+                    declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null,
+                    resVal.getMarcas());
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
 

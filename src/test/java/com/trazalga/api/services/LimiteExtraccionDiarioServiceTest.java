@@ -104,7 +104,8 @@ public class LimiteExtraccionDiarioServiceTest {
 
         assertTrue(res.isExcede());
         assertTrue(res.isBloquear());
-        assertTrue(res.getMensaje().contains("ha sido superado"));
+        assertTrue(res.getMensaje().contains("sobre límite de"));
+        assertTrue(res.getMensaje().contains("exceso"));
     }
 
     @Test

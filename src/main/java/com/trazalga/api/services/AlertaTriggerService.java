@@ -32,7 +32,7 @@ public class AlertaTriggerService {
      * 2. Despacha notificaciones push al declarante y administradores según la configuración.
      */
     public void procesarMarcas(String declaracionTipo, Long declaracionId, Long usuarioDeclaradorId, List<MarcaItem> marcas) {
-        if (marcas == null || marcas.isEmpty() || declaracionId == null) {
+        if (marcas == null || marcas.isEmpty()) {
             return;
         }
 

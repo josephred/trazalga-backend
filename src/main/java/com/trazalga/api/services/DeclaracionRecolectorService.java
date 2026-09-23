@@ -147,6 +147,9 @@ public class DeclaracionRecolectorService {
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
         if (resVal.esRechazado()) {
+            alertaTriggerService.procesarMarcas("RECOLECTOR", null,
+                    declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null,
+                    resVal.getMarcas());
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
 

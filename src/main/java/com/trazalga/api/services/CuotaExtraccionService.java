@@ -123,6 +123,7 @@ public class CuotaExtraccionService {
         if (request.getNivelAgregacion() != null) cuota.setNivelAgregacion(request.getNivelAgregacion());
         if (request.getMetrica() != null) cuota.setMetrica(request.getMetrica());
         if (request.getEsPlantilla() != null) cuota.setEsPlantilla(request.getEsPlantilla());
+        if (request.getModoAccion() != null) cuota.setModoAccion(request.getModoAccion());
         cuota.setPeriodo(request.getPeriodo());
         cuota.setLimiteKg(request.getLimiteKg());
         cuota.setFechaInicio(request.getFechaInicio());
@@ -341,11 +342,17 @@ public class CuotaExtraccionService {
 
             // C. Comparar contra el límite
             if (total.compareTo(limiteEfectivo) > 0) {
-                String accionExceso = configuracionGeneralService.getValor("cuota_accion_exceso_limite", "ALERTA_EXCESO");
-                boolean bloquear = "BLOQUEO_DECLARACION".equalsIgnoreCase(accionExceso) || "BLOQUEO".equalsIgnoreCase(accionExceso) || "BLOQUEO_TOTAL".equalsIgnoreCase(accionExceso);
+                String modoCuota = (c.getModoAccion() != null && !c.getModoAccion().isBlank())
+                        ? c.getModoAccion().trim().toUpperCase()
+                        : configuracionGeneralService.getValor("cuota_accion_exceso_limite", "SOLO_ALERTA");
+                boolean bloquear = "BLOQUEO_DECLARACION".equalsIgnoreCase(modoCuota) || "BLOQUEO".equalsIgnoreCase(modoCuota) || "BLOQUEO_TOTAL".equalsIgnoreCase(modoCuota);
                 String metricaNombre = esCaptura ? "captura biológica" : "desembarque físico";
-                String msg = String.format("Bloqueo: La cuota %s (%s) de %.2f kg ha sido sobrepasada. Total acumulado con esta declaración: %.2f kg (límite: %.2f kg).",
-                        describirAlcance(c), metricaNombre, limiteEfectivo, total, limiteEfectivo);
+                BigDecimal exceso = total.subtract(limiteEfectivo);
+                double sobreconsumoPct = (limiteEfectivo.compareTo(BigDecimal.ZERO) > 0)
+                        ? (total.doubleValue() / limiteEfectivo.doubleValue()) * 100.0
+                        : 100.0;
+                String msg = String.format("Cuota %s (%s) de %.2f kg ha sido sobrepasada. Total acumulado con esta declaración: %.2f kg (exceso: %.2f kg, %.1f%% de consumo).",
+                        describirAlcance(c), metricaNombre, limiteEfectivo, total, exceso, sobreconsumoPct);
 
                 if (bloquear) {
                     if (bloqueoResult == null) {
@@ -608,6 +615,17 @@ public class CuotaExtraccionService {
             cuota.setMetrica("CAPTURA");
         } else {
             throw new IllegalArgumentException("Métrica inválida: " + cuota.getMetrica() + ". Los valores permitidos son CAPTURA o DESEMBARQUE.");
+        }
+
+        // Modo de acción (R3.2)
+        if (cuota.getModoAccion() == null || cuota.getModoAccion().isBlank()) {
+            cuota.setModoAccion("SOLO_ALERTA");
+        } else {
+            String modoNorm = cuota.getModoAccion().trim().toUpperCase();
+            if (!java.util.Set.of("SOLO_ALERTA", "BLOQUEO_DECLARACION").contains(modoNorm)) {
+                throw new IllegalArgumentException("Modo de acción inválido: " + cuota.getModoAccion() + ". Los valores permitidos son SOLO_ALERTA o BLOQUEO_DECLARACION.");
+            }
+            cuota.setModoAccion(modoNorm);
         }
     }
 

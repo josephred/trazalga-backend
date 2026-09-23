@@ -98,9 +98,12 @@ public class VedaEvaluadorService {
             if (coincideVeda) {
                 String modo = configuracionGeneralService.getValor("veda_modo_operacion", "BLOQUEO_ESTRICTO");
                 boolean bloquear = "BLOQUEO_ESTRICTO".equalsIgnoreCase(modo);
-                String resInfo = veda.getResolucion() != null ? " (" + veda.getResolucion() + ")" : "";
-                String detalle = "El recurso '" + (veda.getEspecie() != null ? veda.getEspecie().getNombre() : "declarado") +
-                        "' se encuentra en periodo de VEDA oficial para la fecha " + localFecha + resInfo + ".";
+                String especieNom = veda.getEspecie() != null ? veda.getEspecie().getNombre() : "especie declarada";
+                String metodoNom = veda.getExtraccionTipo() != null ? veda.getExtraccionTipo().getNombre() : "método declarado";
+                String regionNom = veda.getRegion() != null ? veda.getRegion().getNombre() : "Nacional";
+                String resInfo = veda.getResolucion() != null ? veda.getResolucion() : "Subpesca";
+                String detalle = String.format("Extracción de %s por %s el %s en %s durante veda vigente (resolución %s)",
+                        especieNom, metodoNom, localFecha, regionNom, resInfo);
                 return new EvaluacionVedaResult(true, bloquear, detalle, veda);
             }
         }

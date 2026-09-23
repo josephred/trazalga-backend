@@ -1,6 +1,9 @@
 package com.trazalga.api.services;
 
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +34,31 @@ public class DeclaracionMarcaService {
         return repository.findByResueltaFalse();
     }
 
+    public List<DeclaracionMarcaModel> findConFiltros(String marca, Boolean resuelta, String declaracionTipo, Date startDate, Date endDate) {
+        return repository.findConFiltros(marca, resuelta, declaracionTipo, startDate, endDate);
+    }
+
+    public Map<String, Object> getResumen() {
+        List<DeclaracionMarcaModel> todas = repository.findAll();
+        long total = todas.size();
+        long pendientes = todas.stream().filter(m -> Boolean.FALSE.equals(m.getResuelta())).count();
+        long resueltas = todas.stream().filter(m -> Boolean.TRUE.equals(m.getResuelta())).count();
+
+        Map<String, Long> porMarca = new HashMap<>();
+        porMarca.put("EN_VEDA", todas.stream().filter(m -> "EN_VEDA".equals(m.getMarca())).count());
+        porMarca.put("LED_EXCEDIDO", todas.stream().filter(m -> "LED_EXCEDIDO".equals(m.getMarca())).count());
+        porMarca.put("DESEMBARQUE_ATIPICO", todas.stream().filter(m -> "DESEMBARQUE_ATIPICO".equals(m.getMarca())).count());
+        porMarca.put("CUOTA_EXCEDIDA", todas.stream().filter(m -> "CUOTA_EXCEDIDA".equals(m.getMarca())).count());
+        porMarca.put("POSTERIOR_CIERRE", todas.stream().filter(m -> "POSTERIOR_CIERRE".equals(m.getMarca())).count());
+
+        Map<String, Object> resumen = new HashMap<>();
+        resumen.put("total", total);
+        resumen.put("pendientes", pendientes);
+        resumen.put("resueltas", resueltas);
+        resumen.put("porMarca", porMarca);
+        return resumen;
+    }
+
     public DeclaracionMarcaModel marcar(String declaracionTipo, Long declaracionId, String marca, String detalle, Long reglaId) {
         DeclaracionMarcaModel model = DeclaracionMarcaModel.builder()
                 .declaracionTipo(declaracionTipo)
@@ -46,6 +74,13 @@ public class DeclaracionMarcaService {
     public Optional<DeclaracionMarcaModel> resolverMarca(Long id) {
         return repository.findById(id).map(m -> {
             m.setResuelta(true);
+            return repository.save(m);
+        });
+    }
+
+    public Optional<DeclaracionMarcaModel> reabrirMarca(Long id) {
+        return repository.findById(id).map(m -> {
+            m.setResuelta(false);
             return repository.save(m);
         });
     }

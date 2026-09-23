@@ -237,6 +237,9 @@ public class DeclaracionAreaService {
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
         if (resVal.esRechazado()) {
+            alertaTriggerService.procesarMarcas("AREA", null,
+                    declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null,
+                    resVal.getMarcas());
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
 

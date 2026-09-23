@@ -89,20 +89,21 @@ public class ValidacionDeclaracionService {
                 ctx.getFechaExtraccion());
 
         if (vedaRes.isEnVeda()) {
+            marcas.add(MarcaItem.builder()
+                    .marca("EN_VEDA")
+                    .detalle(vedaRes.getMensaje())
+                    .reglaId(vedaRes.getVedaAplicada() != null ? vedaRes.getVedaAplicada().getId() : null)
+                    .build());
             if (vedaRes.isBloquear()) {
                 return ResultadoValidacion.builder()
                         .decision(DecisionValidacion.RECHAZAR)
                         .motivoRechazo(vedaRes.getMensaje())
+                        .marcas(marcas)
                         .capturaCalculada(capturaCalculada)
                         .factorAplicado(factorAplicado)
                         .factorConversionId(factorConversionId)
                         .build();
             } else {
-                marcas.add(MarcaItem.builder()
-                        .marca("EN_VEDA")
-                        .detalle(vedaRes.getMensaje())
-                        .reglaId(vedaRes.getVedaAplicada() != null ? vedaRes.getVedaAplicada().getId() : null)
-                        .build());
                 advertencias.add(vedaRes.getMensaje());
             }
         }
@@ -126,10 +127,19 @@ public class ValidacionDeclaracionService {
                 ctx.getDesembarqueKg(),
                 capturaCalculada);
 
+        if (cuotaRes.getMarca() != null) {
+            marcas.add(MarcaItem.builder()
+                    .marca(cuotaRes.getMarca())
+                    .detalle(cuotaRes.getMensaje())
+                    .reglaId(cuotaRes.getCuotaAplicada() != null ? cuotaRes.getCuotaAplicada().getId() : null)
+                    .build());
+        }
+
         if (cuotaRes.isBloquear()) {
             return ResultadoValidacion.builder()
                     .decision(DecisionValidacion.RECHAZAR)
                     .motivoRechazo(cuotaRes.getMensaje())
+                    .marcas(marcas)
                     .capturaCalculada(capturaCalculada)
                     .factorAplicado(factorAplicado)
                     .factorConversionId(factorConversionId)
@@ -137,11 +147,6 @@ public class ValidacionDeclaracionService {
         }
 
         if (cuotaRes.getMarca() != null) {
-            marcas.add(MarcaItem.builder()
-                    .marca(cuotaRes.getMarca())
-                    .detalle(cuotaRes.getMensaje())
-                    .reglaId(cuotaRes.getCuotaAplicada() != null ? cuotaRes.getCuotaAplicada().getId() : null)
-                    .build());
             advertencias.add(cuotaRes.getMensaje());
         }
 
@@ -161,20 +166,21 @@ public class ValidacionDeclaracionService {
                 capturaCalculada);
 
         if (ledRes.isExcede()) {
+            marcas.add(MarcaItem.builder()
+                    .marca("LED_EXCEDIDO")
+                    .detalle(ledRes.getMensaje())
+                    .reglaId(ledRes.getReglaAplicada() != null ? ledRes.getReglaAplicada().getId() : null)
+                    .build());
             if (ledRes.isBloquear()) {
                 return ResultadoValidacion.builder()
                         .decision(DecisionValidacion.RECHAZAR)
                         .motivoRechazo(ledRes.getMensaje())
+                        .marcas(marcas)
                         .capturaCalculada(capturaCalculada)
                         .factorAplicado(factorAplicado)
                         .factorConversionId(factorConversionId)
                         .build();
             } else {
-                marcas.add(MarcaItem.builder()
-                        .marca("LED_EXCEDIDO")
-                        .detalle(ledRes.getMensaje())
-                        .reglaId(ledRes.getReglaAplicada() != null ? ledRes.getReglaAplicada().getId() : null)
-                        .build());
                 advertencias.add(ledRes.getMensaje());
             }
         }
@@ -184,8 +190,8 @@ public class ValidacionDeclaracionService {
         // ---------------------------------------------------------------------
         double umbralAtipico = configuracionGeneralService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
         if (ctx.getDesembarqueKg() != null && ctx.getDesembarqueKg().doubleValue() > umbralAtipico) {
-            String msgAtipico = String.format("Desembarque individual atípico: %.2f kg declarados supera el umbral de alerta preventiva (%.2f kg).",
-                    ctx.getDesembarqueKg(), umbralAtipico);
+            String msgAtipico = String.format(java.util.Locale.US, "Faena de %.2f kg supera el umbral operativo de %.2f kg",
+                    ctx.getDesembarqueKg().doubleValue(), umbralAtipico);
             marcas.add(MarcaItem.builder()
                     .marca("DESEMBARQUE_ATIPICO")
                     .detalle(msgAtipico)

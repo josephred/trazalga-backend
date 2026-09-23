@@ -28,6 +28,12 @@ public class LimiteExtraccionDiarioService {
     @Autowired
     private IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IEmbarcacionRepository embarcacionRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
     public static class EvaluacionLedResult {
         private final boolean excede;
         private final boolean bloquear;
@@ -148,10 +154,31 @@ public class LimiteExtraccionDiarioService {
         if (total.compareTo(limiteConTolerancia) > 0) {
             String modo = regla.getModoAccion() != null ? regla.getModoAccion().toUpperCase() : "SOLO_ALERTA";
             boolean bloquear = modo.contains("BLOQUEO");
-            String metricaStr = esCaptura ? "captura corregida" : "desembarque físico";
-            String msg = String.format("El límite diario de extracción (%s) de %.2f kg (%s) por %s ha sido superado. " +
-                            "Total acumulado para hoy: %.2f kg (intentando declarar %.2f kg, límite con tolerancia: %.2f kg).",
-                    regla.getNombreRegla(), regla.getLimiteKg(), metricaStr, unidad, total, nuevoMonto, limiteConTolerancia);
+            BigDecimal excesoKg = total.subtract(limiteConTolerancia);
+            double excesoPct = (limiteConTolerancia.compareTo(BigDecimal.ZERO) > 0)
+                    ? excesoKg.multiply(BigDecimal.valueOf(100)).divide(limiteConTolerancia, 1, RoundingMode.HALF_UP).doubleValue()
+                    : 100.0;
+
+            String matricula = "N/A";
+            if (embarcacionId != null && embarcacionRepository != null) {
+                matricula = embarcacionRepository.findById(embarcacionId)
+                        .map(e -> e.getCodigo() != null ? e.getCodigo() : (e.getNombre() != null ? e.getNombre() : "EMB-" + embarcacionId))
+                        .orElse("EMB-" + embarcacionId);
+            }
+
+            String rutArmador = "N/A";
+            if (usuarioId != null && usuarioRepository != null) {
+                rutArmador = usuarioRepository.findById(usuarioId)
+                        .map(u -> u.getRut() != null ? u.getRut() : "USR-" + usuarioId)
+                        .orElse("USR-" + usuarioId);
+            }
+
+            java.time.LocalDate localFecha = fecha != null
+                    ? fecha.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                    : java.time.LocalDate.now();
+
+            String msg = String.format("Embarcación %s — armador %s — %s: %.2f kg acumulados sobre límite de %.2f kg (exceso %.2f kg, %.1f%%)",
+                    matricula, rutArmador, localFecha, total.doubleValue(), limiteConTolerancia.doubleValue(), excesoKg.doubleValue(), excesoPct);
 
             return new EvaluacionLedResult(true, bloquear, total, limiteConTolerancia, msg, regla);
         }

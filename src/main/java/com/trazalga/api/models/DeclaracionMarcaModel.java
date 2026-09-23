@@ -23,7 +23,7 @@ public class DeclaracionMarcaModel {
     @Column(name = "declaracion_tipo", nullable = false, length = 30)
     private String declaracionTipo; // RECOLECTOR | ARMADOR | AREA
 
-    @Column(name = "declaracion_id", nullable = false)
+    @Column(name = "declaracion_id", nullable = true)
     private Long declaracionId;
 
     @Column(name = "marca", nullable = false, length = 40)
