@@ -1394,27 +1394,50 @@ public class ReportRepository {
                 }
             }
 
-            // Alerta de merma biológica (sólo si el interruptor maestro bio_perdida_activo está encendido)
+            // R8.1 y R8.2: Integración Humedad vs Tiempo y Severidad Biológica
             boolean alertaMerma = false;
             String motivoMerma = null;
-            String inconsistenciaBiologica = "NINGUNA";
-            String humUpper = humedadOrigen != null ? humedadOrigen.toUpperCase() : "";
-            if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
-                if (diasTranscurridos >= diasMinHumedo && deltaPct > -mermaMinHumedo) {
-                    inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
-                    if (bioPerdidaActivo) {
-                        alertaMerma = true;
-                        motivoMerma = String.format("Merma húmeda biológicamente inconsistente tras %d días (variación: %.1f%%, min esperado: -%.1f%%)",
-                                diasTranscurridos, deltaPct, mermaMinHumedo);
+            String inconsistenciaBiologica = null;
+            String severidadBiologica = null;
+
+            if (bioPerdidaActivo) {
+                severidadBiologica = "NEUTRA";
+                inconsistenciaBiologica = "NINGUNA";
+                String humUpper = humedadOrigen != null ? humedadOrigen.toUpperCase() : "";
+                double mermaPct = -deltaPct; // Merma: si deltaPct es -7%, mermaPct es +7%
+
+                if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
+                    if (diasTranscurridos >= diasMinHumedo) {
+                        if (mermaPct >= mermaMinHumedo) {
+                            severidadBiologica = "NEUTRA";
+                            inconsistenciaBiologica = "NINGUNA";
+                        } else if (mermaPct > 0 && mermaPct < mermaMinHumedo) {
+                            severidadBiologica = "ATENCION";
+                            inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
+                            alertaMerma = true;
+                            motivoMerma = String.format("Merma húmeda biológicamente insuficiente tras %d días: %.1f%% (esperado: ≥ %.1f%%)",
+                                    diasTranscurridos, mermaPct, mermaMinHumedo);
+                        } else { // mermaPct <= 0 (sin pérdida o con ganancia de peso)
+                            severidadBiologica = "CRITICA";
+                            inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
+                            alertaMerma = true;
+                            motivoMerma = String.format("Inconsistencia biológica crítica tras %d días: sin pérdida o con ganancia (variación: %s%.1f%%, mínimo esperado: merma ≥ %.1f%%)",
+                                    diasTranscurridos, deltaPct >= 0 ? "+" : "", deltaPct, mermaMinHumedo);
+                        }
+                    } else {
+                        severidadBiologica = "NEUTRA";
+                        inconsistenciaBiologica = "NINGUNA";
                     }
-                }
-            } else if (humUpper.contains("SEC")) {
-                if (deltaPct < -mermaMaxSeco) {
-                    inconsistenciaBiologica = "SECO_MERMA_EXCESIVA";
-                    if (bioPerdidaActivo) {
+                } else if (humUpper.contains("SEC")) {
+                    if (mermaPct <= mermaMaxSeco) {
+                        severidadBiologica = "NEUTRA";
+                        inconsistenciaBiologica = "NINGUNA";
+                    } else {
+                        severidadBiologica = "ATENCION";
+                        inconsistenciaBiologica = "SECO_MERMA_EXCESIVA";
                         alertaMerma = true;
-                        motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (variación: %.1f%%, máx: -%.1f%%)",
-                                deltaPct, mermaMaxSeco);
+                        motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (merma: %.1f%%, máx: %.1f%%)",
+                                mermaPct, mermaMaxSeco);
                     }
                 }
             }
@@ -1450,6 +1473,7 @@ public class ReportRepository {
             map.put("motivoMerma", motivoMerma);
             map.put("alertaVariacion", alertaVariacion);
             map.put("inconsistenciaBiologica", inconsistenciaBiologica);
+            map.put("severidadBiologica", severidadBiologica);
 
             list.add(map);
         }
@@ -1514,10 +1538,14 @@ public class ReportRepository {
         metrics.put("semaforoAmarillo", amarillo);
         metrics.put("semaforoNaranja", naranja);
         metrics.put("semaforoRojo", rojo);
-        metrics.put("alertasMerma", alertasMerma);
+        metrics.put("alertasMerma", bioPerdidaActivo ? alertasMerma : 0L);
         metrics.put("alertasVariacion", alertasVariacion);
         metrics.put("umbralVariacionPct", umbralVariacion);
         metrics.put("bioPerdidaActivo", bioPerdidaActivo);
+        metrics.put("controlDesactivado", !bioPerdidaActivo);
+        if (!bioPerdidaActivo) {
+            metrics.put("mensaje", "Control de merma biológica en tránsito desactivado en Administración");
+        }
 
         return metrics;
     }
