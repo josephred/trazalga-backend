@@ -2,6 +2,7 @@ package com.trazalga.api.services;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -771,11 +772,23 @@ public class CuotaExtraccionService {
             if (nombre == null || nombre.trim().isEmpty()) return "AMERB " + cuota.getAmerb().getId();
             return nombre.toUpperCase().startsWith("AMERB") ? nombre : "AMERB " + nombre;
         }
-        if (cuota.getComuna() != null) return "Comuna " + cuota.getComuna().getNombre();
-        if (cuota.getProvincia() != null) return "Provincia " + cuota.getProvincia().getNombre();
-        if (cuota.getRegion() != null) return "Región " + cuota.getRegion().getNombre();
+        if (cuota.getComuna() != null) {
+            String nombre = cuota.getComuna().getNombre();
+            return (nombre != null && !nombre.isBlank()) ? "Comuna " + nombre : "Comuna " + cuota.getComuna().getId();
+        }
+        if (cuota.getProvincia() != null) {
+            String nombre = cuota.getProvincia().getNombre();
+            return (nombre != null && !nombre.isBlank()) ? "Provincia " + nombre : "Provincia " + cuota.getProvincia().getId();
+        }
+        if (cuota.getRegion() != null) {
+            String nombre = cuota.getRegion().getNombre();
+            return (nombre != null && !nombre.isBlank()) ? "Región " + nombre : "Región " + cuota.getRegion().getId();
+        }
         if (cuota.getMacrozona() != null) {
-            return Boolean.TRUE.equals(cuota.getMacrozona().getEsNacional()) ? "Nacional" : "Macrozona " + cuota.getMacrozona().getNombre();
+            String nombre = cuota.getMacrozona().getNombre();
+            boolean esNac = Boolean.TRUE.equals(cuota.getMacrozona().getEsNacional());
+            if (esNac) return "Nacional";
+            return (nombre != null && !nombre.isBlank()) ? "Macrozona " + nombre : "Macrozona " + cuota.getMacrozona().getId();
         }
         return "Global";
     }
@@ -812,12 +825,20 @@ public class CuotaExtraccionService {
         }
     }
 
+    public static LocalDate toLocalDateSafe(Date date) {
+        if (date == null) return null;
+        if (date instanceof java.sql.Date sqlDate) {
+            return sqlDate.toLocalDate();
+        }
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
     public java.sql.Date[] calcularRangoFechas(CuotaExtraccionModel cuota, Date fechaEval) {
-        LocalDate fechaLocal = fechaEval.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate fechaLocal = toLocalDateSafe(fechaEval);
         LocalDate start, end;
         if (cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
-            start = cuota.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-            end = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            start = toLocalDateSafe(cuota.getFechaInicio());
+            end = toLocalDateSafe(cuota.getFechaFin());
         } else if ("MENSUAL".equalsIgnoreCase(cuota.getPeriodo())) {
             start = fechaLocal.withDayOfMonth(1);
             end = fechaLocal.withDayOfMonth(fechaLocal.lengthOfMonth());
@@ -836,16 +857,19 @@ public class CuotaExtraccionService {
         Map<String, Object> params = new HashMap<>();
 
         boolean esPlantilla = Boolean.TRUE.equals(cuota.getEsPlantilla());
-        String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase().trim() : null;
+        String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase().trim() : "";
 
-        if (nivelAgregacion == null || ("COMUNA".equals(nivelAgregacion) && cuota.getComuna() == null)) {
-            if (cuota.getMacrozona() != null) nivelAgregacion = "MACROZONA";
-            else if (cuota.getRegion() != null) nivelAgregacion = "REGION";
-            else if (cuota.getProvincia() != null) nivelAgregacion = "PROVINCIA";
-            else if (cuota.getUsuario() != null) nivelAgregacion = "INDIVIDUAL";
+        if (nivelAgregacion.isEmpty()) {
+            if (cuota.getUsuario() != null) nivelAgregacion = "INDIVIDUAL";
             else if (cuota.getAmerb() != null) nivelAgregacion = "AREA";
             else if (cuota.getComuna() != null) nivelAgregacion = "COMUNA";
-            else nivelAgregacion = (nivelAgregacion != null ? nivelAgregacion : "COMUNA");
+            else if (cuota.getProvincia() != null) nivelAgregacion = "PROVINCIA";
+            else if (cuota.getRegion() != null) nivelAgregacion = "REGION";
+            else if (cuota.getMacrozona() != null) {
+                nivelAgregacion = Boolean.TRUE.equals(cuota.getMacrozona().getEsNacional()) ? "NACIONAL" : "MACROZONA";
+            } else {
+                nivelAgregacion = "NACIONAL";
+            }
         }
 
         if (esPlantilla || "INDIVIDUAL".equals(nivelAgregacion) || cuota.getUsuario() != null) {
@@ -885,7 +909,7 @@ public class CuotaExtraccionService {
                    .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
-            } else if ("NACIONAL".equals(nivelAgregacion)) {
+            } else if ("NACIONAL".equals(nivelAgregacion) || "GLOBAL".equals(nivelAgregacion)) {
                 sql.append("WHERE 1=1 ");
             } else {
                 throw new IllegalStateException("Nivel de agregación territorial desconocido: " + nivelAgregacion + " en cuota id=" + cuota.getId());
@@ -920,7 +944,7 @@ public class CuotaExtraccionService {
                    .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
-            } else if ("NACIONAL".equals(nivelAgregacion)) {
+            } else if ("NACIONAL".equals(nivelAgregacion) || "GLOBAL".equals(nivelAgregacion)) {
                 sql.append("WHERE 1=1 ");
             } else {
                 throw new IllegalStateException("Nivel de agregación territorial desconocido: " + nivelAgregacion + " en cuota id=" + cuota.getId());
@@ -1031,11 +1055,11 @@ public class CuotaExtraccionService {
         CuotaExtraccionModel cuota = cuotaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
         Date now = new Date();
-        LocalDate nowLocal = now.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate nowLocal = toLocalDateSafe(now);
         LocalDate start, end;
         if (cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
-            start = cuota.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-            end = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            start = toLocalDateSafe(cuota.getFechaInicio());
+            end = toLocalDateSafe(cuota.getFechaFin());
         } else if ("MENSUAL".equalsIgnoreCase(cuota.getPeriodo())) {
             start = nowLocal.withDayOfMonth(1);
             end = nowLocal.withDayOfMonth(nowLocal.lengthOfMonth());

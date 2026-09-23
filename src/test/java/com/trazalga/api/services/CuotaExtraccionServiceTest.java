@@ -548,6 +548,19 @@ public class CuotaExtraccionServiceTest {
     }
 
     @Test
+    void testConstruirFiltroTerritorial_NivelVacioSinEntidades_InfiereNacionalSinExcepcion() {
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+        c.setId(102L);
+        c.setNivelAgregacion(""); // o null
+
+        CuotaExtraccionService.FiltroTerritorialCuota filtro =
+            cuotaExtraccionService.construirFiltroTerritorial(c, "declaracion_recolector", null);
+
+        assertNotNull(filtro);
+        assertTrue(filtro.getSqlFragment().contains("WHERE 1=1"));
+    }
+
+    @Test
     void testCerrarCuota_MarcaCerradaYMotivoAdministrativo() {
         CuotaExtraccionModel c = new CuotaExtraccionModel();
         c.setId(10L);

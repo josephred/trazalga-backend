@@ -120,7 +120,7 @@ public class AlertaProgramadaTask {
 
             // 2. Vigencia / Expiración próxima
             if (cuota.getFechaFin() != null) {
-                LocalDate fechaFinLocal = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate fechaFinLocal = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin());
                 long diasRestantes = ChronoUnit.DAYS.between(hoyLocal, fechaFinLocal);
                 if (diasRestantes >= 0 && diasRestantes <= diasPreviosExpiracion) {
                     String titulo = "Aviso de Expiración de Cuota";
@@ -146,8 +146,8 @@ public class AlertaProgramadaTask {
 
         LocalDate start, end;
         if (cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
-            start = cuota.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-            end = cuota.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            start = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaInicio());
+            end = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin());
         } else if (periodo.equals("MENSUAL")) {
             start = hoyLocal.withDayOfMonth(1);
             end = hoyLocal.withDayOfMonth(hoyLocal.lengthOfMonth());
@@ -209,7 +209,7 @@ public class AlertaProgramadaTask {
 
             // Veda puntual por rango de fecha
             if (!Boolean.TRUE.equals(veda.getRecurrenciaAnual()) && veda.getFechaInicio() != null) {
-                LocalDate fechaInicioLocal = veda.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate fechaInicioLocal = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(veda.getFechaInicio());
                 long diasParaInicio = ChronoUnit.DAYS.between(hoyLocal, fechaInicioLocal);
                 if (diasParaInicio >= 0 && diasParaInicio <= diasAvisoVeda) {
                     String titulo = "Aviso Previo de Inicio de Veda";

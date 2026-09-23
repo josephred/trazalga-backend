@@ -50,7 +50,7 @@ public class VedaEvaluadorService {
         }
 
         Date fecha = (fechaExtraccion != null) ? fechaExtraccion : new Date();
-        LocalDate localFecha = fecha.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate localFecha = CuotaExtraccionService.toLocalDateSafe(fecha);
         int mesExtraccion = localFecha.getMonthValue(); // 1 a 12
 
         List<VedaEspecieModel> vedasActivas = vedaRepository.findByActivoTrue();
@@ -87,8 +87,8 @@ public class VedaEvaluadorService {
             } else {
                 if (veda.getFechaInicio() != null && veda.getFechaFin() != null) {
                     // Rango de fechas
-                    LocalDate inicio = veda.getFechaInicio().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-                    LocalDate fin = veda.getFechaFin().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                    LocalDate inicio = CuotaExtraccionService.toLocalDateSafe(veda.getFechaInicio());
+                    LocalDate fin = CuotaExtraccionService.toLocalDateSafe(veda.getFechaFin());
                     if (!localFecha.isBefore(inicio) && !localFecha.isAfter(fin)) {
                         coincideVeda = true;
                     }
