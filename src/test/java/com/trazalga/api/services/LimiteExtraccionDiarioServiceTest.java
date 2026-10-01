@@ -143,4 +143,28 @@ public class LimiteExtraccionDiarioServiceTest {
         assertFalse(res.isBloquear());
         assertEquals(new BigDecimal("1500.00"), res.getTotalAcumulado());
     }
+
+    @Test
+    void testExtraccion2500KgModoAlertaFiscalizacionGeneraExcesoSinBloquear() {
+        // T0.3: Una declaración de 2.500 kg sobre límite de 2.000 kg genera exceso pero NO bloquea
+        reglaArmador.setModoAccion("ALERTA_FISCALIZACION");
+        reglaArmador.setLimiteKg(new BigDecimal("2000.00"));
+        reglaArmador.setMargenToleranciaPct(BigDecimal.ZERO);
+        when(ledConfigRepository.findReglasVigentes(isNull(), any(Date.class)))
+                .thenReturn(List.of(reglaArmador));
+        when(declaracionArmadorRepository.sumDesembarqueByEmbarcacionAndFecha(eq(100L), any(), any(Date.class)))
+                .thenReturn(BigDecimal.ZERO);
+
+        EvaluacionLedResult res = limiteExtraccionDiarioService.evaluar(
+                "ARMADOR", 100L, 5L, null, 1L, 10L, 4L, new Date(),
+                new BigDecimal("2500.00"), new BigDecimal("2500.00")
+        );
+
+        assertTrue(res.isExcede(), "Debe marcar exceso de límite");
+        assertFalse(res.isBloquear(), "En ALERTA_FISCALIZACION NO debe bloquear la declaración");
+        assertEquals(new BigDecimal("2500.00"), res.getTotalAcumulado());
+        assertEquals(new BigDecimal("2000.00"), res.getLimiteConTolerancia());
+        assertTrue(res.getMensaje().contains("sobre límite de"));
+        assertTrue(res.getMensaje().contains("exceso"));
+    }
 }

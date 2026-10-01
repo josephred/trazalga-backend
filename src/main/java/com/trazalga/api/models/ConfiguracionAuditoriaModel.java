@@ -35,6 +35,9 @@ public class ConfiguracionAuditoriaModel {
     @Column(name = "valor_nuevo", length = 1000)
     private String valorNuevo;
 
+    @Column(name = "motivo", length = 500)
+    private String motivo;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = true)
     private UsuarioModel usuario;

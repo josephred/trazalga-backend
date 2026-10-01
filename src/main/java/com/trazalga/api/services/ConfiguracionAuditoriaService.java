@@ -34,12 +34,24 @@ public class ConfiguracionAuditoriaService {
             String valorAnterior,
             String valorNuevo,
             UsuarioModel usuario) {
+        return registrar(entidad, entidadId, campo, valorAnterior, valorNuevo, null, usuario);
+    }
+
+    public ConfiguracionAuditoriaModel registrar(
+            String entidad,
+            String entidadId,
+            String campo,
+            String valorAnterior,
+            String valorNuevo,
+            String motivo,
+            UsuarioModel usuario) {
         ConfiguracionAuditoriaModel model = ConfiguracionAuditoriaModel.builder()
                 .entidad(entidad)
                 .entidadId(entidadId)
                 .campo(campo)
                 .valorAnterior(valorAnterior)
                 .valorNuevo(valorNuevo)
+                .motivo(motivo)
                 .usuario(usuario)
                 .build();
         return repository.save(model);

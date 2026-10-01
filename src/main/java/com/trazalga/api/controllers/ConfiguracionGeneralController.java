@@ -36,6 +36,6 @@ public class ConfiguracionGeneralController {
 
     @PutMapping("/{clave}")
     public ResponseEntity<ConfiguracionGeneralModel> update(@PathVariable String clave, @RequestBody ConfiguracionGeneralModel request) {
-        return ResponseEntity.ok(service.updateConfig(clave, request.getValor()));
+        return ResponseEntity.ok(service.updateConfig(clave, request.getValor(), request.getMotivo(), null));
     }
 }

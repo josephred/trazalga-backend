@@ -29,4 +29,7 @@ public class ConfiguracionGeneralModel {
 
     @Column(name = "categoria", length = 50)
     private String categoria;
+
+    @Transient
+    private String motivo;
 }

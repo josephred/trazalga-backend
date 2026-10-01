@@ -129,13 +129,35 @@ public class ConfiguracionGeneralService {
     }
 
     @Autowired(required = false)
+    private ConfiguracionAuditoriaService auditoriaService;
+
+    @Autowired(required = false)
     private org.springframework.cache.CacheManager cacheManager;
 
     public ConfiguracionGeneralModel updateConfig(String clave, String nuevoValor) {
+        return updateConfig(clave, nuevoValor, null, null);
+    }
+
+    public ConfiguracionGeneralModel updateConfig(String clave, String nuevoValor, String motivo, com.trazalga.api.models.UsuarioModel usuario) {
         ConfiguracionGeneralModel config = repository.findByClave(clave)
                 .orElseThrow(() -> new IllegalArgumentException("Configuración no encontrada: " + clave));
+        String valorAnterior = config.getValor();
         config.setValor(nuevoValor);
         ConfiguracionGeneralModel saved = repository.save(config);
+
+        if (auditoriaService != null && (valorAnterior == null || !valorAnterior.equals(nuevoValor))) {
+            try {
+                auditoriaService.registrar(
+                        "CONFIGURACION_GENERAL",
+                        clave,
+                        "valor",
+                        valorAnterior,
+                        nuevoValor,
+                        motivo,
+                        usuario);
+            } catch (Exception ignored) {
+            }
+        }
 
         if (cacheManager != null) {
             try {

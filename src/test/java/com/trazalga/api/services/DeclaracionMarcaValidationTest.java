@@ -205,4 +205,53 @@ public class DeclaracionMarcaValidationTest {
         assertEquals(1L, porMarca.get("CUOTA_EXCEDIDA"));
         assertEquals(0L, porMarca.get("POSTERIOR_CIERRE"));
     }
+
+    @Test
+    void testLedExcedidoEnModoAlertaPermiteDeclaracionYGeneraMarca() {
+        // T0.3 Aceptación: Declaración de 2.500 kg en ALERTA genera LED_EXCEDIDO y NO se rechaza
+        when(capturaService.calcular(any(), any(), any(), any()))
+                .thenReturn(CalculoCapturaResult.builder()
+                        .exitoso(true)
+                        .captura(new BigDecimal("2500.00"))
+                        .factorAplicado(new BigDecimal("1.00"))
+                        .build());
+
+        when(vedaEvaluadorService.evaluar(any(), any(), any(), any()))
+                .thenReturn(new EvaluacionVedaResult(false, false, "OK", null));
+
+        when(cuotaExtraccionService.evaluarCuotaDeclaracion(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new EvaluacionCuotaResult(true, false, false, false, null, BigDecimal.ZERO, BigDecimal.ZERO, "OK", null));
+
+        com.trazalga.api.models.LimiteExtraccionDiarioConfigModel reglaLed = com.trazalga.api.models.LimiteExtraccionDiarioConfigModel.builder()
+                .id(10L)
+                .nombreRegla("LED Oficial Huiro Palo Barreteado")
+                .modoAccion("ALERTA_FISCALIZACION")
+                .limiteKg(new BigDecimal("2000.00"))
+                .build();
+
+        when(limiteExtraccionDiarioService.evaluar(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new EvaluacionLedResult(true, false, new BigDecimal("2500.00"), new BigDecimal("500.00"),
+                        "LED superado: 2500.00 kg sobre límite de 2000.00 kg", reglaLed));
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("ARMADOR")
+                .usuarioId(1L)
+                .embarcacionId(100L)
+                .especieId(1L)
+                .fechaDeclaracion(new Date())
+                .fechaExtraccion(new Date())
+                .desembarqueKg(new BigDecimal("2500.00"))
+                .build();
+
+        ResultadoValidacion res = validacionService.validar(ctx);
+
+        assertFalse(res.esRechazado(), "En modo ALERTA_FISCALIZACION la declaración de 2.500 kg NO debe ser rechazada");
+        assertTrue(res.getMarcas().stream().anyMatch(m -> "LED_EXCEDIDO".equals(m.getMarca())),
+                "Debe generar marca LED_EXCEDIDO");
+        assertEquals(10L, res.getMarcas().stream()
+                .filter(m -> "LED_EXCEDIDO".equals(m.getMarca()))
+                .findFirst().get().getReglaId());
+        assertTrue(res.getAdvertencias().stream().anyMatch(a -> a.contains("LED superado")),
+                "Debe incluir la advertencia de LED superado");
+    }
 }
