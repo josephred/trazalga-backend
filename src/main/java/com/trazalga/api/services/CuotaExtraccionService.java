@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
 @Service
+@Slf4j
 @Transactional(readOnly = true)
 public class CuotaExtraccionService {
 
@@ -112,6 +115,7 @@ public class CuotaExtraccionService {
 
         resolverReferencias(request);
         cuota.setPerfil(request.getPerfil());
+        if (request.getAmbito() != null) cuota.setAmbito(request.getAmbito());
         cuota.setEspecie(request.getEspecie());
         cuota.setRegion(request.getRegion());
         cuota.setMacrozona(request.getMacrozona());
@@ -220,11 +224,24 @@ public class CuotaExtraccionService {
         // 2. Buscar cuotas activas
         List<CuotaExtraccionModel> todasCuotas = cuotaRepository.findByActivoTrue();
 
-        // 3. Filtrar cuotas aplicables por perfil, especie, método, fechas
+        // 3. Filtrar cuotas aplicables por perfil/ámbito, especie, método, fechas
         List<CuotaExtraccionModel> aplicables = new ArrayList<>();
         for (CuotaExtraccionModel c : todasCuotas) {
-            if (c.getPerfil() != null && !c.getPerfil().equalsIgnoreCase(perfil)) {
-                continue;
+            String ambito = c.getAmbito() != null ? c.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+            if ("AREA_LIBRE".equals(ambito)) {
+                // Cuotas de área libre aplican conjuntamente a RECOLECTOR y ARMADOR
+                if (!"RECOLECTOR".equalsIgnoreCase(perfil) && !"ARMADOR".equalsIgnoreCase(perfil)) {
+                    continue;
+                }
+            } else if ("AMERB".equals(ambito)) {
+                // Cuotas AMERB aplican a Área de Manejo
+                if (!"AREA".equalsIgnoreCase(perfil) && !"ÁREA DE MANEJO".equalsIgnoreCase(perfil)) {
+                    continue;
+                }
+            } else {
+                if (c.getPerfil() != null && !c.getPerfil().equalsIgnoreCase(perfil)) {
+                    continue;
+                }
             }
             if (c.getEspecie() != null && especieId != null && !c.getEspecie().getId().equals(especieId)) {
                 continue;
@@ -408,12 +425,29 @@ public class CuotaExtraccionService {
         return new QuotaCheckResult(res.isPermite(), res.getMensaje());
     }
 
-    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate, String periodo, String perfil) {
-        if (periodo == null || periodo.isEmpty()) periodo = "DIARIO";
-        if (perfil == null || perfil.isEmpty()) perfil = "RECOLECTOR";
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(
+            Date startDate, Date endDate, String periodo, Long comunaId, Long extraccionTipoId, String perfil) {
+        if (perfil != null && !perfil.isBlank()) {
+            log.warn("Parámetro 'perfil' deprecado en getControlCuotasDiarioGlobal. Se favorece ámbito AREA_LIBRE.");
+        }
 
-        List<ControlCuotaDiariaDTO> result = new ArrayList<>();
-        List<CuotaExtraccionModel> cuotas = cuotaRepository.findByPerfilAndActivoTrue(perfil.toUpperCase());
+        List<CuotaExtraccionModel> cuotas = cuotaRepository.findByAmbitoAndActivoTrue("AREA_LIBRE");
+        if ((cuotas == null || cuotas.isEmpty()) && perfil != null && !perfil.isBlank()) {
+            cuotas = cuotaRepository.findByPerfilAndActivoTrue(perfil.toUpperCase());
+        }
+        if (cuotas == null) cuotas = Collections.emptyList();
+
+        if (comunaId != null) {
+            cuotas = cuotas.stream()
+                    .filter(c -> contieneComuna(c, comunaId))
+                    .collect(Collectors.toList());
+        }
+
+        if (extraccionTipoId != null) {
+            cuotas = cuotas.stream()
+                    .filter(c -> c.getExtraccionTipo() == null || c.getExtraccionTipo().getId().equals(extraccionTipoId))
+                    .collect(Collectors.toList());
+        }
 
         if (startDate == null) {
             LocalDate localDate = new Date().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
@@ -423,8 +457,12 @@ public class CuotaExtraccionService {
             endDate = startDate;
         }
 
+        List<ControlCuotaDiariaDTO> result = new ArrayList<>();
         for (CuotaExtraccionModel cuota : cuotas) {
-            if (!periodo.equalsIgnoreCase(cuota.getPeriodo()) || cuota.getEspecie() == null) {
+            if (periodo != null && !periodo.isBlank() && !"ALL".equalsIgnoreCase(periodo) && !periodo.equalsIgnoreCase(cuota.getPeriodo())) {
+                continue;
+            }
+            if (cuota.getEspecie() == null) {
                 continue;
             }
 
@@ -439,6 +477,9 @@ public class CuotaExtraccionService {
             }
 
             String humedadNombre = cuota.getHumedadEstado() != null ? cuota.getHumedadEstado().getNombre() : null;
+            String extraccionTipoNombre = cuota.getExtraccionTipo() != null ? cuota.getExtraccionTipo().getNombre() : null;
+            String comunaNombre = cuota.getComuna() != null ? cuota.getComuna().getNombre() : null;
+            Long comunaIdCuota = cuota.getComuna() != null ? cuota.getComuna().getId() : null;
             BigDecimal factor = null;
             String equivalencia = null;
 
@@ -458,6 +499,7 @@ public class CuotaExtraccionService {
             }
 
             ControlCuotaDiariaDTO dto = ControlCuotaDiariaDTO.builder()
+                .cuotaId(cuota.getId())
                 .especieNombre(cuota.getEspecie().getNombre())
                 .volumenExtraido(sumVolumen)
                 .limiteCuota(limiteEfectivo)
@@ -469,11 +511,24 @@ public class CuotaExtraccionService {
                 .descripcionEquivalencia(equivalencia)
                 .porcentajeUso(Math.round(porcentaje * 100.0) / 100.0)
                 .alcance(describirAlcance(cuota))
+                .periodo(cuota.getPeriodo())
+                .ambito(cuota.getAmbito() != null ? cuota.getAmbito() : "AREA_LIBRE")
+                .extraccionTipoNombre(extraccionTipoNombre)
+                .comunaId(comunaIdCuota)
+                .comunaNombre(comunaNombre)
                 .build();
 
             result.add(dto);
         }
         return result;
+    }
+
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate, String periodo, String perfil) {
+        return getControlCuotasDiarioGlobal(startDate, endDate, periodo, null, null, perfil);
+    }
+
+    public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(Date startDate, Date endDate, String periodo, Long comunaId, Long extraccionTipoId) {
+        return getControlCuotasDiarioGlobal(startDate, endDate, periodo, comunaId, extraccionTipoId, null);
     }
 
     private void resolverReferencias(CuotaExtraccionModel cuota) {
@@ -581,8 +636,22 @@ public class CuotaExtraccionService {
         if (cuota.getPeriodo() == null || cuota.getPeriodo().isBlank()) {
             throw new IllegalArgumentException("El periodo de la cuota es obligatorio (DIARIO, MENSUAL, ANUAL).");
         }
+        if (cuota.getAmbito() == null || cuota.getAmbito().isBlank()) {
+            if (cuota.getAmerb() != null || "AREA".equalsIgnoreCase(cuota.getPerfil())) {
+                cuota.setAmbito("AMERB");
+            } else {
+                cuota.setAmbito("AREA_LIBRE");
+            }
+        } else {
+            String ambNorm = cuota.getAmbito().trim().toUpperCase();
+            if (!java.util.Set.of("AREA_LIBRE", "AMERB").contains(ambNorm)) {
+                throw new IllegalArgumentException("Ámbito de cuota inválido: " + cuota.getAmbito() + ". Los valores permitidos son AREA_LIBRE o AMERB.");
+            }
+            cuota.setAmbito(ambNorm);
+        }
+
         if (cuota.getPerfil() == null || cuota.getPerfil().isBlank()) {
-            throw new IllegalArgumentException("El perfil de la cuota es obligatorio.");
+            cuota.setPerfil("AMERB".equalsIgnoreCase(cuota.getAmbito()) ? "AREA" : "RECOLECTOR");
         }
         if (cuota.getNivelAgregacion() == null || cuota.getNivelAgregacion().trim().isEmpty()) {
             throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL).");
@@ -974,13 +1043,105 @@ public class CuotaExtraccionService {
         cacheConsumoL2.clear();
     }
 
-    private BigDecimal ejecutarConsultaConsumo(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId) {
+    public boolean contieneComuna(CuotaExtraccionModel cuota, Long comunaId) {
+        if (comunaId == null) return true;
+        if (cuota == null) return false;
+
+        // Comuna directa
+        if (cuota.getComuna() != null) {
+            return cuota.getComuna().getId().equals(comunaId);
+        }
+
+        Optional<ComunaModel> comOpt = comunaRepository.findById(comunaId);
+        if (comOpt.isEmpty()) return false;
+        ComunaModel com = comOpt.get();
+
+        // Provincia
+        if (cuota.getProvincia() != null) {
+            return com.getProvincia() != null && cuota.getProvincia().getId().equals(com.getProvincia().getId());
+        }
+
+        // Región
+        if (cuota.getRegion() != null) {
+            return com.getRegion() != null && cuota.getRegion().getId().equals(com.getRegion().getId());
+        }
+
+        // Macrozona
+        if (cuota.getMacrozona() != null) {
+            if (Boolean.TRUE.equals(cuota.getMacrozona().getEsNacional())) return true;
+            if (com.getRegion() == null) return false;
+            return macrozonaService.isRegionInMacrozona(cuota.getMacrozona().getId(), com.getRegion().getId(), new Date());
+        }
+
+        // Si no tiene alcance territorial restringido (Global / Nacional)
+        return cuota.getAmerb() == null && cuota.getUsuario() == null;
+    }
+
+    private BigDecimal ejecutarQueryConsumo(
+            String tableName, String colMetrica, FiltroTerritorialCuota filtro, CuotaExtraccionModel cuota, java.sql.Date[] rango) {
+        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(d." + colMetrica + "), 0) FROM " + tableName + " d ");
+        sql.append(filtro.getSqlFragment());
+        if (cuota.getEspecie() != null) {
+            sql.append("AND d.especie_id = :especieId ");
+        }
+        if (cuota.getExtraccionTipo() != null) {
+            sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
+        }
+        sql.append("AND d.fecha_declaracion BETWEEN :startDate AND :endDate");
+
+        Query q = entityManager.createNativeQuery(sql.toString());
+        q.setParameter("startDate", rango[0]);
+        q.setParameter("endDate", rango[1]);
+        if (cuota.getEspecie() != null) q.setParameter("especieId", cuota.getEspecie().getId());
+        if (cuota.getExtraccionTipo() != null) q.setParameter("extraccionTipoId", cuota.getExtraccionTipo().getId());
+        filtro.aplicarParametros(q);
+
+        Object singleResult = q.getSingleResult();
+        return (singleResult != null) ? new BigDecimal(singleResult.toString()) : BigDecimal.ZERO;
+    }
+
+    private BigDecimal consumoAreaLibre(CuotaExtraccionModel cuota, Date fechaEval, Long targetUsuarioId) {
+        java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
+        boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
+        String colMetrica = esCaptura ? "captura" : "desembarque";
+
+        // 1. Consumo de recolectores — imputación por comuna de inscripción del usuario (u.comuna_id)
+        FiltroTerritorialCuota filtroRecolector = construirFiltroTerritorial(cuota, "declaracion_recolector", targetUsuarioId);
+        BigDecimal consumoRecolector = ejecutarQueryConsumo(
+                "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango);
+
+        // 2. Consumo de armadores — imputación por caleta de desembarque (d.comuna_id)
+        FiltroTerritorialCuota filtroArmador = construirFiltroTerritorial(cuota, "declaracion_armador", targetUsuarioId);
+        BigDecimal consumoArmador = ejecutarQueryConsumo(
+                "declaracion_armador", colMetrica, filtroArmador, cuota, rango);
+
+        return consumoRecolector.add(consumoArmador);
+    }
+
+    private BigDecimal consumoTablaUnica(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId) {
+        boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
+        String colMetrica = esCaptura ? "captura" : "desembarque";
+        String tableName = "declaracion_recolector";
+        if ("ARMADOR".equalsIgnoreCase(perfil)) tableName = "declaracion_armador";
+        if ("AREA".equalsIgnoreCase(perfil) || "ÁREA DE MANEJO".equalsIgnoreCase(perfil) || cuota.getAmerb() != null || "AMERB".equalsIgnoreCase(cuota.getAmbito())) {
+            tableName = "declaracion_area";
+        }
+
+        java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
+        FiltroTerritorialCuota filtro = construirFiltroTerritorial(cuota, tableName, targetUsuarioId);
+        return ejecutarQueryConsumo(tableName, colMetrica, filtro, cuota, rango);
+    }
+
+    public BigDecimal ejecutarConsultaConsumo(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId) {
         String alcance = alcanceDe(cuota);
         boolean esAlcanceAmplio = "MACROZONA".equals(alcance) || "NACIONAL".equals(alcance) || "REGION".equals(alcance) || "GLOBAL".equals(alcance);
 
+        boolean esAreaLibre = "AREA_LIBRE".equalsIgnoreCase(cuota.getAmbito()) || (cuota.getAmbito() == null && cuota.getAmerb() == null && !"AREA".equalsIgnoreCase(cuota.getPerfil()));
+
+        String cachePerfil = esAreaLibre ? "AREALIBRE" : (perfil != null ? perfil : "DEFAULT");
         String cacheKey = (cuota.getId() != null ? cuota.getId() : 0L) + "_" +
                           (fechaEval != null ? fechaEval.getTime() / 86400000L : 0L) + "_" +
-                          perfil + "_" +
+                          cachePerfil + "_" +
                           (targetUsuarioId != null ? targetUsuarioId : "ALL");
 
         long ahora = System.currentTimeMillis();
@@ -997,38 +1158,12 @@ public class CuotaExtraccionService {
             }
         }
 
-        // Zona crítica (>= 90%) o caché expirada: consulta directa transaccional
-        boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
-        String colMetrica = esCaptura ? "captura" : "desembarque";
-        String tableName = "declaracion_recolector";
-        if ("ARMADOR".equalsIgnoreCase(perfil)) tableName = "declaracion_armador";
-        if ("AREA".equalsIgnoreCase(perfil) || "ÁREA DE MANEJO".equalsIgnoreCase(perfil)) tableName = "declaracion_area";
-
-        java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
-        java.sql.Date sqlStart = rango[0];
-        java.sql.Date sqlEnd = rango[1];
-
-        FiltroTerritorialCuota filtro = construirFiltroTerritorial(cuota, tableName, targetUsuarioId);
-
-        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(d." + colMetrica + "), 0) FROM " + tableName + " d ");
-        sql.append(filtro.getSqlFragment());
-        if (cuota.getEspecie() != null) {
-            sql.append("AND d.especie_id = :especieId ");
+        BigDecimal consumo;
+        if (esAreaLibre) {
+            consumo = consumoAreaLibre(cuota, fechaEval, targetUsuarioId);
+        } else {
+            consumo = consumoTablaUnica(cuota, fechaEval, perfil, targetUsuarioId);
         }
-        if (cuota.getExtraccionTipo() != null) {
-            sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
-        }
-        sql.append("AND d.fecha_declaracion BETWEEN :startDate AND :endDate");
-
-        Query q = entityManager.createNativeQuery(sql.toString());
-        q.setParameter("startDate", sqlStart);
-        q.setParameter("endDate", sqlEnd);
-        if (cuota.getEspecie() != null) q.setParameter("especieId", cuota.getEspecie().getId());
-        if (cuota.getExtraccionTipo() != null) q.setParameter("extraccionTipoId", cuota.getExtraccionTipo().getId());
-        filtro.aplicarParametros(q);
-
-        Object singleResult = q.getSingleResult();
-        BigDecimal consumo = (singleResult != null) ? new BigDecimal(singleResult.toString()) : BigDecimal.ZERO;
 
         if (esAlcanceAmplio) {
             cacheConsumoL2.put(cacheKey, new CacheConsumoEntry(consumo, ahora));

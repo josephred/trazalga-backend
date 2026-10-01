@@ -33,9 +33,23 @@ public class CuotaExtraccionModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Perfil: e.g. "RECOLECTOR", "ARMADOR" o "AREA"
+    /**
+     * @deprecated Desde refinamiento 25-sep. Para cuotas AREA_LIBRE el consumo
+     * suma recolector + armador. Para AMERB se conserva el comportamiento original.
+     * Se mantiene por compatibilidad de datos históricos.
+     */
+    @Deprecated
     @Column(nullable = false)
     private String perfil;
+
+    /**
+     * Ámbito de la cuota: "AREA_LIBRE" o "AMERB".
+     * Para cuotas AREA_LIBRE, el consumo suma recolectores y armadores.
+     * Para AMERB, el consumo aplica exclusivamente a declaracion_area.
+     */
+    @Column(name = "ambito", nullable = false, length = 20)
+    @Builder.Default
+    private String ambito = "AREA_LIBRE";
 
     // Especie afectada (nullable = null means applies to any especie)
     @ManyToOne(fetch = FetchType.LAZY)

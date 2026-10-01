@@ -2030,8 +2030,7 @@ public class ReportRepository {
             desglose.add(item);
         }
 
-        double factorPond = totalDesembarque > 0 ? (totalCaptura / totalDesembarque) : 1.0;
-        double factorPondRedondeado = Math.round(factorPond * 1000.0) / 1000.0;
+        Double factorPondRedondeado = totalDesembarque > 0 ? (Math.round((totalCaptura / totalDesembarque) * 1000.0) / 1000.0) : null;
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalDesembarque * 100.0) / 100.0);

@@ -24,4 +24,10 @@ public class ControlCuotaDiariaDTO {
     private Double porcentajeUso;
     // Alcance de la cuota: "Global", nombre del actor o nombre del área de manejo
     private String alcance;
+    private Long cuotaId;
+    private String periodo;
+    private String ambito;
+    private String extraccionTipoNombre;
+    private Long comunaId;
+    private String comunaNombre;
 }

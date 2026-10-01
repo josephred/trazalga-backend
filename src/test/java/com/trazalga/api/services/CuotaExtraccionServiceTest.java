@@ -387,7 +387,7 @@ public class CuotaExtraccionServiceTest {
         // Consumo simulado: 3.580 kg de captura (correspondiente a 1.000 kg secos extraídos)
         Query queryConsumo = mock(Query.class);
         when(entityManager.createNativeQuery(anyString())).thenReturn(queryConsumo);
-        when(queryConsumo.getSingleResult()).thenReturn(new BigDecimal("3580.00"));
+        when(queryConsumo.getSingleResult()).thenReturn(new BigDecimal("3580.00"), BigDecimal.ZERO);
 
         Date fecha = new Date();
         List<com.trazalga.api.dto.ControlCuotaDiariaDTO> dtos = cuotaExtraccionService.getControlCuotasDiarioGlobal(
