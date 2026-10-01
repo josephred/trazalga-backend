@@ -734,8 +734,8 @@ public class ReportRepository {
 
         long total = result[0] != null ? ((Number) result[0]).longValue() : 0;
         long validadas = result[1] != null ? ((Number) result[1]).longValue() : 0;
-        Double promHoras = result[2] != null ? Math.round(((Number) result[2]).doubleValue() / 60.0 * 10.0) / 10.0 : null;
-        Double maxHoras = result[3] != null ? Math.round(((Number) result[3]).doubleValue() / 60.0 * 10.0) / 10.0 : null;
+        Double promHoras = result[2] != null ? Double.valueOf(Math.round(((Number) result[2]).doubleValue() / 60.0 * 10.0) / 10.0) : null;
+        Double maxHoras = result[3] != null ? Double.valueOf(Math.round(((Number) result[3]).doubleValue() / 60.0 * 10.0) / 10.0) : null;
         long pendientes48h = result[4] != null ? ((Number) result[4]).longValue() : 0;
 
         java.util.Map<String, Object> map = new java.util.HashMap<>();
@@ -934,11 +934,21 @@ public class ReportRepository {
         long fueraUmbralTotal = result[2] != null ? ((Number) result[2]).longValue() : 0L;
 
         long totalPesajes = result[3] != null ? ((Number) result[3]).longValue() : 0L;
-        Double promedioPesajes = result[4] != null ? Math.round(((Number) result[4]).doubleValue() * 10.0) / 10.0 : (totalPesajes > 0 ? 0.0 : null);
+        Double promedioPesajes = null;
+        if (result[4] != null) {
+            promedioPesajes = Math.round(((Number) result[4]).doubleValue() * 10.0) / 10.0;
+        } else if (totalPesajes > 0) {
+            promedioPesajes = 0.0;
+        }
         long fueraUmbralPesajes = result[5] != null ? ((Number) result[5]).longValue() : 0L;
 
         long totalDocumentos = result[6] != null ? ((Number) result[6]).longValue() : 0L;
-        Double promedioDocumentos = result[7] != null ? Math.round(((Number) result[7]).doubleValue() * 10.0) / 10.0 : (totalDocumentos > 0 ? 0.0 : null);
+        Double promedioDocumentos = null;
+        if (result[7] != null) {
+            promedioDocumentos = Math.round(((Number) result[7]).doubleValue() * 10.0) / 10.0;
+        } else if (totalDocumentos > 0) {
+            promedioDocumentos = 0.0;
+        }
         long fueraUmbralDocumentos = result[8] != null ? ((Number) result[8]).longValue() : 0L;
 
         java.util.Map<String, Object> pesajeMap = new java.util.HashMap<>();
@@ -984,7 +994,12 @@ public class ReportRepository {
                 }
             }
         }
-        Double promedioVarCadena = conVarCount > 0 ? (Math.round((sumAbsVar / conVarCount) * 10.0) / 10.0) : (totalCadena > 0 ? 0.0 : null);
+        Double promedioVarCadena = null;
+        if (conVarCount > 0) {
+            promedioVarCadena = Math.round((sumAbsVar / conVarCount) * 10.0) / 10.0;
+        } else if (totalCadena > 0) {
+            promedioVarCadena = 0.0;
+        }
 
         java.util.Map<String, Object> cadenaResumen = new java.util.HashMap<>();
         cadenaResumen.put("total", totalCadena);
@@ -2563,7 +2578,7 @@ public class ReportRepository {
             desglose.add(item);
         }
 
-        Double factorPondRedondeado = totalDesembarque > 0 ? (Math.round((totalCaptura / totalDesembarque) * 1000.0) / 1000.0) : null;
+        Double factorPondRedondeado = totalDesembarque > 0 ? Double.valueOf(Math.round((totalCaptura / totalDesembarque) * 1000.0) / 1000.0) : null;
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalDesembarque * 100.0) / 100.0);
