@@ -108,6 +108,35 @@ public class DeclaracionRecolectorService {
         }
     }
 
+    private void validarYResolverCaletaComuna(DeclaracionRecolectorModel model) {
+        if (model.getCaleta() == null || model.getCaleta().getId() == null) {
+            return;
+        }
+        com.trazalga.api.models.CaletaModel caleta = model.getCaleta();
+        if (caleta.getComuna() == null && caleta.getId() != null && entityManager != null) {
+            caleta = entityManager.find(com.trazalga.api.models.CaletaModel.class, caleta.getId());
+            model.setCaleta(caleta);
+        }
+        if (caleta == null) return;
+
+        if (model.getComuna() != null && model.getComuna().getId() != null) {
+            com.trazalga.api.models.ComunaModel comuna = model.getComuna();
+            if (comuna.getNombre() == null && comuna.getId() != null && entityManager != null) {
+                comuna = entityManager.find(com.trazalga.api.models.ComunaModel.class, comuna.getId());
+                model.setComuna(comuna);
+            }
+            if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(model.getComuna().getId())) {
+                String caletaNombre = caleta.getNombre() != null ? caleta.getNombre() : "ID " + caleta.getId();
+                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
+                String comunaDeclaradaNombre = comuna != null && comuna.getNombre() != null ? comuna.getNombre() : "ID " + model.getComuna().getId();
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre, comunaDeclaradaNombre));
+            }
+        } else if (caleta.getComuna() != null) {
+            model.setComuna(caleta.getComuna());
+        }
+    }
+
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
         if (declaracionRecolectorModel.getFechaDeclaracion() != null) {
             if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel.getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
@@ -123,6 +152,7 @@ public class DeclaracionRecolectorService {
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         resolveDependencies(declaracionRecolectorModel);
+        validarYResolverCaletaComuna(declaracionRecolectorModel);
 
         // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
         Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
@@ -208,6 +238,7 @@ public class DeclaracionRecolectorService {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
         resolveDependencies(request);
+        validarYResolverCaletaComuna(request);
         declaracionRecolectorModel.setFolioOrigen(request.getFolioOrigen());
         declaracionRecolectorModel.setFolioDesembarqueRo(request.getFolioDesembarqueRo());
         declaracionRecolectorModel.setFechaExtraccion(request.getFechaExtraccion());

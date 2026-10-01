@@ -203,8 +203,16 @@ public class DeclaracionArmadorService {
         declaracion.setCaleta(caleta);
         
         if (request.getComuna() != null && request.getComuna().getId() != null) {
-            Optional<ComunaModel> comuna = comunaRepository.findById(request.getComuna().getId());
-            comuna.ifPresent(declaracion::setComuna);
+            ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
+            if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
+                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
+                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
+            }
+            declaracion.setComuna(comunaDeclarada);
+        } else if (caleta.getComuna() != null) {
+            declaracion.setComuna(caleta.getComuna());
         }
         
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {
@@ -443,8 +451,16 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setCaleta(caleta);
         
         if (request.getComuna() != null && request.getComuna().getId() != null) {
-            Optional<ComunaModel> comuna = comunaRepository.findById(request.getComuna().getId());
-            comuna.ifPresent(declaracionArmadorModel::setComuna);
+            ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
+            if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
+                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
+                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
+            }
+            declaracionArmadorModel.setComuna(comunaDeclarada);
+        } else if (caleta.getComuna() != null) {
+            declaracionArmadorModel.setComuna(caleta.getComuna());
         }
         
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {

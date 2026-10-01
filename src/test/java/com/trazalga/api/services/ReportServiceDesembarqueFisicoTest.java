@@ -206,5 +206,53 @@ public class ReportServiceDesembarqueFisicoTest {
                 5000.0, true, true, true
         );
     }
+
+    @Test
+    void testGetDesembarqueFisicoMetrics_CaletasHomonimas_DevuelveFilasDiferenciadasConSumaConsistente() {
+        Date inicio = new Date();
+        Date fin = new Date();
+
+        Map<String, Object> filaCaletaA = new HashMap<>();
+        filaCaletaA.put("caleta", "Chepiquilla (Freirina)");
+        filaCaletaA.put("grupo", "Chepiquilla (Freirina)");
+        filaCaletaA.put("totalKg", 1200.0);
+        filaCaletaA.put("totalDeclaraciones", 4L);
+
+        Map<String, Object> filaCaletaB = new HashMap<>();
+        filaCaletaB.put("caleta", "Chepiquilla (Andacollo)");
+        filaCaletaB.put("grupo", "Chepiquilla (Andacollo)");
+        filaCaletaB.put("totalKg", 800.0);
+        filaCaletaB.put("totalDeclaraciones", 2L);
+
+        List<Map<String, Object>> porCaletaList = List.of(filaCaletaA, filaCaletaB);
+
+        Map<String, Object> mockResult = new HashMap<>();
+        mockResult.put("totalDesembarqueKg", 2000.0);
+        mockResult.put("totalDeclaraciones", 6L);
+        mockResult.put("agrupadoPor", "CALETA");
+        mockResult.put("datosAgrupados", porCaletaList);
+        mockResult.put("porCaleta", porCaletaList);
+
+        when(reportRepository.getDesembarqueFisicoMetrics(
+                inicio, fin, null, null, null,
+                null, null, null, null, "CALETA", null,
+                5000.0, true, true, true
+        )).thenReturn(mockResult);
+
+        Map<String, Object> result = reportService.getDesembarqueFisicoMetrics(
+                inicio, fin, null, null, null,
+                null, null, null, null, "CALETA", null
+        );
+
+        assertNotNull(result);
+        assertEquals(2000.0, result.get("totalDesembarqueKg"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> datos = (List<Map<String, Object>>) result.get("datosAgrupados");
+        assertEquals(2, datos.size());
+        assertEquals("Chepiquilla (Freirina)", datos.get(0).get("caleta"));
+        assertEquals("Chepiquilla (Andacollo)", datos.get(1).get("caleta"));
+        double sumaKg = datos.stream().mapToDouble(d -> ((Number) d.get("totalKg")).doubleValue()).sum();
+        assertEquals(((Number) result.get("totalDesembarqueKg")).doubleValue(), sumaKg);
+    }
 }
 

@@ -303,7 +303,7 @@ public class ReportRepository {
             "COALESCE(ext.nombre, 'No especificado') as metodo_nombre, " +
             "u.rut as declarante_rut, " +
             "CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as declarante_nombre, " +
-            "COALESCE(cal.nombre, '—') as caleta_nombre, " +
+            "COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, '—') as caleta_nombre, " +
             "COALESCE(c.nombre, '—') as comuna_nombre, " +
             "COALESCE(reg.nombre, '—') as region_nombre, " +
             "MIN(v.id) as resolucion_id, " +
@@ -317,6 +317,7 @@ public class ReportRepository {
             "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_amerb, CONCAT('DAM-', id)) as folio FROM declaracion_area " +
             ") as decl " +
             "LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
+            "LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id " +
             "LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
             "LEFT JOIN amerb am ON decl.amerb_id = am.id " +
             "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id, am.region_id) " +
@@ -1596,7 +1597,7 @@ public class ReportRepository {
               .append("r.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
               .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
               .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_recolector r ")
@@ -1604,6 +1605,7 @@ public class ReportRepository {
               .append("INNER JOIN especie e ON r.especie_id = e.id ")
               .append("LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id ")
               .append("LEFT JOIN caleta cal ON r.caleta_id = cal.id ")
+              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
               .append("LEFT JOIN comuna c ON COALESCE(r.comuna_id, cal.comuna_id) = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
               .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
@@ -1628,7 +1630,7 @@ public class ReportRepository {
               .append("a.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
               .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
               .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_armador a ")
@@ -1636,7 +1638,8 @@ public class ReportRepository {
               .append("INNER JOIN especie e ON a.especie_id = e.id ")
               .append("LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id ")
               .append("LEFT JOIN caleta cal ON a.caleta_id = cal.id ")
-              .append("LEFT JOIN comuna c ON cal.comuna_id = c.id ")
+              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
+              .append("LEFT JOIN comuna c ON COALESCE(a.comuna_id, cal.comuna_id) = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
               .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
               .append("WHERE 1=1 ");
@@ -1660,7 +1663,7 @@ public class ReportRepository {
               .append("ar.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
               .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
               .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(cal.nombre, 'Sin Caleta') as caleta, ")
+              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
               .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
               .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
               .append("FROM declaracion_area ar ")
@@ -1668,6 +1671,7 @@ public class ReportRepository {
               .append("INNER JOIN especie e ON ar.especie_id = e.id ")
               .append("LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id ")
               .append("LEFT JOIN caleta cal ON ar.caleta_id = cal.id ")
+              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
               .append("LEFT JOIN amerb am ON ar.amerb_id = am.id ")
               .append("LEFT JOIN comuna c ON COALESCE(am.comuna_id, cal.comuna_id) = c.id ")
               .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
@@ -1785,7 +1789,7 @@ public class ReportRepository {
                      "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END), " +
                      "macrozona " +
                      "FROM (" + baseSql + ") as t " +
-                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d'), macrozona";
+                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d'), macrozona, caleta_id, comuna_id";
 
         double threshold = umbralAtipico != null ? umbralAtipico : 5000.0;
         Query query = entityManager.createNativeQuery(sql);

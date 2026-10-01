@@ -18,7 +18,9 @@ import com.trazalga.api.repositories.IEmbarcacionRepository;
 import com.trazalga.api.repositories.IBuzoRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
 import com.trazalga.api.repositories.DeclaracionBuzosRepository;
+import com.trazalga.api.repositories.ICaletaRepository;
 import com.trazalga.api.models.DeclaracionBuzosModel;
+import com.trazalga.api.models.CaletaModel;
 import com.trazalga.api.models.PerfilModel;
 import java.util.ArrayList;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,6 +40,9 @@ public class DeclaracionAreaService {
 
     @Autowired
     private IBuzoRepository buzoRepository;
+
+    @Autowired
+    private ICaletaRepository caletaRepository;
 
     @Autowired
     private IExtraccionTipoRepository extraccionTipoRepository;
@@ -190,6 +195,25 @@ public class DeclaracionAreaService {
         if (declaracion.getExtraccionTipo() != null && declaracion.getExtraccionTipo().getId() != null) {
             extraccionTipoRepository.findById(declaracion.getExtraccionTipo().getId())
                     .ifPresent(declaracion::setExtraccionTipo);
+        }
+
+        // Manejar caleta
+        if (declaracion.getCaleta() != null && declaracion.getCaleta().getId() != null) {
+            CaletaModel caleta = caletaRepository.findById(declaracion.getCaleta().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+            declaracion.setCaleta(caleta);
+        }
+
+        // Validar consistencia caleta ↔ AMERB/comuna
+        if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null
+                && declaracion.getAmerb() != null && declaracion.getAmerb().getComuna() != null) {
+            if (!declaracion.getCaleta().getComuna().getId().equals(declaracion.getAmerb().getComuna().getId())) {
+                String caletaNombre = declaracion.getCaleta().getNombre() != null ? declaracion.getCaleta().getNombre() : "ID " + declaracion.getCaleta().getId();
+                String comunaCaletaNombre = declaracion.getCaleta().getComuna().getNombre() != null ? declaracion.getCaleta().getComuna().getNombre() : "ID " + declaracion.getCaleta().getComuna().getId();
+                String comunaAmerbNombre = declaracion.getAmerb().getComuna().getNombre() != null ? declaracion.getAmerb().getComuna().getNombre() : "ID " + declaracion.getAmerb().getComuna().getId();
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre, comunaAmerbNombre));
+            }
         }
 
         // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
