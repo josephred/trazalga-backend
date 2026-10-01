@@ -3197,5 +3197,181 @@ public class ReportRepository {
 
         return out;
     }
+
+    // =========================================================================
+    // INDICADOR 8 — DETECCIÓN GEOTEMPORAL DE DOBLE OPERACIÓN (Res. 25-sep / T8.1)
+    // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> getDeclaracionesConGeo(Date startDate, Date endDate, Long regionId) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT todas.usuario_id, todas.fecha_declaracion, todas.hora, todas.latitud, todas.longitud, ");
+        sql.append("todas.tipo, todas.id, todas.folio, todas.usuario_nombre, todas.usuario_rut, todas.region_id ");
+        sql.append("FROM ( ");
+        sql.append("  SELECT r.usuario_id, r.fecha_declaracion, r.hora, r.latitud, r.longitud, ");
+        sql.append("         'RECOLECTOR' as tipo, r.id, COALESCE(r.folio_origen, CONCAT('DR-', r.id)) as folio, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         u.rut as usuario_rut, ");
+        sql.append("         COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_recolector r ");
+        sql.append("  JOIN usuario u ON u.id = r.usuario_id ");
+        sql.append("  LEFT JOIN comuna c ON c.id = r.comuna_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = r.caleta_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE r.latitud IS NOT NULL AND r.longitud IS NOT NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT a.usuario_id, a.fecha_declaracion, a.hora, a.latitud, a.longitud, ");
+        sql.append("         'ARMADOR' as tipo, a.id, COALESCE(a.folio_origen, CONCAT('DA-', a.id)) as folio, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         u.rut as usuario_rut, ");
+        sql.append("         COALESCE(cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_armador a ");
+        sql.append("  JOIN usuario u ON u.id = a.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = a.caleta_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE a.latitud IS NOT NULL AND a.longitud IS NOT NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT ar.usuario_id, ar.fecha_declaracion, ar.hora, ar.latitud, ar.longitud, ");
+        sql.append("         'AREA' as tipo, ar.id, COALESCE(ar.folio_origen, CONCAT('DAM-', ar.id)) as folio, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         u.rut as usuario_rut, ");
+        sql.append("         COALESCE(cal.region_id, amc.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_area ar ");
+        sql.append("  JOIN usuario u ON u.id = ar.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = ar.caleta_id ");
+        sql.append("  LEFT JOIN amerb am ON am.id = ar.amerb_id ");
+        sql.append("  LEFT JOIN comuna amc ON amc.id = am.comuna_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE ar.latitud IS NOT NULL AND ar.longitud IS NOT NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT dc.usuario_id, dc.fecha_declaracion, dc.hora, dc.latitud, dc.longitud, ");
+        sql.append("         'COMERCIALIZADOR' as tipo, dc.id, COALESCE(dc.folio_origen, CONCAT('DC-', dc.id)) as folio, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         u.rut as usuario_rut, ");
+        sql.append("         uc.region_id as region_id ");
+        sql.append("  FROM declaracion_comercializador dc ");
+        sql.append("  JOIN usuario u ON u.id = dc.usuario_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE dc.latitud IS NOT NULL AND dc.longitud IS NOT NULL ");
+        sql.append(") AS todas WHERE 1=1 ");
+
+        if (startDate != null) sql.append("AND todas.fecha_declaracion >= :startDate ");
+        if (endDate != null) sql.append("AND todas.fecha_declaracion <= :endDate ");
+        if (regionId != null) sql.append("AND todas.region_id = :regionId ");
+
+        sql.append("ORDER BY todas.usuario_id, todas.fecha_declaracion ASC, todas.hora ASC, todas.id ASC");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (regionId != null) query.setParameter("regionId", regionId);
+
+        List<Object[]> results = query.getResultList();
+        List<java.util.Map<String, Object>> filas = new java.util.ArrayList<>();
+        for (Object[] r : results) {
+            java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("usuarioId", r[0] != null ? ((Number) r[0]).longValue() : null);
+            map.put("fechaDeclaracion", toReportDate(r[1]));
+            map.put("hora", r[2] != null ? r[2].toString() : "");
+            map.put("latitud", r[3] != null ? ((Number) r[3]).doubleValue() : null);
+            map.put("longitud", r[4] != null ? ((Number) r[4]).doubleValue() : null);
+            map.put("tipo", r[5] != null ? r[5].toString() : "");
+            map.put("id", r[6] != null ? ((Number) r[6]).longValue() : null);
+            map.put("folio", r[7] != null ? r[7].toString() : "");
+            map.put("usuarioNombre", r[8] != null ? r[8].toString().trim() : "");
+            map.put("usuarioRut", r[9] != null ? r[9].toString() : "");
+            map.put("regionId", r[10] != null ? ((Number) r[10]).longValue() : null);
+            filas.add(map);
+        }
+        return filas;
+    }
+
+    public long contarDeclaracionesSinGeo(Date startDate, Date endDate, Long regionId) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(*) FROM ( ");
+        sql.append("  SELECT r.id, r.fecha_declaracion, COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_recolector r ");
+        sql.append("  JOIN usuario u ON u.id = r.usuario_id ");
+        sql.append("  LEFT JOIN comuna c ON c.id = r.comuna_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = r.caleta_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE r.latitud IS NULL OR r.longitud IS NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT a.id, a.fecha_declaracion, COALESCE(cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_armador a ");
+        sql.append("  JOIN usuario u ON u.id = a.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = a.caleta_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE a.latitud IS NULL OR a.longitud IS NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT ar.id, ar.fecha_declaracion, COALESCE(cal.region_id, amc.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_area ar ");
+        sql.append("  JOIN usuario u ON u.id = ar.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = ar.caleta_id ");
+        sql.append("  LEFT JOIN amerb am ON am.id = ar.amerb_id ");
+        sql.append("  LEFT JOIN comuna amc ON amc.id = am.comuna_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE ar.latitud IS NULL OR ar.longitud IS NULL ");
+        sql.append("  UNION ALL ");
+        sql.append("  SELECT dc.id, dc.fecha_declaracion, uc.region_id as region_id ");
+        sql.append("  FROM declaracion_comercializador dc ");
+        sql.append("  JOIN usuario u ON u.id = dc.usuario_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  WHERE dc.latitud IS NULL OR dc.longitud IS NULL ");
+        sql.append(") AS sin_geo WHERE 1=1 ");
+
+        if (startDate != null) sql.append("AND sin_geo.fecha_declaracion >= :startDate ");
+        if (endDate != null) sql.append("AND sin_geo.fecha_declaracion <= :endDate ");
+        if (regionId != null) sql.append("AND sin_geo.region_id = :regionId ");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (regionId != null) query.setParameter("regionId", regionId);
+
+        Number count = (Number) query.getSingleResult();
+        return count != null ? count.longValue() : 0L;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> buscarAdyacentesConGeo(Long usuarioId, Long excluyendoId, String excluyendoTipo) {
+        if (usuarioId == null) return java.util.Collections.emptyList();
+        String sql = "SELECT u_decls.usuario_id, u_decls.fecha_declaracion, u_decls.hora, " +
+                "u_decls.latitud, u_decls.longitud, u_decls.tipo, u_decls.id, u_decls.folio " +
+                "FROM ( " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'RECOLECTOR' as tipo, id, COALESCE(folio_origen, CONCAT('DR-', id)) as folio FROM declaracion_recolector WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  UNION ALL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'ARMADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DA-', id)) as folio FROM declaracion_armador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  UNION ALL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'AREA' as tipo, id, COALESCE(folio_origen, CONCAT('DAM-', id)) as folio FROM declaracion_area WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  UNION ALL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'COMERCIALIZADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DC-', id)) as folio FROM declaracion_comercializador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                ") AS u_decls " +
+                (excluyendoId != null && excluyendoTipo != null ? "WHERE NOT (u_decls.tipo = :excluyendoTipo AND u_decls.id = :excluyendoId) " : "") +
+                "ORDER BY u_decls.fecha_declaracion ASC, u_decls.hora ASC, u_decls.id ASC";
+
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("usuarioId", usuarioId);
+        if (excluyendoId != null && excluyendoTipo != null) {
+            query.setParameter("excluyendoTipo", excluyendoTipo);
+            query.setParameter("excluyendoId", excluyendoId);
+        }
+
+        List<Object[]> results = query.getResultList();
+        List<java.util.Map<String, Object>> filas = new java.util.ArrayList<>();
+        for (Object[] r : results) {
+            java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("usuarioId", r[0] != null ? ((Number) r[0]).longValue() : null);
+            map.put("fechaDeclaracion", toReportDate(r[1]));
+            map.put("hora", r[2] != null ? r[2].toString() : "");
+            map.put("latitud", r[3] != null ? ((Number) r[3]).doubleValue() : null);
+            map.put("longitud", r[4] != null ? ((Number) r[4]).doubleValue() : null);
+            map.put("tipo", r[5] != null ? r[5].toString() : "");
+            map.put("id", r[6] != null ? ((Number) r[6]).longValue() : null);
+            map.put("folio", r[7] != null ? r[7].toString() : "");
+            filas.add(map);
+        }
+        return filas;
+    }
 }
 

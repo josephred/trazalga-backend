@@ -304,7 +304,21 @@ public class DeclaracionAreaService {
         alertaTriggerService.procesarMarcas("AREA", savedDeclaracion.getId(),
                 savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
                 resVal.getMarcas());
-        
+
+        // T8.2: Verificación geotemporal de doble operación
+        if (savedDeclaracion.getUsuario() != null && savedDeclaracion.getLatitud() != null && savedDeclaracion.getLongitud() != null) {
+            validacionDeclaracionService.verificarDobleOperacion(
+                    savedDeclaracion.getUsuario().getId(),
+                    savedDeclaracion.getLatitud(),
+                    savedDeclaracion.getLongitud(),
+                    savedDeclaracion.getFechaDeclaracion(),
+                    savedDeclaracion.getHora(),
+                    "AREA",
+                    savedDeclaracion.getId(),
+                    savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DAM-" + savedDeclaracion.getId()
+            );
+        }
+
         return savedDeclaracion;
     }
 

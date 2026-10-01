@@ -79,6 +79,12 @@ public class ConfiguracionGeneralService {
         // Bloqueo de Carga en Bodega Virtual por Marcas (Punto 4 / T4.1)
         createIfNotExist("marcas_bloqueantes_carga", "LED_EXCEDIDO", "Marcas que bloquean el despacho de carga en bodega virtual", "CADENA");
         createIfNotExist("bloqueo_carga_activo", "true", "Habilita el bloqueo de carga en bodega por marcas activas", "CADENA");
+
+        // INDICADOR 8 — DOBLE OPERACIÓN / INCONSISTENCIA GEOTEMPORAL (T8.1)
+        createIfNotExist("doble_op_activo", "true", "Habilita la detección geotemporal de doble operación", "INTEGRIDAD");
+        createIfNotExist("doble_op_distancia_min_km", "5", "Distancia mínima para considerar inconsistencia geográfica", "INTEGRIDAD");
+        createIfNotExist("doble_op_velocidad_max_kmh", "80", "Velocidad máxima plausible entre dos declaraciones", "INTEGRIDAD");
+        createIfNotExist("doble_op_ventana_min_minutos", "30", "Ventana temporal mínima entre declaraciones", "INTEGRIDAD");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

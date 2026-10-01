@@ -41,6 +41,9 @@ public class DeclaracionComercializadorService {
     @Autowired
     private BloqueoCargaService bloqueoCargaService;
 
+    @Autowired(required = false)
+    private ValidacionDeclaracionService validacionDeclaracionService;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -154,6 +157,22 @@ public class DeclaracionComercializadorService {
             );
             congelarResumenDocumento(saved.getId());
         }
+
+        // T8.2: Verificación geotemporal de doble operación
+        if (validacionDeclaracionService != null && saved.getUsuario() != null
+                && saved.getLatitud() != null && saved.getLongitud() != null) {
+            validacionDeclaracionService.verificarDobleOperacion(
+                    saved.getUsuario().getId(),
+                    saved.getLatitud(),
+                    saved.getLongitud(),
+                    saved.getFechaDeclaracion(),
+                    saved.getHora(),
+                    "COMERCIALIZADOR",
+                    saved.getId(),
+                    saved.getFolioDesembarqueAc() != null ? saved.getFolioDesembarqueAc() : "DC-" + saved.getId()
+            );
+        }
+
         return saved;
     }
 

@@ -216,7 +216,21 @@ public class DeclaracionRecolectorService {
         alertaTriggerService.procesarMarcas("RECOLECTOR", saved.getId(),
                 saved.getUsuario() != null ? saved.getUsuario().getId() : null,
                 resVal.getMarcas());
-        
+
+        // T8.2: Verificación geotemporal de doble operación
+        if (saved.getUsuario() != null && saved.getLatitud() != null && saved.getLongitud() != null) {
+            validacionDeclaracionService.verificarDobleOperacion(
+                    saved.getUsuario().getId(),
+                    saved.getLatitud(),
+                    saved.getLongitud(),
+                    saved.getFechaDeclaracion(),
+                    saved.getHora(),
+                    "RECOLECTOR",
+                    saved.getId(),
+                    saved.getFolioOrigen() != null ? saved.getFolioOrigen() : "DR-" + saved.getId()
+            );
+        }
+
         return saved;
     }
 

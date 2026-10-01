@@ -108,6 +108,159 @@ public class ReportService {
         return reportRepository.getDobleOperacion(startDate, endDate, toleranciaPct);
     }
 
+    // =========================================================================
+    // INDICADOR 8 — DETECCIÓN GEOTEMPORAL DE DOBLE OPERACIÓN (Res. 25-sep / T8.1)
+    // =========================================================================
+
+    public java.util.Map<String, Object> getDobleOperacionGeo(Date startDate, Date endDate, Long regionId) {
+        boolean activo = configService.getBoolean("doble_op_activo", true);
+        double distanciaMinKm = configService.getDouble("doble_op_distancia_min_km", 5.0);
+        double velocidadMaxKmh = configService.getDouble("doble_op_velocidad_max_kmh", 80.0);
+        int ventanaMinMinutos = configService.getInt("doble_op_ventana_min_minutos", 30);
+
+        if (!activo) {
+            java.util.Map<String, Object> disabled = new java.util.LinkedHashMap<>();
+            disabled.put("activo", false);
+            disabled.put("hallazgos", java.util.Collections.emptyList());
+            disabled.put("sinGeolocalizacion", 0L);
+            disabled.put("totalDeclaraciones", 0);
+            disabled.put("totalHallazgos", 0);
+            disabled.put("parametros", java.util.Map.of(
+                "distanciaMinKm", distanciaMinKm,
+                "velocidadMaxKmh", velocidadMaxKmh,
+                "ventanaMinMinutos", ventanaMinMinutos
+            ));
+            return disabled;
+        }
+
+        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesConGeo(startDate, endDate, regionId);
+        long sinGeo = reportRepository.contarDeclaracionesSinGeo(startDate, endDate, regionId);
+
+        // Agrupar por usuario_id preservando orden cronológico
+        java.util.Map<Long, List<java.util.Map<String, Object>>> porUsuario = new java.util.LinkedHashMap<>();
+        for (java.util.Map<String, Object> f : filas) {
+            Long uId = (Long) f.get("usuarioId");
+            if (uId != null) {
+                porUsuario.computeIfAbsent(uId, k -> new java.util.ArrayList<>()).add(f);
+            }
+        }
+
+        List<java.util.Map<String, Object>> hallazgos = new java.util.ArrayList<>();
+
+        for (List<java.util.Map<String, Object>> decls : porUsuario.values()) {
+            decls.sort((d1, d2) -> {
+                java.time.LocalDateTime t1 = parseTimestamp((Date) d1.get("fechaDeclaracion"), (String) d1.get("hora"));
+                java.time.LocalDateTime t2 = parseTimestamp((Date) d2.get("fechaDeclaracion"), (String) d2.get("hora"));
+                if (t1 == null || t2 == null) return 0;
+                return t1.compareTo(t2);
+            });
+
+            for (int i = 0; i < decls.size() - 1; i++) {
+                java.util.Map<String, Object> a = decls.get(i);
+                java.util.Map<String, Object> b = decls.get(i + 1);
+
+                Double latA = (Double) a.get("latitud");
+                Double lonA = (Double) a.get("longitud");
+                Double latB = (Double) b.get("latitud");
+                Double lonB = (Double) b.get("longitud");
+
+                if (latA == null || lonA == null || latB == null || lonB == null) continue;
+
+                java.time.LocalDateTime tsA = parseTimestamp((Date) a.get("fechaDeclaracion"), (String) a.get("hora"));
+                java.time.LocalDateTime tsB = parseTimestamp((Date) b.get("fechaDeclaracion"), (String) b.get("hora"));
+
+                if (tsA == null || tsB == null) continue;
+
+                double d = haversineKm(latA, lonA, latB, lonB);
+                double deltaMillis = Math.abs(java.time.Duration.between(tsA, tsB).toMillis());
+                double deltaHoras = deltaMillis / (3600.0 * 1000.0);
+                double deltaMinutos = deltaMillis / (60.0 * 1000.0);
+                double v = deltaHoras > 0 ? (d / deltaHoras) : (d > 0 ? 9999.0 : 0.0);
+
+                boolean hayHallazgo = d >= distanciaMinKm &&
+                        (v > velocidadMaxKmh || deltaMinutos < ventanaMinMinutos);
+
+                if (hayHallazgo) {
+                    java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
+                    h.put("usuarioId", a.get("usuarioId"));
+                    h.put("usuarioNombre", a.get("usuarioNombre"));
+                    h.put("usuarioRut", a.get("usuarioRut"));
+                    h.put("distanciaKm", Math.round(d * 100.0) / 100.0);
+                    h.put("tiempoHoras", Math.round(deltaHoras * 100.0) / 100.0);
+                    h.put("tiempoMinutos", Math.round(deltaMinutos));
+                    h.put("velocidadKmh", Math.round(v * 10.0) / 10.0);
+                    h.put("motivo", String.format(java.util.Locale.US,
+                            "Distancia de %.1f km recorrida en %.0f min (velocidad implícita %.1f km/h)",
+                            d, deltaMinutos, v));
+
+                    java.util.Map<String, Object> puntoA = new java.util.LinkedHashMap<>(a);
+                    puntoA.put("timestamp", tsA.toString());
+                    h.put("declaracionA", puntoA);
+
+                    java.util.Map<String, Object> puntoB = new java.util.LinkedHashMap<>(b);
+                    puntoB.put("timestamp", tsB.toString());
+                    h.put("declaracionB", puntoB);
+
+                    hallazgos.add(h);
+                }
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("activo", true);
+        result.put("hallazgos", hallazgos);
+        result.put("totalHallazgos", hallazgos.size());
+        result.put("sinGeolocalizacion", sinGeo);
+        result.put("totalDeclaraciones", filas.size());
+        result.put("parametros", java.util.Map.of(
+            "distanciaMinKm", distanciaMinKm,
+            "velocidadMaxKmh", velocidadMaxKmh,
+            "ventanaMinMinutos", ventanaMinMinutos
+        ));
+
+        return result;
+    }
+
+    public static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371.0; // radio de la Tierra en km
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    public static java.time.LocalDateTime parseTimestamp(Date fecha, String horaStr) {
+        if (fecha == null) return null;
+        java.time.LocalDate localDate;
+        if (fecha instanceof java.sql.Date) {
+            localDate = ((java.sql.Date) fecha).toLocalDate();
+        } else {
+            localDate = fecha.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+        }
+        java.time.LocalTime localTime = java.time.LocalTime.MIDNIGHT;
+        if (horaStr != null && !horaStr.trim().isEmpty()) {
+            try {
+                String clean = horaStr.trim();
+                if (clean.length() == 5) {
+                    localTime = java.time.LocalTime.parse(clean);
+                } else if (clean.length() >= 8) {
+                    localTime = java.time.LocalTime.parse(clean.substring(0, 8));
+                } else {
+                    String[] parts = clean.split(":");
+                    int h = Integer.parseInt(parts[0]);
+                    int m = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+                    int s = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+                    localTime = java.time.LocalTime.of(h, m, s);
+                }
+            } catch (Exception ignored) {
+                localTime = java.time.LocalTime.MIDNIGHT;
+            }
+        }
+        return java.time.LocalDateTime.of(localDate, localTime);
+    }
+
     /** Medido: 4.935 ms de media, 392.876 filas examinadas para devolver 4. */
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {

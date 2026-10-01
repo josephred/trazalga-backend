@@ -819,6 +819,20 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/doble-operacion-geo")
+    public ResponseEntity<?> getDobleOperacionGeo(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long regionId) {
+        try {
+            return ResponseEntity.ok(reportService.getDobleOperacionGeo(startDate, endDate, regionId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo doble operacion geo: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/curva-snake")
     public ResponseEntity<?> getCurvaSnake(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,

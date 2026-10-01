@@ -91,7 +91,11 @@ public class IndicadoresMetadataCatalogTest {
                 "riesgo_dias_rojo",
                 "riesgo_escala_humedo_sin_merma",
                 "riesgo_agravante_veda_niveles",
-                "riesgo_agravante_led_niveles"
+                "riesgo_agravante_led_niveles",
+                "doble_op_activo",
+                "doble_op_distancia_min_km",
+                "doble_op_velocidad_max_kmh",
+                "doble_op_ventana_min_minutos"
         );
 
         for (String key : requiredKeys) {
@@ -124,7 +128,8 @@ public class IndicadoresMetadataCatalogTest {
                 "LED_EXCEDIDO",
                 "DESEMBARQUE_ATIPICO",
                 "CUOTA_EXCEDIDA",
-                "POSTERIOR_CIERRE"
+                "POSTERIOR_CIERRE",
+                "DOBLE_OPERACION"
         );
 
         assertTrue(validMarcas.contains("EN_VEDA"));
@@ -132,6 +137,7 @@ public class IndicadoresMetadataCatalogTest {
         assertTrue(validMarcas.contains("DESEMBARQUE_ATIPICO"));
         assertTrue(validMarcas.contains("CUOTA_EXCEDIDA"));
         assertTrue(validMarcas.contains("POSTERIOR_CIERRE"));
+        assertTrue(validMarcas.contains("DOBLE_OPERACION"));
 
         assertFalse(validMarcas.contains("PESO_FUERA_UMBRAL"),
                 "PESO_FUERA_UMBRAL es una marca obsoleta prohibida por R X.3");
