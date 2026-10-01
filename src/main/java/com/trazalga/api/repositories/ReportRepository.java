@@ -1010,7 +1010,7 @@ public class ReportRepository {
     public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId, Long regionId) {
         double umbral = 5.0;
 
-        String sqlPlanta = "SELECT dpa.id, dpa.folio_origen, dpa.folio_declaracion_apla, dpa.peso_romana_kg, " +
+        String sqlPlanta = "SELECT dpa.id, dpa.folio_origen, dpa.peso_romana_kg, " +
                 "dpa.fecha_pesaje, dpa.fecha_ingreso_planta, dpa.voucher_romana_numero, dpa.voucher_romana_adjunto, " +
                 "dpa.declaraciones_seleccionadas, dpa.especie_id, " +
                 "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre " +
@@ -1051,7 +1051,6 @@ public class ReportRepository {
         class PlantaRowData {
             Long id;
             String folioOrigen;
-            String folioApla;
             double pesoRomana;
             Date fechaPesaje;
             Date fechaIngreso;
@@ -1075,16 +1074,15 @@ public class ReportRepository {
             PlantaRowData p = new PlantaRowData();
             p.id = ((Number) r[0]).longValue();
             p.folioOrigen = r[1] != null ? r[1].toString() : "";
-            p.folioApla = r[2] != null ? r[2].toString() : "";
-            p.pesoRomana = ((Number) r[3]).doubleValue();
-            p.fechaPesaje = toReportDate(r[4]);
-            p.fechaIngreso = toReportDate(r[5]);
-            p.voucherNumero = r[6] != null ? r[6].toString() : null;
-            p.voucherAdjunto = r[7] != null ? r[7].toString() : null;
-            p.decSel = r[8] != null ? r[8].toString() : "";
-            p.espId = r[9] != null ? ((Number) r[9]).longValue() : null;
-            p.rut = r[10] != null ? r[10].toString() : "";
-            p.nombre = r[11] != null ? r[11].toString() : "";
+            p.pesoRomana = ((Number) r[2]).doubleValue();
+            p.fechaPesaje = toReportDate(r[3]);
+            p.fechaIngreso = toReportDate(r[4]);
+            p.voucherNumero = r[5] != null ? r[5].toString() : null;
+            p.voucherAdjunto = r[6] != null ? r[6].toString() : null;
+            p.decSel = r[7] != null ? r[7].toString() : "";
+            p.espId = r[8] != null ? ((Number) r[8]).longValue() : null;
+            p.rut = r[9] != null ? r[9].toString() : "";
+            p.nombre = r[10] != null ? r[10].toString() : "";
             p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(p.decSel);
 
             List<Long> cIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR");
@@ -1475,7 +1473,7 @@ public class ReportRepository {
 
             java.util.Map<String, Object> item = new java.util.HashMap<>();
             item.put("plantaId", p.id);
-            item.put("plantaFolio", (p.folioApla != null && !p.folioApla.isBlank()) ? p.folioApla : p.folioOrigen);
+            item.put("plantaFolio", p.folioOrigen);
             item.put("plantaRut", p.rut);
             item.put("plantaNombre", p.nombre);
             item.put("fecha", p.fechaIngreso);
