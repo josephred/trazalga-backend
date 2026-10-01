@@ -53,4 +53,10 @@ public class AmerbModel {
     @Column(name = "folio_organizacion", nullable = true)
     private Integer folioOrganizacion;
 
+    @Column(nullable = true)
+    private Double latitud;
+
+    @Column(nullable = true)
+    private Double longitud;
+
 }

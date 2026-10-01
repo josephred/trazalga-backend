@@ -95,7 +95,12 @@ public class IndicadoresMetadataCatalogTest {
                 "doble_op_activo",
                 "doble_op_distancia_min_km",
                 "doble_op_velocidad_max_kmh",
-                "doble_op_ventana_min_minutos"
+                "doble_op_ventana_min_minutos",
+                "origen_geo_activo",
+                "origen_geo_distancia_max_km",
+                "origen_geo_precision_max_m",
+                "origen_geo_patron_pct",
+                "origen_geo_patron_min_decl"
         );
 
         for (String key : requiredKeys) {
@@ -129,7 +134,8 @@ public class IndicadoresMetadataCatalogTest {
                 "DESEMBARQUE_ATIPICO",
                 "CUOTA_EXCEDIDA",
                 "POSTERIOR_CIERRE",
-                "DOBLE_OPERACION"
+                "DOBLE_OPERACION",
+                "ORIGEN_GEO_INCONSISTENTE"
         );
 
         assertTrue(validMarcas.contains("EN_VEDA"));
@@ -138,6 +144,7 @@ public class IndicadoresMetadataCatalogTest {
         assertTrue(validMarcas.contains("CUOTA_EXCEDIDA"));
         assertTrue(validMarcas.contains("POSTERIOR_CIERRE"));
         assertTrue(validMarcas.contains("DOBLE_OPERACION"));
+        assertTrue(validMarcas.contains("ORIGEN_GEO_INCONSISTENTE"));
 
         assertFalse(validMarcas.contains("PESO_FUERA_UMBRAL"),
                 "PESO_FUERA_UMBRAL es una marca obsoleta prohibida por R X.3");

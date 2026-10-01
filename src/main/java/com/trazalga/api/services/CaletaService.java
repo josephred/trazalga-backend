@@ -35,11 +35,15 @@ public class CaletaService {
         return caletaRepository.findById(id);
     }
 
-    public CaletaModel updateById(CaletaModel request,Long id){
-        CaletaModel caleta = caletaRepository.findById(id).get();
-        caleta.setNombre(request.getNombre());
-        caletaRepository.save(caleta);
-        return caleta;
+    public CaletaModel updateById(CaletaModel request, Long id){
+        CaletaModel caleta = caletaRepository.findById(id).orElseThrow();
+        if (request.getNombre() != null) caleta.setNombre(request.getNombre());
+        if (request.getLatitud() != null) caleta.setLatitud(request.getLatitud());
+        if (request.getLongitud() != null) caleta.setLongitud(request.getLongitud());
+        if (request.getRegion() != null) caleta.setRegion(request.getRegion());
+        if (request.getComuna() != null) caleta.setComuna(request.getComuna());
+        if (request.getVaradero() != null) caleta.setVaradero(request.getVaradero());
+        return caletaRepository.save(caleta);
     }
 
     public Boolean deleteCaleta(Long id){

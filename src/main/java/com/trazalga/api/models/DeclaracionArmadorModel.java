@@ -113,6 +113,16 @@ public class DeclaracionArmadorModel {
     @Column(nullable = true)
     private Double longitud;
 
+    @Column(name = "precision_gps_m", nullable = true)
+    private Double precisionGpsM;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "gps_capturado_en", nullable = true)
+    private Date gpsCapturadoEn;
+
+    @Column(name = "envio_offline", nullable = true)
+    private Boolean envioOffline;
+
     @Column(name = "declaracion_destinatario_id", nullable = true)
     private Long declaracionDestinatario;
 

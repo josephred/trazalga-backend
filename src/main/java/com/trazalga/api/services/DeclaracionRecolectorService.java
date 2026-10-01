@@ -231,6 +231,20 @@ public class DeclaracionRecolectorService {
             );
         }
 
+        // T9.3: Verificación de origen real vs GPS capturado
+        Long caletaId = saved.getCaleta() != null ? saved.getCaleta().getId() : null;
+        validacionDeclaracionService.verificarOrigenGeo(
+                "RECOLECTOR",
+                saved.getId(),
+                saved.getFolioOrigen() != null ? saved.getFolioOrigen() : "DR-" + saved.getId(),
+                saved.getLatitud(),
+                saved.getLongitud(),
+                saved.getPrecisionGpsM(),
+                saved.getEnvioOffline(),
+                caletaId,
+                null
+        );
+
         return saved;
     }
 

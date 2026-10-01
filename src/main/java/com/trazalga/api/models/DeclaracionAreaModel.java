@@ -115,6 +115,16 @@ public class DeclaracionAreaModel {
     @Column(nullable = true)
     private Double longitud;
 
+    @Column(name = "precision_gps_m", nullable = true)
+    private Double precisionGpsM;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "gps_capturado_en", nullable = true)
+    private Date gpsCapturadoEn;
+
+    @Column(name = "envio_offline", nullable = true)
+    private Boolean envioOffline;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "embarcacion_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})

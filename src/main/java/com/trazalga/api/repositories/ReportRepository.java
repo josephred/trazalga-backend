@@ -3373,5 +3373,112 @@ public class ReportRepository {
         }
         return filas;
     }
+
+    // =========================================================================
+    // INDICADOR 9 — ORIGEN REAL VS GPS CAPTURADO Y PATRONES (Res. 25-sep / T9.4)
+    // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> getDeclaracionesOrigenGeo(Date startDate, Date endDate, Long regionId) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT todas.tipo, todas.id, todas.folio, todas.fecha_declaracion, todas.hora, ");
+        sql.append("todas.usuario_id, todas.usuario_rut, todas.usuario_nombre, ");
+        sql.append("todas.latitud, todas.longitud, todas.precision_gps_m, todas.gps_capturado_en, todas.envio_offline, ");
+        sql.append("todas.caleta_id, todas.amerb_id, todas.ref_tipo, todas.ref_nombre, todas.ref_lat, todas.ref_lon, todas.region_id ");
+        sql.append("FROM ( ");
+        // 1. Recolector
+        sql.append("  SELECT 'RECOLECTOR' as tipo, r.id, COALESCE(r.folio_origen, CONCAT('DR-', r.id)) as folio, ");
+        sql.append("         r.fecha_declaracion, r.hora, r.usuario_id, u.rut as usuario_rut, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         r.latitud, r.longitud, r.precision_gps_m, r.gps_capturado_en, r.envio_offline, ");
+        sql.append("         r.caleta_id, NULL as amerb_id, ");
+        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
+        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
+        sql.append("         COALESCE(cal.latitud, v.latitud) as ref_lat, ");
+        sql.append("         COALESCE(cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_recolector r ");
+        sql.append("  JOIN usuario u ON u.id = r.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = r.caleta_id ");
+        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
+        sql.append("  LEFT JOIN comuna c ON c.id = r.comuna_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  UNION ALL ");
+        // 2. Armador
+        sql.append("  SELECT 'ARMADOR' as tipo, a.id, COALESCE(a.folio_origen, CONCAT('DA-', a.id)) as folio, ");
+        sql.append("         a.fecha_declaracion, a.hora, a.usuario_id, u.rut as usuario_rut, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         a.latitud, a.longitud, a.precision_gps_m, a.gps_capturado_en, a.envio_offline, ");
+        sql.append("         a.caleta_id, NULL as amerb_id, ");
+        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
+        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
+        sql.append("         COALESCE(cal.latitud, v.latitud) as ref_lat, ");
+        sql.append("         COALESCE(cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         COALESCE(cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_armador a ");
+        sql.append("  JOIN usuario u ON u.id = a.usuario_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = a.caleta_id ");
+        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append("  UNION ALL ");
+        // 3. Area (AMERB)
+        sql.append("  SELECT 'AREA' as tipo, ar.id, COALESCE(ar.folio_origen, CONCAT('DAM-', ar.id)) as folio, ");
+        sql.append("         ar.fecha_declaracion, ar.hora, ar.usuario_id, u.rut as usuario_rut, ");
+        sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
+        sql.append("         ar.latitud, ar.longitud, ar.precision_gps_m, ar.gps_capturado_en, ar.envio_offline, ");
+        sql.append("         ar.caleta_id, ar.amerb_id, ");
+        sql.append("         CASE WHEN am.latitud IS NOT NULL THEN 'AMERB' WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
+        sql.append("         CASE WHEN am.latitud IS NOT NULL THEN am.nombre WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
+        sql.append("         COALESCE(am.latitud, cal.latitud, v.latitud) as ref_lat, ");
+        sql.append("         COALESCE(am.longitud, cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         COALESCE(amc.region_id, cal.region_id, uc.region_id) as region_id ");
+        sql.append("  FROM declaracion_area ar ");
+        sql.append("  JOIN usuario u ON u.id = ar.usuario_id ");
+        sql.append("  LEFT JOIN amerb am ON am.id = ar.amerb_id ");
+        sql.append("  LEFT JOIN caleta cal ON cal.id = ar.caleta_id ");
+        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
+        sql.append("  LEFT JOIN comuna amc ON amc.id = am.comuna_id ");
+        sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
+        sql.append(") AS todas WHERE 1=1 ");
+
+        if (startDate != null) sql.append("AND todas.fecha_declaracion >= :startDate ");
+        if (endDate != null) sql.append("AND todas.fecha_declaracion <= :endDate ");
+        if (regionId != null) sql.append("AND todas.region_id = :regionId ");
+
+        sql.append("ORDER BY todas.fecha_declaracion DESC, todas.hora DESC, todas.id DESC");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+        if (regionId != null) query.setParameter("regionId", regionId);
+
+        List<Object[]> results = query.getResultList();
+        List<java.util.Map<String, Object>> filas = new java.util.ArrayList<>();
+        for (Object[] r : results) {
+            java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("tipo", r[0] != null ? r[0].toString() : "");
+            map.put("id", r[1] != null ? ((Number) r[1]).longValue() : null);
+            map.put("folio", r[2] != null ? r[2].toString() : "");
+            map.put("fechaDeclaracion", toReportDate(r[3]));
+            map.put("hora", r[4] != null ? r[4].toString() : "");
+            map.put("usuarioId", r[5] != null ? ((Number) r[5]).longValue() : null);
+            map.put("usuarioRut", r[6] != null ? r[6].toString() : "");
+            map.put("usuarioNombre", r[7] != null ? r[7].toString().trim() : "");
+            map.put("latitud", r[8] != null ? ((Number) r[8]).doubleValue() : null);
+            map.put("longitud", r[9] != null ? ((Number) r[9]).doubleValue() : null);
+            map.put("precisionGpsM", r[10] != null ? ((Number) r[10]).doubleValue() : null);
+            map.put("gpsCapturadoEn", r[11] != null ? r[11].toString() : null);
+            map.put("envioOffline", r[12] != null ? (Boolean.TRUE.equals(r[12]) || "1".equals(r[12].toString()) || "true".equalsIgnoreCase(r[12].toString())) : false);
+            map.put("caletaId", r[13] != null ? ((Number) r[13]).longValue() : null);
+            map.put("amerbId", r[14] != null ? ((Number) r[14]).longValue() : null);
+            map.put("refTipo", r[15] != null ? r[15].toString() : null);
+            map.put("refNombre", r[16] != null ? r[16].toString() : null);
+            map.put("refLat", r[17] != null ? ((Number) r[17]).doubleValue() : null);
+            map.put("refLon", r[18] != null ? ((Number) r[18]).doubleValue() : null);
+            map.put("regionId", r[19] != null ? ((Number) r[19]).longValue() : null);
+            filas.add(map);
+        }
+        return filas;
+    }
 }
 

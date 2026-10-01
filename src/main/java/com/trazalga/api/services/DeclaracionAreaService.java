@@ -319,6 +319,21 @@ public class DeclaracionAreaService {
             );
         }
 
+        // T9.3: Verificación de origen real vs GPS capturado
+        Long caletaId = savedDeclaracion.getCaleta() != null ? savedDeclaracion.getCaleta().getId() : null;
+        Long amerbId = savedDeclaracion.getAmerb() != null ? savedDeclaracion.getAmerb().getId() : null;
+        validacionDeclaracionService.verificarOrigenGeo(
+                "AREA",
+                savedDeclaracion.getId(),
+                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DAM-" + savedDeclaracion.getId(),
+                savedDeclaracion.getLatitud(),
+                savedDeclaracion.getLongitud(),
+                savedDeclaracion.getPrecisionGpsM(),
+                savedDeclaracion.getEnvioOffline(),
+                caletaId,
+                amerbId
+        );
+
         return savedDeclaracion;
     }
 

@@ -44,6 +44,12 @@ public class ValidacionDeclaracionService {
     @Autowired(required = false)
     private com.trazalga.api.repositories.ReportRepository reportRepository;
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.ICaletaRepository caletaRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IAmerbRepository amerbRepository;
+
     /**
      * Orquesta las 5 validaciones del servidor antes de persistir una declaración.
      */
@@ -328,6 +334,101 @@ public class ValidacionDeclaracionService {
             }
         }
 
+        return Optional.empty();
+    }
+
+    // =========================================================================
+    // INDICADOR 9 — ORIGEN REAL VS GPS CAPTURADO (Res. 25-sep / T9.3)
+    // =========================================================================
+
+    public static class PuntoReferencia {
+        private final String tipo;
+        private final String nombre;
+        private final Double lat;
+        private final Double lon;
+
+        public PuntoReferencia(String tipo, String nombre, Double lat, Double lon) {
+            this.tipo = tipo;
+            this.nombre = nombre;
+            this.lat = lat;
+            this.lon = lon;
+        }
+
+        public String getTipo() { return tipo; }
+        public String getNombre() { return nombre; }
+        public Double getLat() { return lat; }
+        public Double getLon() { return lon; }
+    }
+
+    public PuntoReferencia resolverReferencia(Long amerbId, Long caletaId) {
+        // 1. AMERB -> centroide
+        if (amerbId != null && amerbRepository != null) {
+            com.trazalga.api.models.AmerbModel amerb = amerbRepository.findById(amerbId).orElse(null);
+            if (amerb != null && amerb.getLatitud() != null && amerb.getLongitud() != null) {
+                return new PuntoReferencia("AMERB", amerb.getNombre(), amerb.getLatitud(), amerb.getLongitud());
+            }
+        }
+        // 2. Caleta con coordenadas directas
+        if (caletaId != null && caletaRepository != null) {
+            com.trazalga.api.models.CaletaModel caleta = caletaRepository.findById(caletaId).orElse(null);
+            if (caleta != null && caleta.getLatitud() != null && caleta.getLongitud() != null) {
+                return new PuntoReferencia("CALETA", caleta.getNombre(), caleta.getLatitud(), caleta.getLongitud());
+            }
+            // 3. Varadero asociado de la caleta
+            if (caleta != null && caleta.getVaradero() != null &&
+                    caleta.getVaradero().getLatitud() != null && caleta.getVaradero().getLongitud() != null) {
+                return new PuntoReferencia("VARADERO", caleta.getVaradero().getNombre(),
+                        caleta.getVaradero().getLatitud(), caleta.getVaradero().getLongitud());
+            }
+        }
+        return null; // sin referencia
+    }
+
+    public Optional<com.trazalga.api.models.DeclaracionMarcaModel> verificarOrigenGeo(
+            String tipo,
+            Long id,
+            String folio,
+            Double lat,
+            Double lon,
+            Double precisionM,
+            Boolean envioOffline,
+            Long caletaId,
+            Long amerbId) {
+        if (!configuracionGeneralService.getBoolean("origen_geo_activo", true)) {
+            return Optional.empty();
+        }
+        if (lat == null || lon == null) {
+            return Optional.empty(); // sin GPS, no se puede evaluar
+        }
+
+        double distanciaMaxKm = configuracionGeneralService.getDouble("origen_geo_distancia_max_km", 30.0);
+        double precisionMaxM = configuracionGeneralService.getDouble("origen_geo_precision_max_m", 500.0);
+
+        PuntoReferencia ref = resolverReferencia(amerbId, caletaId);
+        if (ref == null) {
+            // Sin referencia: modo degradado, informa pero no marca
+            return Optional.empty();
+        }
+
+        double distanciaKm = ReportService.haversineKm(lat, lon, ref.getLat(), ref.getLon());
+
+        if (distanciaKm > distanciaMaxKm) {
+            boolean precisionAceptable = precisionM == null || precisionM <= precisionMaxM;
+
+            if (precisionAceptable) {
+                String motivo = String.format(java.util.Locale.US,
+                        "GPS a %.1f km de %s (%s). Referencia: (%.4f,%.4f). GPS: (%.4f,%.4f). Precisión: %.0f m. Offline: %s",
+                        distanciaKm, ref.getNombre(), ref.getTipo(),
+                        ref.getLat(), ref.getLon(), lat, lon,
+                        precisionM != null ? precisionM : 0.0,
+                        Boolean.TRUE.equals(envioOffline) ? "sí" : "no");
+
+                if (declaracionMarcaService != null) {
+                    return Optional.of(declaracionMarcaService.marcar(
+                            tipo, id, "ORIGEN_GEO_INCONSISTENTE", motivo, null));
+                }
+            }
+        }
         return Optional.empty();
     }
 }

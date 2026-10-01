@@ -341,6 +341,20 @@ public class DeclaracionArmadorService {
             );
         }
 
+        // T9.3: Verificación de origen real vs GPS capturado
+        Long caletaId = savedDeclaracion.getCaleta() != null ? savedDeclaracion.getCaleta().getId() : null;
+        validacionDeclaracionService.verificarOrigenGeo(
+                "ARMADOR",
+                savedDeclaracion.getId(),
+                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DA-" + savedDeclaracion.getId(),
+                savedDeclaracion.getLatitud(),
+                savedDeclaracion.getLongitud(),
+                savedDeclaracion.getPrecisionGpsM(),
+                savedDeclaracion.getEnvioOffline(),
+                caletaId,
+                null
+        );
+
         return savedDeclaracion;
     }
 

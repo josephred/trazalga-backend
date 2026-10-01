@@ -85,6 +85,13 @@ public class ConfiguracionGeneralService {
         createIfNotExist("doble_op_distancia_min_km", "5", "Distancia mínima para considerar inconsistencia geográfica", "INTEGRIDAD");
         createIfNotExist("doble_op_velocidad_max_kmh", "80", "Velocidad máxima plausible entre dos declaraciones", "INTEGRIDAD");
         createIfNotExist("doble_op_ventana_min_minutos", "30", "Ventana temporal mínima entre declaraciones", "INTEGRIDAD");
+
+        // INDICADOR 9 — ORIGEN REAL VS GEOLOCALIZACIÓN GPS (T9.3, T9.4)
+        createIfNotExist("origen_geo_activo", "true", "Habilita la detección de inconsistencia GPS vs origen", "INTEGRIDAD");
+        createIfNotExist("origen_geo_distancia_max_km", "30", "Distancia máxima tolerable entre GPS y referencia", "INTEGRIDAD");
+        createIfNotExist("origen_geo_precision_max_m", "500", "Precisión GPS mínima aceptable para marcar", "INTEGRIDAD");
+        createIfNotExist("origen_geo_patron_pct", "50", "% de declaraciones lejanas para detectar patrón", "INTEGRIDAD");
+        createIfNotExist("origen_geo_patron_min_decl", "3", "Mínimo de declaraciones para evaluar patrón", "INTEGRIDAD");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

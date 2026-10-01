@@ -261,6 +261,198 @@ public class ReportService {
         return java.time.LocalDateTime.of(localDate, localTime);
     }
 
+    // =========================================================================
+    // INDICADOR 9 — ORIGEN REAL VS GEOLOCALIZACIÓN GPS (Res. 25-sep / T9.4)
+    // =========================================================================
+
+    public java.util.Map<String, Object> getOrigenGeoPatrones(Date startDate, Date endDate, Long regionId) {
+        boolean activo = configService.getBoolean("origen_geo_activo", true);
+        double distanciaMaxKm = configService.getDouble("origen_geo_distancia_max_km", 30.0);
+        double precisionMaxM = configService.getDouble("origen_geo_precision_max_m", 500.0);
+        double patronPct = configService.getDouble("origen_geo_patron_pct", 50.0);
+        int patronMinDecl = configService.getInt("origen_geo_patron_min_decl", 3);
+
+        java.util.Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("activo", activo);
+        response.put("parametros", java.util.Map.of(
+                "distanciaMaxKm", distanciaMaxKm,
+                "precisionMaxM", precisionMaxM,
+                "patronPct", patronPct,
+                "patronMinDecl", patronMinDecl
+        ));
+
+        if (!activo) {
+            response.put("totalDeclaracionesEvaluadas", 0);
+            response.put("totalInconsistencias", 0);
+            response.put("totalSinGps", 0);
+            response.put("totalSinReferencia", 0);
+            response.put("totalMarcadas", 0);
+            response.put("totalPrecisionBaja", 0);
+            response.put("usuariosPatronSospechoso", 0);
+            response.put("rankingUsuarios", java.util.Collections.emptyList());
+            response.put("hallazgos", java.util.Collections.emptyList());
+            return response;
+        }
+
+        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesOrigenGeo(startDate, endDate, regionId);
+
+        long totalSinGps = 0;
+        long totalSinReferencia = 0;
+        long totalInconsistencias = 0;
+        long totalMarcadas = 0;
+        long totalPrecisionBaja = 0;
+
+        List<java.util.Map<String, Object>> hallazgos = new java.util.ArrayList<>();
+
+        class UserStat {
+            Long usuarioId;
+            String rut;
+            String nombre;
+            int total = 0;
+            int sinGps = 0;
+            int sinRef = 0;
+            int lejos = 0;
+            List<Double> distancias = new java.util.ArrayList<>();
+        }
+
+        java.util.Map<Long, UserStat> userStatsMap = new java.util.LinkedHashMap<>();
+
+        for (java.util.Map<String, Object> fila : filas) {
+            Long uId = fila.get("usuarioId") != null ? ((Number) fila.get("usuarioId")).longValue() : 0L;
+
+            UserStat uStat = userStatsMap.computeIfAbsent(uId, k -> {
+                UserStat s = new UserStat();
+                s.usuarioId = k;
+                s.rut = (String) fila.get("usuarioRut");
+                s.nombre = (String) fila.get("usuarioNombre");
+                return s;
+            });
+
+            uStat.total++;
+
+            Double lat = fila.get("latitud") != null ? ((Number) fila.get("latitud")).doubleValue() : null;
+            Double lon = fila.get("longitud") != null ? ((Number) fila.get("longitud")).doubleValue() : null;
+            Double refLat = fila.get("refLat") != null ? ((Number) fila.get("refLat")).doubleValue() : null;
+            Double refLon = fila.get("refLon") != null ? ((Number) fila.get("refLon")).doubleValue() : null;
+            Double precision = fila.get("precisionGpsM") != null ? ((Number) fila.get("precisionGpsM")).doubleValue() : null;
+            Boolean offline = Boolean.TRUE.equals(fila.get("envioOffline"));
+
+            boolean tieneGps = (lat != null && lon != null);
+            boolean tieneRef = (refLat != null && refLon != null);
+
+            if (!tieneGps) {
+                totalSinGps++;
+                uStat.sinGps++;
+            }
+            if (!tieneRef) {
+                totalSinReferencia++;
+                uStat.sinRef++;
+            }
+
+            if (tieneGps && tieneRef) {
+                double dist = haversineKm(lat, lon, refLat, refLon);
+                dist = Math.round(dist * 10.0) / 10.0;
+                uStat.distancias.add(dist);
+
+                if (dist > distanciaMaxKm) {
+                    totalInconsistencias++;
+                    uStat.lejos++;
+
+                    boolean precisionAceptable = (precision == null || precision <= precisionMaxM);
+                    if (precisionAceptable) {
+                        totalMarcadas++;
+                    } else {
+                        totalPrecisionBaja++;
+                    }
+
+                    java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
+                    h.put("tipo", fila.get("tipo"));
+                    h.put("id", fila.get("id"));
+                    h.put("folio", fila.get("folio"));
+                    h.put("fechaDeclaracion", fila.get("fechaDeclaracion"));
+                    h.put("hora", fila.get("hora"));
+                    h.put("usuarioId", uId);
+                    h.put("usuarioRut", fila.get("usuarioRut"));
+                    h.put("usuarioNombre", fila.get("usuarioNombre"));
+                    h.put("distanciaKm", dist);
+                    h.put("precisionGpsM", precision != null ? Math.round(precision * 10.0) / 10.0 : null);
+                    h.put("envioOffline", offline);
+                    h.put("precisionAceptable", precisionAceptable);
+                    h.put("refTipo", fila.get("refTipo"));
+                    h.put("refNombre", fila.get("refNombre"));
+                    h.put("gpsLatitud", lat);
+                    h.put("gpsLongitud", lon);
+                    h.put("refLatitud", refLat);
+                    h.put("refLongitud", refLon);
+                    h.put("marcaGenerada", precisionAceptable ? "ORIGEN_GEO_INCONSISTENTE" : null);
+
+                    hallazgos.add(h);
+                }
+            }
+        }
+
+        List<java.util.Map<String, Object>> rankingUsuarios = new java.util.ArrayList<>();
+        int sospechososCount = 0;
+
+        for (UserStat stat : userStatsMap.values()) {
+            java.util.Collections.sort(stat.distancias);
+            double medianaDist = 0.0;
+            if (!stat.distancias.isEmpty()) {
+                int size = stat.distancias.size();
+                if (size % 2 == 1) {
+                    medianaDist = stat.distancias.get(size / 2);
+                } else {
+                    medianaDist = (stat.distancias.get((size / 2) - 1) + stat.distancias.get(size / 2)) / 2.0;
+                }
+                medianaDist = Math.round(medianaDist * 10.0) / 10.0;
+            }
+
+            int evaluadas = stat.distancias.size();
+            double pctLejos = evaluadas > 0 ? ((stat.lejos * 100.0) / evaluadas) : 0.0;
+            pctLejos = Math.round(pctLejos * 10.0) / 10.0;
+
+            boolean sospechoso = (pctLejos >= patronPct) && (evaluadas >= patronMinDecl);
+            if (sospechoso) sospechososCount++;
+
+            java.util.Map<String, Object> uMap = new java.util.LinkedHashMap<>();
+            uMap.put("usuarioId", stat.usuarioId);
+            uMap.put("usuarioRut", stat.rut);
+            uMap.put("usuarioNombre", stat.nombre);
+            uMap.put("totalDeclaraciones", stat.total);
+            uMap.put("declaracionesEvaluadas", evaluadas);
+            uMap.put("declaracionesLejos", stat.lejos);
+            uMap.put("porcentajeLejos", pctLejos);
+            uMap.put("sinGps", stat.sinGps);
+            uMap.put("sinReferencia", stat.sinRef);
+            uMap.put("medianaDistanciaKm", medianaDist);
+            uMap.put("patronSospechoso", sospechoso);
+            uMap.put("rotuloPatron", sospechoso ? "Patrón sospechoso — posible uso de clave por terceros" : "Comportamiento regular");
+
+            rankingUsuarios.add(uMap);
+        }
+
+        rankingUsuarios.sort((a, b) -> {
+            int cmpSospechoso = Boolean.compare((Boolean) b.get("patronSospechoso"), (Boolean) a.get("patronSospechoso"));
+            if (cmpSospechoso != 0) return cmpSospechoso;
+            int cmpLejos = Integer.compare((Integer) b.get("declaracionesLejos"), (Integer) a.get("declaracionesLejos"));
+            if (cmpLejos != 0) return cmpLejos;
+            return Double.compare((Double) b.get("porcentajeLejos"), (Double) a.get("porcentajeLejos"));
+        });
+
+        response.put("totalDeclaracionesEvaluadas", filas.size());
+        response.put("totalInconsistencias", totalInconsistencias);
+        response.put("totalSinGps", totalSinGps);
+        response.put("totalSinReferencia", totalSinReferencia);
+        response.put("totalMarcadas", totalMarcadas);
+        response.put("totalPrecisionBaja", totalPrecisionBaja);
+        response.put("usuariosEvaluados", userStatsMap.size());
+        response.put("usuariosPatronSospechoso", sospechososCount);
+        response.put("rankingUsuarios", rankingUsuarios);
+        response.put("hallazgos", hallazgos);
+
+        return response;
+    }
+
     /** Medido: 4.935 ms de media, 392.876 filas examinadas para devolver 4. */
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getVolumenPorEspecie(Date startDate, Date endDate, String perfil) {

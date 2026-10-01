@@ -41,4 +41,10 @@ public class CaletaModel {
     @JoinColumn(name = "varadero_id")
     private VaraderoModel varadero;
 
+    @Column(nullable = true)
+    private Double latitud;
+
+    @Column(nullable = true)
+    private Double longitud;
+
 }
