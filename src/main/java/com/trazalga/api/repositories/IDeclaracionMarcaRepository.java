@@ -24,6 +24,7 @@ public interface IDeclaracionMarcaRepository extends JpaRepository<DeclaracionMa
     @Query("SELECT m FROM DeclaracionMarcaModel m WHERE " +
            "(:marca IS NULL OR :marca = '' OR m.marca = :marca) AND " +
            "(:resuelta IS NULL OR m.resuelta = :resuelta) AND " +
+           "(:estadoGestion IS NULL OR :estadoGestion = '' OR m.estadoGestion = :estadoGestion) AND " +
            "(:declaracionTipo IS NULL OR :declaracionTipo = '' OR m.declaracionTipo = :declaracionTipo) AND " +
            "(:startDate IS NULL OR m.createdAt >= :startDate) AND " +
            "(:endDate IS NULL OR m.createdAt <= :endDate) " +
@@ -31,10 +32,14 @@ public interface IDeclaracionMarcaRepository extends JpaRepository<DeclaracionMa
     List<DeclaracionMarcaModel> findConFiltros(
             @Param("marca") String marca,
             @Param("resuelta") Boolean resuelta,
+            @Param("estadoGestion") String estadoGestion,
             @Param("declaracionTipo") String declaracionTipo,
             @Param("startDate") Date startDate,
             @Param("endDate") Date endDate
     );
+
+    java.util.Optional<DeclaracionMarcaModel> findFirstByDeclaracionTipoAndDeclaracionIdAndMarca(
+            String declaracionTipo, Long declaracionId, String marca);
 
     @Query("SELECT COUNT(m) > 0 FROM DeclaracionMarcaModel m WHERE " +
            "m.declaracionTipo = :tipo AND m.declaracionId = :id AND " +

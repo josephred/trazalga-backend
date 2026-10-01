@@ -308,7 +308,10 @@ public class ReportRepository {
             "COALESCE(reg.nombre, '—') as region_nombre, " +
             "MIN(v.id) as resolucion_id, " +
             "MIN(COALESCE(v.resolucion, 'Subpesca')) as resolucion_nombre, " +
-            "MIN(COALESCE(v.observacion, '')) as observacion " +
+            "MIN(COALESCE(v.observacion, '')) as observacion, " +
+            "MAX(dm.id) as marca_id, " +
+            "MAX(COALESCE(dm.estado_gestion, 'PENDIENTE')) as estado_gestion, " +
+            "MAX(COALESCE(dm.observacion_resolucion, '')) as observacion_gestion " +
             "FROM (" +
             "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_ro, CONCAT('DR-', id)) as folio FROM declaracion_recolector " +
             "    UNION ALL " +
@@ -324,6 +327,7 @@ public class ReportRepository {
             "INNER JOIN especie e ON decl.especie_id = e.id " +
             "LEFT JOIN extraccion_tipo ext ON decl.extraccion_tipo_id = ext.id " +
             "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+            "LEFT JOIN declaracion_marca dm ON dm.declaracion_tipo = decl.tipo_perfil AND dm.declaracion_id = decl.id AND dm.marca = 'EN_VEDA' " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
             "    AND (v.activo = true OR v.activo = 1) " +
             "    AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
@@ -386,6 +390,10 @@ public class ReportRepository {
             map.put("resolucionId", row[12] != null ? ((Number) row[12]).longValue() : null);
             map.put("resolucion", row[13] != null ? row[13].toString() : "Subpesca");
             map.put("observacion", row[14] != null ? row[14].toString() : "");
+            
+            map.put("marcaId", row.length > 15 && row[15] != null ? ((Number) row[15]).longValue() : null);
+            map.put("estadoGestion", row.length > 16 && row[16] != null ? row[16].toString() : "PENDIENTE");
+            map.put("observacionGestion", row.length > 17 && row[17] != null ? row[17].toString() : "");
             
             return map;
         }).collect(Collectors.toList());

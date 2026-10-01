@@ -34,15 +34,20 @@ public class DeclaracionMarcaService {
         return repository.findByResueltaFalse();
     }
 
+    public List<DeclaracionMarcaModel> findConFiltros(String marca, Boolean resuelta, String estadoGestion, String declaracionTipo, Date startDate, Date endDate) {
+        return repository.findConFiltros(marca, resuelta, estadoGestion, declaracionTipo, startDate, endDate);
+    }
+
     public List<DeclaracionMarcaModel> findConFiltros(String marca, Boolean resuelta, String declaracionTipo, Date startDate, Date endDate) {
-        return repository.findConFiltros(marca, resuelta, declaracionTipo, startDate, endDate);
+        return findConFiltros(marca, resuelta, null, declaracionTipo, startDate, endDate);
     }
 
     public Map<String, Object> getResumen() {
         List<DeclaracionMarcaModel> todas = repository.findAll();
         long total = todas.size();
-        long pendientes = todas.stream().filter(m -> Boolean.FALSE.equals(m.getResuelta())).count();
-        long resueltas = todas.stream().filter(m -> Boolean.TRUE.equals(m.getResuelta())).count();
+        long pendientes = todas.stream().filter(m -> !Boolean.TRUE.equals(m.getResuelta()) && !"DERIVADA_CITACION".equalsIgnoreCase(m.getEstadoGestion())).count();
+        long enCitacion = todas.stream().filter(m -> !Boolean.TRUE.equals(m.getResuelta()) && "DERIVADA_CITACION".equalsIgnoreCase(m.getEstadoGestion())).count();
+        long resueltas = todas.stream().filter(m -> Boolean.TRUE.equals(m.getResuelta()) || "RESUELTA".equalsIgnoreCase(m.getEstadoGestion())).count();
 
         Map<String, Long> porMarca = new HashMap<>();
         porMarca.put("EN_VEDA", todas.stream().filter(m -> "EN_VEDA".equals(m.getMarca())).count());
@@ -54,6 +59,7 @@ public class DeclaracionMarcaService {
         Map<String, Object> resumen = new HashMap<>();
         resumen.put("total", total);
         resumen.put("pendientes", pendientes);
+        resumen.put("enCitacion", enCitacion);
         resumen.put("resueltas", resueltas);
         resumen.put("porMarca", porMarca);
         return resumen;
@@ -144,6 +150,47 @@ public class DeclaracionMarcaService {
             m.setEstadoGestion("PENDIENTE");
             return repository.save(m);
         });
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public DeclaracionMarcaModel derivarACitacion(Long marcaId, String numeroCitacion, Long usuarioId) {
+        if (numeroCitacion == null || numeroCitacion.trim().isEmpty()) {
+            throw new IllegalArgumentException("El número de citación es obligatorio para derivar a fiscalización.");
+        }
+
+        DeclaracionMarcaModel marca = repository.findById(marcaId)
+                .orElseThrow(() -> new IllegalArgumentException("Hallazgo #" + marcaId + " no encontrado"));
+
+        marca.setEstadoGestion("DERIVADA_CITACION");
+        marca.setObservacionResolucion("Citación N° " + numeroCitacion.trim());
+        marca.setResueltaPorUsuarioId(usuarioId);
+        marca.setFechaResolucion(new Date());
+        // resuelta sigue en false: la citación no cierra el hallazgo hasta su resolución final
+
+        return repository.save(marca);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public DeclaracionMarcaModel derivarACitacionPorDeclaracion(String declaracionTipo, Long declaracionId, String numeroCitacion, Long usuarioId) {
+        if (numeroCitacion == null || numeroCitacion.trim().isEmpty()) {
+            throw new IllegalArgumentException("El número de citación es obligatorio para derivar a fiscalización.");
+        }
+        String tipoNorm = declaracionTipo.trim().toUpperCase();
+        DeclaracionMarcaModel marca = repository.findFirstByDeclaracionTipoAndDeclaracionIdAndMarca(tipoNorm, declaracionId, "EN_VEDA")
+                .orElseGet(() -> DeclaracionMarcaModel.builder()
+                        .declaracionTipo(tipoNorm)
+                        .declaracionId(declaracionId)
+                        .marca("EN_VEDA")
+                        .detalle("Infracción a decreto de veda biológica derivada a citación")
+                        .resuelta(false)
+                        .build());
+
+        marca.setEstadoGestion("DERIVADA_CITACION");
+        marca.setObservacionResolucion("Citación N° " + numeroCitacion.trim());
+        marca.setResueltaPorUsuarioId(usuarioId);
+        marca.setFechaResolucion(new Date());
+
+        return repository.save(marca);
     }
 
     private void notificarLiberacionDestinatario(DeclaracionMarcaModel marca) {

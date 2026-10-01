@@ -254,4 +254,90 @@ public class DeclaracionMarcaValidationTest {
         assertTrue(res.getAdvertencias().stream().anyMatch(a -> a.contains("LED superado")),
                 "Debe incluir la advertencia de LED superado");
     }
+
+    @Test
+    void testDerivarACitacionActualizaEstadoYConservaMarca() {
+        DeclaracionMarcaModel marcaExistente = DeclaracionMarcaModel.builder()
+                .id(55L)
+                .declaracionTipo("RECOLECTOR")
+                .declaracionId(101L)
+                .marca("EN_VEDA")
+                .detalle("Extracción en veda biológica activa")
+                .resuelta(false)
+                .estadoGestion("PENDIENTE")
+                .createdAt(new Date())
+                .build();
+
+        when(marcaRepository.findById(55L)).thenReturn(java.util.Optional.of(marcaExistente));
+        when(marcaRepository.save(any(DeclaracionMarcaModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DeclaracionMarcaModel derivada = declaracionMarcaService.derivarACitacion(55L, "CIT-2026-0042", 999L);
+
+        assertNotNull(derivada);
+        assertEquals("DERIVADA_CITACION", derivada.getEstadoGestion());
+        assertEquals("Citación N° CIT-2026-0042", derivada.getObservacionResolucion());
+        assertEquals(999L, derivada.getResueltaPorUsuarioId());
+        assertNotNull(derivada.getFechaResolucion());
+        assertFalse(derivada.getResuelta(), "La citación no cierra el hallazgo (resuelta sigue en false)");
+        assertEquals("EN_VEDA", derivada.getMarca());
+        assertEquals(101L, derivada.getDeclaracionId());
+    }
+
+    @Test
+    void testDerivarACitacionExigeNumeroCitacion() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            declaracionMarcaService.derivarACitacion(55L, "", 1L);
+        });
+        assertThrows(IllegalArgumentException.class, () -> {
+            declaracionMarcaService.derivarACitacion(55L, "   ", 1L);
+        });
+        assertThrows(IllegalArgumentException.class, () -> {
+            declaracionMarcaService.derivarACitacion(55L, null, 1L);
+        });
+    }
+
+    @Test
+    void testResumenIncluyeConteoEnCitacion() {
+        DeclaracionMarcaModel m1 = DeclaracionMarcaModel.builder()
+                .marca("EN_VEDA").resuelta(false).estadoGestion("PENDIENTE").build();
+        DeclaracionMarcaModel m2 = DeclaracionMarcaModel.builder()
+                .marca("EN_VEDA").resuelta(false).estadoGestion("DERIVADA_CITACION").build();
+        DeclaracionMarcaModel m3 = DeclaracionMarcaModel.builder()
+                .marca("LED_EXCEDIDO").resuelta(true).estadoGestion("RESUELTA").build();
+
+        when(marcaRepository.findAll()).thenReturn(List.of(m1, m2, m3));
+
+        Map<String, Object> resumen = declaracionMarcaService.getResumen();
+
+        assertEquals(3L, resumen.get("total"));
+        assertEquals(1L, resumen.get("pendientes"));
+        assertEquals(1L, resumen.get("enCitacion"));
+        assertEquals(1L, resumen.get("resueltas"));
+    }
+
+    @Test
+    void testResolucionDefinitivaDesdeEnCitacion() {
+        DeclaracionMarcaModel enCitacion = DeclaracionMarcaModel.builder()
+                .id(77L)
+                .declaracionTipo("RECOLECTOR")
+                .declaracionId(102L)
+                .marca("EN_VEDA")
+                .detalle("Extracción en veda biológica activa")
+                .resuelta(false)
+                .estadoGestion("DERIVADA_CITACION")
+                .observacionResolucion("Citación N° CIT-2026-0088")
+                .build();
+
+        when(marcaRepository.findById(77L)).thenReturn(java.util.Optional.of(enCitacion));
+        when(marcaRepository.save(any(DeclaracionMarcaModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DeclaracionMarcaModel resuelta = declaracionMarcaService.resolverMarca(
+                77L, "SANCION", "Juzgado de Policía Local aplicó multa y decomiso", 888L);
+
+        assertTrue(resuelta.getResuelta());
+        assertEquals("RESUELTA", resuelta.getEstadoGestion());
+        assertEquals("SANCION", resuelta.getResolucionTipo());
+        assertEquals("Juzgado de Policía Local aplicó multa y decomiso", resuelta.getObservacionResolucion());
+        assertEquals(888L, resuelta.getResueltaPorUsuarioId());
+    }
 }

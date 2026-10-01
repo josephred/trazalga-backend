@@ -81,8 +81,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
 
-                        // 5. Resolución de hallazgos: ADMINISTRADOR o FISCALIZADOR
-                        .requestMatchers(HttpMethod.PUT, "/api/declaracion-marcas/*/resolver", "/declaracion-marcas/*/resolver", "/api/declaracion-marcas/**/resolver").hasAnyRole("ADMIN", "FISCALIZADOR")
+                        // 5. Gestión y resolución de hallazgos: ADMINISTRADOR o FISCALIZADOR
+                        .requestMatchers(HttpMethod.PUT, 
+                                "/api/declaracion-marcas/*/resolver", 
+                                "/declaracion-marcas/*/resolver", 
+                                "/declaracionmarca/*/resolver",
+                                "/api/declaracion-marcas/**/resolver").hasAnyRole("ADMIN", "FISCALIZADOR")
+                        .requestMatchers(HttpMethod.PUT, 
+                                "/api/declaracion-marcas/*/derivar-citacion", 
+                                "/declaracion-marcas/*/derivar-citacion", 
+                                "/declaracionmarca/*/derivar-citacion",
+                                "/api/declaracion-marcas/**/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
 
                         // 6. Todo lo demás por ahora permitido para compatibilidad operativa
                         .anyRequest().permitAll()
