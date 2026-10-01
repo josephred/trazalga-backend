@@ -139,6 +139,7 @@ public class DeclaracionPlantaAbastecimientoService {
             declaracion.setFechaIngresoPlanta(new Date());
         }
         sanearComposicion(declaracion);
+        normalizarPatentes(declaracion);
         DeclaracionPlantaAbastecimientoModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -200,6 +201,7 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
         sanearComposicion(model);
+        normalizarPatentes(model);
         repository.save(model);
 
         if (oldSeleccionadas != null && !oldSeleccionadas.isEmpty()) {
@@ -385,6 +387,19 @@ public class DeclaracionPlantaAbastecimientoService {
         if (model.getComposicion() != null && 
             (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
             model.setComposicion(null);
+        }
+    }
+
+    private void normalizarPatentes(DeclaracionPlantaAbastecimientoModel model) {
+        if (model == null) return;
+        if (model.getPlacaPatente() != null) {
+            model.setPlacaPatente(ConsultaPatenteService.normalizarPatente(model.getPlacaPatente()));
+        }
+        if (model.getPlacaPatenteCarro() != null) {
+            model.setPlacaPatenteCarro(ConsultaPatenteService.normalizarPatente(model.getPlacaPatenteCarro()));
+        }
+        if (model.getPatente() != null) {
+            model.setPatente(ConsultaPatenteService.normalizarPatente(model.getPatente()));
         }
     }
 }

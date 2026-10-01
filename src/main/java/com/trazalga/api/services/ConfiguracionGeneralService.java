@@ -92,6 +92,10 @@ public class ConfiguracionGeneralService {
         createIfNotExist("origen_geo_precision_max_m", "500", "Precisión GPS mínima aceptable para marcar", "INTEGRIDAD");
         createIfNotExist("origen_geo_patron_pct", "50", "% de declaraciones lejanas para detectar patrón", "INTEGRIDAD");
         createIfNotExist("origen_geo_patron_min_decl", "3", "Mínimo de declaraciones para evaluar patrón", "INTEGRIDAD");
+
+        // PUNTO 10 — CONSULTA CIUDADANA DE PATENTES (T10.2)
+        createIfNotExist("patente_vigencia_horas", "48", "Horas de vigencia del último movimiento para considerar traslado amparado", "CADENA");
+        createIfNotExist("patente_consulta_max_por_minuto", "20", "Máximo de consultas públicas por IP por minuto", "CADENA");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

@@ -26,6 +26,9 @@ public class SecurityConfig {
     @Autowired
     private JwtRequestFilter jwtRequestFilter;
 
+    @Autowired
+    private com.trazalga.api.security.RateLimitFilter rateLimitFilter;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -48,8 +51,9 @@ public class SecurityConfig {
                         // 1. Opciones CORS preflight siempre permitidas
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 2. Rutas públicas de autenticación
+                        // 2. Rutas públicas de autenticación y consulta ciudadana
                         .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+                        .requestMatchers("/api/public/**", "/public/**", "/patente/**").permitAll()
 
                         // 3. Endpoint de usuario actual
                         .requestMatchers("/api/usuarios/me", "/usuario/me").authenticated()
@@ -99,6 +103,7 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable());
 
+        http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

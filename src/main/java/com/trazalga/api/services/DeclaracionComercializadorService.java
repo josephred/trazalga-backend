@@ -147,6 +147,7 @@ public class DeclaracionComercializadorService {
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
         validarCargasNoBloqueadas(declaracionComercializadorModel.getDeclaracionesSeleccionadas());
         sanearComposicion(declaracionComercializadorModel);
+        normalizarPatentes(declaracionComercializadorModel);
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
@@ -239,6 +240,7 @@ public class DeclaracionComercializadorService {
         declaracionComercializadorModel.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
         
         sanearComposicion(declaracionComercializadorModel);
+        normalizarPatentes(declaracionComercializadorModel);
         declaracionComercializadorRepository.save(declaracionComercializadorModel);
 
         if (oldSeleccionadas != null && !oldSeleccionadas.isEmpty()) {
@@ -376,6 +378,19 @@ public class DeclaracionComercializadorService {
         if (model.getComposicion() != null && 
             (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
             model.setComposicion(null);
+        }
+    }
+
+    private void normalizarPatentes(DeclaracionComercializadorModel model) {
+        if (model == null) return;
+        if (model.getPlacaPatente() != null) {
+            model.setPlacaPatente(ConsultaPatenteService.normalizarPatente(model.getPlacaPatente()));
+        }
+        if (model.getPlacaPatenteCarro() != null) {
+            model.setPlacaPatenteCarro(ConsultaPatenteService.normalizarPatente(model.getPlacaPatenteCarro()));
+        }
+        if (model.getPatente() != null) {
+            model.setPatente(ConsultaPatenteService.normalizarPatente(model.getPatente()));
         }
     }
 }
