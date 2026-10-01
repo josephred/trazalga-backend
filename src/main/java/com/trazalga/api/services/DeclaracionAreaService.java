@@ -68,10 +68,14 @@ public class DeclaracionAreaService {
         return declaraciones;
     }
 
+    @Autowired
+    private BloqueoCargaService bloqueoCargaService;
+
     // NUEVO MÉTODO AÑADIDO
     public List<DeclaracionAreaModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
         List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         declaraciones.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerAreas(declaraciones);
         return declaraciones;
     }
 
@@ -84,6 +88,7 @@ public class DeclaracionAreaService {
         }
         List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         declaraciones.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerAreas(declaraciones);
         return declaraciones;
     }
 

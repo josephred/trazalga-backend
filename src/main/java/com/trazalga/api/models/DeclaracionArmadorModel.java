@@ -137,4 +137,10 @@ public class DeclaracionArmadorModel {
     // Campo transitorio para recibir la lista de buzos del frontend (no se persiste en esta tabla)
     @Transient
     private List<BuzoModel> buzos;
+
+    @Transient
+    private Boolean bloqueada;
+
+    @Transient
+    private String motivoBloqueo;
 }

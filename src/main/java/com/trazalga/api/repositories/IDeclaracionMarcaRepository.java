@@ -35,4 +35,33 @@ public interface IDeclaracionMarcaRepository extends JpaRepository<DeclaracionMa
             @Param("startDate") Date startDate,
             @Param("endDate") Date endDate
     );
+
+    @Query("SELECT COUNT(m) > 0 FROM DeclaracionMarcaModel m WHERE " +
+           "m.declaracionTipo = :tipo AND m.declaracionId = :id AND " +
+           "m.marca IN :marcasBloqueantes AND " +
+           "(m.resuelta = false OR (m.resuelta = true AND (m.resolucionTipo IS NULL OR m.resolucionTipo NOT IN ('LIBERADA', 'DESCARTADA'))))")
+    boolean isCargaBloqueada(
+            @Param("tipo") String tipo,
+            @Param("id") Long id,
+            @Param("marcasBloqueantes") java.util.Collection<String> marcasBloqueantes
+    );
+
+    @Query("SELECT m FROM DeclaracionMarcaModel m WHERE " +
+           "m.declaracionTipo = :tipo AND m.declaracionId IN :ids AND " +
+           "m.marca IN :marcasBloqueantes AND " +
+           "(m.resuelta = false OR (m.resuelta = true AND (m.resolucionTipo IS NULL OR m.resolucionTipo NOT IN ('LIBERADA', 'DESCARTADA'))))")
+    List<DeclaracionMarcaModel> findMarcasBloqueantesPorTipoEIds(
+            @Param("tipo") String tipo,
+            @Param("ids") java.util.Collection<Long> ids,
+            @Param("marcasBloqueantes") java.util.Collection<String> marcasBloqueantes
+    );
+
+    @Query("SELECT m FROM DeclaracionMarcaModel m WHERE " +
+           "CONCAT(m.declaracionTipo, ':', m.declaracionId) IN :tokens AND " +
+           "m.marca IN :marcasBloqueantes AND " +
+           "(m.resuelta = false OR (m.resuelta = true AND (m.resolucionTipo IS NULL OR m.resolucionTipo NOT IN ('LIBERADA', 'DESCARTADA'))))")
+    List<DeclaracionMarcaModel> findMarcasBloqueantesPorTokens(
+            @Param("tokens") java.util.Collection<String> tokens,
+            @Param("marcasBloqueantes") java.util.Collection<String> marcasBloqueantes
+    );
 }

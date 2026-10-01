@@ -16,6 +16,8 @@ import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAreaModel;
+import com.trazalga.api.dto.MotivoBloqueoDTO;
+import com.trazalga.api.exceptions.CargaBloqueadaException;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
@@ -35,6 +37,9 @@ public class DeclaracionComercializadorService {
 
     @Autowired
     IDeclaracionAreaRepository areaRepository;
+
+    @Autowired
+    private BloqueoCargaService bloqueoCargaService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -137,6 +142,7 @@ public class DeclaracionComercializadorService {
 
     @Transactional
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
+        validarCargasNoBloqueadas(declaracionComercializadorModel.getDeclaracionesSeleccionadas());
         sanearComposicion(declaracionComercializadorModel);
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -156,17 +162,20 @@ public class DeclaracionComercializadorService {
     }
 
     public List<DeclaracionComercializadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        return declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        List<DeclaracionComercializadorModel> list = declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        bloqueoCargaService.enriquecerComercializadores(list);
+        return list;
     }
 
     // Variante para el formulario de edición: además de las no consumidas, incluye las
     // que ya consumió la declaración que se está editando (consumidasPorId), para que
     // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
     public List<DeclaracionComercializadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
-        if (consumidasPorId == null) {
-            return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
-        }
-        return declaracionComercializadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        List<DeclaracionComercializadorModel> list = (consumidasPorId == null)
+            ? declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId)
+            : declaracionComercializadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        bloqueoCargaService.enriquecerComercializadores(list);
+        return list;
     }
 
     @Transactional
@@ -175,6 +184,7 @@ public class DeclaracionComercializadorService {
         if (declaracionComercializadorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
         String oldSeleccionadas = declaracionComercializadorModel.getDeclaracionesSeleccionadas();
 
         declaracionComercializadorModel.setFolioOrigen(request.getFolioOrigen());
@@ -255,6 +265,18 @@ public class DeclaracionComercializadorService {
     public String getLastFolioDesembarqueAc() {
         List<String> folios = declaracionComercializadorRepository.findLastFolioDesembarqueAc();
         return folios.isEmpty() ? null : folios.getFirst();
+    }
+
+    private void validarCargasNoBloqueadas(String declaracionesSeleccionadas) {
+        if (declaracionesSeleccionadas != null && !declaracionesSeleccionadas.isBlank()) {
+            Map<String, MotivoBloqueoDTO> bloqueos = bloqueoCargaService.bloqueosPara(declaracionesSeleccionadas);
+            if (!bloqueos.isEmpty()) {
+                Map.Entry<String, MotivoBloqueoDTO> first = bloqueos.entrySet().iterator().next();
+                throw new CargaBloqueadaException(
+                    String.format("La carga %s está retenida por %s (hallazgo #%d) hasta su fiscalización.",
+                        first.getKey(), first.getValue().getMarca(), first.getValue().getMarcaId()));
+            }
+        }
     }
 
     private void marcarDeclaracionesComoConsumidas(String idsCSV, Long consumidaPorId, String tipo, Long usuarioDestinatarioId) {

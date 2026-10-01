@@ -150,4 +150,10 @@ public class DeclaracionAreaModel {
     // Campo transitorio para recibir la lista de buzos del frontend
     @Transient
     private List<BuzoModel> buzos;
+
+    @Transient
+    private Boolean bloqueada;
+
+    @Transient
+    private String motivoBloqueo;
 }

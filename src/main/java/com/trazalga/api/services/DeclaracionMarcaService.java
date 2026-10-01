@@ -71,17 +71,120 @@ public class DeclaracionMarcaService {
         return repository.save(model);
     }
 
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IDeclaracionArmadorRepository armadorRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IDeclaracionRecolectorRepository recolectorRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IDeclaracionAreaRepository areaRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IDeclaracionComercializadorRepository comercializadorRepository;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository plantaAbastecimientoRepository;
+
     public Optional<DeclaracionMarcaModel> resolverMarca(Long id) {
         return repository.findById(id).map(m -> {
             m.setResuelta(true);
-            return repository.save(m);
+            m.setResolucionTipo("LIBERADA");
+            m.setObservacionResolucion("Resolución administrativa automática");
+            m.setFechaResolucion(new Date());
+            m.setEstadoGestion("RESUELTA");
+            DeclaracionMarcaModel saved = repository.save(m);
+            notificarLiberacionDestinatario(saved);
+            return saved;
         });
+    }
+
+    public DeclaracionMarcaModel resolverMarca(Long id, String resolucionTipo, String observacion, Long usuarioId) {
+        DeclaracionMarcaModel m = repository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Hallazgo #" + id + " no encontrado"));
+
+        if (observacion == null || observacion.trim().isEmpty()) {
+            throw new IllegalArgumentException("La observación es obligatoria para resolver el hallazgo.");
+        }
+
+        String tipoNorm = (resolucionTipo != null && !resolucionTipo.isBlank())
+                ? resolucionTipo.trim().toUpperCase() : "LIBERADA";
+
+        if (!List.of("LIBERADA", "DECOMISO", "SANCION", "DESCARTADA").contains(tipoNorm)) {
+            throw new IllegalArgumentException("Tipo de resolución inválido: " + resolucionTipo +
+                    ". Opciones permitidas: LIBERADA, DECOMISO, SANCION, DESCARTADA.");
+        }
+
+        m.setResuelta(true);
+        m.setResolucionTipo(tipoNorm);
+        m.setObservacionResolucion(observacion.trim());
+        m.setFechaResolucion(new Date());
+        m.setResueltaPorUsuarioId(usuarioId);
+        m.setEstadoGestion("RESUELTA");
+
+        DeclaracionMarcaModel saved = repository.save(m);
+
+        if ("LIBERADA".equals(tipoNorm) || "DESCARTADA".equals(tipoNorm)) {
+            notificarLiberacionDestinatario(saved);
+        }
+
+        return saved;
     }
 
     public Optional<DeclaracionMarcaModel> reabrirMarca(Long id) {
         return repository.findById(id).map(m -> {
             m.setResuelta(false);
+            m.setResolucionTipo(null);
+            m.setObservacionResolucion(null);
+            m.setFechaResolucion(null);
+            m.setResueltaPorUsuarioId(null);
+            m.setEstadoGestion("PENDIENTE");
             return repository.save(m);
         });
+    }
+
+    private void notificarLiberacionDestinatario(DeclaracionMarcaModel marca) {
+        if (notificationService == null || marca.getDeclaracionId() == null || marca.getDeclaracionTipo() == null) {
+            return;
+        }
+        try {
+            Long destUserId = null;
+            String tipo = marca.getDeclaracionTipo().toUpperCase();
+            Long declId = marca.getDeclaracionId();
+
+            if ("ARMADOR".equals(tipo) && armadorRepository != null) {
+                destUserId = armadorRepository.findById(declId)
+                        .map(com.trazalga.api.models.DeclaracionArmadorModel::getUsuarioDestinatario)
+                        .map(com.trazalga.api.models.UsuarioModel::getId).orElse(null);
+            } else if ("RECOLECTOR".equals(tipo) && recolectorRepository != null) {
+                destUserId = recolectorRepository.findById(declId)
+                        .map(com.trazalga.api.models.DeclaracionRecolectorModel::getUsuarioDestinatario)
+                        .map(com.trazalga.api.models.UsuarioModel::getId).orElse(null);
+            } else if ("AREA".equals(tipo) && areaRepository != null) {
+                destUserId = areaRepository.findById(declId)
+                        .map(com.trazalga.api.models.DeclaracionAreaModel::getUsuarioDestinatario)
+                        .map(com.trazalga.api.models.UsuarioModel::getId).orElse(null);
+            } else if ("COMERCIALIZADOR".equals(tipo) && comercializadorRepository != null) {
+                destUserId = comercializadorRepository.findById(declId)
+                        .map(com.trazalga.api.models.DeclaracionComercializadorModel::getUsuarioDestinatario)
+                        .map(com.trazalga.api.models.UsuarioModel::getId).orElse(null);
+            } else if ("PLANTA_ABASTECIMIENTO".equals(tipo) && plantaAbastecimientoRepository != null) {
+                destUserId = plantaAbastecimientoRepository.findById(declId)
+                        .map(com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel::getUsuarioDestinatario)
+                        .map(com.trazalga.api.models.UsuarioModel::getId).orElse(null);
+            }
+
+            if (destUserId != null) {
+                String titulo = "Carga liberada en bodega virtual";
+                String mensaje = String.format("La carga %s #%d ha sido liberada por fiscalización (%s). Ya puede ser recepcionada o despachada.",
+                        tipo, declId, marca.getResolucionTipo());
+                notificationService.sendPushNotificationToUser(destUserId, titulo, mensaje);
+            }
+        } catch (Exception ex) {
+            System.err.println("Error al notificar liberación de carga: " + ex.getMessage());
+        }
     }
 }

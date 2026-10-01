@@ -143,4 +143,10 @@ public class DeclaracionRecolectorModel {
 
     @Transient
     private List<BuzoModel> buzos;
+
+    @Transient
+    private Boolean bloqueada;
+
+    @Transient
+    private String motivoBloqueo;
 }

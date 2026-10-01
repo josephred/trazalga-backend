@@ -52,10 +52,24 @@ public class DeclaracionMarcaController {
     }
 
     @PutMapping("/{id}/resolver")
-    public ResponseEntity<DeclaracionMarcaModel> resolver(@PathVariable Long id) {
-        return service.resolverMarca(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> resolver(
+            @PathVariable Long id,
+            @RequestBody(required = false) com.trazalga.api.dto.ResolucionMarcaDTO request,
+            java.security.Principal principal) {
+        Long usuarioId = null;
+        if (request == null) {
+            return service.resolverMarca(id)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        }
+
+        try {
+            DeclaracionMarcaModel resuelta = service.resolverMarca(
+                    id, request.getResolucionTipo(), request.getObservacion(), usuarioId);
+            return ResponseEntity.ok(resuelta);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}/reabrir")

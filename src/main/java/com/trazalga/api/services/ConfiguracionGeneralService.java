@@ -64,6 +64,10 @@ public class ConfiguracionGeneralService {
         createIfNotExist("riesgo_escala_humedo_sin_merma", "ROJO", "Nivel al que escala la inconsistencia biológica grave", "RIESGO");
         createIfNotExist("riesgo_agravante_veda_niveles", "1", "Niveles que incrementa una marca activa EN_VEDA", "RIESGO");
         createIfNotExist("riesgo_agravante_led_niveles", "1", "Niveles que incrementa una marca activa LED_EXCEDIDO", "RIESGO");
+
+        // Bloqueo de Carga en Bodega Virtual por Marcas (Punto 4 / T4.1)
+        createIfNotExist("marcas_bloqueantes_carga", "LED_EXCEDIDO", "Marcas que bloquean el despacho de carga en bodega virtual", "CADENA");
+        createIfNotExist("bloqueo_carga_activo", "true", "Habilita el bloqueo de carga en bodega por marcas activas", "CADENA");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

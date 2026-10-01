@@ -53,9 +53,13 @@ public class DeclaracionRecolectorService {
         return list;
     }
 
+    @Autowired
+    private BloqueoCargaService bloqueoCargaService;
+
     public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
         List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         list.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerRecolectores(list);
         return list;
     }
 
@@ -68,6 +72,7 @@ public class DeclaracionRecolectorService {
         }
         List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         list.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerRecolectores(list);
         return list;
     }
 

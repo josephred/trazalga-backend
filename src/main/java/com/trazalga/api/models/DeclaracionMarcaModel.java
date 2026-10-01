@@ -39,6 +39,23 @@ public class DeclaracionMarcaModel {
     @Builder.Default
     private Boolean resuelta = false;
 
+    @Column(name = "resolucion_tipo", length = 30)
+    private String resolucionTipo; // LIBERADA | DECOMISO | SANCION | DESCARTADA
+
+    @Column(name = "resuelta_por_usuario_id")
+    private Long resueltaPorUsuarioId;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "fecha_resolucion")
+    private Date fechaResolucion;
+
+    @Column(name = "observacion_resolucion", length = 500)
+    private String observacionResolucion;
+
+    @Column(name = "estado_gestion", nullable = false, length = 30)
+    @Builder.Default
+    private String estadoGestion = "PENDIENTE"; // PENDIENTE | DERIVADA_CITACION | RESUELTA
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", nullable = false, updatable = false)
     private Date createdAt;

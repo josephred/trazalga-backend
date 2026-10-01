@@ -75,9 +75,13 @@ public class DeclaracionArmadorService {
         return declaraciones;
     }
 
+    @Autowired
+    private BloqueoCargaService bloqueoCargaService;
+
     public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
         List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         declaraciones.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerArmadores(declaraciones);
         return declaraciones;
     }
 
@@ -90,6 +94,7 @@ public class DeclaracionArmadorService {
         }
         List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         declaraciones.forEach(this::populateBuzos);
+        bloqueoCargaService.enriquecerArmadores(declaraciones);
         return declaraciones;
     }
 

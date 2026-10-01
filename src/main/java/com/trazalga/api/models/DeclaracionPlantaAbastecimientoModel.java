@@ -148,4 +148,10 @@ public class DeclaracionPlantaAbastecimientoModel {
 
     @Column(name = "resumen_documento", columnDefinition = "TEXT")
     private String resumenDocumento;
+
+    @Transient
+    private Boolean bloqueada;
+
+    @Transient
+    private String motivoBloqueo;
 }

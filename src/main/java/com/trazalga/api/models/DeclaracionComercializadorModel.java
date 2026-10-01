@@ -147,4 +147,10 @@ public class DeclaracionComercializadorModel {
     // snapshot recurren al cálculo en vivo (ver DeclaracionComercializadorService).
     @Column(name = "resumen_documento", columnDefinition = "TEXT")
     private String resumenDocumento;
+
+    @Transient
+    private Boolean bloqueada;
+
+    @Transient
+    private String motivoBloqueo;
 }

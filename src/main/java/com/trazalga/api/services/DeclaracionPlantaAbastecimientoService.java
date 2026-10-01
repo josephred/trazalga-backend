@@ -24,6 +24,8 @@ import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
+import com.trazalga.api.dto.MotivoBloqueoDTO;
+import com.trazalga.api.exceptions.CargaBloqueadaException;
 
 @Service
 public class DeclaracionPlantaAbastecimientoService {
@@ -45,6 +47,9 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Autowired
     private ConfiguracionGeneralService configuracionGeneralService;
+
+    @Autowired
+    private BloqueoCargaService bloqueoCargaService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -125,6 +130,7 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Transactional
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
+        validarCargasNoBloqueadas(declaracion.getDeclaracionesSeleccionadas());
         validarVoucherRomana(declaracion);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
@@ -156,6 +162,7 @@ public class DeclaracionPlantaAbastecimientoService {
         if (model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
         validarVoucherRomana(request);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
@@ -246,10 +253,23 @@ public class DeclaracionPlantaAbastecimientoService {
     }
 
     public List<DeclaracionPlantaAbastecimientoModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
-        if (consumidasPorId == null) {
-            return repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        List<DeclaracionPlantaAbastecimientoModel> list = (consumidasPorId == null)
+            ? repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId)
+            : repository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        bloqueoCargaService.enriquecerPlantas(list);
+        return list;
+    }
+
+    private void validarCargasNoBloqueadas(String declaracionesSeleccionadas) {
+        if (declaracionesSeleccionadas != null && !declaracionesSeleccionadas.isBlank()) {
+            Map<String, MotivoBloqueoDTO> bloqueos = bloqueoCargaService.bloqueosPara(declaracionesSeleccionadas);
+            if (!bloqueos.isEmpty()) {
+                Map.Entry<String, MotivoBloqueoDTO> first = bloqueos.entrySet().iterator().next();
+                throw new CargaBloqueadaException(
+                    String.format("La carga %s está retenida por %s (hallazgo #%d) hasta su fiscalización.",
+                        first.getKey(), first.getValue().getMarca(), first.getValue().getMarcaId()));
+            }
         }
-        return repository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
     }
 
     private String generarFolio() {
