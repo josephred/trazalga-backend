@@ -750,6 +750,21 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/cadena-origen-planta")
+    public ResponseEntity<?> getCadenaOrigenPlanta(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long regionId) {
+        try {
+            return ResponseEntity.ok(reportService.getCadenaOrigenPlanta(startDate, endDate, especieId, regionId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo cadena origen a planta: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/tiempo-validacion")
     public ResponseEntity<?> getTiempoValidacion(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,

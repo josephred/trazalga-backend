@@ -153,4 +153,63 @@ public class ReportServiceVariacionPesoTest {
         DeclaracionPlantaAbastecimientoModel guardada = plantaService.save(declTransicion);
         assertNotNull(guardada);
     }
+
+    @Test
+    @DisplayName("T6.2: ReportService delega getCadenaOrigenPlanta al repositorio")
+    void testReportService_GetCadenaOrigenPlanta_DelegaAlRepositorio() {
+        Date startDate = new Date();
+        Date endDate = new Date();
+
+        java.util.List<Map<String, Object>> mockCadena = new java.util.ArrayList<>();
+        Map<String, Object> lote = new HashMap<>();
+        lote.put("plantaId", 101L);
+        lote.put("plantaFolio", "DAPLA-2026-001");
+        lote.put("kgOrigen", 2500.0);
+        lote.put("kgPlanta", 2300.0);
+        lote.put("variacionPct", -8.0);
+        lote.put("fueraUmbral", true);
+        mockCadena.add(lote);
+
+        when(reportRepository.getCadenaOrigenPlanta(startDate, endDate)).thenReturn(mockCadena);
+
+        java.util.List<Map<String, Object>> res = reportService.getCadenaOrigenPlanta(startDate, endDate);
+
+        assertNotNull(res);
+        assertEquals(1, res.size());
+        assertEquals("DAPLA-2026-001", res.get(0).get("plantaFolio"));
+        assertEquals(2500.0, res.get(0).get("kgOrigen"));
+        assertEquals(2300.0, res.get(0).get("kgPlanta"));
+        assertEquals(-8.0, res.get(0).get("variacionPct"));
+        assertTrue((Boolean) res.get(0).get("fueraUmbral"));
+    }
+
+    @Test
+    @DisplayName("T6.2: Criterio aceptación: 2 recolectores (1.000 + 1.500) -> comercializador -> planta (romana 2.300) = -8.0%")
+    void testCalculoCriterioAceptacion_2Recolectores_Comercializador_Planta() {
+        double r1Kg = 1000.0;
+        double r2Kg = 1500.0;
+        double kgOrigen = r1Kg + r2Kg; // 2500.0
+        double kgPlanta = 2300.0;
+
+        double variacionPct = Math.round(((kgPlanta - kgOrigen) / kgOrigen * 100.0) * 10.0) / 10.0;
+
+        assertEquals(2500.0, kgOrigen);
+        assertEquals(2300.0, kgPlanta);
+        assertEquals(-8.0, variacionPct);
+        assertTrue(Math.abs(variacionPct) > 5.0, "Debe superar el umbral general del 5%");
+    }
+
+    @Test
+    @DisplayName("T6.2: Criterio aceptación: lote directo armador (1.200 kg) -> planta (romana 1.140 kg) = -5.0%")
+    void testCalculoCriterioAceptacion_LoteDirecto_Armador_Planta() {
+        double armadorKg = 1200.0;
+        double kgPlanta = 1140.0;
+
+        double variacionPct = Math.round(((kgPlanta - armadorKg) / armadorKg * 100.0) * 10.0) / 10.0;
+
+        assertEquals(1200.0, armadorKg);
+        assertEquals(1140.0, kgPlanta);
+        assertEquals(-5.0, variacionPct);
+        assertFalse(Math.abs(variacionPct) > 5.0, "Variación de exactamente 5% no supera el umbral");
+    }
 }

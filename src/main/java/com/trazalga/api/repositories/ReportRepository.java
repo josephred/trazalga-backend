@@ -968,7 +968,534 @@ public class ReportRepository {
         map.put("documental", docMap);
         map.put("consolidado", consolidadoMap);
 
+        // T6.2: Cadena Origen -> Planta (Romana)
+        List<java.util.Map<String, Object>> cadenaList = getCadenaOrigenPlanta(startDate, endDate);
+        long totalCadena = cadenaList.size();
+        double sumAbsVar = 0.0;
+        long fueraUmbralCadena = 0;
+        int conVarCount = 0;
+        for (java.util.Map<String, Object> c : cadenaList) {
+            Double var = (Double) c.get("variacionPct");
+            if (var != null) {
+                sumAbsVar += Math.abs(var);
+                conVarCount++;
+                if (Math.abs(var) > umbral) {
+                    fueraUmbralCadena++;
+                }
+            }
+        }
+        Double promedioVarCadena = conVarCount > 0 ? (Math.round((sumAbsVar / conVarCount) * 10.0) / 10.0) : (totalCadena > 0 ? 0.0 : null);
+
+        java.util.Map<String, Object> cadenaResumen = new java.util.HashMap<>();
+        cadenaResumen.put("total", totalCadena);
+        cadenaResumen.put("promedioVariacionPct", promedioVarCadena);
+        cadenaResumen.put("fueraUmbral", fueraUmbralCadena);
+
+        map.put("cadenaOrigenPlanta", cadenaList);
+        map.put("cadenaOrigenPlantaResumen", cadenaResumen);
+
         return map;
+    }
+
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate) {
+        return getCadenaOrigenPlanta(startDate, endDate, null, null);
+    }
+
+    /**
+     * T6.2: Resuelve hacia atrás la cadena de custodia origen -> planta (romana).
+     * Por cada recepción en planta con romana (peso_romana_kg > 0), encuentra los
+     * desembarques en origen (recolector, armador o área) que la componen, ya sea
+     * en forma directa o a través de un comercializador (profundidad máxima 2 con cycle protection).
+     */
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId, Long regionId) {
+        double umbral = 5.0;
+
+        String sqlPlanta = "SELECT dpa.id, dpa.folio_origen, dpa.folio_declaracion_apla, dpa.peso_romana_kg, " +
+                "dpa.fecha_pesaje, dpa.fecha_ingreso_planta, dpa.voucher_romana_numero, dpa.voucher_romana_adjunto, " +
+                "dpa.declaraciones_seleccionadas, dpa.especie_id, " +
+                "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre " +
+                "FROM declaracion_planta_abastecimiento dpa " +
+                "JOIN usuario u ON dpa.usuario_id = u.id " +
+                "WHERE dpa.peso_romana_kg IS NOT NULL AND dpa.peso_romana_kg > 0 ";
+
+        if (startDate != null && endDate != null) {
+            sqlPlanta += "AND dpa.fecha_ingreso_planta BETWEEN :startDate AND :endDate ";
+        } else if (startDate != null) {
+            sqlPlanta += "AND dpa.fecha_ingreso_planta >= :startDate ";
+        } else if (endDate != null) {
+            sqlPlanta += "AND dpa.fecha_ingreso_planta <= :endDate ";
+        }
+        if (especieId != null) {
+            sqlPlanta += "AND dpa.especie_id = :especieId ";
+        }
+        sqlPlanta += "ORDER BY dpa.fecha_ingreso_planta DESC, dpa.id DESC";
+
+        Query qPlanta = entityManager.createNativeQuery(sqlPlanta);
+        if (startDate != null) qPlanta.setParameter("startDate", startDate);
+        if (endDate != null) qPlanta.setParameter("endDate", endDate);
+        if (especieId != null) qPlanta.setParameter("especieId", especieId);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> plantRows = qPlanta.getResultList();
+        if (plantRows.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+
+        java.util.Set<Long> allComercializadorIds = new java.util.HashSet<>();
+        java.util.Set<Long> allRecolectorIds = new java.util.HashSet<>();
+        java.util.Set<Long> allArmadorIds = new java.util.HashSet<>();
+        java.util.Set<Long> allAreaIds = new java.util.HashSet<>();
+
+        class PlantaRowData {
+            Long id;
+            String folioOrigen;
+            String folioApla;
+            double pesoRomana;
+            Date fechaPesaje;
+            Date fechaIngreso;
+            String voucherNumero;
+            String voucherAdjunto;
+            String decSel;
+            Long espId;
+            String rut;
+            String nombre;
+            java.util.Map<String, List<Long>> tokens;
+            List<Long> fkComercializadores = new java.util.ArrayList<>();
+            List<Long> fkRecolectores = new java.util.ArrayList<>();
+            List<Long> fkArmadores = new java.util.ArrayList<>();
+            List<Long> fkAreas = new java.util.ArrayList<>();
+        }
+
+        List<PlantaRowData> plantas = new java.util.ArrayList<>();
+        List<Long> plantIds = new java.util.ArrayList<>();
+
+        for (Object[] r : plantRows) {
+            PlantaRowData p = new PlantaRowData();
+            p.id = ((Number) r[0]).longValue();
+            p.folioOrigen = r[1] != null ? r[1].toString() : "";
+            p.folioApla = r[2] != null ? r[2].toString() : "";
+            p.pesoRomana = ((Number) r[3]).doubleValue();
+            p.fechaPesaje = toReportDate(r[4]);
+            p.fechaIngreso = toReportDate(r[5]);
+            p.voucherNumero = r[6] != null ? r[6].toString() : null;
+            p.voucherAdjunto = r[7] != null ? r[7].toString() : null;
+            p.decSel = r[8] != null ? r[8].toString() : "";
+            p.espId = r[9] != null ? ((Number) r[9]).longValue() : null;
+            p.rut = r[10] != null ? r[10].toString() : "";
+            p.nombre = r[11] != null ? r[11].toString() : "";
+            p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(p.decSel);
+
+            List<Long> cIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR");
+            List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR");
+            List<Long> armIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR");
+            List<Long> arIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA");
+
+            allComercializadorIds.addAll(cIds);
+            allRecolectorIds.addAll(recIds);
+            allArmadorIds.addAll(armIds);
+            allAreaIds.addAll(arIds);
+
+            plantas.add(p);
+            plantIds.add(p.id);
+        }
+
+        if (!plantIds.isEmpty()) {
+            String sqlFkC = "SELECT declaracion_destinatario_id, id FROM declaracion_comercializador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkCRows = entityManager.createNativeQuery(sqlFkC).setParameter("ids", plantIds).getResultList();
+            for (Object[] row : fkCRows) {
+                Long pId = ((Number) row[0]).longValue();
+                Long cId = ((Number) row[1]).longValue();
+                allComercializadorIds.add(cId);
+                for (PlantaRowData p : plantas) {
+                    if (p.id.equals(pId) && !p.fkComercializadores.contains(cId)) p.fkComercializadores.add(cId);
+                }
+            }
+
+            String sqlFkR = "SELECT declaracion_destinatario_id, id FROM declaracion_recolector WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkRRows = entityManager.createNativeQuery(sqlFkR).setParameter("ids", plantIds).getResultList();
+            for (Object[] row : fkRRows) {
+                Long pId = ((Number) row[0]).longValue();
+                Long rId = ((Number) row[1]).longValue();
+                allRecolectorIds.add(rId);
+                for (PlantaRowData p : plantas) {
+                    if (p.id.equals(pId) && !p.fkRecolectores.contains(rId)) p.fkRecolectores.add(rId);
+                }
+            }
+
+            String sqlFkA = "SELECT declaracion_destinatario_id, id FROM declaracion_armador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkARows = entityManager.createNativeQuery(sqlFkA).setParameter("ids", plantIds).getResultList();
+            for (Object[] row : fkARows) {
+                Long pId = ((Number) row[0]).longValue();
+                Long aId = ((Number) row[1]).longValue();
+                allArmadorIds.add(aId);
+                for (PlantaRowData p : plantas) {
+                    if (p.id.equals(pId) && !p.fkArmadores.contains(aId)) p.fkArmadores.add(aId);
+                }
+            }
+
+            String sqlFkAr = "SELECT declaracion_destinatario_id, id FROM declaracion_area WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkArRows = entityManager.createNativeQuery(sqlFkAr).setParameter("ids", plantIds).getResultList();
+            for (Object[] row : fkArRows) {
+                Long pId = ((Number) row[0]).longValue();
+                Long arId = ((Number) row[1]).longValue();
+                allAreaIds.add(arId);
+                for (PlantaRowData p : plantas) {
+                    if (p.id.equals(pId) && !p.fkAreas.contains(arId)) p.fkAreas.add(arId);
+                }
+            }
+        }
+
+        class ComData {
+            Long id;
+            String folio;
+            double kg;
+            Date fecha;
+            String rut;
+            String actor;
+            String decSel;
+            java.util.Map<String, List<Long>> tokens;
+            List<Long> fkRecolectores = new java.util.ArrayList<>();
+            List<Long> fkArmadores = new java.util.ArrayList<>();
+            List<Long> fkAreas = new java.util.ArrayList<>();
+        }
+
+        java.util.Map<Long, ComData> comMap = new java.util.HashMap<>();
+        if (!allComercializadorIds.isEmpty()) {
+            String sqlC = "SELECT c.id, c.folio_origen, c.cantidad, c.fecha_declaracion, c.declaraciones_seleccionadas, " +
+                    "u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "FROM declaracion_comercializador c " +
+                    "JOIN usuario u ON c.usuario_id = u.id " +
+                    "WHERE c.id IN (:cIds)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> cRows = entityManager.createNativeQuery(sqlC).setParameter("cIds", allComercializadorIds).getResultList();
+            for (Object[] r : cRows) {
+                ComData ci = new ComData();
+                ci.id = ((Number) r[0]).longValue();
+                ci.folio = r[1] != null ? r[1].toString() : "";
+                ci.kg = r[2] != null ? ((Number) r[2]).doubleValue() : 0.0;
+                ci.fecha = toReportDate(r[3]);
+                ci.decSel = r[4] != null ? r[4].toString() : "";
+                ci.rut = r[5] != null ? r[5].toString() : "";
+                ci.actor = r[6] != null ? r[6].toString() : "";
+                ci.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(ci.decSel);
+
+                List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "RECOLECTOR");
+                List<Long> armIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "ARMADOR");
+                List<Long> arIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "AREA");
+
+                allRecolectorIds.addAll(recIds);
+                allArmadorIds.addAll(armIds);
+                allAreaIds.addAll(arIds);
+
+                comMap.put(ci.id, ci);
+            }
+
+            String sqlFkCR = "SELECT declaracion_destinatario_id, id FROM declaracion_recolector WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkCRRows = entityManager.createNativeQuery(sqlFkCR).setParameter("cIds", allComercializadorIds).getResultList();
+            for (Object[] row : fkCRRows) {
+                Long cId = ((Number) row[0]).longValue();
+                Long rId = ((Number) row[1]).longValue();
+                allRecolectorIds.add(rId);
+                ComData ci = comMap.get(cId);
+                if (ci != null && !ci.fkRecolectores.contains(rId)) ci.fkRecolectores.add(rId);
+            }
+
+            String sqlFkCA = "SELECT declaracion_destinatario_id, id FROM declaracion_armador WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkCARows = entityManager.createNativeQuery(sqlFkCA).setParameter("cIds", allComercializadorIds).getResultList();
+            for (Object[] row : fkCARows) {
+                Long cId = ((Number) row[0]).longValue();
+                Long aId = ((Number) row[1]).longValue();
+                allArmadorIds.add(aId);
+                ComData ci = comMap.get(cId);
+                if (ci != null && !ci.fkArmadores.contains(aId)) ci.fkArmadores.add(aId);
+            }
+
+            String sqlFkCAr = "SELECT declaracion_destinatario_id, id FROM declaracion_area WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> fkCArRows = entityManager.createNativeQuery(sqlFkCAr).setParameter("cIds", allComercializadorIds).getResultList();
+            for (Object[] row : fkCArRows) {
+                Long cId = ((Number) row[0]).longValue();
+                Long arId = ((Number) row[1]).longValue();
+                allAreaIds.add(arId);
+                ComData ci = comMap.get(cId);
+                if (ci != null && !ci.fkAreas.contains(arId)) ci.fkAreas.add(arId);
+            }
+        }
+
+        class OrigenData {
+            String tipo;
+            Long id;
+            String folio;
+            double kg;
+            Date fecha;
+            String rut;
+            String actor;
+            String especie;
+        }
+
+        java.util.Map<Long, OrigenData> recMap = new java.util.HashMap<>();
+        if (!allRecolectorIds.isEmpty()) {
+            String sqlR = "SELECT r.id, r.folio_origen, COALESCE(r.desembarque, r.cantidad), r.fecha_declaracion, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "FROM declaracion_recolector r " +
+                    "JOIN usuario u ON r.usuario_id = u.id " +
+                    "LEFT JOIN especie e ON r.especie_id = e.id " +
+                    "WHERE r.id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> rRows = entityManager.createNativeQuery(sqlR).setParameter("ids", allRecolectorIds).getResultList();
+            for (Object[] r : rRows) {
+                OrigenData oi = new OrigenData();
+                oi.tipo = "RECOLECTOR";
+                oi.id = ((Number) r[0]).longValue();
+                oi.folio = r[1] != null ? r[1].toString() : "";
+                oi.kg = r[2] != null ? ((Number) r[2]).doubleValue() : 0.0;
+                oi.fecha = toReportDate(r[3]);
+                oi.especie = r[4] != null ? r[4].toString() : "";
+                oi.rut = r[5] != null ? r[5].toString() : "";
+                oi.actor = r[6] != null ? r[6].toString() : "";
+                recMap.put(oi.id, oi);
+            }
+        }
+
+        java.util.Map<Long, OrigenData> armMap = new java.util.HashMap<>();
+        if (!allArmadorIds.isEmpty()) {
+            String sqlA = "SELECT a.id, a.folio_origen, COALESCE(a.desembarque, a.cantidad), a.fecha_declaracion, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "FROM declaracion_armador a " +
+                    "JOIN usuario u ON a.usuario_id = u.id " +
+                    "LEFT JOIN especie e ON a.especie_id = e.id " +
+                    "WHERE a.id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> aRows = entityManager.createNativeQuery(sqlA).setParameter("ids", allArmadorIds).getResultList();
+            for (Object[] r : aRows) {
+                OrigenData oi = new OrigenData();
+                oi.tipo = "ARMADOR";
+                oi.id = ((Number) r[0]).longValue();
+                oi.folio = r[1] != null ? r[1].toString() : "";
+                oi.kg = r[2] != null ? ((Number) r[2]).doubleValue() : 0.0;
+                oi.fecha = toReportDate(r[3]);
+                oi.especie = r[4] != null ? r[4].toString() : "";
+                oi.rut = r[5] != null ? r[5].toString() : "";
+                oi.actor = r[6] != null ? r[6].toString() : "";
+                armMap.put(oi.id, oi);
+            }
+        }
+
+        java.util.Map<Long, OrigenData> areaMap = new java.util.HashMap<>();
+        if (!allAreaIds.isEmpty()) {
+            String sqlAr = "SELECT ar.id, ar.folio_origen, COALESCE(ar.desembarque, ar.cantidad), ar.fecha_declaracion, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "FROM declaracion_area ar " +
+                    "JOIN usuario u ON ar.usuario_id = u.id " +
+                    "LEFT JOIN especie e ON ar.especie_id = e.id " +
+                    "WHERE ar.id IN (:ids)";
+            @SuppressWarnings("unchecked")
+            List<Object[]> arRows = entityManager.createNativeQuery(sqlAr).setParameter("ids", allAreaIds).getResultList();
+            for (Object[] r : arRows) {
+                OrigenData oi = new OrigenData();
+                oi.tipo = "AREA";
+                oi.id = ((Number) r[0]).longValue();
+                oi.folio = r[1] != null ? r[1].toString() : "";
+                oi.kg = r[2] != null ? ((Number) r[2]).doubleValue() : 0.0;
+                oi.fecha = toReportDate(r[3]);
+                oi.especie = r[4] != null ? r[4].toString() : "";
+                oi.rut = r[5] != null ? r[5].toString() : "";
+                oi.actor = r[6] != null ? r[6].toString() : "";
+                areaMap.put(oi.id, oi);
+            }
+        }
+
+        for (PlantaRowData p : plantas) {
+            java.util.Set<String> visited = new java.util.HashSet<>();
+            visited.add("PLANTA:" + p.id);
+
+            List<java.util.Map<String, Object>> origenes = new java.util.ArrayList<>();
+            List<java.util.Map<String, Object>> intermediarios = new java.util.ArrayList<>();
+
+            // 1. Orígenes directos (profundidad 1)
+            List<Long> pRecIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR"));
+            for (Long fid : p.fkRecolectores) if (!pRecIds.contains(fid)) pRecIds.add(fid);
+            for (Long rid : pRecIds) {
+                String k = "RECOLECTOR:" + rid;
+                if (!visited.contains(k) && recMap.containsKey(rid)) {
+                    visited.add(k);
+                    OrigenData oi = recMap.get(rid);
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("tipo", oi.tipo);
+                    m.put("id", oi.id);
+                    m.put("folio", oi.folio);
+                    m.put("kg", oi.kg);
+                    m.put("fecha", oi.fecha);
+                    m.put("especie", oi.especie);
+                    m.put("rut", oi.rut);
+                    m.put("actor", oi.actor);
+                    origenes.add(m);
+                }
+            }
+
+            List<Long> pArmIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR"));
+            for (Long fid : p.fkArmadores) if (!pArmIds.contains(fid)) pArmIds.add(fid);
+            for (Long aid : pArmIds) {
+                String k = "ARMADOR:" + aid;
+                if (!visited.contains(k) && armMap.containsKey(aid)) {
+                    visited.add(k);
+                    OrigenData oi = armMap.get(aid);
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("tipo", oi.tipo);
+                    m.put("id", oi.id);
+                    m.put("folio", oi.folio);
+                    m.put("kg", oi.kg);
+                    m.put("fecha", oi.fecha);
+                    m.put("especie", oi.especie);
+                    m.put("rut", oi.rut);
+                    m.put("actor", oi.actor);
+                    origenes.add(m);
+                }
+            }
+
+            List<Long> pArIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA"));
+            for (Long fid : p.fkAreas) if (!pArIds.contains(fid)) pArIds.add(fid);
+            for (Long arid : pArIds) {
+                String k = "AREA:" + arid;
+                if (!visited.contains(k) && areaMap.containsKey(arid)) {
+                    visited.add(k);
+                    OrigenData oi = areaMap.get(arid);
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("tipo", oi.tipo);
+                    m.put("id", oi.id);
+                    m.put("folio", oi.folio);
+                    m.put("kg", oi.kg);
+                    m.put("fecha", oi.fecha);
+                    m.put("especie", oi.especie);
+                    m.put("rut", oi.rut);
+                    m.put("actor", oi.actor);
+                    origenes.add(m);
+                }
+            }
+
+            // 2. Intermediarios (Comercializador - Profundidad 1 y 2)
+            List<Long> pCIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
+            for (Long fid : p.fkComercializadores) if (!pCIds.contains(fid)) pCIds.add(fid);
+            for (Long cid : pCIds) {
+                String ck = "COMERCIALIZADOR:" + cid;
+                if (!visited.contains(ck) && comMap.containsKey(cid)) {
+                    visited.add(ck);
+                    ComData ci = comMap.get(cid);
+                    java.util.Map<String, Object> mInter = new java.util.HashMap<>();
+                    mInter.put("tipo", "COMERCIALIZADOR");
+                    mInter.put("id", ci.id);
+                    mInter.put("folio", ci.folio);
+                    mInter.put("kg", ci.kg);
+                    mInter.put("fecha", ci.fecha);
+                    mInter.put("rut", ci.rut);
+                    mInter.put("actor", ci.actor);
+                    intermediarios.add(mInter);
+
+                    // Profundidad 2: orígenes biológicos que abastecieron a este comercializador
+                    List<Long> cRecIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "RECOLECTOR"));
+                    for (Long fid : ci.fkRecolectores) if (!cRecIds.contains(fid)) cRecIds.add(fid);
+                    for (Long rid : cRecIds) {
+                        String k = "RECOLECTOR:" + rid;
+                        if (!visited.contains(k) && recMap.containsKey(rid)) {
+                            visited.add(k);
+                            OrigenData oi = recMap.get(rid);
+                            java.util.Map<String, Object> m = new java.util.HashMap<>();
+                            m.put("tipo", oi.tipo);
+                            m.put("id", oi.id);
+                            m.put("folio", oi.folio);
+                            m.put("kg", oi.kg);
+                            m.put("fecha", oi.fecha);
+                            m.put("especie", oi.especie);
+                            m.put("rut", oi.rut);
+                            m.put("actor", oi.actor);
+                            origenes.add(m);
+                        }
+                    }
+
+                    List<Long> cArmIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "ARMADOR"));
+                    for (Long fid : ci.fkArmadores) if (!cArmIds.contains(fid)) cArmIds.add(fid);
+                    for (Long aid : cArmIds) {
+                        String k = "ARMADOR:" + aid;
+                        if (!visited.contains(k) && armMap.containsKey(aid)) {
+                            visited.add(k);
+                            OrigenData oi = armMap.get(aid);
+                            java.util.Map<String, Object> m = new java.util.HashMap<>();
+                            m.put("tipo", oi.tipo);
+                            m.put("id", oi.id);
+                            m.put("folio", oi.folio);
+                            m.put("kg", oi.kg);
+                            m.put("fecha", oi.fecha);
+                            m.put("especie", oi.especie);
+                            m.put("rut", oi.rut);
+                            m.put("actor", oi.actor);
+                            origenes.add(m);
+                        }
+                    }
+
+                    List<Long> cArIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "AREA"));
+                    for (Long fid : ci.fkAreas) if (!cArIds.contains(fid)) cArIds.add(fid);
+                    for (Long arid : cArIds) {
+                        String k = "AREA:" + arid;
+                        if (!visited.contains(k) && areaMap.containsKey(arid)) {
+                            visited.add(k);
+                            OrigenData oi = areaMap.get(arid);
+                            java.util.Map<String, Object> m = new java.util.HashMap<>();
+                            m.put("tipo", oi.tipo);
+                            m.put("id", oi.id);
+                            m.put("folio", oi.folio);
+                            m.put("kg", oi.kg);
+                            m.put("fecha", oi.fecha);
+                            m.put("especie", oi.especie);
+                            m.put("rut", oi.rut);
+                            m.put("actor", oi.actor);
+                            origenes.add(m);
+                        }
+                    }
+                }
+            }
+
+            double kgOrigen = 0.0;
+            for (java.util.Map<String, Object> o : origenes) {
+                kgOrigen += o.get("kg") != null ? ((Number) o.get("kg")).doubleValue() : 0.0;
+            }
+
+            double kgPlanta = p.pesoRomana;
+            Double variacionPct = null;
+            if (kgOrigen > 0) {
+                variacionPct = Math.round(((kgPlanta - kgOrigen) / kgOrigen * 100.0) * 10.0) / 10.0;
+            }
+
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("plantaId", p.id);
+            item.put("plantaFolio", (p.folioApla != null && !p.folioApla.isBlank()) ? p.folioApla : p.folioOrigen);
+            item.put("plantaRut", p.rut);
+            item.put("plantaNombre", p.nombre);
+            item.put("fecha", p.fechaIngreso);
+            item.put("fechaPesaje", p.fechaPesaje);
+            item.put("voucherRomanaNumero", p.voucherNumero);
+            item.put("voucherRomanaAdjunto", p.voucherAdjunto);
+            item.put("kgOrigen", Math.round(kgOrigen * 10.0) / 10.0);
+            item.put("kgPlanta", Math.round(kgPlanta * 10.0) / 10.0);
+            item.put("variacionPct", variacionPct);
+            item.put("fueraUmbral", variacionPct != null && Math.abs(variacionPct) > umbral);
+            item.put("origenes", origenes);
+            item.put("intermediario", !intermediarios.isEmpty() ? intermediarios.get(0) : null);
+            if (intermediarios.size() > 1) {
+                item.put("intermediarios", intermediarios);
+            }
+
+            out.add(item);
+        }
+
+        return out;
     }
 
     public List<java.util.Map<String, Object>> getVariacionPesoDetalle(Date startDate, Date endDate) {

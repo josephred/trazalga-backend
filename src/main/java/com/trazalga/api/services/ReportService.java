@@ -140,6 +140,16 @@ public class ReportService {
         return reportRepository.getVariacionPesoDetalle(startDate, endDate);
     }
 
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate) {
+        return reportRepository.getCadenaOrigenPlanta(startDate, endDate);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId, Long regionId) {
+        return reportRepository.getCadenaOrigenPlanta(startDate, endDate, especieId, regionId);
+    }
+
     /**
      * Trazabilidad. Recorre el grafo de declaraciones con un BFS que hace
      * una consulta por nodo, así que el coste crece con el tamaño de la
