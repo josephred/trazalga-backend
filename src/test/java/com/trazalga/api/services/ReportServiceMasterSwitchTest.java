@@ -32,10 +32,10 @@ public class ReportServiceMasterSwitchTest {
     @Test
     void testRetencionBodega_Desactivada_RetornaEstadoInactivoSinFilas() {
         when(configService.getBoolean("retencion_bodega_activo", true)).thenReturn(false);
-        when(configService.getInt("retencion_bodega_dias_amarilla", 3)).thenReturn(3);
-        when(configService.getInt("retencion_bodega_dias_naranja", 5)).thenReturn(5);
-        when(configService.getInt("retencion_bodega_dias_roja", 7)).thenReturn(7);
-        when(configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO")).thenReturn("HUMEDO");
+        when(configService.getInt("retencion_humedo_max_horas", 24)).thenReturn(24);
+        when(configService.getInt("retencion_semihumedo_max_horas", 72)).thenReturn(72);
+        when(configService.getInt("retencion_semiseco_max_horas", 216)).thenReturn(216);
+        when(configService.getInt("retencion_preaviso_pct", 80)).thenReturn(80);
 
         Map<String, Object> result = reportService.getRetencionBodegaMetrics();
 
@@ -44,21 +44,21 @@ public class ReportServiceMasterSwitchTest {
         assertEquals(true, result.get("controlDesactivado"));
         assertEquals(0, result.get("totalLotesEnBodega"));
         assertEquals(Collections.emptyList(), result.get("lotes"));
-        verify(reportRepository, never()).getRetencionBodegaMetrics(anyInt(), anyInt(), anyInt(), anyString());
+        verify(reportRepository, never()).getRetencionPorHumedad(any(), any(), anyInt(), anyInt(), anyInt(), anyInt());
     }
 
     @Test
     void testRetencionBodega_Activada_DelegaEnRepositorio() {
         when(configService.getBoolean("retencion_bodega_activo", true)).thenReturn(true);
-        when(configService.getInt("retencion_bodega_dias_amarilla", 3)).thenReturn(3);
-        when(configService.getInt("retencion_bodega_dias_naranja", 5)).thenReturn(5);
-        when(configService.getInt("retencion_bodega_dias_roja", 7)).thenReturn(7);
-        when(configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO")).thenReturn("HUMEDO");
+        when(configService.getInt("retencion_humedo_max_horas", 24)).thenReturn(24);
+        when(configService.getInt("retencion_semihumedo_max_horas", 72)).thenReturn(72);
+        when(configService.getInt("retencion_semiseco_max_horas", 216)).thenReturn(216);
+        when(configService.getInt("retencion_preaviso_pct", 80)).thenReturn(80);
 
         Map<String, Object> mockRepoResult = new HashMap<>();
         mockRepoResult.put("totalLotesEnBodega", 5);
         mockRepoResult.put("totalKgEnBodega", 12500.0);
-        when(reportRepository.getRetencionBodegaMetrics(3, 5, 7, "HUMEDO")).thenReturn(mockRepoResult);
+        when(reportRepository.getRetencionPorHumedad(null, null, 24, 72, 216, 80)).thenReturn(mockRepoResult);
 
         Map<String, Object> result = reportService.getRetencionBodegaMetrics();
 
@@ -66,7 +66,7 @@ public class ReportServiceMasterSwitchTest {
         assertEquals(true, result.get("activo"));
         assertEquals(false, result.get("controlDesactivado"));
         assertEquals(5, result.get("totalLotesEnBodega"));
-        verify(reportRepository, times(1)).getRetencionBodegaMetrics(3, 5, 7, "HUMEDO");
+        verify(reportRepository, times(1)).getRetencionPorHumedad(null, null, 24, 72, 216, 80);
     }
 
     @Test

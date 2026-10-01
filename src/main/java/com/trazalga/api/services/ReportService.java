@@ -267,11 +267,16 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getRetencionBodegaMetrics() {
+        return getRetencionBodegaMetrics(null, null);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
+    public java.util.Map<String, Object> getRetencionBodegaMetrics(Date startDate, Date endDate) {
         boolean activo = configService.getBoolean("retencion_bodega_activo", true);
-        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
-        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
-        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
-        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+        int humedoMaxH = configService.getInt("retencion_humedo_max_horas", 24);
+        int semihumedoMaxH = configService.getInt("retencion_semihumedo_max_horas", 72);
+        int semisecoMaxH = configService.getInt("retencion_semiseco_max_horas", 216);
+        int preavisoPct = configService.getInt("retencion_preaviso_pct", 80);
 
         if (!activo) {
             java.util.Map<String, Object> disabled = new java.util.HashMap<>();
@@ -280,19 +285,22 @@ public class ReportService {
             disabled.put("mensaje", "Control de retención en bodega desactivado en Administración");
             disabled.put("totalLotesEnBodega", 0);
             disabled.put("totalKgEnBodega", 0.0);
-            disabled.put("diasAmarilla", diasAmarilla);
-            disabled.put("diasNaranja", diasNaranja);
-            disabled.put("diasRoja", diasRoja);
-            disabled.put("estadosSujetos", estadosSujetos);
+            disabled.put("humedoMaxHoras", humedoMaxH);
+            disabled.put("semihumedoMaxHoras", semihumedoMaxH);
+            disabled.put("semisecoMaxHoras", semisecoMaxH);
+            disabled.put("preavisoPct", preavisoPct);
             disabled.put("semaforoVerde", 0L);
             disabled.put("semaforoAmarillo", 0L);
             disabled.put("semaforoNaranja", 0L);
             disabled.put("semaforoRojo", 0L);
             disabled.put("lotes", java.util.Collections.emptyList());
+            disabled.put("lotesRojos", java.util.Collections.emptyList());
+            disabled.put("matriz", java.util.Collections.emptyMap());
             return disabled;
         }
 
-        java.util.Map<String, Object> metrics = reportRepository.getRetencionBodegaMetrics(diasAmarilla, diasNaranja, diasRoja, estadosSujetos);
+        java.util.Map<String, Object> metrics = reportRepository.getRetencionPorHumedad(
+                startDate, endDate, humedoMaxH, semihumedoMaxH, semisecoMaxH, preavisoPct);
         metrics.put("activo", true);
         metrics.put("controlDesactivado", false);
         return metrics;

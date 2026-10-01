@@ -42,14 +42,25 @@ public class ConfiguracionGeneralService {
         createIfNotExist("veda_modo_operacion", "BLOQUEO_ESTRICTO", "Modo de operación ante veda (BLOQUEO_ESTRICTO o ALERTA_FISCALIZACION)", "VEDA");
         createIfNotExist("veda_dias_aviso_previo", "7", "Días de anticipación del aviso preventivo de inicio de veda", "VEDA");
 
-        // 5. Cadena de Custodia / Variación de peso
+        // 5. Cadena de Custodia / Variación de peso y Retención en Bodega (Res. 3602)
         createIfNotExist("variacion_peso_umbral_general_pct", "5.0", "Tolerancia general de variación entre eslabones en porcentaje", "CADENA");
         createIfNotExist("variacion_peso_exige_voucher", "true", "Exige voucher de pesaje en romana para registrar recepción en planta", "CADENA");
-        createIfNotExist("retencion_bodega_activo", "true", "Habilita el control de días de retención en bodega", "CADENA");
-        createIfNotExist("retencion_bodega_dias_amarilla", "3", "Días de retención para alerta amarilla preventiva", "CADENA");
-        createIfNotExist("retencion_bodega_dias_naranja", "5", "Días de retención para alerta naranja crítica", "CADENA");
-        createIfNotExist("retencion_bodega_dias_roja", "7", "Plazo máximo recomendado de retención en días", "CADENA");
-        createIfNotExist("retencion_bodega_estados_sujetos", "HUMEDO", "Estados de humedad sujetos al control de retención (separados por coma)", "CADENA");
+        createIfNotExist("retencion_bodega_activo", "true", "Habilita el control de retención en bodega por tramos de humedad", "CADENA");
+        createIfNotExist("retencion_humedo_max_horas", "24", "Horas máximas de retención para recurso húmedo (Res. 3602)", "CADENA");
+        createIfNotExist("retencion_semihumedo_max_horas", "72", "Horas máximas de retención para recurso semihúmedo (Res. 3602)", "CADENA");
+        createIfNotExist("retencion_semiseco_max_horas", "216", "Horas máximas de retención para recurso semiseco (Res. 3602)", "CADENA");
+        createIfNotExist("retencion_preaviso_pct", "80", "% del plazo a partir del cual el semáforo es amarillo", "CADENA");
+
+        // Deprecados desde 25-sep (Res. 3602): conservados para retrocompatibilidad
+        createIfNotExist("retencion_bodega_dias_amarilla", "3", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");
+        createIfNotExist("retencion_bodega_dias_naranja", "5", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");
+        createIfNotExist("retencion_bodega_dias_roja", "7", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");
+        createIfNotExist("retencion_bodega_estados_sujetos", "HUMEDO", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");
+        updateDescripcionIfExists("retencion_bodega_dias_amarilla", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.");
+        updateDescripcionIfExists("retencion_bodega_dias_naranja", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.");
+        updateDescripcionIfExists("retencion_bodega_dias_roja", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.");
+        updateDescripcionIfExists("retencion_bodega_estados_sujetos", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.");
+
         createIfNotExist("bio_perdida_activo", "true", "Habilita el control de merma biológica en tránsito", "CADENA");
         createIfNotExist("bio_humedo_dias_minimos_transito", "3", "Días desde los que se exige evaporación en recurso húmedo", "CADENA");
         createIfNotExist("bio_humedo_merma_minima_pct", "5.0", "Merma mínima esperada en húmedo tras los días mínimos", "CADENA");
@@ -83,6 +94,17 @@ public class ConfiguracionGeneralService {
             ConfiguracionGeneralModel existing = opt.get();
             if (existing.getCategoria() == null && categoria != null) {
                 existing.setCategoria(categoria);
+                repository.save(existing);
+            }
+        }
+    }
+
+    private void updateDescripcionIfExists(String clave, String descripcion) {
+        Optional<ConfiguracionGeneralModel> opt = repository.findByClave(clave);
+        if (opt.isPresent()) {
+            ConfiguracionGeneralModel existing = opt.get();
+            if (existing.getDescripcion() == null || !existing.getDescripcion().equals(descripcion)) {
+                existing.setDescripcion(descripcion);
                 repository.save(existing);
             }
         }

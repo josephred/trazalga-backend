@@ -2937,8 +2937,224 @@ public class ReportRepository {
     }
 
     // =========================================================================
-    // INDICADOR 6 — RETENCIÓN EN BODEGA VIRTUAL
     // =========================================================================
+    // INDICADOR 7 — RETENCIÓN EN BODEGA VIRTUAL (Res. 3602 / T7.2)
+    // =========================================================================
+
+    public java.util.Map<String, Object> getRetencionPorHumedad(
+            int humedoMaxH, int semihumedoMaxH, int semisecoMaxH, int preavisoPct) {
+        return getRetencionPorHumedad(null, null, humedoMaxH, semihumedoMaxH, semisecoMaxH, preavisoPct);
+    }
+
+    public java.util.Map<String, Object> getRetencionPorHumedad(
+            Date startDate, Date endDate,
+            int humedoMaxH, int semihumedoMaxH, int semisecoMaxH, int preavisoPct) {
+
+        String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC";
+        Query query = entityManager.createNativeQuery(sql);
+        if (startDate != null) query.setParameter("startDate", startDate);
+        if (endDate != null) query.setParameter("endDate", endDate);
+
+        List<Object[]> results = query.getResultList();
+        Date now = new Date();
+
+        List<java.util.Map<String, Object>> lotesEvaluados = new java.util.ArrayList<>();
+        List<java.util.Map<String, Object>> lotesRojos = new java.util.ArrayList<>();
+
+        // Estructura de la Matriz 4x3 (Filas = Estados de Humedad, Columnas = Semáforo)
+        java.util.Map<String, java.util.Map<String, Object>> matriz = new java.util.LinkedHashMap<>();
+        String[] estados = {"HUMEDO", "SEMI_HUMEDO", "SEMI_SECO", "SECO"};
+        for (String est : estados) {
+            java.util.Map<String, Object> fila = new java.util.LinkedHashMap<>();
+            fila.put("VERDE", 0L);
+            fila.put("AMARILLO", 0L);
+            fila.put("ROJO", 0L);
+            fila.put("totalLotes", 0L);
+            fila.put("totalKg", 0.0);
+            matriz.put(est, fila);
+        }
+
+        long verdeTotal = 0;
+        long amarilloTotal = 0;
+        long rojoTotal = 0;
+        long lotesEnBodega = 0;
+        long lotesDestinados = 0;
+        long lotesDestinadosFueraPlazo = 0;
+        double totalKgEnBodega = 0.0;
+        double totalKgGeneral = 0.0;
+
+        for (Object[] row : results) {
+            String folioOrigen = row[0] != null ? row[0].toString() : "";
+            String eslabonOrigen = row[1] != null ? row[1].toString() : "";
+            String actorOrigen = row[2] != null ? row[2].toString() : "";
+            String rutOrigen = row[3] != null ? row[3].toString() : "";
+            String especie = row[4] != null ? row[4].toString() : "";
+            String humedadRaw = row[5] != null ? row[5].toString() : "HÚMEDO";
+            Date fechaOrigen = toReportDate(row[6]);
+            double kgOrigen = row[7] != null ? ((Number) row[7]).doubleValue() : 0.0;
+
+            Double kgComercializador = row[11] != null ? ((Number) row[11]).doubleValue() : null;
+            Date fechaComercializador = toReportDate(row[12]);
+            String actorComercializador = row[13] != null ? row[13].toString() : null;
+
+            Double kgPlanta = row[14] != null ? ((Number) row[14]).doubleValue() : null;
+            Date fechaPlanta = toReportDate(row[15]);
+            String actorPlanta = row[16] != null ? row[16].toString() : null;
+
+            if (fechaOrigen == null && fechaComercializador == null) {
+                continue;
+            }
+
+            Date fechaInicioLote = fechaOrigen != null ? fechaOrigen : fechaComercializador;
+            boolean destinado = (fechaPlanta != null);
+            boolean enBodega = (fechaComercializador != null && !destinado);
+
+            Date fechaFinLote = destinado ? fechaPlanta : now;
+            long diffMillis = Math.max(0, fechaFinLote.getTime() - fechaInicioLote.getTime());
+            long horas = diffMillis / (1000 * 3600);
+
+            // Normalización de Estado de Humedad (Res. 3602)
+            String estadoDeclarado = normalizarEstadoHumedad(humedadRaw);
+            String claveMatriz;
+            int plazoMaxHoras;
+
+            switch (estadoDeclarado) {
+                case "HÚMEDO":
+                    claveMatriz = "HUMEDO";
+                    plazoMaxHoras = humedoMaxH;
+                    break;
+                case "SEMI HÚMEDO":
+                    claveMatriz = "SEMI_HUMEDO";
+                    plazoMaxHoras = semihumedoMaxH;
+                    break;
+                case "SEMI SECO":
+                    claveMatriz = "SEMI_SECO";
+                    plazoMaxHoras = semisecoMaxH;
+                    break;
+                case "SECO":
+                default:
+                    claveMatriz = "SECO";
+                    plazoMaxHoras = Integer.MAX_VALUE;
+                    break;
+            }
+
+            // Semáforo normativo
+            String semaforo;
+            if (plazoMaxHoras == Integer.MAX_VALUE) {
+                semaforo = "VERDE";
+            } else if (horas > plazoMaxHoras) {
+                semaforo = "ROJO";
+            } else if (horas >= Math.round(plazoMaxHoras * (preavisoPct / 100.0))) {
+                semaforo = "AMARILLO";
+            } else {
+                semaforo = "VERDE";
+            }
+
+            // Tramo real biológico según horas transcurridas
+            String tramoReal;
+            if (horas <= 24) {
+                tramoReal = "HÚMEDO";
+            } else if (horas <= 72) {
+                tramoReal = "SEMI HÚMEDO";
+            } else if (horas <= 216) {
+                tramoReal = "SEMI SECO";
+            } else {
+                tramoReal = "SECO";
+            }
+
+            double kgLote = kgComercializador != null ? kgComercializador : (kgPlanta != null ? kgPlanta : kgOrigen);
+
+            // Acumular estadísticas
+            if (enBodega) {
+                lotesEnBodega++;
+                totalKgEnBodega += kgLote;
+            }
+            if (destinado) {
+                lotesDestinados++;
+                if (plazoMaxHoras != Integer.MAX_VALUE && horas > plazoMaxHoras) {
+                    lotesDestinadosFueraPlazo++;
+                }
+            }
+            totalKgGeneral += kgLote;
+
+            if ("VERDE".equals(semaforo)) verdeTotal++;
+            else if ("AMARILLO".equals(semaforo)) amarilloTotal++;
+            else if ("ROJO".equals(semaforo)) rojoTotal++;
+
+            // Acumular en la Matriz 4x3
+            java.util.Map<String, Object> filaMatriz = matriz.get(claveMatriz);
+            if (filaMatriz != null) {
+                filaMatriz.put(semaforo, ((Long) filaMatriz.get(semaforo)) + 1);
+                filaMatriz.put("totalLotes", ((Long) filaMatriz.get("totalLotes")) + 1);
+                filaMatriz.put("totalKg", Math.round((((Double) filaMatriz.get("totalKg")) + kgLote) * 100.0) / 100.0);
+            }
+
+            java.util.Map<String, Object> loteMap = new java.util.LinkedHashMap<>();
+            loteMap.put("folio", folioOrigen);
+            loteMap.put("folioOrigen", folioOrigen);
+            loteMap.put("actor", actorComercializador != null ? actorComercializador : actorOrigen);
+            loteMap.put("actorOrigen", actorOrigen);
+            loteMap.put("rutOrigen", rutOrigen);
+            loteMap.put("actorComercializador", actorComercializador);
+            loteMap.put("actorPlanta", actorPlanta);
+            loteMap.put("especie", especie);
+            loteMap.put("estadoDeclarado", estadoDeclarado);
+            loteMap.put("tramoReal", tramoReal);
+            loteMap.put("horasTranscurridas", horas);
+            loteMap.put("diasTranscurridos", (int) (horas / 24));
+            loteMap.put("plazoMaxHoras", plazoMaxHoras == Integer.MAX_VALUE ? null : plazoMaxHoras);
+            loteMap.put("semaforo", semaforo);
+            loteMap.put("destinado", destinado);
+            loteMap.put("enBodega", enBodega);
+            loteMap.put("enBodegaVirtual", enBodega);
+            loteMap.put("kg", Math.round(kgLote * 100.0) / 100.0);
+            loteMap.put("kgOrigen", Math.round(kgOrigen * 100.0) / 100.0);
+            loteMap.put("kgComercializador", kgComercializador != null ? Math.round(kgComercializador * 100.0) / 100.0 : null);
+            loteMap.put("kgPlanta", kgPlanta != null ? Math.round(kgPlanta * 100.0) / 100.0 : null);
+            loteMap.put("fechaOrigen", fechaInicioLote);
+            loteMap.put("fechaDestino", fechaPlanta);
+            loteMap.put("inconsistenciaHumedad", !estadoDeclarado.equalsIgnoreCase(tramoReal));
+
+            lotesEvaluados.add(loteMap);
+            if ("ROJO".equals(semaforo)) {
+                lotesRojos.add(loteMap);
+            }
+        }
+
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("totalLotes", lotesEvaluados.size());
+        out.put("totalLotesEnBodega", lotesEnBodega);
+        out.put("totalKgEnBodega", Math.round(totalKgEnBodega * 100.0) / 100.0);
+        out.put("totalKgGeneral", Math.round(totalKgGeneral * 100.0) / 100.0);
+        out.put("lotesDestinados", lotesDestinados);
+        out.put("lotesDestinadosFueraPlazo", lotesDestinadosFueraPlazo);
+        out.put("semaforoVerde", verdeTotal);
+        out.put("semaforoAmarillo", amarilloTotal);
+        out.put("semaforoNaranja", 0L);
+        out.put("semaforoRojo", rojoTotal);
+        out.put("matriz", matriz);
+        out.put("lotes", lotesEvaluados);
+        out.put("lotesRojos", lotesRojos);
+
+        java.util.Map<String, Object> params = new java.util.LinkedHashMap<>();
+        params.put("humedoMaxHoras", humedoMaxH);
+        params.put("semihumedoMaxHoras", semihumedoMaxH);
+        params.put("semisecoMaxHoras", semisecoMaxH);
+        params.put("preavisoPct", preavisoPct);
+        out.put("parametros", params);
+
+        return out;
+    }
+
+    private String normalizarEstadoHumedad(String hum) {
+        if (hum == null) return "HÚMEDO";
+        String h = hum.toUpperCase().trim();
+        if (h.contains("SEMI") && (h.contains("HUM") || h.contains("HÚM"))) return "SEMI HÚMEDO";
+        if (h.contains("SEMI") && h.contains("SEC")) return "SEMI SECO";
+        if (h.contains("HUM") || h.contains("HÚM")) return "HÚMEDO";
+        if (h.contains("SEC")) return "SECO";
+        return "HÚMEDO";
+    }
 
     public java.util.Map<String, Object> getRetencionBodegaMetrics(
             int diasAmarilla, int diasNaranja, int diasRoja, String estadosSujetos) {
