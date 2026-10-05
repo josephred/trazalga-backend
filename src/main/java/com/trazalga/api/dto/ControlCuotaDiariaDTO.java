@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Data
 @Builder
@@ -30,4 +31,6 @@ public class ControlCuotaDiariaDTO {
     private String extraccionTipoNombre;
     private Long comunaId;
     private String comunaNombre;
+    private Set<Long> comunaIds;
+    private String comunasNombre;
 }

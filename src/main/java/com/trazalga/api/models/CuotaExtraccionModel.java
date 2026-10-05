@@ -1,6 +1,8 @@
 package com.trazalga.api.models;
 
 import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Column;
@@ -9,6 +11,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -71,10 +75,18 @@ public class CuotaExtraccionModel {
     @JoinColumn(name = "provincia_id", nullable = true)
     private ProvinciaModel provincia;
 
-    // Comuna (nullable = null means applies to any comuna)
+    // Comuna cabecera (conservada por compatibilidad histórica y consultas directas)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comuna_id", nullable = true)
     private ComunaModel comuna;
+
+    // Selección múltiple de comunas (T1.1)
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "cuota_extraccion_comuna",
+               joinColumns = @JoinColumn(name = "cuota_id"),
+               inverseJoinColumns = @JoinColumn(name = "comuna_id"))
+    @Builder.Default
+    private Set<ComunaModel> comunas = new LinkedHashSet<>();
 
     // Actor específico (nullable = null means applies to any actor of the perfil)
     @ManyToOne(fetch = FetchType.LAZY)

@@ -417,8 +417,10 @@ public class CuotaExtraccionServiceTest {
         c.setPeriodo("MENSUAL");
         c.setLimiteKg(1000.0);
         c.setMetrica(null);
+        c.setComuna(comunaLaSerena);
         c.setActivo(false); // para obviar validacion jerarquica compleja
 
+        when(comunaRepository.findById(4101L)).thenReturn(Optional.of(comunaLaSerena));
         when(cuotaRepository.save(any(CuotaExtraccionModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CuotaExtraccionModel guardada = cuotaExtraccionService.save(c);
@@ -466,8 +468,10 @@ public class CuotaExtraccionServiceTest {
         c.setLimiteKg(1000.0);
         c.setMetrica("DESEMBARQUE");
         c.setResolucion("Res. Ex. Nº 142/2026 Subpesca");
+        c.setComuna(comunaLaSerena);
         c.setActivo(false);
 
+        when(comunaRepository.findById(4101L)).thenReturn(Optional.of(comunaLaSerena));
         when(cuotaRepository.save(any(CuotaExtraccionModel.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CuotaExtraccionModel guardada = cuotaExtraccionService.save(c);

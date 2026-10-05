@@ -223,7 +223,7 @@ public class CuotaAreaLibreConsumoTest {
     void testEvaluacionDeclaracionGeneraCuotaExcedidaEnSegundaDeclaracion() {
         when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cuotaComunalBarreteado));
         lenient().when(configuracionGeneralService.getValor(eq("cuota_accion_exceso_limite"), anyString())).thenReturn("SOLO_ALERTA");
-        when(comunaRepository.findById(3102L)).thenReturn(Optional.of(comunaCaldera));
+        lenient().when(comunaRepository.findById(3102L)).thenReturn(Optional.of(comunaCaldera));
 
         // Declaración 1: Recolector declara 4.000 kg. Consumo previo en base de datos es 0.
         Query qRec0 = mock(Query.class);

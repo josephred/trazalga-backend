@@ -5,11 +5,13 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +29,8 @@ import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.models.FactorConversionModel;
 import com.trazalga.api.models.MacrozonaModel;
+import com.trazalga.api.models.ProvinciaModel;
+import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.repositories.IAmerbRepository;
 import com.trazalga.api.repositories.IComunaRepository;
 import com.trazalga.api.repositories.ICuotaExtraccionRepository;
@@ -103,6 +107,7 @@ public class CuotaExtraccionService {
     public CuotaExtraccionModel save(CuotaExtraccionModel cuota) {
         resolverReferencias(cuota);
         validarDatosBasicos(cuota);
+        validarSolapamiento(cuota);
         validarJerarquia(cuota);
         invalidarCacheConsumo();
         return cuotaRepository.save(cuota);
@@ -121,6 +126,10 @@ public class CuotaExtraccionService {
         cuota.setMacrozona(request.getMacrozona());
         cuota.setProvincia(request.getProvincia());
         cuota.setComuna(request.getComuna());
+        if (request.getComunas() != null) {
+            cuota.getComunas().clear();
+            cuota.getComunas().addAll(request.getComunas());
+        }
         cuota.setUsuario(request.getUsuario());
         cuota.setAmerb(request.getAmerb());
         cuota.setExtraccionTipo(request.getExtraccionTipo());
@@ -139,6 +148,7 @@ public class CuotaExtraccionService {
         if (request.getActivo() != null) cuota.setActivo(request.getActivo());
 
         validarDatosBasicos(cuota);
+        validarSolapamiento(cuota);
         validarJerarquia(cuota);
         invalidarCacheConsumo();
         return cuotaRepository.save(cuota);
@@ -273,26 +283,8 @@ public class CuotaExtraccionService {
             }
 
             // Filtrar territorialmente
-            if (comunaImputacionId != null) {
-                Optional<ComunaModel> comOpt = comunaRepository.findById(comunaImputacionId);
-                if (comOpt.isPresent()) {
-                    ComunaModel com = comOpt.get();
-                    if (c.getComuna() != null && !c.getComuna().getId().equals(com.getId())) {
-                        continue;
-                    }
-                    if (c.getProvincia() != null && (com.getProvincia() == null || !c.getProvincia().getId().equals(com.getProvincia().getId()))) {
-                        continue;
-                    }
-                    if (c.getRegion() != null && (com.getRegion() == null || !c.getRegion().getId().equals(com.getRegion().getId()))) {
-                        continue;
-                    }
-                    if (c.getMacrozona() != null) {
-                        Long regId = com.getRegion() != null ? com.getRegion().getId() : null;
-                        if (regId == null || !macrozonaService.isRegionInMacrozona(c.getMacrozona().getId(), regId, fechaEval)) {
-                            continue;
-                        }
-                    }
-                }
+            if (comunaImputacionId != null && !contieneComuna(c, comunaImputacionId)) {
+                continue;
             }
 
             aplicables.add(c);
@@ -406,7 +398,7 @@ public class CuotaExtraccionService {
         int score = 0;
         if (c.getUsuario() != null) score += 64;
         if (c.getAmerb() != null) score += 32;
-        if (c.getComuna() != null) score += 16;
+        if (c.getComuna() != null || (c.getComunas() != null && !c.getComunas().isEmpty())) score += 16;
         if (c.getProvincia() != null) score += 8;
         if (c.getRegion() != null) score += 4;
         if (c.getMacrozona() != null && !Boolean.TRUE.equals(c.getMacrozona().getEsNacional())) score += 2;
@@ -498,6 +490,16 @@ public class CuotaExtraccionService {
                 }
             }
 
+            Set<Long> cIds = idsComunas(cuota);
+            String comunasNombre = null;
+            if (!cIds.isEmpty()) {
+                if (cuota.getComunas() != null && cuota.getComunas().size() > 1) {
+                    comunasNombre = cuota.getComunas().stream().map(ComunaModel::getNombre).collect(Collectors.joining(" + "));
+                } else if (cuota.getComuna() != null) {
+                    comunasNombre = cuota.getComuna().getNombre();
+                }
+            }
+
             ControlCuotaDiariaDTO dto = ControlCuotaDiariaDTO.builder()
                 .cuotaId(cuota.getId())
                 .especieNombre(cuota.getEspecie().getNombre())
@@ -516,6 +518,8 @@ public class CuotaExtraccionService {
                 .extraccionTipoNombre(extraccionTipoNombre)
                 .comunaId(comunaIdCuota)
                 .comunaNombre(comunaNombre)
+                .comunaIds(cIds)
+                .comunasNombre(comunasNombre)
                 .build();
 
             result.add(dto);
@@ -544,9 +548,23 @@ public class CuotaExtraccionService {
             cuota.setProvincia(provinciaRepository.findById(cuota.getProvincia().getId())
                     .orElseThrow(() -> new IllegalArgumentException("La provincia indicada no existe.")));
         }
-        if (cuota.getComuna() != null && cuota.getComuna().getId() != null) {
-            cuota.setComuna(comunaRepository.findById(cuota.getComuna().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("La comuna indicada no existe.")));
+        if (cuota.getComunas() != null && !cuota.getComunas().isEmpty()) {
+            Set<ComunaModel> resueltas = new LinkedHashSet<>();
+            for (ComunaModel c : cuota.getComunas()) {
+                if (c != null && c.getId() != null) {
+                    resueltas.add(comunaRepository.findById(c.getId())
+                            .orElseThrow(() -> new IllegalArgumentException("La comuna indicada con ID " + c.getId() + " no existe.")));
+                }
+            }
+            cuota.setComunas(resueltas);
+            if (cuota.getComuna() == null && !resueltas.isEmpty()) {
+                cuota.setComuna(resueltas.iterator().next());
+            }
+        } else if (cuota.getComuna() != null && cuota.getComuna().getId() != null) {
+            ComunaModel com = comunaRepository.findById(cuota.getComuna().getId())
+                    .orElseThrow(() -> new IllegalArgumentException("La comuna indicada no existe."));
+            cuota.setComuna(com);
+            cuota.setComunas(new LinkedHashSet<>(Collections.singletonList(com)));
         }
         if (cuota.getEspecie() != null && cuota.getEspecie().getId() != null) {
             cuota.setEspecie(especieRepository.findById(cuota.getEspecie().getId())
@@ -636,6 +654,19 @@ public class CuotaExtraccionService {
         if (cuota.getPeriodo() == null || cuota.getPeriodo().isBlank()) {
             throw new IllegalArgumentException("El periodo de la cuota es obligatorio (DIARIO, MENSUAL, ANUAL).");
         }
+
+        // T1.4: Validación de vigencia mensual en mismo mes calendario
+        if ("MENSUAL".equalsIgnoreCase(cuota.getPeriodo()) && cuota.getFechaInicio() != null && cuota.getFechaFin() != null) {
+            LocalDate inicio = toLocalDateSafe(cuota.getFechaInicio());
+            LocalDate fin = toLocalDateSafe(cuota.getFechaFin());
+            if (inicio.getYear() != fin.getYear() || inicio.getMonthValue() != fin.getMonthValue()) {
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                throw new IllegalArgumentException(String.format(
+                        "La vigencia mensual debe quedar dentro de un mismo mes (recibido: %s a %s).",
+                        inicio.format(dtf), fin.format(dtf)));
+            }
+        }
+
         if (cuota.getAmbito() == null || cuota.getAmbito().isBlank()) {
             if (cuota.getAmerb() != null || "AREA".equalsIgnoreCase(cuota.getPerfil())) {
                 cuota.setAmbito("AMERB");
@@ -697,6 +728,136 @@ public class CuotaExtraccionService {
             }
             cuota.setModoAccion(modoNorm);
         }
+
+        // T1.1: Validaciones de alcance territorial por nivel COMUNA y REGION
+        if ("COMUNA".equals(nivelNorm)) {
+            Set<Long> cIds = idsComunas(cuota);
+            if (cIds.isEmpty()) {
+                throw new IllegalArgumentException("Las cuotas de nivel COMUNA deben tener al menos una comuna asociada.");
+            }
+            // Validar que todas pertenezcan a la misma región
+            Long regId = null;
+            RegionModel regObj = null;
+            if (cuota.getComunas() != null && !cuota.getComunas().isEmpty()) {
+                for (ComunaModel com : cuota.getComunas()) {
+                    RegionModel r = com.getRegion();
+                    if (r == null && com.getId() != null) {
+                        r = comunaRepository.findById(com.getId()).map(ComunaModel::getRegion).orElse(null);
+                    }
+                    if (r != null) {
+                        if (regId == null) {
+                            regId = r.getId();
+                            regObj = r;
+                        } else if (!regId.equals(r.getId())) {
+                            throw new IllegalArgumentException("Todas las comunas seleccionadas deben pertenecer a la misma región.");
+                        }
+                    }
+                }
+                if (regObj != null) {
+                    cuota.setRegion(regObj);
+                }
+                cuota.setProvincia(null);
+                cuota.setMacrozona(null);
+                if (!cuota.getComunas().isEmpty()) {
+                    cuota.setComuna(cuota.getComunas().iterator().next());
+                }
+            } else if (cuota.getComuna() != null) {
+                if (cuota.getComuna().getRegion() != null) {
+                    cuota.setRegion(cuota.getComuna().getRegion());
+                }
+                cuota.setProvincia(null);
+                cuota.setMacrozona(null);
+            }
+        } else if ("REGION".equals(nivelNorm)) {
+            if (cuota.getRegion() == null) {
+                throw new IllegalArgumentException("Las cuotas de nivel REGION deben especificar una región.");
+            }
+            if (!idsComunas(cuota).isEmpty()) {
+                throw new IllegalArgumentException("Las cuotas de nivel REGION no deben tener comunas asociadas.");
+            }
+            cuota.setComuna(null);
+            cuota.setComunas(new LinkedHashSet<>());
+            cuota.setProvincia(null);
+            cuota.setMacrozona(null);
+        }
+    }
+
+    public void validarSolapamiento(CuotaExtraccionModel cuota) {
+        if (!Boolean.TRUE.equals(cuota.getActivo())) {
+            return;
+        }
+
+        List<CuotaExtraccionModel> activas = new ArrayList<>(cuotaRepository.findByActivoTrue());
+        activas.removeIf(c -> cuota.getId() != null && cuota.getId().equals(c.getId()));
+
+        String ambitoCuota = cuota.getAmbito() != null ? cuota.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+        String nivelCuota = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().trim().toUpperCase() : "";
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+        for (CuotaExtraccionModel otra : activas) {
+            String ambitoOtra = otra.getAmbito() != null ? otra.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+            String nivelOtra = otra.getNivelAgregacion() != null ? otra.getNivelAgregacion().trim().toUpperCase() : "";
+
+            if (!ambitoCuota.equals(ambitoOtra)) continue;
+            if (!nivelCuota.equals(nivelOtra)) continue;
+            if (!seSolapan(cuota, otra)) continue;
+            if (!especiesComparables(cuota, otra)) continue;
+
+            String nombreEsp = otra.getEspecie() != null ? otra.getEspecie().getNombre() : (cuota.getEspecie() != null ? cuota.getEspecie().getNombre() : "Todas las especies");
+            String nombreMet = otra.getExtraccionTipo() != null ? otra.getExtraccionTipo().getNombre() : (cuota.getExtraccionTipo() != null ? cuota.getExtraccionTipo().getNombre() : "Todos los métodos");
+            String iniStr = otra.getFechaInicio() != null ? toLocalDateSafe(otra.getFechaInicio()).format(dtf) : "indefinido";
+            String finStr = otra.getFechaFin() != null ? toLocalDateSafe(otra.getFechaFin()).format(dtf) : "indefinido";
+
+            if ("COMUNA".equals(nivelCuota)) {
+                Set<Long> cIdsCuota = idsComunas(cuota);
+                Set<Long> cIdsOtra = idsComunas(otra);
+                Set<Long> inter = new LinkedHashSet<>(cIdsCuota);
+                inter.retainAll(cIdsOtra);
+
+                if (!inter.isEmpty()) {
+                    Long cConflictoId = inter.iterator().next();
+                    String nombreComuna = "ID " + cConflictoId;
+                    if (cuota.getComunas() != null) {
+                        for (ComunaModel cm : cuota.getComunas()) {
+                            if (cm != null && cConflictoId.equals(cm.getId()) && cm.getNombre() != null) {
+                                nombreComuna = cm.getNombre();
+                                break;
+                            }
+                        }
+                    }
+                    if (("ID " + cConflictoId).equals(nombreComuna) && otra.getComunas() != null) {
+                        for (ComunaModel cm : otra.getComunas()) {
+                            if (cm != null && cConflictoId.equals(cm.getId()) && cm.getNombre() != null) {
+                                nombreComuna = cm.getNombre();
+                                break;
+                            }
+                        }
+                    }
+                    if (("ID " + cConflictoId).equals(nombreComuna) && cuota.getComuna() != null && cConflictoId.equals(cuota.getComuna().getId())) {
+                        nombreComuna = cuota.getComuna().getNombre();
+                    }
+                    if (("ID " + cConflictoId).equals(nombreComuna) && otra.getComuna() != null && cConflictoId.equals(otra.getComuna().getId())) {
+                        nombreComuna = otra.getComuna().getNombre();
+                    }
+
+                    throw new IllegalArgumentException(String.format(
+                        "La comuna %s ya tiene una cuota activa de %s (%s) del %s al %s (cuota #%d).",
+                        nombreComuna, nombreEsp, nombreMet, iniStr, finStr, otra.getId()
+                    ));
+                }
+            } else if ("REGION".equals(nivelCuota)) {
+                Long rIdCuota = idRegionDe(cuota);
+                Long rIdOtra = idRegionDe(otra);
+                if (rIdCuota != null && rIdCuota.equals(rIdOtra)) {
+                    String nombreReg = nombreRegionDe(otra) != null ? nombreRegionDe(otra) : ("ID " + rIdOtra);
+                    throw new IllegalArgumentException(String.format(
+                        "La región %s ya tiene una cuota activa de %s (%s) del %s al %s (cuota #%d).",
+                        nombreReg, nombreEsp, nombreMet, iniStr, finStr, otra.getId()
+                    ));
+                }
+            }
+        }
     }
 
     public void validarJerarquia(CuotaExtraccionModel cuota) {
@@ -719,7 +880,7 @@ public class CuotaExtraccionService {
             for (CuotaExtraccionModel padre : activas) {
                 if ("AREA".equals(alcanceDe(padre))
                         && padre.getAmerb().getId().equals(cuota.getAmerb().getId())
-                        && mismoPeriodo(cuota, padre) && especiesComparables(cuota, padre)
+                        && seSolapan(cuota, padre) && especiesComparables(cuota, padre)
                         && cuota.getLimiteKg() > padre.getLimiteKg()) {
                     throw new IllegalArgumentException(String.format(
                             "La cuota del usuario (%.2f kg) no puede superar la cuota del área de manejo «%s» (%.2f kg) para %s en periodo %s.",
@@ -743,7 +904,7 @@ public class CuotaExtraccionService {
                 if (("MACROZONA".equals(alcancePadre) || "NACIONAL".equals(alcancePadre))
                         && padre.getMacrozona() != null
                         && macrozonaIdsPadre.contains(padre.getMacrozona().getId())
-                        && mismoPeriodo(cuota, padre) && especiesComparables(cuota, padre)
+                        && seSolapan(cuota, padre) && especiesComparables(cuota, padre)
                         && cuota.getLimiteKg() > padre.getLimiteKg()) {
                     throw new IllegalArgumentException(String.format(
                             "La cuota %s (%.2f kg) no puede superar la cuota macrozonal de «%s» (%.2f kg) para %s en periodo %s.",
@@ -757,7 +918,7 @@ public class CuotaExtraccionService {
         if ("MACROZONA".equals(alcance)) {
             for (CuotaExtraccionModel padre : activas) {
                 if ("NACIONAL".equals(alcanceDe(padre))
-                        && mismoPeriodo(cuota, padre) && especiesComparables(cuota, padre)
+                        && seSolapan(cuota, padre) && especiesComparables(cuota, padre)
                         && cuota.getLimiteKg() > padre.getLimiteKg()) {
                     throw new IllegalArgumentException(String.format(
                             "La cuota macrozonal «%s» (%.2f kg) no puede superar la cuota nacional (%.2f kg) para %s en periodo %s.",
@@ -776,7 +937,7 @@ public class CuotaExtraccionService {
             if ("REGION".equals(alcanceDe(padre))
                     && regionIdPadre != null
                     && regionIdHija.equals(regionIdPadre)
-                    && mismoPeriodo(cuota, padre) && especiesComparables(cuota, padre)
+                    && seSolapan(cuota, padre) && especiesComparables(cuota, padre)
                     && cuota.getLimiteKg() > padre.getLimiteKg()) {
                 throw new IllegalArgumentException(String.format(
                         "La cuota %s (%.2f kg) no puede superar la cuota regional de %s (%.2f kg) para %s en periodo %s.",
@@ -789,6 +950,11 @@ public class CuotaExtraccionService {
         if (c.getRegion() != null) return c.getRegion().getId();
         if (c.getProvincia() != null && c.getProvincia().getRegion() != null) return c.getProvincia().getRegion().getId();
         if (c.getComuna() != null && c.getComuna().getRegion() != null) return c.getComuna().getRegion().getId();
+        if (c.getComunas() != null && !c.getComunas().isEmpty()) {
+            for (ComunaModel com : c.getComunas()) {
+                if (com != null && com.getRegion() != null) return com.getRegion().getId();
+            }
+        }
         if (c.getAmerb() != null && c.getAmerb().getRegionModel() != null) return c.getAmerb().getRegionModel().getId();
         return null;
     }
@@ -796,7 +962,7 @@ public class CuotaExtraccionService {
     private String alcanceDe(CuotaExtraccionModel c) {
         if (c.getUsuario() != null) return "USUARIO";
         if (c.getAmerb() != null) return "AREA";
-        if (c.getComuna() != null) return "COMUNA";
+        if (!idsComunas(c).isEmpty()) return "COMUNA";
         if (c.getProvincia() != null) return "PROVINCIA";
         if (c.getRegion() != null) return "REGION";
         if (c.getMacrozona() != null) {
@@ -809,6 +975,13 @@ public class CuotaExtraccionService {
         if (c.getRegion() != null) return c.getRegion().getNombre();
         if (c.getProvincia() != null && c.getProvincia().getRegion() != null) return c.getProvincia().getRegion().getNombre();
         if (c.getComuna() != null && c.getComuna().getRegion() != null) return c.getComuna().getRegion().getNombre();
+        if (c.getComunas() != null && !c.getComunas().isEmpty()) {
+            for (ComunaModel com : c.getComunas()) {
+                if (com != null && com.getRegion() != null && com.getRegion().getNombre() != null) {
+                    return com.getRegion().getNombre();
+                }
+            }
+        }
         if (c.getAmerb() != null && c.getAmerb().getRegionModel() != null) return c.getAmerb().getRegionModel().getNombre();
         return null;
     }
@@ -825,9 +998,46 @@ public class CuotaExtraccionService {
         return a.getPeriodo() != null && a.getPeriodo().equalsIgnoreCase(b.getPeriodo());
     }
 
+    public boolean seSolapan(CuotaExtraccionModel a, CuotaExtraccionModel b) {
+        if (a == null || b == null) return false;
+        if (a.getFechaInicio() == null && a.getFechaFin() == null && b.getFechaInicio() == null && b.getFechaFin() == null) {
+            return mismoPeriodo(a, b);
+        }
+        LocalDate aInicio = a.getFechaInicio() != null ? toLocalDateSafe(a.getFechaInicio()) : LocalDate.MIN;
+        LocalDate aFin = a.getFechaFin() != null ? toLocalDateSafe(a.getFechaFin()) : LocalDate.MAX;
+        LocalDate bInicio = b.getFechaInicio() != null ? toLocalDateSafe(b.getFechaInicio()) : LocalDate.MIN;
+        LocalDate bFin = b.getFechaFin() != null ? toLocalDateSafe(b.getFechaFin()) : LocalDate.MAX;
+        return !aInicio.isAfter(bFin) && !bInicio.isAfter(aFin);
+    }
+
     private boolean especiesComparables(CuotaExtraccionModel a, CuotaExtraccionModel b) {
-        if (a.getEspecie() == null || b.getEspecie() == null) return true;
-        return a.getEspecie().getId().equals(b.getEspecie().getId());
+        String ambA = a.getAmbito() != null ? a.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+        String ambB = b.getAmbito() != null ? b.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+        if (!ambA.equals(ambB)) return false;
+
+        if (a.getEspecie() != null && b.getEspecie() != null) {
+            if (!a.getEspecie().getId().equals(b.getEspecie().getId())) return false;
+        }
+        if (a.getExtraccionTipo() != null && b.getExtraccionTipo() != null) {
+            if (!a.getExtraccionTipo().getId().equals(b.getExtraccionTipo().getId())) return false;
+        }
+        return true;
+    }
+
+    public Set<Long> idsComunas(CuotaExtraccionModel c) {
+        if (c == null) return Collections.emptySet();
+        Set<Long> ids = new LinkedHashSet<>();
+        if (c.getComunas() != null && !c.getComunas().isEmpty()) {
+            for (ComunaModel com : c.getComunas()) {
+                if (com != null && com.getId() != null) {
+                    ids.add(com.getId());
+                }
+            }
+        }
+        if (ids.isEmpty() && c.getComuna() != null && c.getComuna().getId() != null) {
+            ids.add(c.getComuna().getId());
+        }
+        return ids;
     }
 
     public String describirAlcance(CuotaExtraccionModel cuota) {
@@ -841,9 +1051,18 @@ public class CuotaExtraccionService {
             if (nombre == null || nombre.trim().isEmpty()) return "AMERB " + cuota.getAmerb().getId();
             return nombre.toUpperCase().startsWith("AMERB") ? nombre : "AMERB " + nombre;
         }
-        if (cuota.getComuna() != null) {
-            String nombre = cuota.getComuna().getNombre();
-            return (nombre != null && !nombre.isBlank()) ? "Comuna " + nombre : "Comuna " + cuota.getComuna().getId();
+        Set<Long> cIds = idsComunas(cuota);
+        if (!cIds.isEmpty()) {
+            if (cuota.getComunas() != null && cuota.getComunas().size() > 1) {
+                String nombres = cuota.getComunas().stream()
+                        .map(cm -> cm.getNombre() != null ? cm.getNombre() : String.valueOf(cm.getId()))
+                        .collect(Collectors.joining(" + "));
+                return "Comunas " + nombres;
+            }
+            if (cuota.getComuna() != null) {
+                String nombre = cuota.getComuna().getNombre();
+                return (nombre != null && !nombre.isBlank()) ? "Comuna " + nombre : "Comuna " + cuota.getComuna().getId();
+            }
         }
         if (cuota.getProvincia() != null) {
             String nombre = cuota.getProvincia().getNombre();
@@ -951,11 +1170,12 @@ public class CuotaExtraccionService {
         } else if ("declaracion_recolector".equals(tableName)) {
             sql.append("JOIN usuario u ON d.usuario_id = u.id ");
             if ("COMUNA".equals(nivelAgregacion)) {
-                if (cuota.getComuna() == null) {
+                Set<Long> cIds = idsComunas(cuota);
+                if (cIds.isEmpty()) {
                     throw new IllegalStateException("Cuota nivel COMUNA sin comuna asociada (id=" + cuota.getId() + ")");
                 }
-                sql.append("WHERE u.comuna_id = :filtroComunaId ");
-                params.put("filtroComunaId", cuota.getComuna().getId());
+                sql.append("WHERE u.comuna_id IN (:filtroComunaIds) ");
+                params.put("filtroComunaIds", cIds);
             } else if ("PROVINCIA".equals(nivelAgregacion)) {
                 if (cuota.getProvincia() == null) {
                     throw new IllegalStateException("Cuota nivel PROVINCIA sin provincia asociada (id=" + cuota.getId() + ")");
@@ -986,11 +1206,12 @@ public class CuotaExtraccionService {
         } else {
             // declaracion_armador o declaracion_area territorial
             if ("COMUNA".equals(nivelAgregacion)) {
-                if (cuota.getComuna() == null) {
+                Set<Long> cIds = idsComunas(cuota);
+                if (cIds.isEmpty()) {
                     throw new IllegalStateException("Cuota nivel COMUNA sin comuna asociada (id=" + cuota.getId() + ")");
                 }
-                sql.append("WHERE d.comuna_id = :filtroComunaId ");
-                params.put("filtroComunaId", cuota.getComuna().getId());
+                sql.append("WHERE d.comuna_id IN (:filtroComunaIds) ");
+                params.put("filtroComunaIds", cIds);
             } else if ("PROVINCIA".equals(nivelAgregacion)) {
                 if (cuota.getProvincia() == null) {
                     throw new IllegalStateException("Cuota nivel PROVINCIA sin provincia asociada (id=" + cuota.getId() + ")");
@@ -1047,9 +1268,9 @@ public class CuotaExtraccionService {
         if (comunaId == null) return true;
         if (cuota == null) return false;
 
-        // Comuna directa
-        if (cuota.getComuna() != null) {
-            return cuota.getComuna().getId().equals(comunaId);
+        Set<Long> cIds = idsComunas(cuota);
+        if (!cIds.isEmpty()) {
+            return cIds.contains(comunaId);
         }
 
         Optional<ComunaModel> comOpt = comunaRepository.findById(comunaId);
