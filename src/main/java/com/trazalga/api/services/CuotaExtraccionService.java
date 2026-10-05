@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.trazalga.api.dto.ControlCuotaDiariaDTO;
+import com.trazalga.api.dto.CuotaListadoDTO;
 import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.models.FactorConversionModel;
@@ -681,7 +682,10 @@ public class CuotaExtraccionService {
             cuota.setAmbito(ambNorm);
         }
 
-        if (cuota.getPerfil() == null || cuota.getPerfil().isBlank()) {
+        if ("AREA_LIBRE".equalsIgnoreCase(cuota.getAmbito())) {
+            // T1.2: Columna heredada, sin efecto en áreas libres
+            cuota.setPerfil("RECOLECTOR");
+        } else if (cuota.getPerfil() == null || cuota.getPerfil().isBlank()) {
             cuota.setPerfil("AMERB".equalsIgnoreCase(cuota.getAmbito()) ? "AREA" : "RECOLECTOR");
         }
         if (cuota.getNivelAgregacion() == null || cuota.getNivelAgregacion().trim().isEmpty()) {
@@ -1459,6 +1463,216 @@ public class CuotaExtraccionService {
         c.setFechaCierre(new Date());
         c.setMotivoCierre("ADMINISTRATIVO");
         return cuotaRepository.save(c);
+    }
+
+    public List<CuotaListadoDTO> getListado(Integer anio, Integer mes, Long comunaId, Long extraccionTipoId, String ambito) {
+        String ambitoNorm = (ambito != null && !ambito.isBlank()) ? ambito.trim().toUpperCase() : "AREA_LIBRE";
+        List<CuotaExtraccionModel> todas = cuotaRepository.findAll();
+
+        List<CuotaListadoDTO> result = new ArrayList<>();
+        Date now = new Date();
+        LocalDate nowLocal = toLocalDateSafe(now);
+
+        String[] nombresMeses = {"", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+
+        for (CuotaExtraccionModel c : todas) {
+            String cAmbito = c.getAmbito() != null ? c.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+            if (!"TODOS".equals(ambitoNorm)) {
+                if ("AMERB".equals(ambitoNorm)) {
+                    if (!"AMERB".equals(cAmbito) && c.getAmerb() == null && !"AREA".equalsIgnoreCase(c.getPerfil())) {
+                        continue;
+                    }
+                } else if ("AREA_LIBRE".equals(ambitoNorm)) {
+                    if ("AMERB".equals(cAmbito) || c.getAmerb() != null || "AREA".equalsIgnoreCase(c.getPerfil())) {
+                        continue;
+                    }
+                } else {
+                    if (!ambitoNorm.equals(cAmbito)) {
+                        continue;
+                    }
+                }
+            }
+
+            // Filtro año
+            if (anio != null && c.getFechaInicio() != null) {
+                LocalDate ini = toLocalDateSafe(c.getFechaInicio());
+                LocalDate fin = c.getFechaFin() != null ? toLocalDateSafe(c.getFechaFin()) : ini;
+                if (anio < ini.getYear() || anio > fin.getYear()) {
+                    continue;
+                }
+            }
+
+            // Filtro mes
+            if (mes != null && mes >= 1 && mes <= 12 && c.getFechaInicio() != null) {
+                LocalDate ini = toLocalDateSafe(c.getFechaInicio());
+                LocalDate fin = c.getFechaFin() != null ? toLocalDateSafe(c.getFechaFin()) : ini;
+                int targetAnio = (anio != null) ? anio : ini.getYear();
+                LocalDate mesInicio = LocalDate.of(targetAnio, mes, 1);
+                LocalDate mesFin = mesInicio.withDayOfMonth(mesInicio.lengthOfMonth());
+                if (ini.isAfter(mesFin) || fin.isBefore(mesInicio)) {
+                    continue;
+                }
+            }
+
+            // Filtro comuna
+            if (comunaId != null) {
+                if (!contieneComuna(c, comunaId)) {
+                    continue;
+                }
+            }
+
+            // Filtro tipo extracción
+            if (extraccionTipoId != null) {
+                if (c.getExtraccionTipo() == null || !c.getExtraccionTipo().getId().equals(extraccionTipoId)) {
+                    continue;
+                }
+            }
+
+            // Determinar si es formato anterior
+            boolean esFormatoAnt = esFormatoAnterior(c);
+
+            // Calcular fecha de evaluación para el consumo
+            Date fechaEval = now;
+            if (c.getFechaFin() != null) {
+                LocalDate fin = toLocalDateSafe(c.getFechaFin());
+                if (nowLocal.isAfter(fin)) {
+                    fechaEval = c.getFechaFin();
+                } else if (c.getFechaInicio() != null && nowLocal.isBefore(toLocalDateSafe(c.getFechaInicio()))) {
+                    fechaEval = c.getFechaInicio();
+                }
+            }
+
+            BigDecimal limiteNominal = (c.getLimiteKg() != null) ? BigDecimal.valueOf(c.getLimiteKg()) : BigDecimal.ZERO;
+            BigDecimal limiteEfectivo = calcularLimiteEfectivo(c, fechaEval);
+            BigDecimal factor = BigDecimal.ONE;
+            if (c.getHumedadEstado() != null && c.getEspecie() != null && !"DESEMBARQUE".equalsIgnoreCase(c.getMetrica())) {
+                factor = factorConversionService.findFactorVigente(c.getEspecie().getId(), c.getHumedadEstado().getId(), fechaEval)
+                        .map(FactorConversionModel::getFactor)
+                        .orElse(BigDecimal.ONE);
+            }
+
+            BigDecimal consumo = BigDecimal.ZERO;
+            try {
+                consumo = ejecutarConsultaConsumo(c, fechaEval, c.getPerfil(), (c.getUsuario() != null ? c.getUsuario().getId() : null));
+            } catch (Exception e) {
+                log.warn("No se pudo calcular consumo para cuota id={}: {}", c.getId(), e.getMessage());
+            }
+
+            BigDecimal saldo = limiteEfectivo.subtract(consumo);
+            if (saldo.compareTo(BigDecimal.ZERO) < 0) saldo = BigDecimal.ZERO;
+
+            double pct = (limiteEfectivo.compareTo(BigDecimal.ZERO) > 0)
+                    ? (consumo.doubleValue() / limiteEfectivo.doubleValue()) * 100.0
+                    : 0.0;
+
+            String vigenciaDesc = formatearVigencia(c, nombresMeses);
+
+            Set<Long> cIds = idsComunas(c);
+            List<String> comNombres = new ArrayList<>();
+            if (c.getComunas() != null && !c.getComunas().isEmpty()) {
+                comNombres = c.getComunas().stream()
+                        .map(cm -> cm.getNombre() != null ? cm.getNombre() : ("Comuna " + cm.getId()))
+                        .toList();
+            } else if (c.getComuna() != null) {
+                comNombres = List.of(c.getComuna().getNombre() != null ? c.getComuna().getNombre() : ("Comuna " + c.getComuna().getId()));
+            }
+            String comunasNombre = String.join(" + ", comNombres);
+
+            CuotaListadoDTO dto = CuotaListadoDTO.builder()
+                    .id(c.getId())
+                    .ambito(cAmbito)
+                    .perfil(c.getPerfil())
+                    .nivelAgregacion(c.getNivelAgregacion())
+                    .regionId(c.getRegion() != null ? c.getRegion().getId() : (c.getComuna() != null && c.getComuna().getRegion() != null ? c.getComuna().getRegion().getId() : null))
+                    .regionNombre(nombreRegionDe(c))
+                    .comunaId(c.getComuna() != null ? c.getComuna().getId() : (!cIds.isEmpty() ? cIds.iterator().next() : null))
+                    .comunaNombre(c.getComuna() != null ? c.getComuna().getNombre() : (!comNombres.isEmpty() ? comNombres.get(0) : null))
+                    .comunaIds(cIds)
+                    .comunaNombres(comNombres)
+                    .comunasNombre(comunasNombre)
+                    .especieId(c.getEspecie() != null ? c.getEspecie().getId() : null)
+                    .especieNombre(c.getEspecie() != null ? c.getEspecie().getNombre() : "Sin especie")
+                    .extraccionTipoId(c.getExtraccionTipo() != null ? c.getExtraccionTipo().getId() : null)
+                    .extraccionTipoNombre(c.getExtraccionTipo() != null ? c.getExtraccionTipo().getNombre() : "Todos los métodos")
+                    .periodo(c.getPeriodo())
+                    .fechaInicio(c.getFechaInicio())
+                    .fechaFin(c.getFechaFin())
+                    .vigenciaDescripcion(vigenciaDesc)
+                    .limiteKg(c.getLimiteKg())
+                    .limiteNominal(limiteNominal)
+                    .limiteEfectivo(limiteEfectivo)
+                    .consumoAcumulado(consumo)
+                    .porcentajeUso(Math.round(pct * 10.0) / 10.0)
+                    .saldoDisponible(saldo)
+                    .metrica(c.getMetrica() != null ? c.getMetrica() : "CAPTURA")
+                    .humedadEstadoId(c.getHumedadEstado() != null ? c.getHumedadEstado().getId() : null)
+                    .humedadEstadoNombre(c.getHumedadEstado() != null ? c.getHumedadEstado().getNombre() : "Sin conversión")
+                    .factorConversion(factor)
+                    .modoAccion(c.getModoAccion() != null ? c.getModoAccion() : "SOLO_ALERTA")
+                    .resolucion(c.getResolucion())
+                    .estado(c.getEstado() != null ? c.getEstado() : "ABIERTA")
+                    .fechaCierre(c.getFechaCierre())
+                    .motivoCierre(c.getMotivoCierre())
+                    .activo(c.getActivo())
+                    .alcance(describirAlcance(c))
+                    .esFormatoAnterior(esFormatoAnt)
+                    .build();
+
+            result.add(dto);
+        }
+
+        result.sort((a, b) -> {
+            int cmpAnt = Boolean.compare(Boolean.TRUE.equals(a.getEsFormatoAnterior()), Boolean.TRUE.equals(b.getEsFormatoAnterior()));
+            if (cmpAnt != 0) return cmpAnt;
+            if (a.getFechaInicio() != null && b.getFechaInicio() != null) {
+                int cmpFecha = b.getFechaInicio().compareTo(a.getFechaInicio());
+                if (cmpFecha != 0) return cmpFecha;
+            } else if (a.getFechaInicio() != null) {
+                return -1;
+            } else if (b.getFechaInicio() != null) {
+                return 1;
+            }
+            Long idA = a.getId() != null ? a.getId() : 0L;
+            Long idB = b.getId() != null ? b.getId() : 0L;
+            return idB.compareTo(idA);
+        });
+
+        return result;
+    }
+
+    public boolean esFormatoAnterior(CuotaExtraccionModel c) {
+        if (Boolean.TRUE.equals(c.getEsPlantilla())) return true;
+        if (c.getUsuario() != null) return true;
+        if (c.getMacrozona() != null || c.getProvincia() != null) return true;
+        String periodo = c.getPeriodo() != null ? c.getPeriodo().trim().toUpperCase() : "";
+        if (!"MENSUAL".equals(periodo)) return true;
+        if (c.getFechaInicio() == null || c.getFechaFin() == null) return true;
+        String nivel = c.getNivelAgregacion() != null ? c.getNivelAgregacion().trim().toUpperCase() : "";
+        if (!"COMUNA".equals(nivel) && !"REGION".equals(nivel)) return true;
+        return false;
+    }
+
+    private String formatearVigencia(CuotaExtraccionModel c, String[] nombresMeses) {
+        if (c.getFechaInicio() == null) {
+            return c.getPeriodo() != null ? c.getPeriodo() : "Sin vigencia";
+        }
+        LocalDate ini = toLocalDateSafe(c.getFechaInicio());
+        LocalDate fin = c.getFechaFin() != null ? toLocalDateSafe(c.getFechaFin()) : null;
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+        if ("MENSUAL".equalsIgnoreCase(c.getPeriodo()) && fin != null && ini.getMonthValue() == fin.getMonthValue() && ini.getYear() == fin.getYear()) {
+            String mesNombre = nombresMeses[ini.getMonthValue()] + " " + ini.getYear();
+            if (ini.getDayOfMonth() == 1 && fin.getDayOfMonth() == fin.lengthOfMonth()) {
+                return mesNombre;
+            } else {
+                return String.format("%s (%02d al %02d)", mesNombre, ini.getDayOfMonth(), fin.getDayOfMonth());
+            }
+        }
+        if (fin != null) {
+            return ini.format(dtf) + " al " + fin.format(dtf);
+        }
+        return "Desde " + ini.format(dtf);
     }
 
     public static class QuotaCheckResult {

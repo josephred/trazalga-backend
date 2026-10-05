@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trazalga.api.dto.ControlCuotaDiariaDTO;
+import com.trazalga.api.dto.CuotaListadoDTO;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.services.CuotaExtraccionService;
 import java.util.List;
@@ -29,6 +30,16 @@ public class CuotaExtraccionController {
 
     @Autowired
     CuotaExtraccionService cuotaService;
+
+    @GetMapping("/listado")
+    public List<CuotaListadoDTO> getListado(
+            @RequestParam(required = false) Integer anio,
+            @RequestParam(required = false) Integer mes,
+            @RequestParam(required = false) Long comunaId,
+            @RequestParam(required = false) Long extraccionTipoId,
+            @RequestParam(required = false, defaultValue = "AREA_LIBRE") String ambito) {
+        return cuotaService.getListado(anio, mes, comunaId, extraccionTipoId, ambito);
+    }
 
     @GetMapping("/dashboard-diario")
     public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(
@@ -72,8 +83,7 @@ public class CuotaExtraccionController {
 
     @PutMapping(path = "/{id}")
     public CuotaExtraccionModel update(@RequestBody CuotaExtraccionModel request, @PathVariable("id") Long id) {
-        request.setId(id);
-        return cuotaService.save(request);
+        return cuotaService.update(id, request);
     }
 
     @DeleteMapping(path = "/{id}")
