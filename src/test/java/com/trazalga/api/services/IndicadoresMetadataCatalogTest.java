@@ -62,6 +62,7 @@ public class IndicadoresMetadataCatalogTest {
                 "desembarque_fuente_area_activa",
                 "captura_politica_sin_factor",
                 "captura_factor_default",
+                "cuota_fecha_imputacion",
                 "cuota_umbral_restante_pct",
                 "cuota_desvio_velocidad_pct",
                 "cuota_dias_previos_expiracion",

@@ -32,6 +32,7 @@ public class ConfiguracionGeneralService {
         createIfNotExist("captura_factor_default", "1.0000", "Factor de respaldo cuando la política es USAR_DEFAULT", "CAPTURA");
 
         // 3. Cuotas
+        createIfNotExist("cuota_fecha_imputacion", "EXTRACCION", "Fecha utilizada para imputar el consumo de cuota mensual: EXTRACCION o DECLARACION", "CUOTA");
         createIfNotExist("cuota_umbral_restante_pct", "10.0", "Porcentaje restante que dispara la alerta preventiva de cuota", "CUOTA");
         createIfNotExist("cuota_desvio_velocidad_pct", "25.0", "Desvío tolerado entre % de consumo y % de tiempo transcurrido", "CUOTA");
         createIfNotExist("cuota_dias_previos_expiracion", "5", "Días antes del fin de vigencia para avisar expiración de cuota", "CUOTA");
@@ -177,6 +178,10 @@ public class ConfiguracionGeneralService {
     @Autowired(required = false)
     private org.springframework.cache.CacheManager cacheManager;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private CuotaExtraccionService cuotaExtraccionService;
+
     public ConfiguracionGeneralModel updateConfig(String clave, String nuevoValor) {
         return updateConfig(clave, nuevoValor, null, null);
     }
@@ -210,6 +215,13 @@ public class ConfiguracionGeneralService {
                         cache.clear();
                     }
                 }
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (cuotaExtraccionService != null && clave != null && clave.startsWith("cuota_")) {
+            try {
+                cuotaExtraccionService.invalidarCacheConsumo();
             } catch (Exception ignored) {
             }
         }

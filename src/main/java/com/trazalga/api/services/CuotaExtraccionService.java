@@ -104,6 +104,14 @@ public class CuotaExtraccionService {
         return cuotaRepository.findById(id);
     }
 
+    public String getModoImputacion() {
+        if (configuracionGeneralService == null) {
+            return "EXTRACCION";
+        }
+        String modo = configuracionGeneralService.getValor("cuota_fecha_imputacion", "EXTRACCION");
+        return (modo != null && "DECLARACION".equalsIgnoreCase(modo.trim())) ? "DECLARACION" : "EXTRACCION";
+    }
+
     @Transactional
     public CuotaExtraccionModel save(CuotaExtraccionModel cuota) {
         resolverReferencias(cuota);
@@ -221,7 +229,13 @@ public class CuotaExtraccionService {
             BigDecimal desembarqueKg,
             BigDecimal capturaKg) {
 
-        Date fechaEval = (fechaDeclaracion != null) ? fechaDeclaracion : (fechaExtraccion != null ? fechaExtraccion : new Date());
+        String modo = getModoImputacion();
+        Date fechaEval;
+        if ("DECLARACION".equalsIgnoreCase(modo)) {
+            fechaEval = (fechaDeclaracion != null) ? fechaDeclaracion : (fechaExtraccion != null ? fechaExtraccion : new Date());
+        } else {
+            fechaEval = (fechaExtraccion != null) ? fechaExtraccion : (fechaDeclaracion != null ? fechaDeclaracion : new Date());
+        }
 
         // 1. Si es AMERB, validar primero si la especie está habilitada por resolución
         if (amerbId != null && especieId != null) {
@@ -1148,6 +1162,9 @@ public class CuotaExtraccionService {
         StringBuilder sql = new StringBuilder();
         Map<String, Object> params = new HashMap<>();
 
+        String modo = getModoImputacion();
+        String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
+
         boolean esPlantilla = Boolean.TRUE.equals(cuota.getEsPlantilla());
         String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase().trim() : "";
 
@@ -1198,8 +1215,8 @@ public class CuotaExtraccionService {
                 }
                 sql.append("JOIN comuna c ON u.comuna_id = c.id ")
                    .append("JOIN macrozona_region mr ON c.region_id = mr.region_id ")
-                   .append("  AND (mr.vigencia_inicio IS NULL OR d.fecha_declaracion >= mr.vigencia_inicio) ")
-                   .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
+                   .append("  AND (mr.vigencia_inicio IS NULL OR d.").append(colFecha).append(" >= mr.vigencia_inicio) ")
+                   .append("  AND (mr.vigencia_fin IS NULL OR d.").append(colFecha).append(" <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
             } else if ("NACIONAL".equals(nivelAgregacion) || "GLOBAL".equals(nivelAgregacion)) {
@@ -1234,8 +1251,8 @@ public class CuotaExtraccionService {
                 }
                 sql.append("JOIN comuna c ON d.comuna_id = c.id ")
                    .append("JOIN macrozona_region mr ON c.region_id = mr.region_id ")
-                   .append("  AND (mr.vigencia_inicio IS NULL OR d.fecha_declaracion >= mr.vigencia_inicio) ")
-                   .append("  AND (mr.vigencia_fin IS NULL OR d.fecha_declaracion <= mr.vigencia_fin) ")
+                   .append("  AND (mr.vigencia_inicio IS NULL OR d.").append(colFecha).append(" >= mr.vigencia_inicio) ")
+                   .append("  AND (mr.vigencia_fin IS NULL OR d.").append(colFecha).append(" <= mr.vigencia_fin) ")
                    .append("WHERE mr.macrozona_id = :filtroMacrozonaId ");
                 params.put("filtroMacrozonaId", cuota.getMacrozona().getId());
             } else if ("NACIONAL".equals(nivelAgregacion) || "GLOBAL".equals(nivelAgregacion)) {
@@ -1304,6 +1321,9 @@ public class CuotaExtraccionService {
 
     private BigDecimal ejecutarQueryConsumo(
             String tableName, String colMetrica, FiltroTerritorialCuota filtro, CuotaExtraccionModel cuota, java.sql.Date[] rango) {
+        String modo = getModoImputacion();
+        String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
+
         StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(d." + colMetrica + "), 0) FROM " + tableName + " d ");
         sql.append(filtro.getSqlFragment());
         if (cuota.getEspecie() != null) {
@@ -1312,7 +1332,7 @@ public class CuotaExtraccionService {
         if (cuota.getExtraccionTipo() != null) {
             sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
         }
-        sql.append("AND d.fecha_declaracion BETWEEN :startDate AND :endDate");
+        sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate");
 
         Query q = entityManager.createNativeQuery(sql.toString());
         q.setParameter("startDate", rango[0]);
@@ -1363,10 +1383,12 @@ public class CuotaExtraccionService {
 
         boolean esAreaLibre = "AREA_LIBRE".equalsIgnoreCase(cuota.getAmbito()) || (cuota.getAmbito() == null && cuota.getAmerb() == null && !"AREA".equalsIgnoreCase(cuota.getPerfil()));
 
+        String modoImputacion = getModoImputacion();
         String cachePerfil = esAreaLibre ? "AREALIBRE" : (perfil != null ? perfil : "DEFAULT");
         String cacheKey = (cuota.getId() != null ? cuota.getId() : 0L) + "_" +
                           (fechaEval != null ? fechaEval.getTime() / 86400000L : 0L) + "_" +
                           cachePerfil + "_" +
+                          modoImputacion + "_" +
                           (targetUsuarioId != null ? targetUsuarioId : "ALL");
 
         long ahora = System.currentTimeMillis();
