@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.dto.CuotaListadoDTO;
 import com.trazalga.api.models.AmerbModel;
 import com.trazalga.api.models.ComunaModel;
@@ -265,5 +266,46 @@ public class CuotaListadoTest {
         when(cuotaRepository.findAll()).thenReturn(List.of(cMesAcotado));
         List<CuotaListadoDTO> res2 = cuotaService.getListado(null, null, null, null, "TODOS");
         assertEquals("Marzo 2026 (10 al 25)", res2.get(0).getVigenciaDescripcion());
+    }
+
+    @Test
+    @DisplayName("T1.7: Con enero a diciembre de 2026 cargados, el tablero del 15-10 muestra sólo las cuotas de octubre")
+    void testTablero_MuestraSoloCuotasDeOctubre_CuandoSeFiltraAl15DeOctubre() {
+        List<CuotaExtraccionModel> doceMeses = new java.util.ArrayList<>();
+        for (int m = 1; m <= 12; m++) {
+            LocalDate ini = LocalDate.of(2026, m, 1);
+            LocalDate fin = ini.withDayOfMonth(ini.lengthOfMonth());
+            doceMeses.add(CuotaExtraccionModel.builder()
+                    .id((long) m)
+                    .ambito("AREA_LIBRE")
+                    .nivelAgregacion("COMUNA")
+                    .comunas(Set.of(comunaLaSerena))
+                    .especie(especieHuiro)
+                    .extraccionTipo(extraccionVarado)
+                    .periodo("MENSUAL")
+                    .fechaInicio(Date.valueOf(ini))
+                    .fechaFin(Date.valueOf(fin))
+                    .limiteKg(10_000.0)
+                    .metrica("DESEMBARQUE")
+                    .activo(true)
+                    .build());
+        }
+
+        when(cuotaRepository.findByAmbitoAndActivoTrue("AREA_LIBRE")).thenReturn(doceMeses);
+
+        Query mockQuery = mock(Query.class);
+        lenient().when(entityManager.createNativeQuery(anyString())).thenReturn(mockQuery);
+        lenient().when(mockQuery.getSingleResult()).thenReturn(new BigDecimal("1000.00"));
+
+        Date fechaTablero = Date.valueOf("2026-10-15");
+        List<ControlCuotaDiariaDTO> dtos = cuotaService.getControlCuotasDiarioGlobal(
+                fechaTablero, fechaTablero, null, null, null, null);
+
+        assertNotNull(dtos);
+        assertEquals(1, dtos.size(), "El tablero del 15-10 debe mostrar exactamente una cuota");
+        ControlCuotaDiariaDTO dtoOct = dtos.get(0);
+        assertEquals(10L, dtoOct.getCuotaId(), "La cuota mostrada debe ser la de octubre (#10)");
+        assertEquals("Octubre 2026", dtoOct.getVigenciaFormateada());
+        assertTrue(dtoOct.getComunasNombre().contains("La Serena"));
     }
 }

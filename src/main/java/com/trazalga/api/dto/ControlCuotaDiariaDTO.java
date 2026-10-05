@@ -33,4 +33,7 @@ public class ControlCuotaDiariaDTO {
     private String comunaNombre;
     private Set<Long> comunaIds;
     private String comunasNombre;
+    private String fechaInicio;
+    private String fechaFin;
+    private String vigenciaFormateada;
 }

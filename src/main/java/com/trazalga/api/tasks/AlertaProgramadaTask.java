@@ -8,6 +8,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,18 @@ public class AlertaProgramadaTask {
                 continue;
             }
 
+            // T1.7: Evaluar sólo cuotas vigentes hoy (las cuotas pasadas o futuras no generan alertas)
+            // Las cuotas sin fechas (formato anterior) se siguen evaluando.
+            LocalDate cInicio = cuota.getFechaInicio() != null ? com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaInicio()) : null;
+            LocalDate cFin = cuota.getFechaFin() != null ? com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin()) : null;
+
+            if (cInicio != null && hoyLocal.isBefore(cInicio)) {
+                continue;
+            }
+            if (cFin != null && hoyLocal.isAfter(cFin)) {
+                continue;
+            }
+
             BigDecimal limite = cuotaExtraccionService.calcularLimiteEfectivo(cuota, hoy);
             if (limite == null || limite.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
@@ -123,10 +137,13 @@ public class AlertaProgramadaTask {
                 LocalDate fechaFinLocal = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin());
                 long diasRestantes = ChronoUnit.DAYS.between(hoyLocal, fechaFinLocal);
                 if (diasRestantes >= 0 && diasRestantes <= diasPreviosExpiracion) {
-                    String titulo = "Aviso de Expiración de Cuota";
-                    String mensaje = String.format("La cuota de %s (%s) vencerá en %d día(s) (fecha de término: %s).",
-                            alcance, especieNombre, diasRestantes, cuota.getFechaFin());
-                    notificar(cuota.getUsuario() != null ? cuota.getUsuario().getId() : null, titulo, mensaje);
+                    // T1.7: No avisar expiración si existe una cuota sucesora contigua para la misma especie, método y comunas
+                    if (!tieneSucesoraContigua(cuota, fechaFinLocal, cuotasActivas)) {
+                        String titulo = "Aviso de Expiración de Cuota";
+                        String mensaje = String.format("La cuota de %s (%s) vencerá en %d día(s) (fecha de término: %s).",
+                                alcance, especieNombre, diasRestantes, cuota.getFechaFin());
+                        notificar(cuota.getUsuario() != null ? cuota.getUsuario().getId() : null, titulo, mensaje);
+                    }
                 }
             }
 
@@ -288,5 +305,42 @@ public class AlertaProgramadaTask {
         } catch (Exception e) {
             return def;
         }
+    }
+
+    boolean tieneSucesoraContigua(CuotaExtraccionModel cuota, LocalDate fechaFinLocal, List<CuotaExtraccionModel> todasCuotas) {
+        if (fechaFinLocal == null || todasCuotas == null) return false;
+        LocalDate diaSiguiente = fechaFinLocal.plusDays(1);
+        String ambitoA = cuota.getAmbito() != null ? cuota.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+        Long espA = cuota.getEspecie() != null ? cuota.getEspecie().getId() : null;
+        Long metA = cuota.getExtraccionTipo() != null ? cuota.getExtraccionTipo().getId() : null;
+        Set<Long> comA = cuotaExtraccionService.idsComunas(cuota);
+        Long regA = cuota.getRegion() != null ? cuota.getRegion().getId() : null;
+
+        for (CuotaExtraccionModel s : todasCuotas) {
+            if (s.getId() != null && s.getId().equals(cuota.getId())) continue;
+            if (!Boolean.TRUE.equals(s.getActivo())) continue;
+            if (s.getFechaInicio() == null) continue;
+
+            LocalDate sInicio = com.trazalga.api.services.CuotaExtraccionService.toLocalDateSafe(s.getFechaInicio());
+            if (!diaSiguiente.equals(sInicio)) continue;
+
+            String ambitoS = s.getAmbito() != null ? s.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+            if (!ambitoA.equals(ambitoS)) continue;
+
+            Long espS = s.getEspecie() != null ? s.getEspecie().getId() : null;
+            if (!Objects.equals(espA, espS)) continue;
+
+            Long metS = s.getExtraccionTipo() != null ? s.getExtraccionTipo().getId() : null;
+            if (!Objects.equals(metA, metS)) continue;
+
+            Set<Long> comS = cuotaExtraccionService.idsComunas(s);
+            if (!comA.equals(comS)) continue;
+
+            Long regS = s.getRegion() != null ? s.getRegion().getId() : null;
+            if (!Objects.equals(regA, regS)) continue;
+
+            return true;
+        }
+        return false;
     }
 }

@@ -464,6 +464,12 @@ public class CuotaExtraccionService {
             endDate = startDate;
         }
 
+        LocalDate sDate = toLocalDateSafe(startDate);
+        LocalDate eDate = toLocalDateSafe(endDate);
+
+        String[] nombresMeses = {"", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+
         List<ControlCuotaDiariaDTO> result = new ArrayList<>();
         for (CuotaExtraccionModel cuota : cuotas) {
             if (periodo != null && !periodo.isBlank() && !"ALL".equalsIgnoreCase(periodo) && !periodo.equalsIgnoreCase(cuota.getPeriodo())) {
@@ -471,6 +477,17 @@ public class CuotaExtraccionService {
             }
             if (cuota.getEspecie() == null) {
                 continue;
+            }
+
+            // T1.7: Conservar sólo cuotas cuya vigencia se solapa con [startDate, endDate] (hoy por defecto)
+            // Las cuotas sin fechas (formato anterior) se siguen mostrando.
+            if (cuota.getFechaInicio() != null || cuota.getFechaFin() != null) {
+                LocalDate cInicio = cuota.getFechaInicio() != null ? toLocalDateSafe(cuota.getFechaInicio()) : LocalDate.MIN;
+                LocalDate cFin = cuota.getFechaFin() != null ? toLocalDateSafe(cuota.getFechaFin()) : LocalDate.MAX;
+                boolean seSolapan = !cInicio.isAfter(eDate) && !sDate.isAfter(cFin);
+                if (!seSolapan) {
+                    continue;
+                }
             }
 
             BigDecimal sumVolumen = ejecutarConsultaConsumo(cuota, startDate, perfil, cuota.getUsuario() != null ? cuota.getUsuario().getId() : null);
@@ -508,7 +525,7 @@ public class CuotaExtraccionService {
             Set<Long> cIds = idsComunas(cuota);
             String comunasNombre = null;
             if (!cIds.isEmpty()) {
-                if (cuota.getComunas() != null && cuota.getComunas().size() > 1) {
+                if (cuota.getComunas() != null && !cuota.getComunas().isEmpty()) {
                     comunasNombre = cuota.getComunas().stream().map(ComunaModel::getNombre).collect(Collectors.joining(" + "));
                 } else if (cuota.getComuna() != null) {
                     comunasNombre = cuota.getComuna().getNombre();
@@ -535,6 +552,9 @@ public class CuotaExtraccionService {
                 .comunaNombre(comunaNombre)
                 .comunaIds(cIds)
                 .comunasNombre(comunasNombre)
+                .fechaInicio(cuota.getFechaInicio() != null ? cuota.getFechaInicio().toString() : null)
+                .fechaFin(cuota.getFechaFin() != null ? cuota.getFechaFin().toString() : null)
+                .vigenciaFormateada(formatearVigencia(cuota, nombresMeses))
                 .build();
 
             result.add(dto);
