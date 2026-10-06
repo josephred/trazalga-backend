@@ -17,6 +17,10 @@ public class ReportRepository {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.CadenaCustodiaService cadenaCustodiaService;
+
     public List<ReportDTO> generateReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
         String tableName;
         String dateColumn = "fecha_declaracion";
@@ -1720,6 +1724,9 @@ public class ReportRepository {
     }
 
     public com.trazalga.api.dto.TrazabilidadResponseDTO getTrazabilidad(Integer tipo, Long id) {
+        if (cadenaCustodiaService != null) {
+            return cadenaCustodiaService.getTrazabilidad(tipo, id);
+        }
         java.util.Queue<String> queue = new java.util.LinkedList<>();
         java.util.Set<String> visited = new java.util.HashSet<>();
         
