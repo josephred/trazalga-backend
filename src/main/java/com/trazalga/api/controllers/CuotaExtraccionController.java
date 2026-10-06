@@ -71,6 +71,25 @@ public class CuotaExtraccionController {
         return org.springframework.http.ResponseEntity.unprocessableEntity().body(body);
     }
 
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    @PostMapping("/lote")
+    public org.springframework.http.ResponseEntity<?> createLote(@RequestBody com.fasterxml.jackson.databind.JsonNode node) {
+        if (node.isArray()) {
+            List<CuotaExtraccionModel> lista = objectMapper.convertValue(
+                    node,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<CuotaExtraccionModel>>() {}
+            );
+            List<CuotaExtraccionModel> creadas = cuotaService.saveLote(lista);
+            return org.springframework.http.ResponseEntity.ok(creadas);
+        } else {
+            com.trazalga.api.dto.CuotaLoteDTO dto = objectMapper.convertValue(node, com.trazalga.api.dto.CuotaLoteDTO.class);
+            List<CuotaExtraccionModel> creadas = cuotaService.saveLote(dto);
+            return org.springframework.http.ResponseEntity.ok(creadas);
+        }
+    }
+
     @PostMapping
     public CuotaExtraccionModel create(@RequestBody CuotaExtraccionModel cuota) {
         return cuotaService.save(cuota);

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -13,6 +14,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -26,9 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.dto.CuotaListadoDTO;
+import com.trazalga.api.dto.CuotaLoteDTO;
 import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.CuotaExtraccionModel;
+import com.trazalga.api.models.EspecieModel;
+import com.trazalga.api.models.ExtraccionTipoModel;
 import com.trazalga.api.models.FactorConversionModel;
+import com.trazalga.api.models.HumedadEstadoModel;
 import com.trazalga.api.models.MacrozonaModel;
 import com.trazalga.api.models.ProvinciaModel;
 import com.trazalga.api.models.RegionModel;
@@ -120,6 +126,187 @@ public class CuotaExtraccionService {
         validarJerarquia(cuota);
         invalidarCacheConsumo();
         return cuotaRepository.save(cuota);
+    }
+
+    /**
+     * T1.8: Alta transaccional de cuotas por lote.
+     * Si cualquier cuota no supera las validaciones o solapa con cuotas existentes,
+     * no se guarda ninguna y se indica el periodo que causó el conflicto.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<CuotaExtraccionModel> saveLote(List<CuotaExtraccionModel> cuotas) {
+        if (cuotas == null || cuotas.isEmpty()) {
+            throw new IllegalArgumentException("La lista de cuotas a guardar no puede estar vacía.");
+        }
+
+        // 1. Validar solapamiento interno en el lote
+        validarSolapamientoInternoLote(cuotas);
+
+        // 2. Validar cada cuota contra la base de datos
+        for (CuotaExtraccionModel c : cuotas) {
+            try {
+                resolverReferencias(c);
+                validarDatosBasicos(c);
+                validarSolapamiento(c);
+                validarJerarquia(c);
+            } catch (IllegalArgumentException ex) {
+                String mesNombre = "";
+                if (c.getFechaInicio() != null) {
+                    mesNombre = toLocalDateSafe(c.getFechaInicio()).getMonth()
+                            .getDisplayName(TextStyle.FULL, new Locale("es", "ES"));
+                    mesNombre = mesNombre.substring(0, 1).toUpperCase() + mesNombre.substring(1);
+                }
+                String contexto = !mesNombre.isEmpty() ? ("mes " + mesNombre) : ("cuota " + c.getPeriodo());
+                throw new IllegalArgumentException("Error en " + contexto + ": " + ex.getMessage(), ex);
+            }
+        }
+
+        // 3. Persistir todas las cuotas atómicamente
+        List<CuotaExtraccionModel> guardadas = cuotaRepository.saveAll(cuotas);
+        invalidarCacheConsumo();
+        return guardadas;
+    }
+
+    /**
+     * T1.8: Asistente de Alta Anual (genera cuotas mensuales consecutivas).
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<CuotaExtraccionModel> saveLote(CuotaLoteDTO dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud no puede estar vacío.");
+        }
+        if (dto.getAnio() == null || dto.getAnio() < 2000 || dto.getAnio() > 2100) {
+            throw new IllegalArgumentException("El año de vigencia es obligatorio y debe ser válido.");
+        }
+        if (dto.getEspecieId() == null) {
+            throw new IllegalArgumentException("La especie objetivo es obligatoria.");
+        }
+        if (dto.getExtraccionTipoId() == null) {
+            throw new IllegalArgumentException("El método de extracción es obligatorio.");
+        }
+        String nivel = dto.getNivelAgregacion() != null ? dto.getNivelAgregacion().trim().toUpperCase() : "COMUNA";
+        if ("COMUNA".equals(nivel) && (dto.getComunaIds() == null || dto.getComunaIds().isEmpty())) {
+            throw new IllegalArgumentException("Debe seleccionar al menos una comuna para el nivel Comunal.");
+        }
+        if ("REGION".equals(nivel) && dto.getRegionId() == null) {
+            throw new IllegalArgumentException("Debe seleccionar una región para el nivel Regional.");
+        }
+        if (dto.getMeses() == null || dto.getMeses().isEmpty()) {
+            throw new IllegalArgumentException("Debe incluir la grilla de meses.");
+        }
+
+        EspecieModel especie = especieRepository.findById(dto.getEspecieId())
+                .orElseThrow(() -> new IllegalArgumentException("Especie no encontrada con ID: " + dto.getEspecieId()));
+        ExtraccionTipoModel metodo = extraccionTipoRepository.findById(dto.getExtraccionTipoId())
+                .orElseThrow(() -> new IllegalArgumentException("Método no encontrado con ID: " + dto.getExtraccionTipoId()));
+        RegionModel region = dto.getRegionId() != null ? regionRepository.findById(dto.getRegionId()).orElse(null) : null;
+        HumedadEstadoModel humedad = dto.getHumedadEstadoId() != null
+                ? humedadEstadoRepository.findById(dto.getHumedadEstadoId()).orElse(null)
+                : null;
+
+        Set<ComunaModel> comunas = new LinkedHashSet<>();
+        ComunaModel primeraComuna = null;
+        if ("COMUNA".equals(nivel) && dto.getComunaIds() != null) {
+            for (Long cId : dto.getComunaIds()) {
+                if (cId != null) {
+                    ComunaModel cm = comunaRepository.findById(cId)
+                            .orElseThrow(() -> new IllegalArgumentException("Comuna no encontrada con ID: " + cId));
+                    comunas.add(cm);
+                    if (primeraComuna == null) {
+                        primeraComuna = cm;
+                    }
+                    if (region == null && cm.getRegion() != null) {
+                        region = cm.getRegion();
+                    }
+                }
+            }
+        }
+
+        String metrica = dto.getMetrica() != null ? dto.getMetrica() : "CAPTURA";
+        if ("DESEMBARQUE".equalsIgnoreCase(metrica) && (dto.getResolucion() == null || dto.getResolucion().trim().isEmpty())) {
+            throw new IllegalArgumentException("La métrica DESEMBARQUE exige número de resolución técnica.");
+        }
+
+        List<CuotaExtraccionModel> cuotas = new ArrayList<>();
+        for (CuotaLoteDTO.CuotaMesItemDTO item : dto.getMeses()) {
+            if (item == null || item.getMes() == null) continue;
+            int m = item.getMes();
+            if (m < 1 || m > 12) {
+                throw new IllegalArgumentException("Número de mes inválido: " + m);
+            }
+            if (item.getLimiteKg() == null || item.getLimiteKg() <= 0) {
+                throw new IllegalArgumentException(String.format("El límite para el mes %d debe ser mayor que cero.", m));
+            }
+
+            LocalDate ini = LocalDate.of(dto.getAnio(), m, 1);
+            LocalDate fin = ini.withDayOfMonth(ini.lengthOfMonth());
+
+            CuotaExtraccionModel cuota = CuotaExtraccionModel.builder()
+                    .ambito(dto.getAmbito() != null ? dto.getAmbito() : "AREA_LIBRE")
+                    .nivelAgregacion(nivel)
+                    .perfil("RECOLECTOR")
+                    .region(region)
+                    .comuna(primeraComuna)
+                    .comunas(new LinkedHashSet<>(comunas))
+                    .especie(especie)
+                    .extraccionTipo(metodo)
+                    .humedadEstado(humedad)
+                    .periodo("MENSUAL")
+                    .fechaInicio(java.sql.Date.valueOf(ini))
+                    .fechaFin(java.sql.Date.valueOf(fin))
+                    .limiteKg(item.getLimiteKg())
+                    .metrica(metrica)
+                    .modoAccion(dto.getModoAccion() != null ? dto.getModoAccion() : "SOLO_ALERTA")
+                    .resolucion(dto.getResolucion() != null ? dto.getResolucion().trim() : null)
+                    .estado("ABIERTA")
+                    .activo(item.getActivo() != null ? item.getActivo() : true)
+                    .build();
+
+            cuotas.add(cuota);
+        }
+
+        return saveLote(cuotas);
+    }
+
+    private void validarSolapamientoInternoLote(List<CuotaExtraccionModel> cuotas) {
+        for (int i = 0; i < cuotas.size(); i++) {
+            CuotaExtraccionModel a = cuotas.get(i);
+            if (!Boolean.TRUE.equals(a.getActivo())) continue;
+            for (int j = i + 1; j < cuotas.size(); j++) {
+                CuotaExtraccionModel b = cuotas.get(j);
+                if (!Boolean.TRUE.equals(b.getActivo())) continue;
+
+                String ambitoA = a.getAmbito() != null ? a.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+                String ambitoB = b.getAmbito() != null ? b.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
+                if (!ambitoA.equals(ambitoB)) continue;
+
+                String nivelA = a.getNivelAgregacion() != null ? a.getNivelAgregacion().trim().toUpperCase() : "";
+                String nivelB = b.getNivelAgregacion() != null ? b.getNivelAgregacion().trim().toUpperCase() : "";
+                if (!nivelA.equals(nivelB)) continue;
+
+                if (!seSolapan(a, b)) continue;
+                if (!especiesComparables(a, b)) continue;
+
+                if ("COMUNA".equals(nivelA)) {
+                    Set<Long> cIdsA = idsComunas(a);
+                    Set<Long> cIdsB = idsComunas(b);
+                    Set<Long> inter = new LinkedHashSet<>(cIdsA);
+                    inter.retainAll(cIdsB);
+                    if (!inter.isEmpty()) {
+                        throw new IllegalArgumentException(String.format(
+                            "Conflicto interno en el lote: las cuotas para las comunas %s presentan fechas solapadas.",
+                            inter
+                        ));
+                    }
+                } else if ("REGION".equals(nivelA)) {
+                    Long rA = idRegionDe(a);
+                    Long rB = idRegionDe(b);
+                    if (rA != null && rA.equals(rB)) {
+                        throw new IllegalArgumentException("Conflicto interno en el lote: existen cuotas regionales con fechas solapadas.");
+                    }
+                }
+            }
+        }
     }
 
     @Transactional
