@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class CadenaCustodiaService {
 
     private static final int TOPE_MAX_NODOS = 500;
@@ -35,11 +34,12 @@ public class CadenaCustodiaService {
     @PersistenceContext
     private final EntityManager entityManager;
 
-    @Autowired(required = false)
-    private ConfiguracionGeneralService configService;
+    private final ConfiguracionGeneralService configService;
 
-    // Constructor para pruebas unitarias con inyección manual
-    public CadenaCustodiaService(EntityManager entityManager, ConfiguracionGeneralService configService) {
+    // Constructor con inyección de dependencias
+    @Autowired
+    public CadenaCustodiaService(EntityManager entityManager,
+                                 @Autowired(required = false) ConfiguracionGeneralService configService) {
         this.entityManager = entityManager;
         this.configService = configService;
     }

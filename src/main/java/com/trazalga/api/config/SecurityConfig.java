@@ -97,7 +97,10 @@ public class SecurityConfig {
                                 "/declaracionmarca/*/derivar-citacion",
                                 "/api/declaracion-marcas/**/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
 
-                        // 6. Todo lo demás por ahora permitido para compatibilidad operativa
+                        // 6. Consultas de trazabilidad y búsqueda por folio: ADMINISTRADOR, FISCALIZADOR o AUDITOR (T2.2)
+                        .requestMatchers("/api/consultas/**", "/consultas/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 7. Todo lo demás por ahora permitido para compatibilidad operativa
                         .anyRequest().permitAll()
                 )
                 .httpBasic(basic -> basic.disable())

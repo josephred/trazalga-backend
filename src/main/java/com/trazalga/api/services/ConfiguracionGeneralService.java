@@ -97,6 +97,10 @@ public class ConfiguracionGeneralService {
         // PUNTO 10 — CONSULTA CIUDADANA DE PATENTES (T10.2)
         createIfNotExist("patente_vigencia_horas", "48", "Horas de vigencia del último movimiento para considerar traslado amparado", "CADENA");
         createIfNotExist("patente_consulta_max_por_minuto", "20", "Máximo de consultas públicas por IP por minuto", "CADENA");
+
+        // PRIORIDAD 2 — CONSULTA POR FOLIO (T2.2)
+        createIfNotExist("consulta_folio_dias_embarcacion", "30", "Días hacia atrás para buscar desembarques por código de embarcación", "CONSULTAS");
+        createIfNotExist("consulta_folio_max_resultados", "20", "Máximo de resultados devueltos en la búsqueda puntual por folio", "CONSULTAS");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {
