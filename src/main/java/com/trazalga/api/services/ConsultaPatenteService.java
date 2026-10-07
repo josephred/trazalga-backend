@@ -82,7 +82,7 @@ public class ConsultaPatenteService {
                 SELECT COALESCE(dpa.fecha_traslado, dpa.fecha_ingreso_planta) as fecha_mov, 
                        dpa.hora, 
                        'RECEPCION_EN_PLANTA' as tipo,
-                       COALESCE(dpa.folio_origen, dpa.folio_declaracion_a_pla, CONCAT('DPA-', dpa.id)) as folio, 
+                       COALESCE(dpa.folio_origen, dpa.folio_declaracionapla, CONCAT('DPA-', dpa.id)) as folio, 
                        COALESCE(e.nombre, 'Alga') as especie_nombre,
                        dpa.cantidad as kg,
                        COALESCE(c.nombre, '') as comuna_nombre,
