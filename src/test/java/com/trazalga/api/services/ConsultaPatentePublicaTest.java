@@ -246,4 +246,53 @@ public class ConsultaPatentePublicaTest {
         Map<String, Object> result72 = patenteService.consultar("LP-12-34", request);
         assertEquals(true, result72.get("vigente"));
     }
+
+    /**
+     * Caso 7: Listar patentes de camiones de comerciantes
+     */
+    @Test
+    void testCaso7_ObtenerPatentesCamionesComerciantes_RetornaListaFormateada() {
+        LocalDateTime movReciente = LocalDateTime.now().minusHours(5);
+        Date fechaMov = Date.from(movReciente.atZone(ZoneId.systemDefault()).toInstant());
+        String horaMov = String.format("%02d:%02d:00", movReciente.getHour(), movReciente.getMinute());
+
+        Object[] row1 = new Object[]{
+                "ZZXX00",                 // 0: patente_norm
+                null,                     // 1: placa_patente_carro
+                "camion_sin_acoplado",   // 2: vehiculo_transporte
+                "Carmen Comer A.",        // 3: comerciante
+                "5555",                   // 4: rut_comerciante
+                "Pato Lol",               // 5: chofer_transporte
+                "22333444-5",             // 6: rut_chofer
+                fechaMov,                 // 7: fecha_mov
+                horaMov,                  // 8: hora
+                "CHASCA",                 // 9: especie
+                4500.0,                   // 10: kg
+                "Illapel",                // 11: comuna_origen
+                "Planta ABAS L. H.",      // 12: destino
+                "ENVIADA",                // 13: estado
+                "1781036393129",          // 14: folio
+                2L                        // 15: total_movs
+        };
+
+        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row1));
+
+        List<Map<String, Object>> lista = patenteService.obtenerPatentesCamionesComerciantes();
+
+        assertNotNull(lista);
+        assertEquals(1, lista.size());
+        Map<String, Object> camion = lista.get(0);
+        assertEquals("ZZXX00", camion.get("patente"));
+        assertEquals("Camión sin acoplado", camion.get("vehiculo"));
+        assertEquals("Carmen Comer A.", camion.get("comerciante"));
+        assertEquals("5555", camion.get("rutComerciante"));
+        assertEquals("Pato Lol", camion.get("chofer"));
+        assertEquals("22333444-5", camion.get("rutChofer"));
+        assertEquals("CHASCA", camion.get("especie"));
+        assertEquals(4500.0, camion.get("kg"));
+        assertEquals("Illapel", camion.get("comunaOrigen"));
+        assertEquals(true, camion.get("vigente")); // movReciente es hace 5h (< 48h)
+        assertEquals(2, camion.get("totalMovimientos"));
+    }
 }

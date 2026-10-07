@@ -203,6 +203,165 @@ public class ConsultaPatenteService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> obtenerPatentesCamionesComerciantes() {
+        int vigenciaHoras = configService.getInt("patente_vigencia_horas", 48);
+
+        String sql = """
+            SELECT 
+                sub.patente_norm,
+                sub.placa_patente_carro,
+                sub.vehiculo_transporte,
+                sub.comerciante,
+                sub.rut_comerciante,
+                sub.chofer_transporte,
+                sub.rut_chofer,
+                sub.fecha_mov,
+                sub.hora,
+                sub.especie,
+                sub.kg,
+                sub.comuna_origen,
+                sub.destino,
+                sub.estado,
+                sub.folio,
+                sub.total_movs
+            FROM (
+                SELECT 
+                    UPPER(REPLACE(REPLACE(COALESCE(dc.placa_patente, dc.patente), ' ', ''), '-', '')) AS patente_norm,
+                    dc.placa_patente_carro,
+                    dc.vehiculo_transporte,
+                    COALESCE(dc.nombre_comercializador, CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) AS comerciante,
+                    u.rut AS rut_comerciante,
+                    dc.chofer_transporte,
+                    dc.rut_chofer,
+                    COALESCE(dc.fecha_traslado, dc.fecha_declaracion) AS fecha_mov,
+                    dc.hora,
+                    COALESCE(e.nombre, 'Alga') AS especie,
+                    dc.cantidad AS kg,
+                    COALESCE(c.nombre, '') AS comuna_origen,
+                    COALESCE(dc.nombre_destinatario, ud.nombres, 'Planta') AS destino,
+                    dc.estado,
+                    COALESCE(dc.folio_origen, CONCAT('DC-', dc.id)) AS folio,
+                    COUNT(*) OVER (PARTITION BY UPPER(REPLACE(REPLACE(COALESCE(dc.placa_patente, dc.patente), ' ', ''), '-', ''))) AS total_movs,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY UPPER(REPLACE(REPLACE(COALESCE(dc.placa_patente, dc.patente), ' ', ''), '-', '')) 
+                        ORDER BY COALESCE(dc.fecha_traslado, dc.fecha_declaracion) DESC, dc.hora DESC, dc.id DESC
+                    ) AS rn
+                FROM declaracion_comercializador dc
+                LEFT JOIN usuario u ON dc.usuario_id = u.id
+                LEFT JOIN comuna c ON u.comuna_id = c.id
+                LEFT JOIN usuario ud ON dc.usuario_destinatario_id = ud.id
+                LEFT JOIN especie e ON dc.especie_id = e.id
+                WHERE (dc.placa_patente IS NOT NULL AND TRIM(dc.placa_patente) != '')
+                   OR (dc.patente IS NOT NULL AND TRIM(dc.patente) != '')
+            ) sub
+            WHERE sub.rn = 1
+            ORDER BY sub.fecha_mov DESC, sub.hora DESC
+        """;
+
+        Query query = entityManager.createNativeQuery(sql);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        LocalDateTime ahora = LocalDateTime.now();
+
+        for (Object[] row : rows) {
+            String patenteNorm = (String) row[0];
+            String patenteCarro = row[1] != null ? normalizarPatente(row[1].toString()) : null;
+            String vehiculoRaw = row[2] != null ? row[2].toString().trim() : null;
+            String comerciante = row[3] != null ? row[3].toString().trim() : "Comerciante";
+            String rutComerciante = row[4] != null ? row[4].toString().trim() : null;
+            String chofer = row[5] != null ? row[5].toString().trim() : "Chofer no informado";
+            String rutChofer = row[6] != null ? row[6].toString().trim() : null;
+            Date fechaDate = (Date) row[7];
+            String horaStr = row[8] != null ? row[8].toString().trim() : null;
+            String especie = (String) row[9];
+            Number kgNum = (Number) row[10];
+            String comunaOrigen = row[11] != null && !row[11].toString().isBlank() ? row[11].toString().trim() : "Origen acreditado";
+            String destino = row[12] != null ? sanitizarDestino(row[12].toString()) : "Planta autorizada";
+            String estado = (String) row[13];
+            String folio = (String) row[14];
+            Number totalMovsNum = (Number) row[15];
+
+            LocalTime localTime = parsearHora(horaStr);
+            LocalDate localDate = toLocalDate(fechaDate);
+            LocalDateTime fechaHoraMovimiento = localDate != null ? LocalDateTime.of(localDate, localTime) : null;
+
+            double horasTranscurridas = 9999.0;
+            boolean vigente = false;
+            if (fechaHoraMovimiento != null) {
+                long diffSeconds = ChronoUnit.SECONDS.between(fechaHoraMovimiento, ahora);
+                horasTranscurridas = Math.max(0.0, Math.round((diffSeconds / 3600.0) * 10.0) / 10.0);
+                vigente = (horasTranscurridas <= vigenciaHoras);
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("patente", patenteNorm);
+            item.put("patenteCarro", patenteCarro);
+            item.put("vehiculo", formatearVehiculo(vehiculoRaw));
+            item.put("vehiculoCodigo", vehiculoRaw);
+            item.put("comerciante", comerciante);
+            item.put("rutComerciante", rutComerciante);
+            item.put("chofer", chofer);
+            item.put("rutChofer", rutChofer);
+            item.put("fechaHoraMovimiento", fechaHoraMovimiento != null ? fechaHoraMovimiento.toString() : null);
+            item.put("hora", horaStr);
+            item.put("especie", especie);
+            item.put("kg", kgNum != null ? Math.round(kgNum.doubleValue() * 10.0) / 10.0 : 0.0);
+            item.put("comunaOrigen", comunaOrigen);
+            item.put("destino", destino);
+            item.put("estado", estado != null ? estado : "ENVIADA");
+            item.put("folio", folio);
+            item.put("totalMovimientos", totalMovsNum != null ? totalMovsNum.intValue() : 1);
+            item.put("horasTranscurridas", horasTranscurridas);
+            item.put("vigente", vigente);
+
+            resultado.add(item);
+        }
+
+        return resultado;
+    }
+
+    public LocalTime parsearHora(String horaStr) {
+        if (horaStr == null || horaStr.isBlank()) {
+            return LocalTime.MIDNIGHT;
+        }
+        try {
+            if (horaStr.length() == 5) {
+                return LocalTime.parse(horaStr);
+            } else if (horaStr.length() >= 8) {
+                return LocalTime.parse(horaStr.substring(0, 8));
+            }
+        } catch (Exception ignored) {}
+        return LocalTime.MIDNIGHT;
+    }
+
+    public LocalDate toLocalDate(Date fechaDate) {
+        if (fechaDate == null) return null;
+        if (fechaDate instanceof java.sql.Date sqlDate) {
+            return sqlDate.toLocalDate();
+        } else if (fechaDate instanceof java.sql.Timestamp sqlTs) {
+            return sqlTs.toLocalDateTime().toLocalDate();
+        } else {
+            return fechaDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+    }
+
+    public String formatearVehiculo(String vehiculoRaw) {
+        if (vehiculoRaw == null || vehiculoRaw.isBlank()) {
+            return "Camión";
+        }
+        return switch (vehiculoRaw.toLowerCase().trim()) {
+            case "camion_sin_acoplado" -> "Camión sin acoplado";
+            case "camion_con_acoplado" -> "Camión con acoplado";
+            case "camioneta" -> "Camioneta";
+            case "furgon" -> "Furgón";
+            case "carro_arrastre" -> "Carro de arrastre";
+            default -> vehiculoRaw.replace("_", " ");
+        };
+    }
+
     public String getClientIp(HttpServletRequest request) {
         if (request == null) return "127.0.0.1";
         String xf = request.getHeader("X-Forwarded-For");
