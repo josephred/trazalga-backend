@@ -38,6 +38,9 @@ public class ConsultaTrazabilidadSecurityTest {
     @MockBean
     private ConsultaFolioService consultaFolioService;
 
+    @MockBean
+    private com.trazalga.api.services.FichaTrazabilidadService fichaTrazabilidadService;
+
     @BeforeEach
     void setUp() {
         ResultadoFolioDTO dummy = ResultadoFolioDTO.builder()
@@ -49,6 +52,13 @@ public class ConsultaTrazabilidadSecurityTest {
                 .build();
         when(consultaFolioService.buscar(anyString(), anyString()))
                 .thenReturn(Collections.singletonList(dummy));
+
+        com.trazalga.api.dto.FichaTrazabilidadDTO dummyFicha = com.trazalga.api.dto.FichaTrazabilidadDTO.builder()
+                .tipoConsulta("ARMADOR")
+                .idConsulta(1L)
+                .build();
+        when(fichaTrazabilidadService.obtenerFicha(anyString(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(dummyFicha);
     }
 
     @Test
@@ -110,5 +120,62 @@ public class ConsultaTrazabilidadSecurityTest {
                 .param("q", "DA100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].tipo").value("ARMADOR"));
+    }
+
+    // --- Pruebas de Seguridad para Ficha (T2.3) ---
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("T2.3 Seguridad: Petición anónima (sin token) a /api/consultas/ficha/{tipo}/{id} devuelve HTTP 401 Unauthorized")
+    void testFichaSinToken_Devuelve401() throws Exception {
+        mockMvc.perform(get("/api/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("T2.3 Seguridad: Petición anónima a /consultas/ficha/{tipo}/{id} (ruta sin prefijo api) devuelve HTTP 401 Unauthorized")
+    void testFichaSinToken_RutaSinPrefijo_Devuelve401() throws Exception {
+        mockMvc.perform(get("/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
+    }
+
+    @Test
+    @WithMockUser(username = "11.111.111-1", roles = {"USER"})
+    @DisplayName("T2.3 Seguridad: Usuario móvil con ROLE_USER a /api/consultas/ficha/{tipo}/{id} devuelve HTTP 403 Forbidden")
+    void testFichaUsuarioMovilRoleUser_Devuelve403() throws Exception {
+        mockMvc.perform(get("/api/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Acceso denegado"));
+    }
+
+    @Test
+    @WithMockUser(username = "22.222.222-2", roles = {"ADMIN"})
+    @DisplayName("T2.3 Seguridad: Usuario con ROLE_ADMIN a /api/consultas/ficha/{tipo}/{id} devuelve HTTP 200 OK")
+    void testFichaUsuarioAdmin_Devuelve200() throws Exception {
+        mockMvc.perform(get("/api/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipoConsulta").value("ARMADOR"))
+                .andExpect(jsonPath("$.idConsulta").value(1));
+    }
+
+    @Test
+    @WithMockUser(username = "33.333.333-3", roles = {"FISCALIZADOR"})
+    @DisplayName("T2.3 Seguridad: Usuario con ROLE_FISCALIZADOR a /api/consultas/ficha/{tipo}/{id} devuelve HTTP 200 OK")
+    void testFichaUsuarioFiscalizador_Devuelve200() throws Exception {
+        mockMvc.perform(get("/api/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipoConsulta").value("ARMADOR"));
+    }
+
+    @Test
+    @WithMockUser(username = "44.444.444-4", roles = {"AUDITOR"})
+    @DisplayName("T2.3 Seguridad: Usuario con ROLE_AUDITOR a /api/consultas/ficha/{tipo}/{id} devuelve HTTP 200 OK")
+    void testFichaUsuarioAuditor_Devuelve200() throws Exception {
+        mockMvc.perform(get("/api/consultas/ficha/ARMADOR/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipoConsulta").value("ARMADOR"));
     }
 }
