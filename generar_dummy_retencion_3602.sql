@@ -62,24 +62,33 @@ SET @comp = COALESCE((SELECT id FROM composicion ORDER BY id LIMIT 1), 1);
 
 -- Caso 1: Húmedo 18 h -> VERDE (< 19.2 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H18', DATE(NOW() - INTERVAL 18 HOUR), TIME(NOW() - INTERVAL 18 HOUR), 1200.0, 1356.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-H18', DATE(NOW() - INTERVAL 18 HOUR), TIME(NOW() - INTERVAL 18 HOUR), 1200.0, 1356.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r1 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H18', DATE(NOW() - INTERVAL 17 HOUR), TIME(NOW() - INTERVAL 17 HOUR), 1200.0, @esp_palo, @hum_humedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-H18', DATE(NOW() - INTERVAL 17 HOUR), TIME(NOW() - INTERVAL 17 HOUR), 1200.0, @esp_palo, @hum_humedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r1));
+SET @c1 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c1, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r1;
 
 -- Caso 2: Húmedo 22 h -> AMARILLO (≥ 19.2 h y ≤ 24 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H22', DATE(NOW() - INTERVAL 22 HOUR), TIME(NOW() - INTERVAL 22 HOUR), 1500.0, 1695.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-H22', DATE(NOW() - INTERVAL 22 HOUR), TIME(NOW() - INTERVAL 22 HOUR), 1500.0, 1695.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r2 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H22', DATE(NOW() - INTERVAL 21 HOUR), TIME(NOW() - INTERVAL 21 HOUR), 1500.0, @esp_palo, @hum_humedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-H22', DATE(NOW() - INTERVAL 21 HOUR), TIME(NOW() - INTERVAL 21 HOUR), 1500.0, @esp_palo, @hum_humedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r2));
+SET @c2 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c2, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r2;
 
 -- Caso 3: Húmedo 30 h -> ROJO (> 24 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H30', DATE(NOW() - INTERVAL 30 HOUR), TIME(NOW() - INTERVAL 30 HOUR), 1800.0, 2034.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-H30', DATE(NOW() - INTERVAL 30 HOUR), TIME(NOW() - INTERVAL 30 HOUR), 1800.0, 2034.0, 1.13, @esp_palo, @hum_humedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r3 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-H30', DATE(NOW() - INTERVAL 29 HOUR), TIME(NOW() - INTERVAL 29 HOUR), 1800.0, @esp_palo, @hum_humedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-H30', DATE(NOW() - INTERVAL 29 HOUR), TIME(NOW() - INTERVAL 29 HOUR), 1800.0, @esp_palo, @hum_humedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r3));
+SET @c3 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c3, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r3;
 
 
 -- ----------------------------------------------------------------------------
@@ -88,24 +97,33 @@ VALUES ('DUMMY-RET3602-H30', DATE(NOW() - INTERVAL 29 HOUR), TIME(NOW() - INTERV
 
 -- Caso 4: Semihúmedo 50 h -> VERDE (< 57.6 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH50', DATE(NOW() - INTERVAL 50 HOUR), TIME(NOW() - INTERVAL 50 HOUR), 2000.0, 3000.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SH50', DATE(NOW() - INTERVAL 50 HOUR), TIME(NOW() - INTERVAL 50 HOUR), 2000.0, 3000.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r4 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH50', DATE(NOW() - INTERVAL 49 HOUR), TIME(NOW() - INTERVAL 49 HOUR), 2000.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SH50', DATE(NOW() - INTERVAL 49 HOUR), TIME(NOW() - INTERVAL 49 HOUR), 2000.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r4));
+SET @c4 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c4, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r4;
 
 -- Caso 5: Semihúmedo 60 h -> AMARILLO (> 57.6 h y ≤ 72 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH60', DATE(NOW() - INTERVAL 60 HOUR), TIME(NOW() - INTERVAL 60 HOUR), 2200.0, 3300.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SH60', DATE(NOW() - INTERVAL 60 HOUR), TIME(NOW() - INTERVAL 60 HOUR), 2200.0, 3300.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r5 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH60', DATE(NOW() - INTERVAL 58 HOUR), TIME(NOW() - INTERVAL 58 HOUR), 2200.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SH60', DATE(NOW() - INTERVAL 58 HOUR), TIME(NOW() - INTERVAL 58 HOUR), 2200.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r5));
+SET @c5 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c5, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r5;
 
 -- Caso 6: Semihúmedo 80 h -> ROJO (> 72 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH80', DATE(NOW() - INTERVAL 80 HOUR), TIME(NOW() - INTERVAL 80 HOUR), 2500.0, 3750.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SH80', DATE(NOW() - INTERVAL 80 HOUR), TIME(NOW() - INTERVAL 80 HOUR), 2500.0, 3750.0, 1.50, @esp_palo, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r6 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SH80', DATE(NOW() - INTERVAL 78 HOUR), TIME(NOW() - INTERVAL 78 HOUR), 2500.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SH80', DATE(NOW() - INTERVAL 78 HOUR), TIME(NOW() - INTERVAL 78 HOUR), 2500.0, @esp_palo, @hum_semihumedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r6));
+SET @c6 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c6, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r6;
 
 
 -- ----------------------------------------------------------------------------
@@ -114,24 +132,33 @@ VALUES ('DUMMY-RET3602-SH80', DATE(NOW() - INTERVAL 78 HOUR), TIME(NOW() - INTER
 
 -- Caso 7: Semiseco 150 h -> VERDE (< 172.8 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS150', DATE(NOW() - INTERVAL 150 HOUR), TIME(NOW() - INTERVAL 150 HOUR), 3000.0, 6000.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SS150', DATE(NOW() - INTERVAL 150 HOUR), TIME(NOW() - INTERVAL 150 HOUR), 3000.0, 6000.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r7 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS150', DATE(NOW() - INTERVAL 148 HOUR), TIME(NOW() - INTERVAL 148 HOUR), 3000.0, @esp_palo, @hum_semiseco, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SS150', DATE(NOW() - INTERVAL 148 HOUR), TIME(NOW() - INTERVAL 148 HOUR), 3000.0, @esp_palo, @hum_semiseco, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r7));
+SET @c7 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c7, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r7;
 
 -- Caso 8: Semiseco 8 días (192 h) -> AMARILLO (> 172.8 h y ≤ 216 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS192', DATE(NOW() - INTERVAL 192 HOUR), TIME(NOW() - INTERVAL 192 HOUR), 3200.0, 6400.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SS192', DATE(NOW() - INTERVAL 192 HOUR), TIME(NOW() - INTERVAL 192 HOUR), 3200.0, 6400.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r8 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS192', DATE(NOW() - INTERVAL 190 HOUR), TIME(NOW() - INTERVAL 190 HOUR), 3200.0, @esp_palo, @hum_semiseco, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SS192', DATE(NOW() - INTERVAL 190 HOUR), TIME(NOW() - INTERVAL 190 HOUR), 3200.0, @esp_palo, @hum_semiseco, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r8));
+SET @c8 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c8, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r8;
 
 -- Caso 9: Semiseco 10 días (240 h) -> ROJO (> 216 h)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS240', DATE(NOW() - INTERVAL 240 HOUR), TIME(NOW() - INTERVAL 240 HOUR), 3500.0, 7000.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-SS240', DATE(NOW() - INTERVAL 240 HOUR), TIME(NOW() - INTERVAL 240 HOUR), 3500.0, 7000.0, 2.00, @esp_palo, @hum_semiseco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r9 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-SS240', DATE(NOW() - INTERVAL 238 HOUR), TIME(NOW() - INTERVAL 238 HOUR), 3500.0, @esp_palo, @hum_semiseco, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-SS240', DATE(NOW() - INTERVAL 238 HOUR), TIME(NOW() - INTERVAL 238 HOUR), 3500.0, @esp_palo, @hum_semiseco, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r9));
+SET @c9 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c9, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r9;
 
 
 -- ----------------------------------------------------------------------------
@@ -140,20 +167,28 @@ VALUES ('DUMMY-RET3602-SS240', DATE(NOW() - INTERVAL 238 HOUR), TIME(NOW() - INT
 
 -- Caso 10: Seco 15 días (360 h) -> VERDE (sin límite)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-S360', DATE(NOW() - INTERVAL 360 HOUR), TIME(NOW() - INTERVAL 360 HOUR), 4000.0, 14320.0, 3.58, @esp_palo, @hum_seco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-S360', DATE(NOW() - INTERVAL 360 HOUR), TIME(NOW() - INTERVAL 360 HOUR), 4000.0, 14320.0, 3.58, @esp_palo, @hum_seco, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r10 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-S360', DATE(NOW() - INTERVAL 350 HOUR), TIME(NOW() - INTERVAL 350 HOUR), 4000.0, @esp_palo, @hum_seco, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-S360', DATE(NOW() - INTERVAL 350 HOUR), TIME(NOW() - INTERVAL 350 HOUR), 4000.0, @esp_palo, @hum_seco, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r10));
+SET @c10 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c10, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r10;
 
--- Lote Destinado Fuera de Plazo (Semihúmedo despachado a planta con 90 h de tránsito)
+-- Lote Destinado Fuera de Plazo (Semihúmedo despachado a planta con 95 h de permanencia)
 INSERT INTO declaracion_recolector (folio_origen, fecha_declaracion, hora, desembarque, captura, factor_aplicado, especie_id, humedad_estado_id, caleta_id, comuna_id, usuario_id, extraccion_tipo_id, composicion_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-DEST-ROJO', DATE(NOW() - INTERVAL 120 HOUR), TIME(NOW() - INTERVAL 120 HOUR), 1600.0, 2400.0, 1.50, @esp_negro, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+VALUES ('DUMMY-RET3602-REC-DEST-ROJO', DATE(NOW() - INTERVAL 120 HOUR), TIME(NOW() - INTERVAL 120 HOUR), 1600.0, 2400.0, 1.50, @esp_negro, @hum_semihumedo, @caleta, @comuna, @user_rec, @ext_tipo, @comp, @user_com);
+SET @r11 = LAST_INSERT_ID();
 
-INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-DEST-ROJO', DATE(NOW() - INTERVAL 115 HOUR), TIME(NOW() - INTERVAL 115 HOUR), 1600.0, @esp_negro, @hum_semihumedo, @user_com, @user_pla);
+INSERT INTO declaracion_comercializador (folio_origen, fecha_declaracion, hora, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-COM-DEST-ROJO', DATE(NOW() - INTERVAL 25 HOUR), TIME(NOW() - INTERVAL 25 HOUR), 1600.0, @esp_negro, @hum_semihumedo, @user_com, @user_pla, CONCAT('RECOLECTOR:', @r11));
+SET @c11 = LAST_INSERT_ID();
+UPDATE declaracion_recolector SET declaracion_destinatario_id = @c11, consumida_por_tipo = 'COMERCIALIZADOR' WHERE id = @r11;
 
-INSERT INTO declaracion_planta_abastecimiento (folio_origen, fecha_ingreso_planta, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id)
-VALUES ('DUMMY-RET3602-DEST-ROJO', DATE(NOW() - INTERVAL 25 HOUR), 1600.0, @esp_negro, @hum_semihumedo, @user_pla, @user_pla);
+INSERT INTO declaracion_planta_abastecimiento (folio_origen, folio_declaracion_a_pla, fecha_ingreso_planta, cantidad, especie_id, humedad_estado_id, usuario_id, usuario_destinatario_id, declaraciones_seleccionadas)
+VALUES ('DUMMY-RET3602-PLA-DEST-ROJO', 'DAPLA-RET3602-99', DATE(NOW() - INTERVAL 24 HOUR), 1600.0, @esp_negro, @hum_semihumedo, @user_pla, @user_pla, CONCAT('COMERCIALIZADOR:', @c11));
+SET @p11 = LAST_INSERT_ID();
+UPDATE declaracion_comercializador SET declaracion_destinatario_id = @p11, consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' WHERE id = @c11;
 
 -- ----------------------------------------------------------------------------
 -- 6. VERIFICACIÓN FINAL

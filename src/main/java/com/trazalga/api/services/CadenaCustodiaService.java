@@ -725,7 +725,7 @@ public class CadenaCustodiaService {
      * Calcula las horas transcurridas en bodega entre la entrada y la salida.
      * Si la salida no ha ocurrido todavía, corre hasta ahora ({@code LocalDateTime.now()}).
      */
-    public double horasEnBodega(LocalDateTime entrada, LocalDateTime salida) {
+    public static double horasEnBodega(LocalDateTime entrada, LocalDateTime salida) {
         if (entrada == null) {
             return 0.0;
         }
@@ -735,13 +735,13 @@ public class CadenaCustodiaService {
         return Math.round(horas * 10.0) / 10.0;
     }
 
-    public double horasEnBodega(Date fechaEntrada, String horaEntrada, Date fechaSalida, String horaSalida) {
+    public static double horasEnBodega(Date fechaEntrada, String horaEntrada, Date fechaSalida, String horaSalida) {
         LocalDateTime ent = ReportService.parseTimestamp(fechaEntrada, horaEntrada);
         LocalDateTime sal = fechaSalida != null ? ReportService.parseTimestamp(fechaSalida, horaSalida) : null;
         return horasEnBodega(ent, sal);
     }
 
-    public double horasEnBodega(Date fechaEntrada, String horaEntrada) {
+    public static double horasEnBodega(Date fechaEntrada, String horaEntrada) {
         return horasEnBodega(fechaEntrada, horaEntrada, null, null);
     }
 

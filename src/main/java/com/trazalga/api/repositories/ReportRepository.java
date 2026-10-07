@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.trazalga.api.services.ReportService;
 
 @Repository
 public class ReportRepository {
@@ -1823,67 +1824,103 @@ public class ReportRepository {
         }
 
         return "SELECT " +
-            "orig.folio_origen, orig.eslabon_origen, orig.actor_origen, orig.rut_origen, orig.especie, " +
-            "orig.humedad_origen, orig.fecha_origen, orig.kg_origen, orig.captura_origen, orig.factor_aplicado, " +
-            "orig.embarcacion, c.kg_comercializador, c.fecha_comercializador, c.actor_comercializador, " +
-            "p.kg_planta, p.fecha_planta, p.actor_planta, orig.marcas_activas " +
+            "orig.folio_origen, " +                                            // 0
+            "orig.eslabon_origen, " +                                          // 1
+            "orig.actor_origen, " +                                            // 2
+            "orig.rut_origen, " +                                              // 3
+            "orig.especie, " +                                                 // 4
+            "orig.humedad_origen, " +                                          // 5
+            "orig.fecha_origen, " +                                            // 6
+            "orig.kg_origen, " +                                               // 7
+            "orig.captura_origen, " +                                          // 8
+            "orig.factor_aplicado, " +                                         // 9
+            "orig.embarcacion, " +                                             // 10
+            "c.cantidad as kg_comercializador, " +                             // 11
+            "c.fecha_declaracion as fecha_comercializador, " +                 // 12
+            "TRIM(CONCAT(COALESCE(uc.nombres, ''), ' ', COALESCE(uc.apellidop, ''))) as actor_comercializador, " + // 13
+            "COALESCE(p_via_c.peso_romana_kg, p_via_c.cantidad, p_directa.peso_romana_kg, p_directa.cantidad) as kg_planta, " + // 14
+            "COALESCE(p_via_c.fecha_ingreso_planta, p_directa.fecha_ingreso_planta) as fecha_planta, " +                         // 15
+            "COALESCE(TRIM(CONCAT(COALESCE(up_c.nombres, ''), ' ', COALESCE(up_c.apellidop, ''))), TRIM(CONCAT(COALESCE(up_d.nombres, ''), ' ', COALESCE(up_d.apellidop, '')))) as actor_planta, " + // 16
+            "orig.marcas_activas, " +                                          // 17
+            "orig.hora_origen, " +                                             // 18
+            "c.hora as hora_comercializador, " +                               // 19
+            "COALESCE(p_via_c.hora, p_directa.hora) as hora_planta, " +        // 20
+            "COALESCE(c_tot.tot_orig, p_tot.tot_orig_directo, orig.kg_origen) as kg_origen_despacho, " + // 21
+            "c.id as id_comercializador, " +                                   // 22
+            "COALESCE(p_via_c.id, p_directa.id) as id_planta " +               // 23
             "FROM (" +
-            "    SELECT 'RECOLECTOR' as eslabon_origen, r.folio_origen, MIN(r.fecha_declaracion) as fecha_origen, " +
-            "    SUM(r.desembarque) as kg_origen, SUM(r.captura) as captura_origen, MAX(r.factor_aplicado) as factor_aplicado, " +
-            "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
-            "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, NULL as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(r.id) AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
+            "    SELECT 'RECOLECTOR' as eslabon_origen, r.id as orig_id, r.declaracion_destinatario_id as dest_id, r.consumida_por_tipo as dest_tipo, " +
+            "    COALESCE(r.folio_origen, r.folio_desembarque_ro, CONCAT('RO-', r.id)) as folio_origen, r.fecha_declaracion as fecha_origen, r.hora as hora_origen, " +
+            "    r.desembarque as kg_origen, r.captura as captura_origen, r.factor_aplicado as factor_aplicado, " +
+            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+            "    u.rut as rut_origen, NULL as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = r.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_recolector r " +
             "    INNER JOIN usuario u ON r.usuario_id = u.id " +
             "    INNER JOIN especie e ON r.especie_id = e.id " +
             "    LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id " +
-            "    WHERE r.folio_origen IS NOT NULL AND r.folio_origen <> '' " + filterRecolector +
-            "    GROUP BY r.folio_origen " +
+            "    WHERE 1=1 " + filterRecolector +
             "    UNION ALL " +
-            "    SELECT 'ARMADOR' as eslabon_origen, a.folio_origen, MIN(a.fecha_declaracion) as fecha_origen, " +
-            "    SUM(a.desembarque) as kg_origen, SUM(a.captura) as captura_origen, MAX(a.factor_aplicado) as factor_aplicado, " +
-            "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
-            "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, MAX(emb.nombre) as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(a.id) AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) as marcas_activas " +
+            "    SELECT 'ARMADOR' as eslabon_origen, a.id as orig_id, a.declaracion_destinatario_id as dest_id, a.consumida_por_tipo as dest_tipo, " +
+            "    COALESCE(a.folio_origen, a.folio_desembarque_da, CONCAT('DA-', a.id)) as folio_origen, a.fecha_declaracion as fecha_origen, a.hora as hora_origen, " +
+            "    a.desembarque as kg_origen, a.captura as captura_origen, a.factor_aplicado as factor_aplicado, " +
+            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+            "    u.rut as rut_origen, emb.nombre as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = a.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_armador a " +
             "    INNER JOIN usuario u ON a.usuario_id = u.id " +
             "    INNER JOIN especie e ON a.especie_id = e.id " +
             "    LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id " +
             "    LEFT JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
-            "    WHERE a.folio_origen IS NOT NULL AND a.folio_origen <> '' " + filterArmador +
-            "    GROUP BY a.folio_origen " +
+            "    WHERE 1=1 " + filterArmador +
             "    UNION ALL " +
-            "    SELECT 'AREA' as eslabon_origen, ar.folio_origen, MIN(ar.fecha_declaracion) as fecha_origen, " +
-            "    SUM(ar.desembarque) as kg_origen, SUM(ar.captura) as captura_origen, MAX(ar.factor_aplicado) as factor_aplicado, " +
-            "    MAX(e.nombre) as especie, COALESCE(MAX(h.nombre), 'HÚMEDO') as humedad_origen, " +
-            "    MAX(TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')))) as actor_origen, " +
-            "    MAX(u.rut) as rut_origen, NULL as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = MAX(ar.id) AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) as marcas_activas " +
+            "    SELECT 'AREA' as eslabon_origen, ar.id as orig_id, ar.declaracion_destinatario_id as dest_id, ar.consumida_por_tipo as dest_tipo, " +
+            "    COALESCE(ar.folio_origen, ar.folio_desembarque_amerb, CONCAT('DAM-', ar.id)) as folio_origen, ar.fecha_declaracion as fecha_origen, ar.hora as hora_origen, " +
+            "    ar.desembarque as kg_origen, ar.captura as captura_origen, ar.factor_aplicado as factor_aplicado, " +
+            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+            "    u.rut as rut_origen, NULL as embarcacion, " +
+            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = ar.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) as marcas_activas " +
             "    FROM declaracion_area ar " +
             "    INNER JOIN usuario u ON ar.usuario_id = u.id " +
             "    INNER JOIN especie e ON ar.especie_id = e.id " +
             "    LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id " +
-            "    WHERE ar.folio_origen IS NOT NULL AND ar.folio_origen <> '' " + filterArea +
-            "    GROUP BY ar.folio_origen " +
+            "    WHERE 1=1 " + filterArea +
             ") orig " +
+            "LEFT JOIN declaracion_comercializador c " +
+            "    ON (orig.dest_tipo = 'COMERCIALIZADOR' AND c.id = orig.dest_id) " +
+            "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND c.folio_origen = orig.folio_origen) " +
+            "LEFT JOIN usuario uc ON c.usuario_id = uc.id " +
+            "LEFT JOIN declaracion_planta_abastecimiento p_via_c " +
+            "    ON (c.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND p_via_c.id = c.declaracion_destinatario_id) " +
+            "    OR (c.declaracion_destinatario_id IS NULL AND c.folio_origen IS NOT NULL AND c.folio_origen <> '' AND p_via_c.folio_origen = c.folio_origen) " +
+            "LEFT JOIN usuario up_c ON p_via_c.usuario_id = up_c.id " +
+            "LEFT JOIN declaracion_planta_abastecimiento p_directa " +
+            "    ON (orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = orig.dest_id) " +
+            "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND p_directa.folio_origen = orig.folio_origen) " +
+            "LEFT JOIN usuario up_d ON p_directa.usuario_id = up_d.id " +
             "LEFT JOIN (" +
-            "    SELECT dc.folio_origen, SUM(dc.cantidad) as kg_comercializador, MIN(dc.fecha_declaracion) as fecha_comercializador, " +
-            "    MAX(TRIM(CONCAT(COALESCE(uc.nombres, ''), ' ', COALESCE(uc.apellidop, '')))) as actor_comercializador " +
-            "    FROM declaracion_comercializador dc " +
-            "    LEFT JOIN usuario uc ON dc.usuario_id = uc.id " +
-            "    WHERE dc.folio_origen IS NOT NULL AND dc.folio_origen <> '' " +
-            "    GROUP BY dc.folio_origen " +
-            ") c ON orig.folio_origen = c.folio_origen " +
+            "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig " +
+            "    FROM (" +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "        UNION ALL " +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "        UNION ALL " +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "    ) o_com GROUP BY declaracion_destinatario_id " +
+            ") c_tot ON c.id = c_tot.declaracion_destinatario_id " +
             "LEFT JOIN (" +
-            "    SELECT pa.folio_origen, SUM(pa.cantidad) as kg_planta, MIN(pa.fecha_ingreso_planta) as fecha_planta, " +
-            "    MAX(TRIM(CONCAT(COALESCE(up.nombres, ''), ' ', COALESCE(up.apellidop, '')))) as actor_planta " +
-            "    FROM declaracion_planta_abastecimiento pa " +
-            "    LEFT JOIN usuario up ON pa.usuario_id = up.id " +
-            "    WHERE pa.folio_origen IS NOT NULL AND pa.folio_origen <> '' " +
-            "    GROUP BY pa.folio_origen " +
-            ") p ON orig.folio_origen = p.folio_origen";
+            "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig_directo " +
+            "    FROM (" +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+            "        UNION ALL " +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+            "        UNION ALL " +
+            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+            "    ) o_dir GROUP BY declaracion_destinatario_id " +
+            ") p_tot ON orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = p_tot.declaracion_destinatario_id";
     }
 
     public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(
@@ -1932,9 +1969,12 @@ public class ReportRepository {
                 }
             }
 
+            Double kgOrigenDespacho = row.length > 21 && row[21] != null ? ((Number) row[21]).doubleValue() : null;
+            double kgBase = (kgOrigenDespacho != null && kgOrigenDespacho > 0) ? kgOrigenDespacho : kgOrigen;
+
             double kgDestino = kgPlanta != null ? kgPlanta : (kgComercializador != null ? kgComercializador : kgOrigen);
-            double deltaKg = kgDestino - kgOrigen;
-            double deltaPct = kgOrigen > 0 ? (deltaKg / kgOrigen) * 100.0 : 0.0;
+            double deltaKg = kgDestino - kgBase;
+            double deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
 
             int diasTranscurridos = fechaPlanta != null
                     ? diffDays(fechaOrigen, fechaPlanta)
@@ -3021,6 +3061,10 @@ public class ReportRepository {
             Date fechaPlanta = toReportDate(row[15]);
             String actorPlanta = row[16] != null ? row[16].toString() : null;
 
+            String horaOrigen = row.length > 18 && row[18] != null ? row[18].toString() : null;
+            String horaComercializador = row.length > 19 && row[19] != null ? row[19].toString() : null;
+            String horaPlanta = row.length > 20 && row[20] != null ? row[20].toString() : null;
+
             if (fechaOrigen == null && fechaComercializador == null) {
                 continue;
             }
@@ -3029,9 +3073,23 @@ public class ReportRepository {
             boolean destinado = (fechaPlanta != null);
             boolean enBodega = (fechaComercializador != null && !destinado);
 
-            Date fechaFinLote = destinado ? fechaPlanta : now;
-            long diffMillis = Math.max(0, fechaFinLote.getTime() - fechaInicioLote.getTime());
-            long horas = diffMillis / (1000 * 3600);
+            java.time.LocalDateTime inicioTs = ReportService.parseTimestamp(
+                    fechaInicioLote,
+                    horaOrigen != null ? horaOrigen : horaComercializador
+            );
+            java.time.LocalDateTime finTs;
+            if (destinado) {
+                if (fechaComercializador != null) {
+                    finTs = ReportService.parseTimestamp(fechaComercializador, horaComercializador);
+                } else {
+                    finTs = ReportService.parseTimestamp(fechaPlanta, horaPlanta);
+                }
+            } else {
+                finTs = java.time.LocalDateTime.now();
+            }
+
+            double horasExactas = com.trazalga.api.services.CadenaCustodiaService.horasEnBodega(inicioTs, finTs);
+            long horas = Math.round(horasExactas);
 
             // Normalización de Estado de Humedad (Res. 3602)
             String estadoDeclarado = normalizarEstadoHumedad(humedadRaw);
@@ -3499,6 +3557,18 @@ public class ReportRepository {
             filas.add(map);
         }
         return filas;
+    }
+
+    /**
+     * Consulta de control para detectar cadenas donde un comercializador es consumido
+     * por otro comercializador (multisalto). Si devuelve > 0, requiere resolución
+     * profunda en Java mediante CadenaCustodiaService.
+     */
+    public long contarComercializadoresMultisalto() {
+        String sql = "SELECT COUNT(*) FROM declaracion_comercializador WHERE consumida_por_tipo = 'COMERCIALIZADOR'";
+        Query q = entityManager.createNativeQuery(sql);
+        Object res = q.getSingleResult();
+        return res != null ? ((Number) res).longValue() : 0L;
     }
 }
 

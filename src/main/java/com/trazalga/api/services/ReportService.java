@@ -650,4 +650,11 @@ public class ReportService {
         metrics.put("controlDesactivado", false);
         return metrics;
     }
+
+    /**
+     * Consulta de control para detectar cadenas con mas de un salto de comercializador (T2.5).
+     */
+    public long contarComercializadoresMultisalto() {
+        return reportRepository.contarComercializadoresMultisalto();
+    }
 }
