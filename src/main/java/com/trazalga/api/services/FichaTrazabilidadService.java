@@ -35,6 +35,9 @@ public class FichaTrazabilidadService {
     private final IDeclaracionPlantaAbastecimientoRepository plantaRepository;
     private final DeclaracionBuzosRepository buzosRepository;
 
+    @Autowired(required = false)
+    private FactorConversionService factorConversionService;
+
     @Autowired
     public FichaTrazabilidadService(
             CadenaCustodiaService cadenaCustodiaService,
@@ -45,7 +48,8 @@ public class FichaTrazabilidadService {
             @Autowired(required = false) IDeclaracionAreaRepository areaRepository,
             @Autowired(required = false) IDeclaracionComercializadorRepository comercializadorRepository,
             @Autowired(required = false) IDeclaracionPlantaAbastecimientoRepository plantaRepository,
-            @Autowired(required = false) DeclaracionBuzosRepository buzosRepository) {
+            @Autowired(required = false) DeclaracionBuzosRepository buzosRepository,
+            @Autowired(required = false) FactorConversionService factorConversionService) {
         this.cadenaCustodiaService = cadenaCustodiaService;
         this.declaracionMarcaService = declaracionMarcaService;
         this.bloqueoCargaService = bloqueoCargaService;
@@ -55,6 +59,7 @@ public class FichaTrazabilidadService {
         this.comercializadorRepository = comercializadorRepository;
         this.plantaRepository = plantaRepository;
         this.buzosRepository = buzosRepository;
+        this.factorConversionService = factorConversionService;
     }
 
     /**
@@ -105,8 +110,14 @@ public class FichaTrazabilidadService {
             }
         }
 
-        // 4. Construir bloque de planta de abastecimiento
-        FichaPlantaDTO plantaDTO = construirPlantaDTO(cadena.getPlantaAbastecimientoId(), totalKgOrigen);
+        BigDecimal totalCapturaOrigen = BigDecimal.ZERO;
+        for (FichaOrigenDTO o : origenesDTO) {
+            BigDecimal cap = o.getCapturaKg() != null ? o.getCapturaKg() : (o.getDesembarqueKg() != null ? o.getDesembarqueKg() : BigDecimal.ZERO);
+            totalCapturaOrigen = totalCapturaOrigen.add(cap);
+        }
+
+        // 4. Construir bloque de planta de abastecimiento (T3.3)
+        FichaPlantaDTO plantaDTO = construirPlantaDTO(cadena.getPlantaAbastecimientoId(), totalKgOrigen, totalCapturaOrigen);
 
         // 5. Construir resumen superior de alertas y retenciones de toda la cadena
         FichaAlertasDTO alertasDTO = construirAlertasDTO(origenesDTO, comDTOList, plantaDTO);
@@ -347,7 +358,7 @@ public class FichaTrazabilidadService {
     // CONSTRUCCIÓN DE PLANTA
     // =========================================================================
 
-    private FichaPlantaDTO construirPlantaDTO(Long plantaId, BigDecimal totalKgOrigen) {
+    private FichaPlantaDTO construirPlantaDTO(Long plantaId, BigDecimal totalKgOrigen, BigDecimal totalCapturaOrigen) {
         if (plantaId == null) {
             return FichaPlantaDTO.builder()
                     .recepcionada(false)
@@ -381,6 +392,37 @@ public class FichaTrazabilidadService {
             variacionPct = Math.round(((pesoPlanta - pesoOrigen) / pesoOrigen * 100.0) * 10.0) / 10.0;
         }
 
+        // T3.3: Ambos estados de humedad y factor de recepción
+        String humOrigen = p.getHumedadEstado() != null ? p.getHumedadEstado().getNombre() : null;
+        String humRecepcion = p.getHumedadEstadoRecepcion() != null
+                ? p.getHumedadEstadoRecepcion().getNombre()
+                : humOrigen;
+
+        Long humIdRecepcion = p.getHumedadEstadoRecepcion() != null
+                ? p.getHumedadEstadoRecepcion().getId()
+                : (p.getHumedadEstado() != null ? p.getHumedadEstado().getId() : null);
+
+        Long espId = p.getEspecie() != null ? p.getEspecie().getId() : null;
+
+        BigDecimal factor = null;
+        if (factorConversionService != null && espId != null && humIdRecepcion != null) {
+            try {
+                factor = factorConversionService.findFactorVigente(espId, humIdRecepcion, p.getFechaIngresoPlanta())
+                        .map(FactorConversionModel::getFactor)
+                        .orElse(null);
+            } catch (Exception e) {
+                factor = null;
+            }
+        }
+
+        double factorD = factor != null ? factor.doubleValue() : 1.0;
+        double capturaPlanta = pesoPlanta * factorD;
+        Double variacionEqPct = null;
+        if (totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0) {
+            double capOrig = totalCapturaOrigen.doubleValue();
+            variacionEqPct = Math.round(((capturaPlanta - capOrig) / capOrig * 100.0) * 10.0) / 10.0;
+        }
+
         FichaPlantaDTO.FichaPlantaDTOBuilder b = FichaPlantaDTO.builder()
                 .id(p.getId())
                 .recepcionada(true)
@@ -398,9 +440,15 @@ public class FichaTrazabilidadService {
                 .fechaPesajeRomana(p.getFechaPesaje())
                 .cantidadDeclarada(p.getCantidad())
                 .rotuloPesaje(conRomana ? "Pesaje en romana" : "Sin pesaje en romana")
-                .humedadEstadoRecepcion(p.getHumedadEstado() != null ? p.getHumedadEstado().getNombre() : null)
+                .humedadEstadoOrigen(humOrigen)
+                .humedadEstadoRecepcion(humRecepcion)
                 .humedadHigrometro(p.getHumedadHigrometro())
                 .variacionPct(variacionPct)
+                .variacionEqPct(variacionEqPct)
+                .capturaOrigenTotal(totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0
+                        ? totalCapturaOrigen.setScale(2, java.math.RoundingMode.HALF_UP) : null)
+                .capturaPlantaTotal(BigDecimal.valueOf(capturaPlanta).setScale(2, java.math.RoundingMode.HALF_UP))
+                .factorConversionRecepcion(factor)
                 .rotuloVariacion("Variación de la recepción completa")
                 .docOrigenTipo(p.getDocumentoTributarioOrigenTipo())
                 .docOrigenNumero(p.getDocumentoTributarioOrigenNumero())

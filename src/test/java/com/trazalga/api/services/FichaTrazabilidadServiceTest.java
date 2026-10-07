@@ -51,6 +51,9 @@ public class FichaTrazabilidadServiceTest {
     @Mock
     private DeclaracionBuzosRepository buzosRepository;
 
+    @Mock
+    private FactorConversionService factorConversionService;
+
     @InjectMocks
     private FichaTrazabilidadService service;
 
@@ -336,5 +339,81 @@ public class FichaTrazabilidadServiceTest {
     void testValidacionParametros() {
         assertThrows(ResponseStatusException.class, () -> service.obtenerFicha(null, 10L));
         assertThrows(ResponseStatusException.class, () -> service.obtenerFicha("RECOLECTOR", null));
+    }
+
+    @Test
+    @DisplayName("T3.3: La ficha muestra estado de origen, estado de recepción, variación física y variación equivalente")
+    void testT33_FichaMuestraAmbosEstadosYAmbasVariaciones() {
+        Long recId = 301L;
+        Long plaId = 401L;
+        Long espId = 1L;
+        Date fecha = new Date();
+
+        mockCadena = CadenaCustodiaService.Cadena.builder()
+                .tipoConsulta("RECOLECTOR")
+                .idConsulta(recId)
+                .estadoHumedadPredominante("Húmedo")
+                .plantaAbastecimientoId(plaId)
+                .origenes(Collections.singletonList(
+                        CadenaCustodiaService.OrigenRef.builder()
+                                .tipo("RECOLECTOR").id(recId).folio("RO-301")
+                                .cantidad(new BigDecimal("2500.00"))
+                                .fecha(fecha)
+                                .build()
+                ))
+                .build();
+        when(cadenaCustodiaService.resolver("RECOLECTOR", recId)).thenReturn(mockCadena);
+
+        EspecieModel especie = new EspecieModel().setId(espId).setNombre("Huiro palo");
+        HumedadEstadoModel humOrigen = new HumedadEstadoModel().setId(1L).setNombre("Húmedo");
+        HumedadEstadoModel humRecepcion = new HumedadEstadoModel().setId(2L).setNombre("Semihúmedo");
+
+        DeclaracionRecolectorModel rec = new DeclaracionRecolectorModel();
+        rec.setId(recId);
+        rec.setFolioOrigen("RO-301");
+        rec.setDesembarque(new BigDecimal("2500.00"));
+        rec.setCaptura(new BigDecimal("2825.00")); // 2500 * 1.13
+        rec.setEspecie(especie);
+        rec.setHumedadEstado(humOrigen);
+        when(recolectorRepository.findById(recId)).thenReturn(Optional.of(rec));
+
+        DeclaracionPlantaAbastecimientoModel pla = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(plaId)
+                .folioOrigen("PLA-401")
+                .pesoRomanaKg(new BigDecimal("1600.00"))
+                .voucherRomanaNumero("VCH-5544")
+                .fechaIngresoPlanta(fecha)
+                .especie(especie)
+                .humedadEstado(humOrigen)
+                .humedadEstadoRecepcion(humRecepcion)
+                .build();
+        when(plantaRepository.findById(plaId)).thenReturn(Optional.of(pla));
+
+        // Factor para Huiro palo en Semihúmedo = 1.75 -> Captura planta = 1600 * 1.75 = 2800 kg
+        FactorConversionModel fc = FactorConversionModel.builder()
+                .factor(new BigDecimal("1.75"))
+                .build();
+        when(factorConversionService.findFactorVigente(eq(espId), eq(2L), any(Date.class)))
+                .thenReturn(Optional.of(fc));
+
+        FichaTrazabilidadDTO ficha = service.obtenerFicha("RECOLECTOR", recId);
+
+        assertNotNull(ficha);
+        assertNotNull(ficha.getPlanta());
+
+        // Ambos estados
+        assertEquals("Húmedo", ficha.getPlanta().getHumedadEstadoOrigen());
+        assertEquals("Semihúmedo", ficha.getPlanta().getHumedadEstadoRecepcion());
+
+        // Ambas variaciones
+        // Física: (1600 - 2500) / 2500 * 100 = -36.0%
+        assertEquals(-36.0, ficha.getPlanta().getVariacionPct(), 0.01);
+        // Equivalente: (2800 - 2825) / 2825 * 100 = -0.9%
+        assertNotNull(ficha.getPlanta().getVariacionEqPct());
+        assertEquals(-0.9, ficha.getPlanta().getVariacionEqPct(), 0.01);
+
+        // Capturas totales
+        assertEquals(new BigDecimal("2825.00"), ficha.getPlanta().getCapturaOrigenTotal());
+        assertEquals(new BigDecimal("2800.00"), ficha.getPlanta().getCapturaPlantaTotal());
     }
 }

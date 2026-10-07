@@ -22,6 +22,14 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.CadenaCustodiaService cadenaCustodiaService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.FactorConversionService factorConversionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.ConfiguracionGeneralService configuracionGeneralService;
+
     public List<ReportDTO> generateReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
         String tableName;
         String dateColumn = "fecha_declaracion";
@@ -994,9 +1002,9 @@ public class ReportRepository {
             if (var != null) {
                 sumAbsVar += Math.abs(var);
                 conVarCount++;
-                if (Math.abs(var) > umbral) {
-                    fueraUmbralCadena++;
-                }
+            }
+            if (Boolean.TRUE.equals(c.get("fueraUmbral"))) {
+                fueraUmbralCadena++;
             }
         }
         Double promedioVarCadena = null;
@@ -1033,9 +1041,13 @@ public class ReportRepository {
         String sqlPlanta = "SELECT dpa.id, dpa.folio_origen, dpa.peso_romana_kg, " +
                 "dpa.fecha_pesaje, dpa.fecha_ingreso_planta, dpa.voucher_romana_numero, dpa.voucher_romana_adjunto, " +
                 "dpa.declaraciones_seleccionadas, dpa.especie_id, " +
-                "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre " +
+                "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre, " +
+                "dpa.humedad_estado_id, he_orig.nombre as humedad_origen_nombre, " +
+                "dpa.humedad_estado_recepcion_id, he_rec.nombre as humedad_recepcion_nombre " +
                 "FROM declaracion_planta_abastecimiento dpa " +
                 "JOIN usuario u ON dpa.usuario_id = u.id " +
+                "LEFT JOIN humedad_estado he_orig ON dpa.humedad_estado_id = he_orig.id " +
+                "LEFT JOIN humedad_estado he_rec ON dpa.humedad_estado_recepcion_id = he_rec.id " +
                 "WHERE dpa.peso_romana_kg IS NOT NULL AND dpa.peso_romana_kg > 0 ";
 
         if (startDate != null && endDate != null) {
@@ -1080,6 +1092,10 @@ public class ReportRepository {
             Long espId;
             String rut;
             String nombre;
+            Long humedadOrigenId;
+            String humedadOrigenNombre;
+            Long humedadRecepcionId;
+            String humedadRecepcionNombre;
             java.util.Map<String, List<Long>> tokens;
             List<Long> fkComercializadores = new java.util.ArrayList<>();
             List<Long> fkRecolectores = new java.util.ArrayList<>();
@@ -1103,6 +1119,10 @@ public class ReportRepository {
             p.espId = r[8] != null ? ((Number) r[8]).longValue() : null;
             p.rut = r[9] != null ? r[9].toString() : "";
             p.nombre = r[10] != null ? r[10].toString() : "";
+            p.humedadOrigenId = r.length > 11 && r[11] != null ? ((Number) r[11]).longValue() : null;
+            p.humedadOrigenNombre = r.length > 12 && r[12] != null ? r[12].toString() : null;
+            p.humedadRecepcionId = r.length > 13 && r[13] != null ? ((Number) r[13]).longValue() : null;
+            p.humedadRecepcionNombre = r.length > 14 && r[14] != null ? r[14].toString() : null;
             p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(p.decSel);
 
             List<Long> cIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR");
@@ -1253,19 +1273,23 @@ public class ReportRepository {
             Long id;
             String folio;
             double kg;
+            double captura;
             Date fecha;
             String rut;
             String actor;
             String especie;
+            String humedad;
         }
 
         java.util.Map<Long, OrigenData> recMap = new java.util.HashMap<>();
         if (!allRecolectorIds.isEmpty()) {
             String sqlR = "SELECT r.id, r.folio_origen, COALESCE(r.desembarque, r.cantidad), r.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(r.captura, COALESCE(r.desembarque, r.cantidad)) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_recolector r " +
                     "JOIN usuario u ON r.usuario_id = u.id " +
                     "LEFT JOIN especie e ON r.especie_id = e.id " +
+                    "LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id " +
                     "WHERE r.id IN (:ids)";
             @SuppressWarnings("unchecked")
             List<Object[]> rRows = entityManager.createNativeQuery(sqlR).setParameter("ids", allRecolectorIds).getResultList();
@@ -1279,6 +1303,8 @@ public class ReportRepository {
                 oi.especie = r[4] != null ? r[4].toString() : "";
                 oi.rut = r[5] != null ? r[5].toString() : "";
                 oi.actor = r[6] != null ? r[6].toString() : "";
+                oi.captura = r.length > 7 && r[7] != null ? ((Number) r[7]).doubleValue() : oi.kg;
+                oi.humedad = r.length > 8 && r[8] != null ? r[8].toString() : null;
                 recMap.put(oi.id, oi);
             }
         }
@@ -1286,10 +1312,12 @@ public class ReportRepository {
         java.util.Map<Long, OrigenData> armMap = new java.util.HashMap<>();
         if (!allArmadorIds.isEmpty()) {
             String sqlA = "SELECT a.id, a.folio_origen, COALESCE(a.desembarque, a.cantidad), a.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(a.captura, COALESCE(a.desembarque, a.cantidad)) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_armador a " +
                     "JOIN usuario u ON a.usuario_id = u.id " +
                     "LEFT JOIN especie e ON a.especie_id = e.id " +
+                    "LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id " +
                     "WHERE a.id IN (:ids)";
             @SuppressWarnings("unchecked")
             List<Object[]> aRows = entityManager.createNativeQuery(sqlA).setParameter("ids", allArmadorIds).getResultList();
@@ -1303,6 +1331,8 @@ public class ReportRepository {
                 oi.especie = r[4] != null ? r[4].toString() : "";
                 oi.rut = r[5] != null ? r[5].toString() : "";
                 oi.actor = r[6] != null ? r[6].toString() : "";
+                oi.captura = r.length > 7 && r[7] != null ? ((Number) r[7]).doubleValue() : oi.kg;
+                oi.humedad = r.length > 8 && r[8] != null ? r[8].toString() : null;
                 armMap.put(oi.id, oi);
             }
         }
@@ -1310,10 +1340,12 @@ public class ReportRepository {
         java.util.Map<Long, OrigenData> areaMap = new java.util.HashMap<>();
         if (!allAreaIds.isEmpty()) {
             String sqlAr = "SELECT ar.id, ar.folio_origen, COALESCE(ar.desembarque, ar.cantidad), ar.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(ar.captura, COALESCE(ar.desembarque, ar.cantidad)) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_area ar " +
                     "JOIN usuario u ON ar.usuario_id = u.id " +
                     "LEFT JOIN especie e ON ar.especie_id = e.id " +
+                    "LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id " +
                     "WHERE ar.id IN (:ids)";
             @SuppressWarnings("unchecked")
             List<Object[]> arRows = entityManager.createNativeQuery(sqlAr).setParameter("ids", allAreaIds).getResultList();
@@ -1327,6 +1359,8 @@ public class ReportRepository {
                 oi.especie = r[4] != null ? r[4].toString() : "";
                 oi.rut = r[5] != null ? r[5].toString() : "";
                 oi.actor = r[6] != null ? r[6].toString() : "";
+                oi.captura = r.length > 7 && r[7] != null ? ((Number) r[7]).doubleValue() : oi.kg;
+                oi.humedad = r.length > 8 && r[8] != null ? r[8].toString() : null;
                 areaMap.put(oi.id, oi);
             }
         }
@@ -1351,6 +1385,8 @@ public class ReportRepository {
                     m.put("id", oi.id);
                     m.put("folio", oi.folio);
                     m.put("kg", oi.kg);
+                    m.put("captura", oi.captura);
+                    m.put("humedad", oi.humedad);
                     m.put("fecha", oi.fecha);
                     m.put("especie", oi.especie);
                     m.put("rut", oi.rut);
@@ -1371,6 +1407,8 @@ public class ReportRepository {
                     m.put("id", oi.id);
                     m.put("folio", oi.folio);
                     m.put("kg", oi.kg);
+                    m.put("captura", oi.captura);
+                    m.put("humedad", oi.humedad);
                     m.put("fecha", oi.fecha);
                     m.put("especie", oi.especie);
                     m.put("rut", oi.rut);
@@ -1391,6 +1429,8 @@ public class ReportRepository {
                     m.put("id", oi.id);
                     m.put("folio", oi.folio);
                     m.put("kg", oi.kg);
+                    m.put("captura", oi.captura);
+                    m.put("humedad", oi.humedad);
                     m.put("fecha", oi.fecha);
                     m.put("especie", oi.especie);
                     m.put("rut", oi.rut);
@@ -1430,6 +1470,8 @@ public class ReportRepository {
                             m.put("id", oi.id);
                             m.put("folio", oi.folio);
                             m.put("kg", oi.kg);
+                            m.put("captura", oi.captura);
+                            m.put("humedad", oi.humedad);
                             m.put("fecha", oi.fecha);
                             m.put("especie", oi.especie);
                             m.put("rut", oi.rut);
@@ -1450,6 +1492,8 @@ public class ReportRepository {
                             m.put("id", oi.id);
                             m.put("folio", oi.folio);
                             m.put("kg", oi.kg);
+                            m.put("captura", oi.captura);
+                            m.put("humedad", oi.humedad);
                             m.put("fecha", oi.fecha);
                             m.put("especie", oi.especie);
                             m.put("rut", oi.rut);
@@ -1470,6 +1514,8 @@ public class ReportRepository {
                             m.put("id", oi.id);
                             m.put("folio", oi.folio);
                             m.put("kg", oi.kg);
+                            m.put("captura", oi.captura);
+                            m.put("humedad", oi.humedad);
                             m.put("fecha", oi.fecha);
                             m.put("especie", oi.especie);
                             m.put("rut", oi.rut);
@@ -1481,14 +1527,46 @@ public class ReportRepository {
             }
 
             double kgOrigen = 0.0;
+            double capturaOrigen = 0.0;
             for (java.util.Map<String, Object> o : origenes) {
                 kgOrigen += o.get("kg") != null ? ((Number) o.get("kg")).doubleValue() : 0.0;
+                capturaOrigen += o.get("captura") != null ? ((Number) o.get("captura")).doubleValue()
+                        : (o.get("kg") != null ? ((Number) o.get("kg")).doubleValue() : 0.0);
             }
 
             double kgPlanta = p.pesoRomana;
             Double variacionPct = null;
             if (kgOrigen > 0) {
                 variacionPct = Math.round(((kgPlanta - kgOrigen) / kgOrigen * 100.0) * 10.0) / 10.0;
+            }
+
+            // T3.2: Factor de conversión para humedad de recepción
+            Long humedadPlantaId = p.humedadRecepcionId != null ? p.humedadRecepcionId : p.humedadOrigenId;
+            Double factorRecepcion = null;
+            if (factorConversionService != null && p.espId != null && humedadPlantaId != null) {
+                try {
+                    factorRecepcion = factorConversionService.findFactorVigente(p.espId, humedadPlantaId, p.fechaIngreso)
+                            .map(f -> f.getFactor().doubleValue())
+                            .orElse(null);
+                } catch (Exception e) {
+                    factorRecepcion = null;
+                }
+            }
+
+            double capturaPlanta = kgPlanta * (factorRecepcion != null ? factorRecepcion : 1.0);
+            Double variacionEqPct = null;
+            if (capturaOrigen > 0) {
+                variacionEqPct = Math.round(((capturaPlanta - capturaOrigen) / capturaOrigen * 100.0) * 10.0) / 10.0;
+            }
+
+            boolean alertaEquivalente = configuracionGeneralService != null
+                    && configuracionGeneralService.getBoolean("variacion_peso_alerta_equivalente", false);
+
+            boolean fueraUmbral;
+            if (alertaEquivalente && variacionEqPct != null) {
+                fueraUmbral = Math.abs(variacionEqPct) > umbral;
+            } else {
+                fueraUmbral = variacionPct != null && Math.abs(variacionPct) > umbral;
             }
 
             java.util.Map<String, Object> item = new java.util.HashMap<>();
@@ -1502,8 +1580,17 @@ public class ReportRepository {
             item.put("voucherRomanaAdjunto", p.voucherAdjunto);
             item.put("kgOrigen", Math.round(kgOrigen * 10.0) / 10.0);
             item.put("kgPlanta", Math.round(kgPlanta * 10.0) / 10.0);
+            item.put("capturaOrigen", Math.round(capturaOrigen * 10.0) / 10.0);
+            item.put("capturaPlanta", Math.round(capturaPlanta * 10.0) / 10.0);
+            item.put("factorRecepcion", factorRecepcion);
+            item.put("humedadOrigenId", p.humedadOrigenId);
+            item.put("humedadOrigen", p.humedadOrigenNombre != null ? p.humedadOrigenNombre : (!origenes.isEmpty() && origenes.get(0).get("humedad") != null ? origenes.get(0).get("humedad") : null));
+            item.put("humedadRecepcionId", p.humedadRecepcionId);
+            item.put("humedadRecepcion", p.humedadRecepcionNombre);
             item.put("variacionPct", variacionPct);
-            item.put("fueraUmbral", variacionPct != null && Math.abs(variacionPct) > umbral);
+            item.put("variacionEqPct", variacionEqPct);
+            item.put("fueraUmbral", fueraUmbral);
+            item.put("alertaEquivalente", alertaEquivalente);
             item.put("origenes", origenes);
             item.put("intermediario", !intermediarios.isEmpty() ? intermediarios.get(0) : null);
             if (intermediarios.size() > 1) {

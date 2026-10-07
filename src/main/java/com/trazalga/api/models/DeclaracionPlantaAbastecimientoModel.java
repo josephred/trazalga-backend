@@ -69,6 +69,10 @@ public class DeclaracionPlantaAbastecimientoModel {
     @JoinColumn(name = "humedad_estado_id", nullable = false)
     private HumedadEstadoModel humedadEstado;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "humedad_estado_recepcion_id", nullable = true)
+    private HumedadEstadoModel humedadEstadoRecepcion;
+
     @Column(name = "humedad_higrometro", precision = 5, scale = 2)
     private BigDecimal humedadHigrometro;
 

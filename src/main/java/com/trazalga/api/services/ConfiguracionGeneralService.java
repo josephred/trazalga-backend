@@ -101,6 +101,13 @@ public class ConfiguracionGeneralService {
         // PRIORIDAD 2 — CONSULTA POR FOLIO (T2.2)
         createIfNotExist("consulta_folio_dias_embarcacion", "30", "Días hacia atrás para buscar desembarques por código de embarcación", "CONSULTAS");
         createIfNotExist("consulta_folio_max_resultados", "20", "Máximo de resultados devueltos en la búsqueda puntual por folio", "CONSULTAS");
+
+        // PRIORIDAD 3 — PLANTA: HUMEDAD EN RECEPCIÓN Y VARIACIÓN EQUIVALENTE (T3.1, T3.2)
+        createIfNotExist("planta_exige_humedad_recepcion", "false", "Exige ingresar el estado de humedad al recibir el camión en planta", "CADENA");
+        createIfNotExist("variacion_peso_alerta_equivalente", "false", "Usa la variación equivalente en captura para disparar alertas de peso cuando cambia la humedad", "CADENA");
+
+        // PRIORIDAD 4 — PATENTES REGISTRADAS DE PRUEBA (T4.1)
+        createIfNotExist("patente_lista_prueba_activa", "false", "Habilita la lista de patentes de prueba en consultas para fiscalización QA", "CADENA");
     }
 
     private void createIfNotExist(String clave, String valorDefecto, String descripcion, String categoria) {

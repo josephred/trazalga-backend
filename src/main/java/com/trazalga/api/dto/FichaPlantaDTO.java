@@ -36,10 +36,15 @@ public class FichaPlantaDTO {
     private BigDecimal cantidadDeclarada;
     private String rotuloPesaje; // "Pesaje en romana" o "Sin pesaje en romana"
 
-    // Humedad y variación
+    // Humedad y variación (T3.3: ambos estados y ambas variaciones)
+    private String humedadEstadoOrigen;
     private String humedadEstadoRecepcion;
     private BigDecimal humedadHigrometro;
-    private Double variacionPct; // ej: -8.0
+    private Double variacionPct; // ej: -8.0 (variación física)
+    private Double variacionEqPct; // variación equivalente en captura
+    private BigDecimal capturaOrigenTotal;
+    private BigDecimal capturaPlantaTotal;
+    private BigDecimal factorConversionRecepcion;
     private String rotuloVariacion; // "Variación de la recepción completa"
 
     // Documentos tributarios y transporte

@@ -132,6 +132,7 @@ public class DeclaracionPlantaAbastecimientoService {
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
         validarCargasNoBloqueadas(declaracion.getDeclaracionesSeleccionadas());
         validarVoucherRomana(declaracion);
+        validarHumedadRecepcion(declaracion);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
         }
@@ -165,6 +166,7 @@ public class DeclaracionPlantaAbastecimientoService {
         }
         validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
         validarVoucherRomana(request);
+        validarHumedadRecepcion(request);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
         model.setFolioOrigen(request.getFolioOrigen());
@@ -179,6 +181,7 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setEspecie(request.getEspecie());
         model.setComposicion(request.getComposicion());
         model.setHumedadEstado(request.getHumedadEstado());
+        model.setHumedadEstadoRecepcion(request.getHumedadEstadoRecepcion());
         model.setHumedadHigrometro(request.getHumedadHigrometro());
         model.setCantidad(request.getCantidad());
         model.setVoucherRomanaNumero(request.getVoucherRomanaNumero());
@@ -232,6 +235,18 @@ public class DeclaracionPlantaAbastecimientoService {
             if (!tieneVoucher || !tienePesoRomana) {
                 throw new IllegalArgumentException(
                     "El registro de recepción en planta exige número de voucher y peso en romana según la normativa vigente (variacion_peso_exige_voucher=true)."
+                );
+            }
+        }
+    }
+
+    private void validarHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
+        if (configuracionGeneralService == null || model == null) return;
+        boolean exigeHumedad = configuracionGeneralService.getBoolean("planta_exige_humedad_recepcion", false);
+        if (exigeHumedad) {
+            if (model.getHumedadEstadoRecepcion() == null || model.getHumedadEstadoRecepcion().getId() == null) {
+                throw new IllegalArgumentException(
+                    "El registro de recepción en planta exige el estado de humedad al recibir el camión según la normativa vigente (planta_exige_humedad_recepcion=true)."
                 );
             }
         }
