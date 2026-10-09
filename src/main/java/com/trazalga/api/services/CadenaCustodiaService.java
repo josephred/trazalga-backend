@@ -327,31 +327,76 @@ public class CadenaCustodiaService {
         String amountCol = "desembarque";
         String folioCol = "folio_origen";
         boolean hasSeleccionadas = false;
-        String extraJoinEspecie = "LEFT JOIN especie e ON d.especie_id = e.id ";
-        String extraJoinHumedad = "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id ";
-        String extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom ";
+        String extraJoins = "";
+        String extraCols = "";
 
         switch (tipoStr) {
             case "RECOLECTOR":
                 tableName = "declaracion_recolector";
                 roleName = "Recolector";
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
+                             "LEFT JOIN caleta cal ON d.caleta_id = cal.id " +
+                             "LEFT JOIN comuna com ON d.comuna_id = com.id " +
+                             "LEFT JOIN region reg ON com.region_id = reg.id " +
+                             "LEFT JOIN extraccion_tipo ext ON d.extraccion_tipo_id = ext.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
+                            "d.varadero as var_nom, ext.nombre as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "d.estado as est, CAST(d.humedad AS CHAR) as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 break;
             case "ARMADOR":
                 tableName = "declaracion_armador";
                 roleName = "Armador";
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
+                             "LEFT JOIN caleta cal ON d.caleta_id = cal.id " +
+                             "LEFT JOIN comuna com ON cal.comuna_id = com.id " +
+                             "LEFT JOIN region reg ON com.region_id = reg.id " +
+                             "LEFT JOIN embarcacion emb ON d.embarcacion_id = emb.id " +
+                             "LEFT JOIN buzo buz ON d.buzo_id = buz.id " +
+                             "LEFT JOIN extraccion_tipo ext ON d.extraccion_tipo_id = ext.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
+                            "NULL as var_nom, ext.nombre as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "d.estado as est, CAST(d.humedad AS CHAR) as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
+                            "COALESCE(emb.nombre, d.embarcacion_nombre) as emb_nom, COALESCE(buz.nombre, d.buzo_nombre) as buzo_nom, " +
+                            "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 break;
             case "AREA":
                 tableName = "declaracion_area";
                 roleName = "Área de Manejo";
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
+                             "LEFT JOIN amerb am ON d.amerb_id = am.id " +
+                             "LEFT JOIN caleta cal ON d.caleta_id = cal.id " +
+                             "LEFT JOIN comuna com ON cal.comuna_id = com.id " +
+                             "LEFT JOIN region reg ON com.region_id = reg.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
+                            "COALESCE(am.nombre, d.codigo_sernapesca_amerb) as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "'ENVIADA' as est, NULL as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 break;
             case "COMERCIALIZADOR":
                 tableName = "declaracion_comercializador";
                 roleName = "Comercializador";
                 amountCol = "cantidad";
                 hasSeleccionadas = true;
-                extraJoinEspecie = "";
-                extraJoinHumedad = "";
-                extraCols = "NULL as esp_id, NULL as esp_nom, NULL as hum_id, NULL as hum_nom ";
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, NULL as cal_nom, NULL as com_nom, NULL as reg_nom, " +
+                            "NULL as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "d.estado as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "d.vehiculo_transporte as vehiculo, COALESCE(d.placa_patente, d.patente) as pat, d.placa_patente_carro as pat_carro, " +
+                            "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, " +
+                            "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 break;
             case "PLANTA_ABASTECIMIENTO":
                 tableName = "declaracion_planta_abastecimiento";
@@ -360,6 +405,16 @@ public class CadenaCustodiaService {
                 dateCol = "fecha_ingreso_planta";
                 folioCol = "folio_declaracion_a_pla";
                 hasSeleccionadas = true;
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
+                            "NULL as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "'RECEPCIONADA' as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, NULL as n_dest_dir, " +
+                            "d.vehiculo_transporte as vehiculo, COALESCE(d.placa_patente, d.patente) as pat, d.placa_patente_carro as pat_carro, " +
+                            "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, " +
+                            "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 break;
             case "PLANTA_PRODUCCION":
                 tableName = "declaracion_planta_produccion";
@@ -368,8 +423,16 @@ public class CadenaCustodiaService {
                 dateCol = "fecha_produccion";
                 folioCol = "folio_declaracion_p_pla";
                 hasSeleccionadas = true;
-                extraJoinEspecie = "LEFT JOIN especie e ON d.materia_prima_especie_id = e.id ";
-                extraCols = "d.materia_prima_especie_id as esp_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom ";
+                extraJoins = "LEFT JOIN especie e ON d.materia_prima_especie_id = e.id " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
+                             "LEFT JOIN producto prod ON d.producto_resultante_id = prod.id ";
+                extraCols = "d.materia_prima_especie_id as esp_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
+                            "prod.nombre as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "'PRODUCIDA' as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, NULL as n_dest_dir, " +
+                            "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, " +
+                            "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 break;
             case "PLANTA_DESTINO":
                 tableName = "declaracion_planta_destino";
@@ -378,9 +441,18 @@ public class CadenaCustodiaService {
                 dateCol = "fecha_declaracion_destino";
                 folioCol = "folio_declaracion_destino";
                 hasSeleccionadas = true;
-                extraJoinEspecie = "";
-                extraJoinHumedad = "";
-                extraCols = "NULL as esp_id, NULL as esp_nom, NULL as hum_id, NULL as hum_nom ";
+                extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
+                             "LEFT JOIN producto prod ON d.producto_id = prod.id ";
+                extraCols = "d.especie_id as esp_id, e.nombre as esp_nom, NULL as hum_id, NULL as hum_nom, " +
+                            "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
+                            "prod.nombre as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
+                            "d.estado as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, d.nombre_destino as n_dest_dir, " +
+                            "d.vehiculo_transporte as vehiculo, COALESCE(d.placa_patente, d.patente) as pat, d.placa_patente_carro as pat_carro, " +
+                            "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
+                            "NULL as emb_nom, NULL as buzo_nom, " +
+                            "COALESCE(d.documento_tributario_origen_tipo, d.documento_tributario_tipo) as dt_tipo, " +
+                            "COALESCE(d.documento_tributario_origen_numero, d.documento_tributario_numero) as dt_num, " +
+                            "COALESCE(d.documento_tributario_origen_fecha, d.documento_tributario_fecha) as dt_fecha ";
                 break;
             default:
                 return map;
@@ -394,8 +466,7 @@ public class CadenaCustodiaService {
                 "udest.rut as rut_dest, TRIM(CONCAT(COALESCE(udest.nombres, ''), ' ', COALESCE(udest.apellidop, ''))) as nom_dest " +
                 "FROM " + tableName + " d " +
                 "INNER JOIN usuario u ON d.usuario_id = u.id " +
-                extraJoinEspecie +
-                extraJoinHumedad +
+                extraJoins +
                 "LEFT JOIN usuario udest ON d.usuario_destinatario_id = udest.id " +
                 "WHERE d.id IN (:ids)";
 
@@ -421,8 +492,32 @@ public class CadenaCustodiaService {
                 String espNom = r[13] != null ? r[13].toString() : null;
                 Long humId = r[14] != null ? ((Number) r[14]).longValue() : null;
                 String humNom = r[15] != null ? r[15].toString() : null;
-                String rutDest = r[16] != null ? r[16].toString() : null;
-                String nomDest = r[17] != null ? r[17].toString() : null;
+
+                String codSerna = r[16] != null ? r[16].toString() : null;
+                String calNom = r[17] != null ? r[17].toString() : null;
+                String comNom = r[18] != null ? r[18].toString() : null;
+                String regNom = r[19] != null ? r[19].toString() : null;
+                String varNom = r[20] != null ? r[20].toString() : null;
+                String extNom = r[21] != null ? r[21].toString() : null;
+                Double lat = r[22] != null ? ((Number) r[22]).doubleValue() : null;
+                Double lon = r[23] != null ? ((Number) r[23]).doubleValue() : null;
+                String est = r[24] != null ? r[24].toString() : null;
+                String humHigro = r[25] != null ? r[25].toString() : null;
+                String nDestDir = r[26] != null ? r[26].toString() : null;
+                String vehiculo = r[27] != null ? r[27].toString() : null;
+                String pat = r[28] != null ? r[28].toString() : null;
+                String patCarro = r[29] != null ? r[29].toString() : null;
+                String choferNom = r[30] != null ? r[30].toString() : null;
+                String choferRut = r[31] != null ? r[31].toString() : null;
+                String embNom = r[32] != null ? r[32].toString() : null;
+                String buzoNom = r[33] != null ? r[33].toString() : null;
+                String dtTipo = r[34] != null ? r[34].toString() : null;
+                String dtNum = r[35] != null ? r[35].toString() : null;
+                Date dtFecha = toDate(r[36]);
+
+                String rutDest = r[37] != null ? r[37].toString() : null;
+                String nomDest = r[38] != null ? r[38].toString() : null;
+                String finalDestNom = (nDestDir != null && !nDestDir.isBlank()) ? nDestDir : nomDest;
 
                 LocalDateTime ts = ReportService.parseTimestamp(d, hora);
 
@@ -433,9 +528,35 @@ public class CadenaCustodiaService {
                         .nombreActor(actor.trim())
                         .rutActor(rut)
                         .fecha(d)
+                        .hora(hora)
                         .cantidad(cant)
                         .descripcionEvento("Declaración de tipo " + roleName)
                         .folio(folio)
+                        .codigoSernapesca(codSerna)
+                        .especie(espNom)
+                        .estadoHumedad(humNom)
+                        .porcentajeHumedad(humHigro)
+                        .caleta(calNom)
+                        .comuna(comNom)
+                        .region(regNom)
+                        .varaderoOAmerb(varNom)
+                        .metodoExtraccion(extNom)
+                        .latitud(lat)
+                        .longitud(lon)
+                        .estado(est != null ? est : "ENVIADA")
+                        .nombreDestinatario(finalDestNom)
+                        .rutDestinatario(rutDest)
+                        .vehiculoTransporte(vehiculo)
+                        .patente(pat)
+                        .patenteCarro(patCarro)
+                        .chofer(choferNom)
+                        .rutChofer(choferRut)
+                        .embarcacion(embNom)
+                        .buzo(buzoNom)
+                        .docTipo(dtTipo)
+                        .docNumero(dtNum)
+                        .docFecha(dtFecha)
+                        .declaracionesSeleccionadas(decSel)
                         .build();
 
                 RawNodeData raw = new RawNodeData();
