@@ -1,10 +1,17 @@
 package com.trazalga.api.services;
 
 import com.trazalga.api.config.CacheConfig;
+import com.trazalga.api.dto.FiltroRecepcionesVariacion;
+import com.trazalga.api.dto.OrigenInformativoDTO;
+import com.trazalga.api.dto.PageDTO;
 import com.trazalga.api.dto.ReportDTO;
+import com.trazalga.api.dto.ResultadoVariacionPesoDTO;
 import com.trazalga.api.repositories.ReportRepository;
-import lombok.RequiredArgsConstructor;
+import com.trazalga.api.services.indicadores.VariacionPesoService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -44,11 +51,26 @@ import java.util.List;
  * usuarios sin que se repitan las claves.
  * ─────────────────────────────────────────────────────────────────────────
  */
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReportService {
 
     private final ReportRepository reportRepository;
+    private final ConfiguracionGeneralService configService;
+    private final VariacionPesoService variacionPesoService;
+
+    public ReportService(ReportRepository reportRepository, ConfiguracionGeneralService configService) {
+        this(reportRepository, configService, null);
+    }
+
+    @Autowired
+    public ReportService(ReportRepository reportRepository,
+                         ConfiguracionGeneralService configService,
+                         @Autowired(required = false) VariacionPesoService variacionPesoService) {
+        this.reportRepository = reportRepository;
+        this.configService = configService;
+        this.variacionPesoService = variacionPesoService;
+    }
 
     /**
      * Reporte por usuario. SIN caché: la clave incluye el rut y no se repite
@@ -477,7 +499,35 @@ public class ReportService {
     /** El componente más caro de la cascada de resumen-global: 14,0 s medidos. */
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
-        return reportRepository.getVariacionPesoMetrics(startDate, endDate, umbralPct);
+        java.util.Map<String, Object> metrics = new java.util.LinkedHashMap<>(reportRepository.getVariacionPesoMetrics(startDate, endDate, umbralPct));
+        if (variacionPesoService != null) {
+            try {
+                metrics.put("comercializadorPlanta", variacionPesoService.obtenerResumenComercializadorPlanta(startDate, endDate));
+            } catch (Exception e) {
+                log.warn("Error calculando bloque comercializadorPlanta: {}", e.getMessage());
+            }
+        }
+        return metrics;
+    }
+
+    /**
+     * TV.3 · Lista paginada de recepciones comercializador -> planta evaluadas con la fórmula canónica.
+     */
+    public PageDTO<ResultadoVariacionPesoDTO> getVariacionPesoRecepciones(FiltroRecepcionesVariacion filtro, Pageable pageable) {
+        if (variacionPesoService == null) {
+            return PageDTO.of(java.util.Collections.emptyList(), 0, 20, 0);
+        }
+        return variacionPesoService.evaluarRecepciones(filtro, pageable);
+    }
+
+    /**
+     * TV.3 · Lista de orígenes biológicos que alimentaron a la planta (informativo bajo demanda).
+     */
+    public List<OrigenInformativoDTO> getOrigenesRecepcionPlanta(Long plantaId) {
+        if (variacionPesoService == null) {
+            return java.util.Collections.emptyList();
+        }
+        return variacionPesoService.obtenerOrigenesInformativos(plantaId);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
@@ -514,8 +564,6 @@ public class ReportService {
     // =========================================================================
     // FASE 4 — INDICADORES Y TRAZABILIDAD POR LOTE (folio_origen)
     // =========================================================================
-
-    private final ConfiguracionGeneralService configService;
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate, Double umbralVariacion) {

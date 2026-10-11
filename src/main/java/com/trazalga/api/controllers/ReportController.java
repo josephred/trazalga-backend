@@ -11,7 +11,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.trazalga.api.dto.FiltroDesembarqueAtipico;
+import com.trazalga.api.dto.FiltroRecepcionesVariacion;
 import com.trazalga.api.dto.FiltroSobrepasos;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
@@ -740,6 +742,51 @@ public class ReportController {
             return ResponseEntity.ok(reportService.getVariacionPesoDetalle(startDate, endDate));
         } catch (Exception e) {
             System.err.println("Error obteniendo detalle de variación de peso: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // TV.3: ENDPOINTS AUDITABLES DE VARIACIÓN COMERCIALIZADOR -> PLANTA
+    // =========================================================================
+
+    @GetMapping("/variacion-peso/recepciones")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getVariacionPesoRecepciones(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) String semaforo,
+            @RequestParam(required = false) String tramo,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long plantaId,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size) {
+        try {
+            FiltroRecepcionesVariacion filtro = FiltroRecepcionesVariacion.builder()
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .semaforo(semaforo)
+                    .tramo(tramo)
+                    .especieId(especieId)
+                    .plantaId(plantaId)
+                    .build();
+            Pageable pageable = PageRequest.of(page, size);
+            return ResponseEntity.ok(reportService.getVariacionPesoRecepciones(filtro, pageable));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo recepciones con variación de peso: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/variacion-peso/recepciones/{plantaId}/origenes")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getOrigenesRecepcionPlanta(@PathVariable("plantaId") Long plantaId) {
+        try {
+            return ResponseEntity.ok(reportService.getOrigenesRecepcionPlanta(plantaId));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo orígenes de recepción de planta: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }

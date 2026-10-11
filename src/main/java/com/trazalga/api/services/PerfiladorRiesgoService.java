@@ -60,7 +60,8 @@ public class PerfiladorRiesgoService {
         for (Map<String, Object> lote : lotesBrutos) {
             String folio = (String) lote.get("folioOrigen");
             String humedad = (String) lote.get("humedadOrigen");
-            double deltaPct = lote.get("deltaPct") != null ? ((Number) lote.get("deltaPct")).doubleValue() : 0.0;
+            Double deltaPctObj = lote.get("deltaPct") != null ? ((Number) lote.get("deltaPct")).doubleValue() : null;
+            double deltaPct = deltaPctObj != null ? deltaPctObj : 0.0;
             double absDelta = Math.abs(deltaPct);
             int diasEnBodega = lote.get("diasEnBodega") != null ? ((Number) lote.get("diasEnBodega")).intValue() : 0;
             double kgLote = lote.get("kgDestino") != null ? ((Number) lote.get("kgDestino")).doubleValue() :
@@ -73,7 +74,9 @@ public class PerfiladorRiesgoService {
 
             // 1. Nivel de Variación de Peso
             String nivelVariacion;
-            if (absDelta >= varRojo) {
+            if (deltaPctObj == null) {
+                nivelVariacion = NIVEL_VERDE;
+            } else if (absDelta >= varRojo) {
                 nivelVariacion = NIVEL_ROJO;
             } else if (absDelta >= varAmarillo) {
                 nivelVariacion = NIVEL_AMARILLO;
@@ -101,9 +104,9 @@ public class PerfiladorRiesgoService {
             int nivelFinalInt = nivelBaseInt;
             List<String> motivos = new ArrayList<>();
 
-            if (nivelVariacion.equals(NIVEL_ROJO)) {
+            if (nivelVariacion.equals(NIVEL_ROJO) && deltaPctObj != null) {
                 motivos.add(String.format("Variación severa de peso (%.1f%% sobre umbral rojo %.1f%%)", deltaPct, varRojo));
-            } else if (nivelVariacion.equals(NIVEL_AMARILLO)) {
+            } else if (nivelVariacion.equals(NIVEL_AMARILLO) && deltaPctObj != null) {
                 motivos.add(String.format("Variación moderada de peso (%.1f%% sobre umbral amarillo %.1f%%)", deltaPct, varAmarillo));
             }
 

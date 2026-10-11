@@ -68,7 +68,9 @@ public class ParametrosService {
                     getInt("bio_humedo_dias_minimos_transito", 3),
                     getDouble("bio_humedo_merma_minima_pct", 5.0),
                     getDouble("bio_seco_merma_maxima_pct", 3.0),
-                    getBoolean("variacion_peso_alerta_equivalente", false)
+                    getBoolean("variacion_peso_alerta_equivalente", false),
+                    getDouble("variacion_peso_umbral_general_pct", 5.0),
+                    getDouble("riesgo_variacion_rojo_pct", 10.0)
             );
             variacionCache.compareAndSet(null, cached);
         }

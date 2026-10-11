@@ -30,6 +30,10 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.ConfiguracionGeneralService configuracionGeneralService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica evaluadorCoherenciaBiologica;
+
     public List<ReportDTO> generateReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
         String tableName;
         String dateColumn = "fecha_declaracion";
@@ -2055,13 +2059,43 @@ public class ReportRepository {
                     }
                 }
             }
-
             Double kgOrigenDespacho = row.length > 21 && row[21] != null ? ((Number) row[21]).doubleValue() : null;
-            double kgBase = (kgOrigenDespacho != null && kgOrigenDespacho > 0) ? kgOrigenDespacho : kgOrigen;
 
-            double kgDestino = kgPlanta != null ? kgPlanta : (kgComercializador != null ? kgComercializador : kgOrigen);
-            double deltaKg = kgDestino - kgBase;
-            double deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
+            // TV.4: El deltaPct de un lote es el del último tramo cerrado:
+            // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o venta directa a planta);
+            // 2) si sólo declaró el comercializador, es el acopio, origen -> comercializador por despacho (T2.5);
+            // 3) si no hay ninguno, queda nulo, con el rótulo «sin tramo cerrado».
+            double kgBase;
+            double kgDestino;
+            Double deltaKg = null;
+            Double deltaPct = null;
+            String tramoCerrado;
+
+            if (kgPlanta != null && kgPlanta > 0) {
+                if (kgComercializador != null && kgComercializador > 0) {
+                    kgBase = kgComercializador;
+                    kgDestino = kgPlanta;
+                    tramoCerrado = "COMERCIALIZADOR_PLANTA";
+                } else {
+                    kgBase = (kgOrigenDespacho != null && kgOrigenDespacho > 0) ? kgOrigenDespacho : kgOrigen;
+                    kgDestino = kgPlanta;
+                    tramoCerrado = "DIRECTO";
+                }
+                deltaKg = kgDestino - kgBase;
+                deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
+            } else if (kgComercializador != null && kgComercializador > 0) {
+                kgBase = (kgOrigenDespacho != null && kgOrigenDespacho > 0) ? kgOrigenDespacho : kgOrigen;
+                kgDestino = kgComercializador;
+                tramoCerrado = "ACOPIO";
+                deltaKg = kgDestino - kgBase;
+                deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
+            } else {
+                kgBase = kgOrigen;
+                kgDestino = kgOrigen;
+                tramoCerrado = "SIN_TRAMO_CERRADO";
+                deltaKg = 0.0;
+                deltaPct = null;
+            }
 
             int diasTranscurridos = fechaPlanta != null
                     ? diffDays(fechaOrigen, fechaPlanta)
@@ -2090,55 +2124,36 @@ public class ReportRepository {
                 }
             }
 
-            // R8.1 y R8.2: Integración Humedad vs Tiempo y Severidad Biológica
+            // TV.4: Severidad biológica canónica delegada en EvaluadorCoherenciaBiologica
             boolean alertaMerma = false;
             String motivoMerma = null;
-            String inconsistenciaBiologica = null;
-            String severidadBiologica = null;
+            String inconsistenciaBiologica = "NINGUNA";
+            String severidadBiologica = "NEUTRA";
 
-            if (bioPerdidaActivo) {
-                severidadBiologica = "NEUTRA";
-                inconsistenciaBiologica = "NINGUNA";
-                String humUpper = humedadOrigen != null ? humedadOrigen.toUpperCase() : "";
-                double mermaPct = -deltaPct; // Merma: si deltaPct es -7%, mermaPct es +7%
+            if (deltaPct != null && bioPerdidaActivo) {
+                com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica evaluador = evaluadorCoherenciaBiologica != null
+                        ? evaluadorCoherenciaBiologica
+                        : new com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica();
 
-                if (humUpper.contains("HUMED") || humUpper.contains("HÚMED")) {
-                    if (diasTranscurridos >= diasMinHumedo) {
-                        if (mermaPct >= mermaMinHumedo) {
-                            severidadBiologica = "NEUTRA";
-                            inconsistenciaBiologica = "NINGUNA";
-                        } else if (mermaPct > 0 && mermaPct < mermaMinHumedo) {
-                            severidadBiologica = "ATENCION";
-                            inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
-                            alertaMerma = true;
-                            motivoMerma = String.format("Merma húmeda biológicamente insuficiente tras %d días: %.1f%% (esperado: ≥ %.1f%%)",
-                                    diasTranscurridos, mermaPct, mermaMinHumedo);
-                        } else { // mermaPct <= 0 (sin pérdida o con ganancia de peso)
-                            severidadBiologica = "CRITICA";
-                            inconsistenciaBiologica = "HUMEDO_SIN_MERMA";
-                            alertaMerma = true;
-                            motivoMerma = String.format("Inconsistencia biológica crítica tras %d días: sin pérdida o con ganancia (variación: %s%.1f%%, mínimo esperado: merma ≥ %.1f%%)",
-                                    diasTranscurridos, deltaPct >= 0 ? "+" : "", deltaPct, mermaMinHumedo);
-                        }
-                    } else {
-                        severidadBiologica = "NEUTRA";
-                        inconsistenciaBiologica = "NINGUNA";
-                    }
-                } else if (humUpper.contains("SEC")) {
-                    if (mermaPct <= mermaMaxSeco) {
-                        severidadBiologica = "NEUTRA";
-                        inconsistenciaBiologica = "NINGUNA";
-                    } else {
-                        severidadBiologica = "ATENCION";
-                        inconsistenciaBiologica = "SECO_MERMA_EXCESIVA";
-                        alertaMerma = true;
-                        motivoMerma = String.format("Merma seca anómala: alga deshidratada pierde más peso del tolerado (merma: %.1f%%, máx: %.1f%%)",
-                                mermaPct, mermaMaxSeco);
-                    }
-                }
+                com.trazalga.api.services.parametros.ParametrosVariacion pVar = new com.trazalga.api.services.parametros.ParametrosVariacion(
+                        true, diasMinHumedo,
+                        mermaMinHumedo != null ? mermaMinHumedo : 5.0,
+                        mermaMaxSeco != null ? mermaMaxSeco : 3.0,
+                        false,
+                        umbralVariacion != null ? umbralVariacion : 5.0,
+                        10.0
+                );
+
+                com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica.ResultadoEvaluacion resBio =
+                        evaluador.evaluar(humedadOrigen, humedadOrigen, deltaPct, null, diasTranscurridos, pVar);
+
+                severidadBiologica = resBio.semaforo().toSeveridadIndicador8();
+                inconsistenciaBiologica = resBio.criterio();
+                alertaMerma = resBio.alerta();
+                motivoMerma = resBio.descripcion();
             }
 
-            boolean alertaVariacion = Math.abs(deltaPct) > (umbralVariacion != null ? umbralVariacion : 5.0);
+            boolean alertaVariacion = deltaPct != null && Math.abs(deltaPct) > (umbralVariacion != null ? umbralVariacion : 5.0);
 
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("folioOrigen", folioOrigen);
@@ -2159,8 +2174,9 @@ public class ReportRepository {
             map.put("fechaPlanta", fechaPlanta);
             map.put("actorPlanta", actorPlanta);
             map.put("kgDestino", Math.round(kgDestino * 100.0) / 100.0);
-            map.put("deltaKg", Math.round(deltaKg * 100.0) / 100.0);
-            map.put("deltaPct", Math.round(deltaPct * 10.0) / 10.0);
+            map.put("deltaKg", deltaKg != null ? Math.round(deltaKg * 100.0) / 100.0 : null);
+            map.put("deltaPct", deltaPct != null ? Math.round(deltaPct * 10.0) / 10.0 : null);
+            map.put("tramoCerrado", tramoCerrado);
             map.put("diasTranscurridos", diasTranscurridos);
             map.put("diasEnBodega", diasEnBodega);
             map.put("enBodegaVirtual", enBodegaVirtual);

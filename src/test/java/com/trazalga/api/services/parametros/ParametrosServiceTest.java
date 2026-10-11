@@ -55,6 +55,8 @@ public class ParametrosServiceTest {
         assertNotNull(variacion);
         assertTrue(variacion.bioPerdidaActivo());
         assertEquals(3, variacion.bioHumedoDiasMinimosTransito());
+        assertEquals(5.0, variacion.variacionPesoUmbralGeneralPct());
+        assertEquals(10.0, variacion.riesgoVariacionRojoPct());
 
         ParametrosDesembarque desembarque = parametrosService.desembarque();
         assertNotNull(desembarque);

@@ -54,6 +54,9 @@ public class FichaTrazabilidadServiceTest {
     @Mock
     private FactorConversionService factorConversionService;
 
+    @Mock
+    private com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService;
+
     @InjectMocks
     private FichaTrazabilidadService service;
 
@@ -162,6 +165,11 @@ public class FichaTrazabilidadServiceTest {
                 .humedadEstado(humHumedo)
                 .build();
         when(plantaRepository.findById(plaId)).thenReturn(Optional.of(pModel));
+        when(variacionPesoService.evaluarRecepcion(pModel)).thenReturn(
+                com.trazalga.api.dto.ResultadoVariacionPesoDTO.builder()
+                        .deltaPct(-6.1)
+                        .build()
+        );
 
         // 3. Ejecutar servicio
         FichaTrazabilidadDTO ficha = service.obtenerFicha("RECOLECTOR", rec1Id);
@@ -197,14 +205,14 @@ public class FichaTrazabilidadServiceTest {
         assertEquals("4455", com.getDocOrigenNumero());
         assertEquals("ABCD12", com.getPatenteCamion());
 
-        // Planta: 2.300 kg en romana y variación de -8.0%
+        // Planta: 2.300 kg en romana y variación de -6.1% respecto a comercializador (TV.4)
         assertNotNull(ficha.getPlanta());
         assertTrue(ficha.getPlanta().isRecepcionada());
         assertTrue(ficha.getPlanta().isConRomana());
         assertEquals(new BigDecimal("2300.00"), ficha.getPlanta().getPesoRomanaKg());
         assertEquals("VCH-02OCT-9988", ficha.getPlanta().getNumeroVoucherRomana());
-        assertEquals(-8.0, ficha.getPlanta().getVariacionPct(), 0.01);
-        assertEquals("Variación de la recepción completa", ficha.getPlanta().getRotuloVariacion());
+        assertEquals(-6.1, ficha.getPlanta().getVariacionPct(), 0.01);
+        assertEquals("Variación respecto del despacho del comercializador (recepción completa)", ficha.getPlanta().getRotuloVariacion());
     }
 
     @Test

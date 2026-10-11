@@ -38,6 +38,9 @@ public class FichaTrazabilidadService {
     @Autowired(required = false)
     private FactorConversionService factorConversionService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService;
+
     @Autowired
     public FichaTrazabilidadService(
             CadenaCustodiaService cadenaCustodiaService,
@@ -49,7 +52,8 @@ public class FichaTrazabilidadService {
             @Autowired(required = false) IDeclaracionComercializadorRepository comercializadorRepository,
             @Autowired(required = false) IDeclaracionPlantaAbastecimientoRepository plantaRepository,
             @Autowired(required = false) DeclaracionBuzosRepository buzosRepository,
-            @Autowired(required = false) FactorConversionService factorConversionService) {
+            @Autowired(required = false) FactorConversionService factorConversionService,
+            @Autowired(required = false) com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService) {
         this.cadenaCustodiaService = cadenaCustodiaService;
         this.declaracionMarcaService = declaracionMarcaService;
         this.bloqueoCargaService = bloqueoCargaService;
@@ -60,6 +64,7 @@ public class FichaTrazabilidadService {
         this.plantaRepository = plantaRepository;
         this.buzosRepository = buzosRepository;
         this.factorConversionService = factorConversionService;
+        this.variacionPesoService = variacionPesoService;
     }
 
     /**
@@ -381,13 +386,32 @@ public class FichaTrazabilidadService {
 
         DeclaracionPlantaAbastecimientoModel p = opt.get();
         boolean conRomana = p.getPesoRomanaKg() != null && p.getPesoRomanaKg().compareTo(BigDecimal.ZERO) > 0;
-
         double pesoPlanta = conRomana
                 ? p.getPesoRomanaKg().doubleValue()
                 : (p.getCantidad() != null ? p.getCantidad().doubleValue() : 0.0);
 
         Double variacionPct = null;
-        if (totalKgOrigen != null && totalKgOrigen.compareTo(BigDecimal.ZERO) > 0) {
+        Double variacionEqPct = null;
+        BigDecimal capturaPlantaTotal = null;
+        BigDecimal capturaOrigenTotal = null;
+        String rotuloVariacion = "Variación respecto del despacho del comercializador (recepción completa)";
+
+        if (conRomana && variacionPesoService != null) {
+            com.trazalga.api.dto.ResultadoVariacionPesoDTO res = variacionPesoService.evaluarRecepcion(p);
+            if (res != null) {
+                variacionPct = res.getDeltaPct();
+                variacionEqPct = res.getDeltaEqPct();
+                if (res.getCapturaDespachoEq() != null) {
+                    capturaOrigenTotal = BigDecimal.valueOf(res.getCapturaDespachoEq()).setScale(2, java.math.RoundingMode.HALF_UP);
+                }
+                if (res.getCapturaRecepcionEq() != null) {
+                    capturaPlantaTotal = BigDecimal.valueOf(res.getCapturaRecepcionEq()).setScale(2, java.math.RoundingMode.HALF_UP);
+                }
+            } else if (totalKgOrigen != null && totalKgOrigen.compareTo(BigDecimal.ZERO) > 0) {
+                double pesoOrigen = totalKgOrigen.doubleValue();
+                variacionPct = Math.round(((pesoPlanta - pesoOrigen) / pesoOrigen * 100.0) * 10.0) / 10.0;
+            }
+        } else if (conRomana && totalKgOrigen != null && totalKgOrigen.compareTo(BigDecimal.ZERO) > 0) {
             double pesoOrigen = totalKgOrigen.doubleValue();
             variacionPct = Math.round(((pesoPlanta - pesoOrigen) / pesoOrigen * 100.0) * 10.0) / 10.0;
         }
@@ -417,8 +441,13 @@ public class FichaTrazabilidadService {
 
         double factorD = factor != null ? factor.doubleValue() : 1.0;
         double capturaPlanta = pesoPlanta * factorD;
-        Double variacionEqPct = null;
-        if (totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0) {
+        if (capturaPlantaTotal == null) {
+            capturaPlantaTotal = BigDecimal.valueOf(capturaPlanta).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        if (capturaOrigenTotal == null && totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0) {
+            capturaOrigenTotal = totalCapturaOrigen.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        if (variacionEqPct == null && totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0) {
             double capOrig = totalCapturaOrigen.doubleValue();
             variacionEqPct = Math.round(((capturaPlanta - capOrig) / capOrig * 100.0) * 10.0) / 10.0;
         }
@@ -445,11 +474,10 @@ public class FichaTrazabilidadService {
                 .humedadHigrometro(p.getHumedadHigrometro())
                 .variacionPct(variacionPct)
                 .variacionEqPct(variacionEqPct)
-                .capturaOrigenTotal(totalCapturaOrigen != null && totalCapturaOrigen.compareTo(BigDecimal.ZERO) > 0
-                        ? totalCapturaOrigen.setScale(2, java.math.RoundingMode.HALF_UP) : null)
-                .capturaPlantaTotal(BigDecimal.valueOf(capturaPlanta).setScale(2, java.math.RoundingMode.HALF_UP))
+                .capturaOrigenTotal(capturaOrigenTotal)
+                .capturaPlantaTotal(capturaPlantaTotal)
                 .factorConversionRecepcion(factor)
-                .rotuloVariacion("Variación de la recepción completa")
+                .rotuloVariacion(rotuloVariacion)
                 .docOrigenTipo(p.getDocumentoTributarioOrigenTipo())
                 .docOrigenNumero(p.getDocumentoTributarioOrigenNumero())
                 .docOrigenFecha(p.getDocumentoTributarioOrigenFecha())
