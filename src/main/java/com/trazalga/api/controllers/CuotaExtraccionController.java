@@ -38,8 +38,9 @@ public class CuotaExtraccionController {
             @RequestParam(required = false) Integer mes,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long extraccionTipoId,
-            @RequestParam(required = false, defaultValue = "AREA_LIBRE") String ambito) {
-        return cuotaService.getListado(anio, mes, comunaId, extraccionTipoId, ambito);
+            @RequestParam(required = false, defaultValue = "AREA_LIBRE") String ambito,
+            @RequestParam(required = false) Long amerbId) {
+        return cuotaService.getListado(anio, mes, comunaId, extraccionTipoId, ambito, amerbId);
     }
 
     @GetMapping("/dashboard-diario")
@@ -156,6 +157,19 @@ public class CuotaExtraccionController {
     @GetMapping(path = "/{id}/consumo")
     public Map<String, Object> getConsumo(@PathVariable("id") Long id) {
         return cuotaService.getConsumoCuota(id);
+    }
+
+    /**
+     * Recalcula cronológicamente los hallazgos y consumo de la cuota (TC.10 / D9 del 02-10).
+     * Sólo para usuarios con rol ADMIN. Idempotente: correrlo dos veces no duplica marcas.
+     */
+    @PostMapping(path = "/{id}/recalcular-hallazgos")
+    @PreAuthorize("hasRole('ADMIN')")
+    public com.trazalga.api.dto.ResumenRecalculoCuotaDTO recalcularHallazgos(
+            @PathVariable("id") Long id,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate desde,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate hasta) {
+        return cuotaService.recalcularHallazgos(id, desde, hasta);
     }
 
     // DTO simple para validación de declaración

@@ -27,6 +27,10 @@ public class ConfiguracionGeneralService {
         // 1. Desembarque
         createIfNotExist("desembarque_unidad_base", "kg", "Unidad de cara al usuario. Bloqueada por norma técnica.", "DESEMBARQUE");
         createIfNotExist("desembarque_umbral_atipico_kg", "5000", "Desembarque individual que dispara auditoría de pesaje", "DESEMBARQUE");
+        createIfNotExist("desembarque_atipico_estadistico_activo", "false", "Habilita la detección de desembarques atípicos por desviación estadística z > sigma", "DESEMBARQUE");
+        createIfNotExist("desembarque_atipico_sigma", "2.5", "Umbral sigma (desviaciones estándar) para considerar atípico un desembarque", "DESEMBARQUE");
+        createIfNotExist("desembarque_atipico_ventana_dias", "90", "Ventana de días hacia atrás para calcular la media y desviación del grupo", "DESEMBARQUE");
+        createIfNotExist("desembarque_atipico_min_muestras", "10", "Mínimo de declaraciones en el grupo para aplicar el criterio estadístico", "DESEMBARQUE");
         createIfNotExist("desembarque_fuente_recolector_activa", "true", "Computa declaraciones de recolector", "DESEMBARQUE");
         createIfNotExist("desembarque_fuente_armador_activa", "true", "Computa declaraciones de armador", "DESEMBARQUE");
         createIfNotExist("desembarque_fuente_area_activa", "true", "Computa declaraciones de área", "DESEMBARQUE");

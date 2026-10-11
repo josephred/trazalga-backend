@@ -49,4 +49,7 @@ public class ControlCuotaDiariaDTO {
     private String provinciaNombre;
     private Long regionId;
     private String regionNombre;
+
+    // TQ.3: Cantidad de declaraciones del período creadas antes de la carga de la cuota
+    private Integer declaracionesPreviasSinEvaluar;
 }

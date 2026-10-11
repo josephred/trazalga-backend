@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trazalga.api.dto.CuotaLoteDTO;
+import com.trazalga.api.dto.ResumenRecalculoCuotaDTO;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.services.CuotaExtraccionService;
 
@@ -211,5 +212,30 @@ public class CuotaExtraccionControllerMockMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].tipo").value("CREADA"));
+    }
+
+    @Test
+    @DisplayName("TC.10 MockMvc: POST /api/cuotas/{id}/recalcular-hallazgos devuelve 200 y resumen")
+    void testRecalcularHallazgos_Devuelve200YResumen() throws Exception {
+        ResumenRecalculoCuotaDTO mockResumen = ResumenRecalculoCuotaDTO.builder()
+                .cuotaId(10L)
+                .cuotaNombre("Comuna Coquimbo")
+                .declaracionesEvaluadas(5)
+                .marcasNuevas(2)
+                .marcasExistentes(1)
+                .consumoFinalKg(java.math.BigDecimal.valueOf(1250.0))
+                .limiteKg(java.math.BigDecimal.valueOf(1000.0))
+                .porcentajeConsumoFinal(125.0)
+                .marcasGeneradas(List.of())
+                .build();
+
+        when(cuotaService.recalcularHallazgos(eq(10L), any(), any())).thenReturn(mockResumen);
+
+        mockMvc.perform(post("/api/cuotas/10/recalcular-hallazgos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cuotaId").value(10))
+                .andExpect(jsonPath("$.declaracionesEvaluadas").value(5))
+                .andExpect(jsonPath("$.marcasNuevas").value(2))
+                .andExpect(jsonPath("$.porcentajeConsumoFinal").value(125.0));
     }
 }

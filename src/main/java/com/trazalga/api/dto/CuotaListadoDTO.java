@@ -25,6 +25,8 @@ public class CuotaListadoDTO {
     private String regionNombre;
     private Long provinciaId;
     private String provinciaNombre;
+    private Long amerbId;
+    private String amerbNombre;
     private Long comunaId; // comuna cabecera
     private String comunaNombre; // nombre comuna cabecera
     private Set<Long> comunaIds;
@@ -75,4 +77,7 @@ public class CuotaListadoDTO {
     private Integer personasSobreLimite;
     private Double maxPorcentaje;
     private String textoConsumoPlantilla;
+
+    // TQ.3: Cantidad de declaraciones del período creadas antes de la carga de la cuota
+    private Integer declaracionesPreviasSinEvaluar;
 }

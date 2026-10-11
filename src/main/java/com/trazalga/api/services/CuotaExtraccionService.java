@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,6 +130,25 @@ public class CuotaExtraccionService {
 
     @Autowired(required = false)
     private com.trazalga.api.services.cuotas.ResolutorImputacionTerritorial resolutorImputacion;
+
+    @Autowired(required = false)
+    @Lazy
+    private com.trazalga.api.services.cuotas.RecalculoCuotaService recalculoCuotaService;
+
+    @Transactional
+    public com.trazalga.api.dto.ResumenRecalculoCuotaDTO recalcularHallazgos(Long cuotaId, java.time.LocalDate desde, java.time.LocalDate hasta) {
+        if (recalculoCuotaService == null) {
+            throw new IllegalStateException("Servicio de recálculo de cuotas no disponible");
+        }
+        return recalculoCuotaService.recalcularHallazgos(cuotaId, desde, hasta);
+    }
+
+    public int contarDeclaracionesPreviasSinEvaluar(CuotaExtraccionModel cuota) {
+        if (recalculoCuotaService == null) {
+            return 0;
+        }
+        return recalculoCuotaService.contarDeclaracionesPreviasSinEvaluar(cuota);
+    }
 
     public com.trazalga.api.services.cuotas.AlcanceCuotaRegistry getAlcanceRegistry() {
         if (alcanceCuotaRegistry != null) {
@@ -733,7 +753,7 @@ public class CuotaExtraccionService {
         public CuotaExtraccionModel getCuotaAplicada() { return cuotaAplicada; }
     }
 
-    private boolean ambitoAplica(CuotaExtraccionModel c, String perfil) {
+    public boolean ambitoAplica(CuotaExtraccionModel c, String perfil) {
         String ambito = c.getAmbito() != null ? c.getAmbito().trim().toUpperCase() : "AREA_LIBRE";
         if ("AREA_LIBRE".equals(ambito)) {
             return "RECOLECTOR".equalsIgnoreCase(perfil) || "ARMADOR".equalsIgnoreCase(perfil);
@@ -743,19 +763,19 @@ public class CuotaExtraccionService {
         return c.getPerfil() == null || c.getPerfil().equalsIgnoreCase(perfil);
     }
 
-    private boolean especieAplica(CuotaExtraccionModel c, Long especieId) {
+    public boolean especieAplica(CuotaExtraccionModel c, Long especieId) {
         return c.getEspecie() == null || (especieId != null && c.getEspecie().getId().equals(especieId));
     }
 
-    private boolean metodoAplica(CuotaExtraccionModel c, Long extraccionTipoId) {
+    public boolean metodoAplica(CuotaExtraccionModel c, Long extraccionTipoId) {
         return c.getExtraccionTipo() == null || (extraccionTipoId != null && c.getExtraccionTipo().getId().equals(extraccionTipoId));
     }
 
-    private boolean vigenciaContiene(CuotaExtraccionModel c, java.time.LocalDate fecha) {
+    public boolean vigenciaContiene(CuotaExtraccionModel c, java.time.LocalDate fecha) {
         return vigenciaContiene(c, fecha, null);
     }
 
-    private boolean vigenciaContiene(CuotaExtraccionModel c, java.time.LocalDate fecha, java.time.LocalDate cierre) {
+    public boolean vigenciaContiene(CuotaExtraccionModel c, java.time.LocalDate fecha, java.time.LocalDate cierre) {
         if (fecha == null) return true;
         if (c.getFechaInicio() != null && fecha.isBefore(toLocalDateSafe(c.getFechaInicio()))) {
             return false;
@@ -777,11 +797,11 @@ public class CuotaExtraccionService {
         return true;
     }
 
-    private boolean amerbAplica(CuotaExtraccionModel c, Long amerbId) {
+    public boolean amerbAplica(CuotaExtraccionModel c, Long amerbId) {
         return c.getAmerb() == null || (amerbId != null && c.getAmerb().getId().equals(amerbId));
     }
 
-    private boolean usuarioAplica(CuotaExtraccionModel c, Long usuarioId) {
+    public boolean usuarioAplica(CuotaExtraccionModel c, Long usuarioId) {
         return c.getUsuario() == null || (usuarioId != null && c.getUsuario().getId().equals(usuarioId));
     }
 
@@ -1192,6 +1212,7 @@ public class CuotaExtraccionService {
                 .provinciaNombre(cuota.getProvincia() != null ? cuota.getProvincia().getNombre() : null)
                 .regionId(cuota.getRegion() != null ? cuota.getRegion().getId() : null)
                 .regionNombre(cuota.getRegion() != null ? cuota.getRegion().getNombre() : null)
+                .declaracionesPreviasSinEvaluar(contarDeclaracionesPreviasSinEvaluar(cuota))
                 .build();
 
             result.add(dto);
@@ -2038,6 +2059,10 @@ public class CuotaExtraccionService {
     }
 
     public List<CuotaListadoDTO> getListado(Integer anio, Integer mes, Long comunaId, Long extraccionTipoId, String ambito) {
+        return getListado(anio, mes, comunaId, extraccionTipoId, ambito, null);
+    }
+
+    public List<CuotaListadoDTO> getListado(Integer anio, Integer mes, Long comunaId, Long extraccionTipoId, String ambito, Long amerbId) {
         String ambitoNorm = (ambito != null && !ambito.isBlank()) ? ambito.trim().toUpperCase() : "AREA_LIBRE";
         List<CuotaExtraccionModel> todas = cuotaRepository.findAll();
 
@@ -2063,6 +2088,13 @@ public class CuotaExtraccionService {
                     if (!ambitoNorm.equals(cAmbito)) {
                         continue;
                     }
+                }
+            }
+
+            // Filtro específico por AMERB (TM.5)
+            if (amerbId != null) {
+                if (c.getAmerb() == null || !c.getAmerb().getId().equals(amerbId)) {
+                    continue;
                 }
             }
 
@@ -2160,6 +2192,8 @@ public class CuotaExtraccionService {
                     .regionNombre(nombreRegionDe(c))
                     .provinciaId(c.getProvincia() != null ? c.getProvincia().getId() : null)
                     .provinciaNombre(nombreProvinciaDe(c))
+                    .amerbId(c.getAmerb() != null ? c.getAmerb().getId() : null)
+                    .amerbNombre(c.getAmerb() != null ? c.getAmerb().getNombre() : null)
                     .esPlantilla(Boolean.TRUE.equals(c.getEsPlantilla()))
                     .usuarioId(c.getUsuario() != null ? c.getUsuario().getId() : null)
                     .usuarioNombre(c.getUsuario() != null ? ((c.getUsuario().getNombres() != null ? c.getUsuario().getNombres() : "") + " " + (c.getUsuario().getApellidop() != null ? c.getUsuario().getApellidop() : "")).trim() : null)
@@ -2194,6 +2228,7 @@ public class CuotaExtraccionService {
                     .activo(c.getActivo())
                     .alcance(describirAlcance(c))
                     .esFormatoAnterior(esFormatoAnt)
+                    .declaracionesPreviasSinEvaluar(contarDeclaracionesPreviasSinEvaluar(c))
                     .build();
 
             if (Boolean.TRUE.equals(c.getEsPlantilla()) && consumoIndividualQuery != null) {
