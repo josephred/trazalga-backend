@@ -3,6 +3,7 @@ package com.trazalga.api.services;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -294,19 +295,36 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setHumedad(request.getHumedad());
         declaracionRecolectorModel.setDesembarque(request.getDesembarque());
 
-        // Recalcular captura con autoridad del servidor
-        CalculoCapturaResult capRes = capturaService.calcular(
-                declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null,
-                declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null,
-                declaracionRecolectorModel.getFechaExtraccion(),
-                declaracionRecolectorModel.getDesembarque());
-        if (capRes.isExitoso()) {
-            declaracionRecolectorModel.setCaptura(capRes.getCaptura());
-            declaracionRecolectorModel.setFactorAplicado(capRes.getFactorAplicado());
-            declaracionRecolectorModel.setFactorConversionId(capRes.getFactorConversionId());
-        } else {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
+        // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
+        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
+                ? declaracionRecolectorModel.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null ? declaracionRecolectorModel.getComuna().getId() : null;
+        Long regionId = (declaracionRecolectorModel.getComuna() != null && declaracionRecolectorModel.getComuna().getRegion() != null)
+                ? declaracionRecolectorModel.getComuna().getRegion().getId() : null;
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("RECOLECTOR")
+                .usuarioId(declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null)
+                .especieId(declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null)
+                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null ? declaracionRecolectorModel.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracionRecolectorModel.getFechaExtraccion())
+                .fechaDeclaracion(new Date())
+                .desembarqueKg(declaracionRecolectorModel.getDesembarque())
+                .esEdicion(true)
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
+
+        declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
+        declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
+        declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
 
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
@@ -334,6 +352,11 @@ public class DeclaracionRecolectorService {
             }
         }
         populateBuzos(updated);
+
+        // TC.5: Registrar marcas no bloqueantes de forma idempotente
+        alertaTriggerService.procesarMarcas("RECOLECTOR", updated.getId(),
+                updated.getUsuario() != null ? updated.getUsuario().getId() : null,
+                resVal.getMarcas());
 
         // Notificar al destinatario que la declaración fue modificada
         if (updated.getUsuarioDestinatario() != null && updated.getUsuarioDestinatario().getId() != null) {

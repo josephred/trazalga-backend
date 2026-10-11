@@ -39,6 +39,15 @@ public class UsuarioController {
     }
     
 
+    @GetMapping("/buscar")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public List<com.trazalga.api.dto.UsuarioBusquedaDTO> buscarUsuarios(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String perfil,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return usuarioService.buscarUsuarios(q, perfil, limit);
+    }
+
     @GetMapping("/all-usuarios")
     public List<UsuarioModel> getAllUsuarios() {
         return usuarioService.getAllUsuarios();

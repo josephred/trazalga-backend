@@ -26,4 +26,5 @@ public class ContextoDeclaracion {
     private Date fechaExtraccion;
     private Date fechaDeclaracion;
     private BigDecimal desembarqueKg;
+    private Boolean esEdicion;
 }

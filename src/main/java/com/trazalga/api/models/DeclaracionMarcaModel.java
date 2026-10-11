@@ -56,6 +56,25 @@ public class DeclaracionMarcaModel {
     @Builder.Default
     private String estadoGestion = "PENDIENTE"; // PENDIENTE | DERIVADA_CITACION | RESUELTA
 
+    @Column(name = "criterio_parametro", length = 80)
+    private String criterioParametro;
+
+    @Column(name = "criterio_umbral", length = 40)
+    private String criterioUmbral;
+
+    @Column(name = "criterio_valor", length = 40)
+    private String criterioValor;
+
+    @Column(name = "criterio_unidad", length = 20)
+    private String criterioUnidad;
+
+    @Column(name = "origen", nullable = false, length = 20)
+    @Builder.Default
+    private String origen = "VALIDACION"; // VALIDACION | BARRIDO | RECALCULO
+
+    @Column(name = "clave_idempotencia", length = 160, unique = true)
+    private String claveIdempotencia;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", nullable = false, updatable = false)
     private Date createdAt;

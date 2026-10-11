@@ -139,7 +139,6 @@ public class CuotaAreaLibreConsumoTest {
         cuotaComunalBarreteado.setPeriodo("DIARIO");
         cuotaComunalBarreteado.setLimiteKg(10000.0); // 10.000 kg límite
         cuotaComunalBarreteado.setModoAccion("SOLO_ALERTA");
-        cuotaComunalBarreteado.setEstado("ABIERTA");
         cuotaComunalBarreteado.setActivo(true);
     }
 
@@ -201,7 +200,6 @@ public class CuotaAreaLibreConsumoTest {
         cuotaAmerb.setMetrica("DESEMBARQUE");
         cuotaAmerb.setPeriodo("DIARIO");
         cuotaAmerb.setLimiteKg(15000.0);
-        cuotaAmerb.setEstado("ABIERTA");
         cuotaAmerb.setActivo(true);
 
         Query queryArea = mock(Query.class);

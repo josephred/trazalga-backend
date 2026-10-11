@@ -25,9 +25,10 @@ public class ResultadoValidacion {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class MarcaItem {
-        private String marca; // EN_VEDA | LED_EXCEDIDO | CUOTA_EXCEDIDA | POSTERIOR_CIERRE | DESEMBARQUE_ATIPICO
+        private String marca; // EN_VEDA | LED_EXCEDIDO | CUOTA_EXCEDIDA | POSTERIOR_CIERRE | DECLARACION_EXTEMPORANEA | DESEMBARQUE_ATIPICO
         private String detalle;
         private Long reglaId;
+        private com.trazalga.api.services.hallazgos.CriterioHallazgo criterio;
     }
 
     private DecisionValidacion decision;

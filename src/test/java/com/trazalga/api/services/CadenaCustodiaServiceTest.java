@@ -46,7 +46,7 @@ class CadenaCustodiaServiceTest {
                                   Long espId, String espNom,
                                   Long humId, String humNom,
                                   String rutDest, String nomDest) {
-        Object[] row = new Object[18];
+        Object[] row = new Object[39];
         row[0] = id;
         row[1] = nombres;
         row[2] = apellidop;
@@ -63,8 +63,8 @@ class CadenaCustodiaServiceTest {
         row[13] = espNom;
         row[14] = humId;
         row[15] = humNom;
-        row[16] = rutDest;
-        row[17] = nomDest;
+        row[37] = rutDest;
+        row[38] = nomDest;
         return row;
     }
 

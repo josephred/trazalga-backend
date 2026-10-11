@@ -139,10 +139,12 @@ public class CuotaExtraccionControllerMockMvcTest {
                 .limiteKg(100_000.0)
                 .build();
 
-        when(cuotaService.save(any(CuotaExtraccionModel.class))).thenReturn(guardada);
+        when(cuotaService.save(any(com.trazalga.api.dto.CuotaRequestDTO.class))).thenReturn(guardada);
 
         String payload = """
         {
+            "especieId": 1,
+            "extraccionTipoId": 10,
             "ambito": "AREA_LIBRE",
             "nivelAgregacion": "COMUNA",
             "periodo": "MENSUAL",
@@ -158,5 +160,56 @@ public class CuotaExtraccionControllerMockMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(50))
                 .andExpect(jsonPath("$.fechaInicio").value("2026-03-01"));
+    }
+
+    @Test
+    @DisplayName("TC.2 MockMvc: PUT /api/cuotas/{id}/cerrar acepta cuerpo opcional")
+    void testCerrarCuota_CuerpoOpcional() throws Exception {
+        CuotaExtraccionModel cerrada = CuotaExtraccionModel.builder()
+                .id(10L)
+                .estado("CERRADA")
+                .build();
+
+        when(cuotaService.cerrarCuota(eq(10L), eq("ADMINISTRATIVO"), eq("Cierre de prueba"))).thenReturn(cerrada);
+
+        String payload = """
+        {
+            "motivo": "ADMINISTRATIVO",
+            "observacion": "Cierre de prueba"
+        }
+        """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cuotas/10/cerrar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.estado").value("CERRADA"));
+    }
+
+    @Test
+    @DisplayName("TC.2 MockMvc: PUT /api/cuotas/{id}/reabrir sin motivo devuelve 422")
+    void testReabrirCuota_SinMotivoDevuelve422() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cuotas/10/reabrir")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("TC.2 MockMvc: GET /api/cuotas/{id}/eventos devuelve lista")
+    void testGetEventos_DevuelveLista() throws Exception {
+        com.trazalga.api.models.CuotaExtraccionEventoModel ev = com.trazalga.api.models.CuotaExtraccionEventoModel.builder()
+                .id(1L)
+                .tipo("CREADA")
+                .motivo("INICIO")
+                .build();
+
+        when(cuotaService.getEventos(10L)).thenReturn(List.of(ev));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/cuotas/10/eventos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("CREADA"));
     }
 }

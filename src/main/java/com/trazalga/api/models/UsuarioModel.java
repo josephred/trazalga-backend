@@ -61,4 +61,18 @@ public class UsuarioModel {
             this.estado = "ACTIVO";
         }
     }
+
+    public String getNombreCompleto() {
+        StringBuilder sb = new StringBuilder();
+        if (nombres != null) sb.append(nombres.trim());
+        if (apellidop != null && !apellidop.isBlank()) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(apellidop.trim());
+        }
+        if (apellidom != null && !apellidom.isBlank()) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(apellidom.trim());
+        }
+        return sb.toString();
+    }
 }

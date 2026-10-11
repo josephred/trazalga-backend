@@ -379,13 +379,13 @@ public class CuotaMultiComunaVigenciaTest {
         CuotaExtraccionService.FiltroTerritorialCuota filtroRecolector =
                 cuotaExtraccionService.construirFiltroTerritorial(c, "declaracion_recolector", null);
 
-        assertTrue(filtroRecolector.getSqlFragment().contains("u.comuna_id IN (:filtroComunaIds)"));
+        assertTrue(filtroRecolector.getSqlFragment().contains("c.id IN (:filtroComunaIds)"));
         assertEquals(Set.of(4101L, 4102L), filtroRecolector.getParametros().get("filtroComunaIds"));
 
         CuotaExtraccionService.FiltroTerritorialCuota filtroArmador =
                 cuotaExtraccionService.construirFiltroTerritorial(c, "declaracion_armador", null);
 
-        assertTrue(filtroArmador.getSqlFragment().contains("d.comuna_id IN (:filtroComunaIds)"));
+        assertTrue(filtroArmador.getSqlFragment().contains("c.id IN (:filtroComunaIds)"));
         assertEquals(Set.of(4101L, 4102L), filtroArmador.getParametros().get("filtroComunaIds"));
     }
 

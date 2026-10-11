@@ -28,10 +28,13 @@ public class AlertaTriggerService {
     @Autowired
     private IUsuarioRepository usuarioRepository;
 
+    @Autowired
+    private com.trazalga.api.services.hallazgos.HallazgoService hallazgoService;
+
     /**
-     * Procesa las marcas resultantes de la validación del servidor:
-     * 1. Las persiste en declaracion_marca para auditoría y reportes.
-     * 2. Despacha notificaciones push al declarante y administradores según la configuración.
+     * Procesa las marcas resultantes de la validación del servidor (Fachada TA.5):
+     * Delega en HallazgoService para persistencia idempotente y emisión de eventos
+     * de dominio notificados AFTER_COMMIT.
      */
     public void procesarMarcas(String declaracionTipo, Long declaracionId, Long usuarioDeclaradorId, List<MarcaItem> marcas) {
         if (marcas == null || marcas.isEmpty()) {
@@ -39,50 +42,18 @@ public class AlertaTriggerService {
         }
 
         for (MarcaItem m : marcas) {
-            // 1. Persistir marca
-            declaracionMarcaService.marcar(
+            String reglaStr = m.getReglaId() != null ? String.valueOf(m.getReglaId()) : "GENERAL";
+            hallazgoService.registrar(
                     declaracionTipo,
                     declaracionId,
                     m.getMarca(),
+                    reglaStr,
+                    m.getCriterio(),
                     m.getDetalle(),
-                    m.getReglaId());
-
-            // 2. Notificar según tipo de marca
-            switch (m.getMarca()) {
-                case "EN_VEDA" -> {
-                    Optional<ConfiguracionAlertaModel> cfg = configuracionService.getByTipo("EXTRACCION_VEDA");
-                    if (cfg.isPresent() && Boolean.TRUE.equals(cfg.get().getActivo())) {
-                        notificarAlerta(usuarioDeclaradorId, "¡Alerta de Veda!", m.getDetalle());
-                    }
-                }
-                case "CUOTA_EXCEDIDA" -> {
-                    Optional<ConfiguracionAlertaModel> cfg = configuracionService.getByTipo("LIMITE_CUOTA");
-                    if (cfg.isPresent() && Boolean.TRUE.equals(cfg.get().getActivo())) {
-                        notificarAlerta(usuarioDeclaradorId, "Alerta de Cuota Superada", m.getDetalle());
-                    }
-                }
-                case "POSTERIOR_CIERRE" -> {
-                    notificarAlerta(usuarioDeclaradorId, "Declaración Post-Cierre de Cuota", m.getDetalle());
-                }
-                case "LED_EXCEDIDO" -> {
-                    Map<String, String> data = new HashMap<>();
-                    data.put("tipo", "LED_EXCEDIDO");
-                    data.put("marca", "LED_EXCEDIDO");
-                    data.put("enlace", "/alertas?marca=LED_EXCEDIDO");
-                    if (declaracionId != null) {
-                        data.put("declaracionId", String.valueOf(declaracionId));
-                    }
-
-                    // R4.5: Notificar al perfil fiscalizador con enlace a la vista de hallazgos
-                    notificationService.notificarFiscalizadores(null, "Alerta Límite Diario (LED) Superado", m.getDetalle(), data);
-                    if (usuarioDeclaradorId != null) {
-                        notificationService.sendPushNotificationToUser(usuarioDeclaradorId, "Alerta Límite Diario (LED) Superado", m.getDetalle(), data);
-                    }
-                }
-                case "DESEMBARQUE_ATIPICO" -> {
-                    notificarSoloAdmins("Aviso de Desembarque Atípico", m.getDetalle());
-                }
-            }
+                    "VALIDACION",
+                    usuarioDeclaradorId,
+                    null
+            );
         }
     }
 

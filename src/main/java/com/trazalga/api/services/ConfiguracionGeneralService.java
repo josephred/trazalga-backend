@@ -14,6 +14,10 @@ public class ConfiguracionGeneralService {
     @Autowired
     private ConfiguracionGeneralRepository repository;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
     @PostConstruct
     public void initDefaults() {
         // Dispositivo / Rastreo
@@ -37,7 +41,7 @@ public class ConfiguracionGeneralService {
         createIfNotExist("cuota_desvio_velocidad_pct", "25.0", "Desvío tolerado entre % de consumo y % de tiempo transcurrido", "CUOTA");
         createIfNotExist("cuota_dias_previos_expiracion", "5", "Días antes del fin de vigencia para avisar expiración de cuota", "CUOTA");
         createIfNotExist("cuota_accion_post_cierre", "ALERTA_CRITICA", "Acción ante declaración post cierre administrativo (ALERTA_CRITICA o BLOQUEO_TOTAL)", "CUOTA");
-        createIfNotExist("cuota_accion_exceso_limite", "ALERTA_EXCESO", "Acción ante exceso de cuota (ALERTA_EXCESO o BLOQUEO_DECLARACION)", "CUOTA");
+        createIfNotExist("cuota_accion_exceso_limite", "ALERTA_EXCESO", "[DEPRECADO] Reemplazado por modo_accion en cada cuota y cuota_umbral_restante_pct", "CUOTA");
 
         // 4. Vedas
         createIfNotExist("veda_modo_operacion", "BLOQUEO_ESTRICTO", "Modo de operación ante veda (BLOQUEO_ESTRICTO o ALERTA_FISCALIZACION)", "VEDA");
@@ -233,6 +237,13 @@ public class ConfiguracionGeneralService {
         if (cuotaExtraccionService != null && clave != null && clave.startsWith("cuota_")) {
             try {
                 cuotaExtraccionService.invalidarCacheConsumo();
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (parametrosService != null) {
+            try {
+                parametrosService.invalidar();
             } catch (Exception ignored) {
             }
         }

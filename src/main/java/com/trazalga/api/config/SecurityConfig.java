@@ -15,12 +15,14 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import com.trazalga.api.security.JwtRequestFilter;
 
 import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Autowired
@@ -66,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/factores-conversion/**", "/factorconversion/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/cuotas/*/cerrar", "/cuota/*/cerrar").hasAnyRole("ADMIN", "FISCALIZADOR")
                         .requestMatchers(HttpMethod.POST, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/cuotas/**", "/cuota/**").hasRole("ADMIN")
@@ -84,8 +87,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**", "/admin/**").hasRole("ADMIN")
 
-                        // 5. Gestión y resolución de hallazgos: ADMINISTRADOR o FISCALIZADOR
+                        // 5. Hallazgos e indicadores normativos (TA.3 / TX.1): ADMIN, FISCALIZADOR o AUDITOR
+                        .requestMatchers("/api/hallazgos/**", "/hallazgos/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 6. Reportes analíticos de trazabilidad (TX.1): ADMIN, FISCALIZADOR o AUDITOR
+                        .requestMatchers(HttpMethod.GET, "/api/reportes/**", "/reportes/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 7. Cuotas (consulta): ADMIN, FISCALIZADOR o AUDITOR (TX.1)
+                        .requestMatchers(HttpMethod.GET, "/api/cuotas/**", "/cuota/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+                        .requestMatchers(HttpMethod.GET, "/api/usuarios/buscar", "/usuario/buscar").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 8. Gestión y resolución de hallazgos/marcas: ADMINISTRADOR o FISCALIZADOR (TX.1)
                         .requestMatchers(HttpMethod.PUT, 
                                 "/api/declaracion-marcas/*/resolver", 
                                 "/declaracion-marcas/*/resolver", 
@@ -95,12 +109,29 @@ public class SecurityConfig {
                                 "/api/declaracion-marcas/*/derivar-citacion", 
                                 "/declaracion-marcas/*/derivar-citacion", 
                                 "/declaracionmarca/*/derivar-citacion",
-                                "/api/declaracion-marcas/**/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
+                                "/api/declaracion-marcas/**/derivar-citacion",
+                                "/api/declaracion-marcas/declaracion/**/derivar-citacion",
+                                "/declaracion-marcas/declaracion/**/derivar-citacion",
+                                "/declaracionmarca/declaracion/**/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
+                        .requestMatchers(HttpMethod.PUT, 
+                                "/api/declaracion-marcas/*/reabrir", 
+                                "/declaracion-marcas/*/reabrir", 
+                                "/declaracionmarca/*/reabrir",
+                                "/api/declaracion-marcas/**/reabrir").hasAnyRole("ADMIN", "FISCALIZADOR")
 
-                        // 6. Consultas de trazabilidad y búsqueda por folio: ADMINISTRADOR, FISCALIZADOR o AUDITOR (T2.2)
+                        // 9. Consulta de marcas: ADMINISTRADOR, FISCALIZADOR o AUDITOR (TX.1)
+                        .requestMatchers(HttpMethod.GET, 
+                                "/api/declaracion-marcas/**", 
+                                "/declaracion-marcas/**", 
+                                "/declaracionmarca/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 10. Búsqueda de usuarios con RUT y datos personales (TX.1)
+                        .requestMatchers(HttpMethod.GET, "/api/usuarios/buscar", "/usuario/buscar").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
+                        // 11. Consultas de trazabilidad y búsqueda por folio: ADMINISTRADOR, FISCALIZADOR o AUDITOR (T2.2)
                         .requestMatchers("/api/consultas/**", "/consultas/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
 
-                        // 7. Todo lo demás por ahora permitido para compatibilidad operativa
+                        // 12. Todo lo demás permitido para compatibilidad operativa de la app móvil
                         .anyRequest().permitAll()
                 )
                 .httpBasic(basic -> basic.disable())

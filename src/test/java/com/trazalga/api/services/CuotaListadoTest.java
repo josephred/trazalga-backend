@@ -173,7 +173,6 @@ public class CuotaListadoTest {
         c1.setFechaFin(Date.valueOf(LocalDate.of(2026, 3, 31)));
         c1.setLimiteKg(100000.0);
         c1.setActivo(true);
-        c1.setEstado("ABIERTA");
 
         // Cuota 2: Abril 2026, La Serena, Varado
         CuotaExtraccionModel c2 = new CuotaExtraccionModel();
@@ -188,7 +187,6 @@ public class CuotaListadoTest {
         c2.setFechaFin(Date.valueOf(LocalDate.of(2026, 4, 30)));
         c2.setLimiteKg(80000.0);
         c2.setActivo(true);
-        c2.setEstado("ABIERTA");
 
         // Cuota 3: AMERB (debe ocultarse con ámbito AREA_LIBRE)
         CuotaExtraccionModel cAmerb = new CuotaExtraccionModel();

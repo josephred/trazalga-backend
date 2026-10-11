@@ -21,4 +21,18 @@ public interface ICuotaExtraccionRepository extends JpaRepository<CuotaExtraccio
     List<CuotaExtraccionModel> findByEsPlantillaTrueAndActivoTrue();
 
     List<CuotaExtraccionModel> findByAmbitoAndActivoTrue(String ambito);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT DISTINCT c FROM CuotaExtraccionModel c " +
+        "LEFT JOIN FETCH c.especie " +
+        "LEFT JOIN FETCH c.extraccionTipo " +
+        "LEFT JOIN FETCH c.humedadEstado " +
+        "LEFT JOIN FETCH c.region " +
+        "LEFT JOIN FETCH c.provincia " +
+        "LEFT JOIN FETCH c.comuna " +
+        "LEFT JOIN FETCH c.usuario " +
+        "LEFT JOIN FETCH c.amerb " +
+        "WHERE c.activo = true AND (c.estado IS NULL OR UPPER(c.estado) != 'CERRADA')"
+    )
+    List<CuotaExtraccionModel> findActivasConRelaciones();
 }

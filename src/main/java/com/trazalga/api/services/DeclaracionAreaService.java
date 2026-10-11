@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -368,19 +369,6 @@ public class DeclaracionAreaService {
                     .ifPresent(declaracion::setExtraccionTipo);
         }
 
-        BigDecimal desBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : null;
-        CalculoCapturaResult capRes = capturaService.calcular(
-                declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null,
-                declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null,
-                declaracion.getFechaExtraccion(),
-                desBd);
-        if (capRes.isExitoso()) {
-            declaracion.setCaptura(capRes.getCaptura().doubleValue());
-            declaracion.setFactorAplicado(capRes.getFactorAplicado());
-            declaracion.setFactorConversionId(capRes.getFactorConversionId());
-        } else {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
-        }
         declaracion.setTipoDestinatario(request.getTipoDestinatario());
         declaracion.setUsuarioDestinatario(request.getUsuarioDestinatario());
         declaracion.setComposicion(request.getComposicion());
@@ -391,6 +379,55 @@ public class DeclaracionAreaService {
         declaracion.setBuzo(request.getBuzo());
         // Asegurarse de actualizar también el nuevo campo si es necesario
         declaracion.setDeclaracionDestinatario(request.getDeclaracionDestinatario());
+
+        // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
+        Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
+                ? declaracion.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = null;
+        Long regionId = null;
+        if (declaracion.getAmerb() != null && declaracion.getAmerb().getComuna() != null) {
+            comunaDesembarqueId = declaracion.getAmerb().getComuna().getId();
+            if (declaracion.getAmerb().getComuna().getRegion() != null) {
+                regionId = declaracion.getAmerb().getComuna().getRegion().getId();
+            }
+        }
+        if (regionId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
+            regionId = declaracion.getCaleta().getComuna().getRegion().getId();
+        }
+        if (comunaDesembarqueId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null) {
+            comunaDesembarqueId = declaracion.getCaleta().getComuna().getId();
+        }
+
+        BigDecimal desembarqueBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : BigDecimal.ZERO;
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("AREA")
+                .usuarioId(declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null)
+                .buzoId(declaracion.getBuzo() != null ? declaracion.getBuzo().getId() : null)
+                .embarcacionId(declaracion.getEmbarcacion() != null ? declaracion.getEmbarcacion().getId() : null)
+                .amerbId(declaracion.getAmerb() != null ? declaracion.getAmerb().getId() : null)
+                .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
+                .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracion.getFechaExtraccion())
+                .fechaDeclaracion(new Date())
+                .desembarqueKg(desembarqueBd)
+                .esEdicion(true)
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
+        }
+
+        if (resVal.getCapturaCalculada() != null) {
+            declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
+        }
+        declaracion.setFactorAplicado(resVal.getFactorAplicado());
+        declaracion.setFactorConversionId(resVal.getFactorConversionId());
 
         DeclaracionAreaModel updatedDeclaracion = declaracionAreaRepository.save(declaracion);
 
@@ -415,6 +452,11 @@ public class DeclaracionAreaService {
         }
 
         populateBuzos(updatedDeclaracion);
+
+        // TC.5: Registrar marcas no bloqueantes de forma idempotente
+        alertaTriggerService.procesarMarcas("AREA", updatedDeclaracion.getId(),
+                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                resVal.getMarcas());
 
         // Notificar al destinatario que la declaración fue modificada
         if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {

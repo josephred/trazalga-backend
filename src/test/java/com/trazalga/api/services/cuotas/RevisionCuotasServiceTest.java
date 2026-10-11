@@ -1,4 +1,4 @@
-package com.trazalga.api.tasks;
+package com.trazalga.api.services.cuotas;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -7,7 +7,6 @@ import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -20,31 +19,33 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.trazalga.api.dto.ControlCuotaDiariaDTO;
+import com.trazalga.api.models.AvisoEnviadoModel;
 import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.ExtraccionTipoModel;
 import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IAvisoEnviadoRepository;
 import com.trazalga.api.repositories.ICuotaExtraccionRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.ConfiguracionGeneralService;
 import com.trazalga.api.services.CuotaExtraccionService;
 import com.trazalga.api.services.NotificationService;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
-
 /**
- * T1.7: Pruebas de aceptación para tablero y alertas programadas
- * operando exclusivamente sobre cuotas vigentes.
+ * Pruebas unitarias para RevisionCuotasService (TC.6 / K3).
+ * Verifica cuotas vigentes, reglas de expiración, no repetición de avisos (idempotencia)
+ * y cierre automático en modo de bloqueo ante agotamiento.
  */
 @ExtendWith(MockitoExtension.class)
-public class AlertaProgramadaTaskCuotasVigentesTest {
+public class RevisionCuotasServiceTest {
 
     @Mock
     private ICuotaExtraccionRepository cuotaRepository;
+
+    @Mock
+    private IAvisoEnviadoRepository avisoEnviadoRepository;
 
     @Mock
     private CuotaExtraccionService cuotaExtraccionService;
@@ -59,10 +60,10 @@ public class AlertaProgramadaTaskCuotasVigentesTest {
     private IUsuarioRepository usuarioRepository;
 
     @Mock
-    private EntityManager entityManager;
+    private com.trazalga.api.repositories.ICuotaExtraccionEventoRepository cuotaEventoRepository;
 
     @InjectMocks
-    private AlertaProgramadaTask task;
+    private RevisionCuotasService service;
 
     private RegionModel regionCoquimbo;
     private ComunaModel comunaLaSerena;
@@ -90,6 +91,7 @@ public class AlertaProgramadaTaskCuotasVigentesTest {
             }
             return Collections.emptySet();
         });
+        lenient().when(avisoEnviadoRepository.existsById(anyString())).thenReturn(false);
     }
 
     private CuotaExtraccionModel crearCuotaMes(long id, int anio, int mes) {
@@ -114,42 +116,40 @@ public class AlertaProgramadaTaskCuotasVigentesTest {
     }
 
     @Test
-    @DisplayName("T1.7: Una cuota de marzo excedida no genera notificaciones en octubre")
+    @DisplayName("TC.6: Una cuota de marzo expirada no genera notificaciones en octubre")
     void testCuotaMarzoExcedida_NoGeneraNotificacionesEnOctubre() {
         CuotaExtraccionModel cuotaMarzo = crearCuotaMes(3L, 2026, 3);
-        when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cuotaMarzo));
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(cuotaMarzo));
 
         LocalDate hoyOctubre = LocalDate.of(2026, 10, 15);
         Date hoyDate = Date.valueOf(hoyOctubre);
 
-        task.revisarCuotas(hoyDate, hoyOctubre);
+        int procesadas = service.revisar(hoyOctubre, hoyDate);
 
-        // No debe haberse enviado ninguna notificación porque marzo expiró
+        assertEquals(0, procesadas);
         verify(notificationService, never()).sendPushNotificationToUser(anyLong(), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("T1.7: La cuota de octubre no avisa expiración si existe la cuota sucesora de noviembre")
+    @DisplayName("TC.6: La cuota de octubre no avisa expiración si existe la cuota sucesora de noviembre")
     void testCuotaOctubreConSucesoraNoviembre_NoAvisaExpiracion() {
         CuotaExtraccionModel cuotaOctubre = crearCuotaMes(10L, 2026, 10);
         CuotaExtraccionModel cuotaNoviembre = crearCuotaMes(11L, 2026, 11);
 
-        when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cuotaOctubre, cuotaNoviembre));
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(cuotaOctubre, cuotaNoviembre));
 
-        // 28 de octubre: 3 días antes del fin de vigencia (31 de octubre), dentro del umbral de 5 días
         LocalDate hoy28Oct = LocalDate.of(2026, 10, 28);
         Date hoyDate = Date.valueOf(hoy28Oct);
 
         when(cuotaExtraccionService.calcularLimiteEfectivo(eq(cuotaOctubre), any(Date.class)))
                 .thenReturn(BigDecimal.valueOf(10_000.0));
-        // Consumo normal del 50%, no dispara alerta de saldo
         when(cuotaExtraccionService.calcularConsumoAcumulado(eq(cuotaOctubre), any(Date.class)))
                 .thenReturn(BigDecimal.valueOf(5_000.0));
         when(cuotaExtraccionService.describirAlcance(cuotaOctubre)).thenReturn("Comuna La Serena");
 
-        task.revisarCuotas(hoyDate, hoy28Oct);
+        int procesadas = service.revisar(hoy28Oct, hoyDate);
 
-        // Al existir cuota de noviembre, se suprime el aviso de expiración
+        assertEquals(1, procesadas);
         verify(notificationService, never()).sendPushNotificationToUser(
                 anyLong(),
                 contains("Expiración"),
@@ -158,13 +158,12 @@ public class AlertaProgramadaTaskCuotasVigentesTest {
     }
 
     @Test
-    @DisplayName("T1.7: La cuota de diciembre, sin sucesora para enero, sí avisa expiración")
+    @DisplayName("TC.6: La cuota de diciembre, sin sucesora para enero, sí avisa expiración")
     void testCuotaDiciembreSinSucesora_SiAvisaExpiracion() {
         CuotaExtraccionModel cuotaDiciembre = crearCuotaMes(12L, 2026, 12);
 
-        when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cuotaDiciembre));
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(cuotaDiciembre));
 
-        // 28 de diciembre: 3 días antes del término (31 de diciembre)
         LocalDate hoy28Dic = LocalDate.of(2026, 12, 28);
         Date hoyDate = Date.valueOf(hoy28Dic);
 
@@ -174,13 +173,68 @@ public class AlertaProgramadaTaskCuotasVigentesTest {
                 .thenReturn(BigDecimal.valueOf(5_000.0));
         when(cuotaExtraccionService.describirAlcance(cuotaDiciembre)).thenReturn("Comuna La Serena");
 
-        task.revisarCuotas(hoyDate, hoy28Dic);
+        int procesadas = service.revisar(hoy28Dic, hoyDate);
 
-        // Sin sucesora contigua para el 1 de enero, debe enviar aviso de expiración
+        assertEquals(1, procesadas);
         verify(notificationService, atLeastOnce()).sendPushNotificationToUser(
                 eq(1L),
                 contains("Aviso de Expiración de Cuota"),
                 contains("vencerá en 3 día(s)")
         );
+        verify(avisoEnviadoRepository).save(any(AvisoEnviadoModel.class));
+    }
+
+    @Test
+    @DisplayName("TC.6: Idempotencia - No envía aviso si ya fue registrado previamente en aviso_enviado")
+    void testAvisoIdempotente_NoEnviaRepetido() {
+        CuotaExtraccionModel cuotaDiciembre = crearCuotaMes(12L, 2026, 12);
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(cuotaDiciembre));
+
+        LocalDate hoy28Dic = LocalDate.of(2026, 12, 28);
+        Date hoyDate = Date.valueOf(hoy28Dic);
+
+        when(cuotaExtraccionService.calcularLimiteEfectivo(eq(cuotaDiciembre), any(Date.class)))
+                .thenReturn(BigDecimal.valueOf(10_000.0));
+        when(cuotaExtraccionService.calcularConsumoAcumulado(eq(cuotaDiciembre), any(Date.class)))
+                .thenReturn(BigDecimal.valueOf(5_000.0));
+        when(cuotaExtraccionService.describirAlcance(cuotaDiciembre)).thenReturn("Comuna La Serena");
+
+        // Simular que el aviso ya fue enviado anteriormente
+        when(avisoEnviadoRepository.existsById("CUOTA:12:VENCIMIENTO:0")).thenReturn(true);
+
+        service.revisar(hoy28Dic, hoyDate);
+
+        // No debe reenviar la notificación push
+        verify(notificationService, never()).sendPushNotificationToUser(
+                anyLong(),
+                contains("Aviso de Expiración de Cuota"),
+                anyString()
+        );
+    }
+
+    @Test
+    @DisplayName("TC.6: Cuota agotada en modo BLOQUEO_DECLARACION se cierra automáticamente con motivo AGOTAMIENTO")
+    void testCuotaAgotada_ModoBloqueo_CierraAutomaticamente() {
+        CuotaExtraccionModel cuota = crearCuotaMes(15L, 2026, 10);
+        cuota.setModoAccion("BLOQUEO_DECLARACION");
+
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(cuota));
+
+        LocalDate hoy15Oct = LocalDate.of(2026, 10, 15);
+        Date hoyDate = Date.valueOf(hoy15Oct);
+
+        when(cuotaExtraccionService.calcularLimiteEfectivo(eq(cuota), any(Date.class)))
+                .thenReturn(BigDecimal.valueOf(10_000.0));
+        // Consumido 10.500 kg -> Agotada
+        when(cuotaExtraccionService.calcularConsumoAcumulado(eq(cuota), any(Date.class)))
+                .thenReturn(BigDecimal.valueOf(10_500.0));
+        when(cuotaExtraccionService.describirAlcance(cuota)).thenReturn("Comuna La Serena");
+
+        service.revisar(hoy15Oct, hoyDate);
+
+        assertEquals("CERRADA", cuota.getEstado());
+        assertEquals("AGOTAMIENTO", cuota.getMotivoCierre());
+        assertNotNull(cuota.getFechaCierreAutomatico());
+        verify(cuotaRepository).save(cuota);
     }
 }

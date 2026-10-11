@@ -315,6 +315,10 @@ public class CadenaCustodiaService {
     // CONSULTAS POR TIPO DE ESLABÓN (BATCH)
     // =========================================================================
 
+    private static Object getCol(Object[] r, int idx) {
+        return (r != null && idx >= 0 && idx < r.length) ? r[idx] : null;
+    }
+
     private Map<Long, RawNodeData> fetchBatchNodes(String tipoStr, Collection<Long> ids) {
         Map<Long, RawNodeData> map = new HashMap<>();
         if (ids == null || ids.isEmpty()) {
@@ -477,46 +481,47 @@ public class CadenaCustodiaService {
             List<Object[]> rows = query.getResultList();
 
             for (Object[] r : rows) {
-                Long nid = ((Number) r[0]).longValue();
-                String actor = (r[1] != null ? r[1].toString() : "") + " " + (r[2] != null ? r[2].toString() : "");
-                String rut = r[3] != null ? r[3].toString() : "";
-                Date d = toDate(r[4]);
-                BigDecimal cant = r[5] != null ? new BigDecimal(r[5].toString()) : BigDecimal.ZERO;
-                String folio = r[6] != null ? r[6].toString() : "";
-                Long destId = r[7] != null ? ((Number) r[7]).longValue() : null;
-                String destTipo = r[8] != null ? r[8].toString() : null;
-                String decSel = r[9] != null ? r[9].toString() : null;
-                String hora = r[10] != null ? r[10].toString() : null;
-                Long uDestId = r[11] != null ? ((Number) r[11]).longValue() : null;
-                Long espId = r[12] != null ? ((Number) r[12]).longValue() : null;
-                String espNom = r[13] != null ? r[13].toString() : null;
-                Long humId = r[14] != null ? ((Number) r[14]).longValue() : null;
-                String humNom = r[15] != null ? r[15].toString() : null;
+                Long nid = getCol(r, 0) != null ? ((Number) getCol(r, 0)).longValue() : null;
+                if (nid == null) continue;
+                String actor = (getCol(r, 1) != null ? getCol(r, 1).toString() : "") + " " + (getCol(r, 2) != null ? getCol(r, 2).toString() : "");
+                String rut = getCol(r, 3) != null ? getCol(r, 3).toString() : "";
+                Date d = toDate(getCol(r, 4));
+                BigDecimal cant = getCol(r, 5) != null ? new BigDecimal(getCol(r, 5).toString()) : BigDecimal.ZERO;
+                String folio = getCol(r, 6) != null ? getCol(r, 6).toString() : "";
+                Long destId = getCol(r, 7) != null ? ((Number) getCol(r, 7)).longValue() : null;
+                String destTipo = getCol(r, 8) != null ? getCol(r, 8).toString() : null;
+                String decSel = getCol(r, 9) != null ? getCol(r, 9).toString() : null;
+                String hora = getCol(r, 10) != null ? getCol(r, 10).toString() : null;
+                Long uDestId = getCol(r, 11) != null ? ((Number) getCol(r, 11)).longValue() : null;
+                Long espId = getCol(r, 12) != null ? ((Number) getCol(r, 12)).longValue() : null;
+                String espNom = getCol(r, 13) != null ? getCol(r, 13).toString() : null;
+                Long humId = getCol(r, 14) != null ? ((Number) getCol(r, 14)).longValue() : null;
+                String humNom = getCol(r, 15) != null ? getCol(r, 15).toString() : null;
 
-                String codSerna = r[16] != null ? r[16].toString() : null;
-                String calNom = r[17] != null ? r[17].toString() : null;
-                String comNom = r[18] != null ? r[18].toString() : null;
-                String regNom = r[19] != null ? r[19].toString() : null;
-                String varNom = r[20] != null ? r[20].toString() : null;
-                String extNom = r[21] != null ? r[21].toString() : null;
-                Double lat = r[22] != null ? ((Number) r[22]).doubleValue() : null;
-                Double lon = r[23] != null ? ((Number) r[23]).doubleValue() : null;
-                String est = r[24] != null ? r[24].toString() : null;
-                String humHigro = r[25] != null ? r[25].toString() : null;
-                String nDestDir = r[26] != null ? r[26].toString() : null;
-                String vehiculo = r[27] != null ? r[27].toString() : null;
-                String pat = r[28] != null ? r[28].toString() : null;
-                String patCarro = r[29] != null ? r[29].toString() : null;
-                String choferNom = r[30] != null ? r[30].toString() : null;
-                String choferRut = r[31] != null ? r[31].toString() : null;
-                String embNom = r[32] != null ? r[32].toString() : null;
-                String buzoNom = r[33] != null ? r[33].toString() : null;
-                String dtTipo = r[34] != null ? r[34].toString() : null;
-                String dtNum = r[35] != null ? r[35].toString() : null;
-                Date dtFecha = toDate(r[36]);
+                String codSerna = getCol(r, 16) != null ? getCol(r, 16).toString() : null;
+                String calNom = getCol(r, 17) != null ? getCol(r, 17).toString() : null;
+                String comNom = getCol(r, 18) != null ? getCol(r, 18).toString() : null;
+                String regNom = getCol(r, 19) != null ? getCol(r, 19).toString() : null;
+                String varNom = getCol(r, 20) != null ? getCol(r, 20).toString() : null;
+                String extNom = getCol(r, 21) != null ? getCol(r, 21).toString() : null;
+                Double lat = getCol(r, 22) != null ? ((Number) getCol(r, 22)).doubleValue() : null;
+                Double lon = getCol(r, 23) != null ? ((Number) getCol(r, 23)).doubleValue() : null;
+                String est = getCol(r, 24) != null ? getCol(r, 24).toString() : null;
+                String humHigro = getCol(r, 25) != null ? getCol(r, 25).toString() : null;
+                String nDestDir = getCol(r, 26) != null ? getCol(r, 26).toString() : null;
+                String vehiculo = getCol(r, 27) != null ? getCol(r, 27).toString() : null;
+                String pat = getCol(r, 28) != null ? getCol(r, 28).toString() : null;
+                String patCarro = getCol(r, 29) != null ? getCol(r, 29).toString() : null;
+                String choferNom = getCol(r, 30) != null ? getCol(r, 30).toString() : null;
+                String choferRut = getCol(r, 31) != null ? getCol(r, 31).toString() : null;
+                String embNom = getCol(r, 32) != null ? getCol(r, 32).toString() : null;
+                String buzoNom = getCol(r, 33) != null ? getCol(r, 33).toString() : null;
+                String dtTipo = getCol(r, 34) != null ? getCol(r, 34).toString() : null;
+                String dtNum = getCol(r, 35) != null ? getCol(r, 35).toString() : null;
+                Date dtFecha = toDate(getCol(r, 36));
 
-                String rutDest = r[37] != null ? r[37].toString() : null;
-                String nomDest = r[38] != null ? r[38].toString() : null;
+                String rutDest = getCol(r, 37) != null ? getCol(r, 37).toString() : null;
+                String nomDest = getCol(r, 38) != null ? getCol(r, 38).toString() : null;
                 String finalDestNom = (nDestDir != null && !nDestDir.isBlank()) ? nDestDir : nomDest;
 
                 LocalDateTime ts = ReportService.parseTimestamp(d, hora);

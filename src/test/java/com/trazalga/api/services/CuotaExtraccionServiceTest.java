@@ -87,6 +87,18 @@ public class CuotaExtraccionServiceTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock
+    private com.trazalga.api.repositories.ICuotaExtraccionEventoRepository cuotaEventoRepository;
+
+    @Mock
+    private com.trazalga.api.repositories.IDeclaracionMarcaRepository declaracionMarcaRepository;
+
+    @Mock
+    private com.trazalga.api.repositories.IAvisoEnviadoRepository avisoEnviadoRepository;
+
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private CuotaExtraccionService cuotaExtraccionService;
 
@@ -100,6 +112,12 @@ public class CuotaExtraccionServiceTest {
     @BeforeEach
     void setUp() {
         cuotaExtraccionService.invalidarCacheConsumo();
+
+        com.trazalga.api.services.cuotas.CierreCuotaService realCierreService = new com.trazalga.api.services.cuotas.CierreCuotaService();
+        org.springframework.test.util.ReflectionTestUtils.setField(realCierreService, "cuotaRepository", cuotaRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(realCierreService, "cuotaEventoRepository", cuotaEventoRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(realCierreService, "eventPublisher", eventPublisher);
+        org.springframework.test.util.ReflectionTestUtils.setField(cuotaExtraccionService, "cierreCuotaService", realCierreService);
 
         especieHuiro = new EspecieModel();
         especieHuiro.setId(1L);
@@ -246,7 +264,6 @@ public class CuotaExtraccionServiceTest {
         cComuna.setPeriodo("MENSUAL");
         cComuna.setLimiteKg(10000.0);
         cComuna.setMetrica("CAPTURA");
-        cComuna.setEstado("ABIERTA");
         cComuna.setActivo(true);
 
         // Cuota 2: Macrozona Norte (50.000 kg)
@@ -258,7 +275,6 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setPeriodo("MENSUAL");
         cMacrozona.setLimiteKg(50000.0);
         cMacrozona.setMetrica("CAPTURA");
-        cMacrozona.setEstado("ABIERTA");
         cMacrozona.setNivelAgregacion("MACROZONA");
         cMacrozona.setModoAccion("BLOQUEO_DECLARACION");
         cMacrozona.setActivo(true);
@@ -268,17 +284,24 @@ public class CuotaExtraccionServiceTest {
         when(macrozonaService.isRegionInMacrozona(eq(10L), eq(4L), any(Date.class))).thenReturn(true);
 
         // Mock queries for consumption:
+        // Mock queries for consumption (recolector + armador en AREA_LIBRE):
         // Comunal consumed: 1.000 kg (10%)
         // Macrozona consumed: 49.500 kg (99%)
-        Query queryComuna = mock(Query.class);
-        when(queryComuna.getSingleResult()).thenReturn("1000.00");
+        Query queryComunaRec = mock(Query.class);
+        when(queryComunaRec.getSingleResult()).thenReturn("1000.00");
+        Query queryComunaArm = mock(Query.class);
+        when(queryComunaArm.getSingleResult()).thenReturn("0.00");
 
-        Query queryMacrozona = mock(Query.class);
-        when(queryMacrozona.getSingleResult()).thenReturn("49500.00");
+        Query queryMacrozonaRec = mock(Query.class);
+        when(queryMacrozonaRec.getSingleResult()).thenReturn("49500.00");
+        Query queryMacrozonaArm = mock(Query.class);
+        when(queryMacrozonaArm.getSingleResult()).thenReturn("0.00");
 
         when(entityManager.createNativeQuery(anyString()))
-                .thenReturn(queryComuna)
-                .thenReturn(queryMacrozona);
+                .thenReturn(queryComunaRec)
+                .thenReturn(queryComunaArm)
+                .thenReturn(queryMacrozonaRec)
+                .thenReturn(queryMacrozonaArm);
 
         // Intento de declaración de 1.000 kg
         // Parámetros: perfil, usuarioId, amerbId, especieId, extraccionTipoId, comunaImputacionId, fechaExtraccion, fechaDeclaracion, desembarqueKg, capturaKg
@@ -306,7 +329,6 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setPeriodo("MENSUAL");
         cMacrozona.setLimiteKg(50000.0);
         cMacrozona.setMetrica("CAPTURA");
-        cMacrozona.setEstado("ABIERTA");
         cMacrozona.setNivelAgregacion("MACROZONA");
         cMacrozona.setModoAccion("SOLO_ALERTA");
         cMacrozona.setActivo(true);
@@ -340,7 +362,6 @@ public class CuotaExtraccionServiceTest {
         cMacrozona.setPeriodo("MENSUAL");
         cMacrozona.setLimiteKg(50000.0);
         cMacrozona.setMetrica("CAPTURA");
-        cMacrozona.setEstado("ABIERTA");
         cMacrozona.setNivelAgregacion("MACROZONA");
         cMacrozona.setActivo(true);
 
@@ -374,7 +395,6 @@ public class CuotaExtraccionServiceTest {
         cuotaMensual.setLimiteKg(5000.0); // 5.000 kg secos nominales
         cuotaMensual.setHumedadEstado(estadoSeco);
         cuotaMensual.setMetrica("CAPTURA");
-        cuotaMensual.setEstado("ABIERTA");
         cuotaMensual.setActivo(true);
 
         com.trazalga.api.models.FactorConversionModel factor358 = new com.trazalga.api.models.FactorConversionModel();
@@ -568,7 +588,6 @@ public class CuotaExtraccionServiceTest {
     void testCerrarCuota_MarcaCerradaYMotivoAdministrativo() {
         CuotaExtraccionModel c = new CuotaExtraccionModel();
         c.setId(10L);
-        c.setEstado("ABIERTA");
 
         when(cuotaRepository.findById(10L)).thenReturn(java.util.Optional.of(c));
         when(cuotaRepository.save(any(CuotaExtraccionModel.class))).thenAnswer(i -> i.getArgument(0));

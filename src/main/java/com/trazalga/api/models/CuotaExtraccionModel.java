@@ -148,18 +148,22 @@ public class CuotaExtraccionModel {
     private String resolucion;
 
     // Estado administrativo de la cuota: ABIERTA | CERRADA
+    @Setter(AccessLevel.NONE)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String estado = "ABIERTA";
 
+    @Setter(AccessLevel.NONE)
     @Temporal(TemporalType.DATE)
     @Column(name = "fecha_cierre", nullable = true)
     private Date fechaCierre;
 
+    @Setter(AccessLevel.NONE)
     @Temporal(TemporalType.DATE)
     @Column(name = "fecha_cierre_automatico", nullable = true)
     private Date fechaCierreAutomatico;
 
+    @Setter(AccessLevel.NONE)
     @Column(name = "motivo_cierre", nullable = true, length = 30)
     private String motivoCierre; // AGOTAMIENTO | ADMINISTRATIVO | VENCIMIENTO
 
@@ -187,4 +191,85 @@ public class CuotaExtraccionModel {
         updatedAt = new Date();
     }
 
+    /**
+     * Cierra la cuota administrativamente o por agotamiento/vencimiento (TC.2).
+     * Solo opera desde estado ABIERTA.
+     *
+     * @param motivo Motivo de cierre: "ADMINISTRATIVO", "AGOTAMIENTO", "VENCIMIENTO".
+     * @param fecha Fecha de cierre (si es nula, se usa la fecha actual).
+     * @param usuarioId ID del usuario responsable (opcional).
+     */
+    public void cerrar(String motivo, Date fecha, Long usuarioId) {
+        if ("CERRADA".equalsIgnoreCase(this.estado)) {
+            throw new IllegalStateException("La cuota ID " + this.id + " ya se encuentra cerrada.");
+        }
+        String motivoNorm = (motivo != null && !motivo.isBlank()) ? motivo.trim().toUpperCase() : "ADMINISTRATIVO";
+        Date fechaEfectiva = (fecha != null) ? fecha : new Date();
+
+        if ("AGOTAMIENTO".equals(motivoNorm)) {
+            this.fechaCierreAutomatico = fechaEfectiva;
+        } else {
+            this.fechaCierre = fechaEfectiva;
+        }
+        this.motivoCierre = motivoNorm;
+        this.estado = "CERRADA";
+    }
+
+    /**
+     * Reabre una cuota previamente cerrada (TC.2).
+     * Solo opera desde estado CERRADA y exige un motivo justificativo no vacío.
+     *
+     * @param motivo Motivo de reapertura obligatorio.
+     * @param usuarioId ID del usuario responsable (opcional).
+     */
+    public void reabrir(String motivo, Long usuarioId) {
+        if (!"CERRADA".equalsIgnoreCase(this.estado)) {
+            throw new IllegalStateException("La cuota ID " + this.id + " no está cerrada (estado actual: " + this.estado + ").");
+        }
+        if (motivo == null || motivo.trim().isEmpty()) {
+            throw new IllegalArgumentException("El motivo de reapertura es obligatorio.");
+        }
+        this.estado = "ABIERTA";
+        this.fechaCierre = null;
+        this.fechaCierreAutomatico = null;
+        this.motivoCierre = null;
+    }
+
+    /**
+     * Determina la fecha efectiva de cierre para la evaluación de declaraciones (TC.2 / TC.4).
+     *
+     * 1. fechaCierre (cierre manual o por vencimiento ejecutado).
+     * 2. fechaCierreAutomatico (cierre por agotamiento).
+     * 3. Si ambas son nulas, el cierre por vencimiento está activo y fechaFin < hoy: fechaFin.
+     *    Así, las reglas de TC.4 no dependen de la hora a la que corra la tarea diaria de TC.3.
+     */
+    public java.time.LocalDate fechaCierreEfectiva(java.time.LocalDate hoy, boolean cierrePorVencimientoActivo) {
+        if (this.fechaCierre != null) {
+            return toLocalDateSafe(this.fechaCierre);
+        }
+        if (this.fechaCierreAutomatico != null) {
+            return toLocalDateSafe(this.fechaCierreAutomatico);
+        }
+        if (cierrePorVencimientoActivo && this.fechaFin != null && hoy != null) {
+            java.time.LocalDate fFin = toLocalDateSafe(this.fechaFin);
+            if (fFin.isBefore(hoy)) {
+                return fFin;
+            }
+        }
+        return null;
+    }
+
+    public java.time.LocalDate fechaCierreEfectiva(Date hoyDate, boolean cierrePorVencimientoActivo) {
+        java.time.LocalDate hoy = hoyDate != null ? toLocalDateSafe(hoyDate) : java.time.LocalDate.now();
+        return fechaCierreEfectiva(hoy, cierrePorVencimientoActivo);
+    }
+
+    private static java.time.LocalDate toLocalDateSafe(Date date) {
+        if (date == null) return null;
+        if (date instanceof java.sql.Date) {
+            return ((java.sql.Date) date).toLocalDate();
+        }
+        return date.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+    }
 }
+

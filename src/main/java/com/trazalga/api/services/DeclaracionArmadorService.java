@@ -454,19 +454,6 @@ public class DeclaracionArmadorService {
                     .ifPresent(declaracionArmadorModel::setExtraccionTipo);
         }
 
-        CalculoCapturaResult capRes = capturaService.calcular(
-                declaracionArmadorModel.getEspecie() != null ? declaracionArmadorModel.getEspecie().getId() : (request.getEspecie() != null ? request.getEspecie().getId() : null),
-                declaracionArmadorModel.getHumedadEstado() != null ? declaracionArmadorModel.getHumedadEstado().getId() : (request.getHumedadEstado() != null ? request.getHumedadEstado().getId() : null),
-                declaracionArmadorModel.getFechaExtraccion(),
-                declaracionArmadorModel.getDesembarque());
-        if (capRes.isExitoso()) {
-            declaracionArmadorModel.setCaptura(capRes.getCaptura().doubleValue());
-            declaracionArmadorModel.setFactorAplicado(capRes.getFactorAplicado());
-            declaracionArmadorModel.setFactorConversionId(capRes.getFactorConversionId());
-        } else {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, capRes.getMensaje());
-        }
-
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());
         
         if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {
@@ -518,6 +505,43 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setLatitud(request.getLatitud());
         declaracionArmadorModel.setLongitud(request.getLongitud());
 
+        // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
+        Long comunaInscripcionId = (declaracionArmadorModel.getUsuario() != null && declaracionArmadorModel.getUsuario().getComuna() != null)
+                ? declaracionArmadorModel.getUsuario().getComuna().getId() : null;
+        Long comunaDesembarqueId = declaracionArmadorModel.getComuna() != null ? declaracionArmadorModel.getComuna().getId() : null;
+        Long regionId = null;
+        if (declaracionArmadorModel.getComuna() != null && declaracionArmadorModel.getComuna().getRegion() != null) {
+            regionId = declaracionArmadorModel.getComuna().getRegion().getId();
+        } else if (declaracionArmadorModel.getCaleta() != null && declaracionArmadorModel.getCaleta().getComuna() != null && declaracionArmadorModel.getCaleta().getComuna().getRegion() != null) {
+            regionId = declaracionArmadorModel.getCaleta().getComuna().getRegion().getId();
+        }
+
+        ContextoDeclaracion ctx = ContextoDeclaracion.builder()
+                .tipoDeclaracion("ARMADOR")
+                .usuarioId(declaracionArmadorModel.getUsuario() != null ? declaracionArmadorModel.getUsuario().getId() : null)
+                .buzoId(declaracionArmadorModel.getBuzo() != null ? declaracionArmadorModel.getBuzo().getId() : null)
+                .embarcacionId(declaracionArmadorModel.getEmbarcacion() != null ? declaracionArmadorModel.getEmbarcacion().getId() : null)
+                .especieId(declaracionArmadorModel.getEspecie() != null ? declaracionArmadorModel.getEspecie().getId() : null)
+                .humedadEstadoId(declaracionArmadorModel.getHumedadEstado() != null ? declaracionArmadorModel.getHumedadEstado().getId() : null)
+                .extraccionTipoId(declaracionArmadorModel.getExtraccionTipo() != null ? declaracionArmadorModel.getExtraccionTipo().getId() : null)
+                .comunaDesembarqueId(comunaDesembarqueId)
+                .comunaInscripcionId(comunaInscripcionId)
+                .regionId(regionId)
+                .fechaExtraccion(declaracionArmadorModel.getFechaExtraccion())
+                .fechaDeclaracion(new Date())
+                .desembarqueKg(declaracionArmadorModel.getDesembarque())
+                .esEdicion(true)
+                .build();
+
+        ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
+        if (resVal.esRechazado()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
+        }
+
+        declaracionArmadorModel.setCaptura(resVal.getCapturaCalculada().doubleValue());
+        declaracionArmadorModel.setFactorAplicado(resVal.getFactorAplicado());
+        declaracionArmadorModel.setFactorConversionId(resVal.getFactorConversionId());
+
         DeclaracionArmadorModel updatedDeclaracion = declaracionArmadorRepository.save(declaracionArmadorModel);
 
         // Actualizar buzos: eliminar los anteriores y guardar los nuevos
@@ -558,6 +582,11 @@ public class DeclaracionArmadorService {
         }
 
         populateBuzos(updatedDeclaracion);
+
+        // TC.5: Registrar marcas no bloqueantes de forma idempotente
+        alertaTriggerService.procesarMarcas("ARMADOR", updatedDeclaracion.getId(),
+                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                resVal.getMarcas());
 
         // Notificar al destinatario que la declaración fue modificada
         if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {

@@ -110,4 +110,63 @@ public class UsuarioService {
             return false;
         }
     }
+
+    public List<com.trazalga.api.dto.UsuarioBusquedaDTO> buscarUsuarios(String q, String perfil, Integer limit) {
+        int max = (limit != null && limit > 0) ? Math.min(limit, 50) : 20;
+        String term = q != null ? q.trim().toLowerCase() : "";
+        String termLimpio = term.replace(".", "").replace("-", "").trim();
+
+        List<UsuarioModel> todos = usuarioRepository.findAll();
+        List<com.trazalga.api.dto.UsuarioBusquedaDTO> res = new ArrayList<>();
+
+        for (UsuarioModel u : todos) {
+            if (perfil != null && !perfil.isBlank()) {
+                String perfNom = (u.getPerfil() != null && u.getPerfil().getNombre() != null)
+                        ? u.getPerfil().getNombre() : "";
+                if (!perfNom.equalsIgnoreCase(perfil.trim())) {
+                    continue;
+                }
+            }
+
+            if (!term.isEmpty()) {
+                String rut = u.getRut() != null ? u.getRut().toLowerCase() : "";
+                String rutLimpio = rut.replace(".", "").replace("-", "").trim();
+                String nombres = u.getNombres() != null ? u.getNombres().toLowerCase() : "";
+                String apellidop = u.getApellidop() != null ? u.getApellidop().toLowerCase() : "";
+                String nombreCompleto = (nombres + " " + apellidop).trim();
+
+                boolean coincideRut = rut.contains(term) || (!termLimpio.isEmpty() && rutLimpio.contains(termLimpio));
+                boolean coincideNombre = nombres.contains(term) || apellidop.contains(term) || nombreCompleto.contains(term);
+
+                if (!coincideRut && !coincideNombre) {
+                    continue;
+                }
+            }
+
+            String nom = ((u.getNombres() != null ? u.getNombres() : "") + " " +
+                          (u.getApellidop() != null ? u.getApellidop() : "")).trim();
+            String perfilNombre = u.getPerfil() != null ? u.getPerfil().getNombre() : null;
+            String comunaNombre = u.getComuna() != null ? u.getComuna().getNombre() : null;
+            Long comunaId = u.getComuna() != null ? u.getComuna().getId() : null;
+            Long regionId = (u.getComuna() != null && u.getComuna().getRegion() != null)
+                    ? u.getComuna().getRegion().getId() : null;
+
+            res.add(com.trazalga.api.dto.UsuarioBusquedaDTO.builder()
+                    .id(u.getId())
+                    .rut(u.getRut())
+                    .nombre(nom.isEmpty() ? "Usuario " + u.getId() : nom)
+                    .perfil(perfilNombre)
+                    .comuna(comunaNombre)
+                    .comunaId(comunaId)
+                    .regionId(regionId)
+                    .build());
+
+            if (res.size() >= max) {
+                break;
+            }
+        }
+
+        return res;
+    }
 }
+

@@ -17,7 +17,10 @@ public class CuotaLoteDTO {
     private String ambito; // default "AREA_LIBRE"
     private String nivelAgregacion; // default "COMUNA"
     private Long regionId;
+    private Long provinciaId;
     private Set<Long> comunaIds;
+    private Long usuarioId;
+    private Boolean esPlantilla;
     private Long especieId;
     private Long extraccionTipoId;
     private Long humedadEstadoId;

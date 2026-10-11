@@ -50,6 +50,9 @@ public class ValidacionDeclaracionService {
     @Autowired(required = false)
     private com.trazalga.api.repositories.IAmerbRepository amerbRepository;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.cuotas.ResolutorImputacionTerritorial resolutorImputacion;
+
     /**
      * Orquesta las 5 validaciones del servidor antes de persistir una declaración.
      */
@@ -121,25 +124,48 @@ public class ValidacionDeclaracionService {
         }
 
         // ---------------------------------------------------------------------
-        // 3. Evaluación de Cuotas de Extracción
+        // 3. Evaluación de Cuotas de Extracción (TC.8)
         // ---------------------------------------------------------------------
-        Long comunaImputacion = "RECOLECTOR".equalsIgnoreCase(ctx.getTipoDeclaracion())
-                ? (ctx.getComunaInscripcionId() != null ? ctx.getComunaInscripcionId() : ctx.getComunaDesembarqueId())
-                : (ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId());
+        Long comunaImputacion;
+        if (resolutorImputacion != null) {
+            comunaImputacion = resolutorImputacion.resolver(ctx.getTipoDeclaracion()).comunaImputacion(ctx);
+        } else {
+            comunaImputacion = "RECOLECTOR".equalsIgnoreCase(ctx.getTipoDeclaracion())
+                    ? (ctx.getComunaInscripcionId() != null ? ctx.getComunaInscripcionId() : ctx.getComunaDesembarqueId())
+                    : (ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId());
+        }
 
-        CuotaExtraccionService.EvaluacionCuotaResult cuotaRes = cuotaExtraccionService.evaluarCuotaDeclaracion(
-                ctx.getTipoDeclaracion(),
-                ctx.getUsuarioId(),
-                ctx.getAmerbId(),
-                ctx.getEspecieId(),
-                ctx.getExtraccionTipoId(),
-                comunaImputacion,
-                ctx.getFechaExtraccion(),
-                ctx.getFechaDeclaracion(),
-                ctx.getDesembarqueKg(),
-                capturaCalculada);
+        CuotaExtraccionService.EvaluacionCuotaResult cuotaRes;
+        if (Boolean.TRUE.equals(ctx.getEsEdicion())) {
+            cuotaRes = cuotaExtraccionService.evaluarCuotaDeclaracion(
+                    ctx.getTipoDeclaracion(),
+                    ctx.getUsuarioId(),
+                    ctx.getAmerbId(),
+                    ctx.getEspecieId(),
+                    ctx.getExtraccionTipoId(),
+                    comunaImputacion,
+                    ctx.getFechaExtraccion(),
+                    ctx.getFechaDeclaracion(),
+                    ctx.getDesembarqueKg(),
+                    capturaCalculada,
+                    true);
+        } else {
+            cuotaRes = cuotaExtraccionService.evaluarCuotaDeclaracion(
+                    ctx.getTipoDeclaracion(),
+                    ctx.getUsuarioId(),
+                    ctx.getAmerbId(),
+                    ctx.getEspecieId(),
+                    ctx.getExtraccionTipoId(),
+                    comunaImputacion,
+                    ctx.getFechaExtraccion(),
+                    ctx.getFechaDeclaracion(),
+                    ctx.getDesembarqueKg(),
+                    capturaCalculada);
+        }
 
-        if (cuotaRes.getMarca() != null) {
+        if (cuotaRes.getMarcas() != null && !cuotaRes.getMarcas().isEmpty()) {
+            marcas.addAll(cuotaRes.getMarcas());
+        } else if (cuotaRes.getMarca() != null) {
             marcas.add(MarcaItem.builder()
                     .marca(cuotaRes.getMarca())
                     .detalle(cuotaRes.getMensaje())

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import com.trazalga.api.models.DeclaracionMarcaModel;
@@ -95,6 +96,7 @@ public class DeclaracionMarcaService {
     @Autowired(required = false)
     private com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository plantaAbastecimientoRepository;
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public Optional<DeclaracionMarcaModel> resolverMarca(Long id) {
         return repository.findById(id).map(m -> {
             m.setResuelta(true);
@@ -108,6 +110,7 @@ public class DeclaracionMarcaService {
         });
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public DeclaracionMarcaModel resolverMarca(Long id, String resolucionTipo, String observacion, Long usuarioId) {
         DeclaracionMarcaModel m = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Hallazgo #" + id + " no encontrado"));
@@ -140,6 +143,7 @@ public class DeclaracionMarcaService {
         return saved;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public Optional<DeclaracionMarcaModel> reabrirMarca(Long id) {
         return repository.findById(id).map(m -> {
             m.setResuelta(false);
@@ -152,6 +156,7 @@ public class DeclaracionMarcaService {
         });
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     @org.springframework.transaction.annotation.Transactional
     public DeclaracionMarcaModel derivarACitacion(Long marcaId, String numeroCitacion, Long usuarioId) {
         if (numeroCitacion == null || numeroCitacion.trim().isEmpty()) {
@@ -170,6 +175,7 @@ public class DeclaracionMarcaService {
         return repository.save(marca);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     @org.springframework.transaction.annotation.Transactional
     public DeclaracionMarcaModel derivarACitacionPorDeclaracion(String declaracionTipo, Long declaracionId, String numeroCitacion, Long usuarioId) {
         if (numeroCitacion == null || numeroCitacion.trim().isEmpty()) {

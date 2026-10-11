@@ -23,6 +23,8 @@ public class CuotaListadoDTO {
     // Territorio
     private Long regionId;
     private String regionNombre;
+    private Long provinciaId;
+    private String provinciaNombre;
     private Long comunaId; // comuna cabecera
     private String comunaNombre; // nombre comuna cabecera
     private Set<Long> comunaIds;
@@ -64,4 +66,13 @@ public class CuotaListadoDTO {
     private Boolean activo;
     private String alcance; // "Comunas Coquimbo + La Serena", "Región Coquimbo", etc.
     private Boolean esFormatoAnterior; // true si periodo != MENSUAL, sin fechas, o nivel no comunal/regional
+
+    // Campos de cuotas individuales y plantillas (TM.1 / TM.2)
+    private Boolean esPlantilla;
+    private Long usuarioId;
+    private String usuarioNombre;
+    private Integer personasConActividad;
+    private Integer personasSobreLimite;
+    private Double maxPorcentaje;
+    private String textoConsumoPlantilla;
 }

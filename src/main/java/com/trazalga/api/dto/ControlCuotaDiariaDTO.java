@@ -36,4 +36,17 @@ public class ControlCuotaDiariaDTO {
     private String fechaInicio;
     private String fechaFin;
     private String vigenciaFormateada;
+
+    // Campos de cuotas individuales y plantillas (TM.1 / TM.2)
+    private Boolean esPlantilla;
+    private Integer personasConActividad;
+    private Integer personasSobreLimite;
+    private Double maxPorcentaje;
+    private String textoConsumoPlantilla;
+    private Long usuarioId;
+    private String usuarioNombre;
+    private Long provinciaId;
+    private String provinciaNombre;
+    private Long regionId;
+    private String regionNombre;
 }

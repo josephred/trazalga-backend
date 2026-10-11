@@ -69,4 +69,8 @@ public interface IDeclaracionMarcaRepository extends JpaRepository<DeclaracionMa
             @Param("tokens") java.util.Collection<String> tokens,
             @Param("marcasBloqueantes") java.util.Collection<String> marcasBloqueantes
     );
+
+    java.util.Optional<DeclaracionMarcaModel> findByClaveIdempotencia(String claveIdempotencia);
+
+    long countByReglaId(Long reglaId);
 }

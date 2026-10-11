@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.trazalga.api.models.DeclaracionMarcaModel;
@@ -56,6 +57,7 @@ public class DeclaracionMarcaController {
     }
 
     @PutMapping("/{id}/resolver")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public ResponseEntity<?> resolver(
             @PathVariable Long id,
             @RequestBody(required = false) com.trazalga.api.dto.ResolucionMarcaDTO request,
@@ -77,6 +79,7 @@ public class DeclaracionMarcaController {
     }
 
     @PutMapping("/{id}/derivar-citacion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public ResponseEntity<?> derivarACitacion(
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
@@ -95,6 +98,7 @@ public class DeclaracionMarcaController {
     }
 
     @PutMapping("/declaracion/{tipo}/{id}/derivar-citacion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public ResponseEntity<?> derivarACitacionPorDeclaracion(
             @PathVariable String tipo,
             @PathVariable Long id,
@@ -114,6 +118,7 @@ public class DeclaracionMarcaController {
     }
 
     @PutMapping("/{id}/reabrir")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
     public ResponseEntity<DeclaracionMarcaModel> reabrir(@PathVariable Long id) {
         return service.reabrirMarca(id)
                 .map(ResponseEntity::ok)

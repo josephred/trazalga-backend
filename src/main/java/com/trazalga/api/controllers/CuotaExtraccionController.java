@@ -22,6 +22,7 @@ import com.trazalga.api.dto.ControlCuotaDiariaDTO;
 import com.trazalga.api.dto.CuotaListadoDTO;
 import com.trazalga.api.models.CuotaExtraccionModel;
 import com.trazalga.api.services.CuotaExtraccionService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import java.util.List;
 
 @RestController
@@ -63,11 +64,21 @@ public class CuotaExtraccionController {
         return cuotaService.getMaestros();
     }
 
-    /** Las violaciones de la jerarquía de cuotas (usuario ≤ área ≤ región) llegan como 422 con mensaje. */
-    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleValidacion(IllegalArgumentException ex) {
+    /** Las violaciones de negocio y validación de cuotas llegan como 422 con mensaje descriptivo (TC.2 / TC.9). */
+    @org.springframework.web.bind.annotation.ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleValidacion(RuntimeException ex) {
         Map<String, Object> body = new HashMap<>();
         body.put("message", ex.getMessage());
+        return org.springframework.http.ResponseEntity.unprocessableEntity().body(body);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(org.springframework.web.bind.MethodArgumentNotValidException ex) {
+        Map<String, Object> body = new HashMap<>();
+        String msg = ex.getBindingResult().getFieldErrors().stream()
+                .map(err -> err.getDefaultMessage())
+                .collect(java.util.stream.Collectors.joining(", "));
+        body.put("message", msg);
         return org.springframework.http.ResponseEntity.unprocessableEntity().body(body);
     }
 
@@ -91,7 +102,7 @@ public class CuotaExtraccionController {
     }
 
     @PostMapping
-    public CuotaExtraccionModel create(@RequestBody CuotaExtraccionModel cuota) {
+    public CuotaExtraccionModel create(@jakarta.validation.Valid @RequestBody com.trazalga.api.dto.CuotaRequestDTO cuota) {
         return cuotaService.save(cuota);
     }
 
@@ -101,7 +112,7 @@ public class CuotaExtraccionController {
     }
 
     @PutMapping(path = "/{id}")
-    public CuotaExtraccionModel update(@RequestBody CuotaExtraccionModel request, @PathVariable("id") Long id) {
+    public CuotaExtraccionModel update(@jakarta.validation.Valid @RequestBody com.trazalga.api.dto.CuotaRequestDTO request, @PathVariable("id") Long id) {
         return cuotaService.update(id, request);
     }
 
@@ -113,8 +124,33 @@ public class CuotaExtraccionController {
     }
 
     @PutMapping(path = "/{id}/cerrar")
-    public CuotaExtraccionModel cerrar(@PathVariable("id") Long id) {
-        return cuotaService.cerrarCuota(id);
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
+    public CuotaExtraccionModel cerrar(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String motivo = (body != null) ? body.get("motivo") : null;
+        String observacion = (body != null) ? body.get("observacion") : null;
+        return cuotaService.cerrarCuota(id, motivo, observacion);
+    }
+
+    @PutMapping(path = "/{id}/reabrir")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
+    public CuotaExtraccionModel reabrir(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String motivo = (body != null) ? body.get("motivo") : null;
+        if (motivo == null || motivo.trim().isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                    "El motivo de reapertura es obligatorio."
+            );
+        }
+        return cuotaService.reabrirCuota(id, motivo.trim());
+    }
+
+    @GetMapping(path = "/{id}/eventos")
+    public List<com.trazalga.api.models.CuotaExtraccionEventoModel> getEventos(@PathVariable("id") Long id) {
+        return cuotaService.getEventos(id);
     }
 
     @GetMapping(path = "/{id}/consumo")
