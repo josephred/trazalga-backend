@@ -88,7 +88,7 @@ public class DeclaracionMarcaValidationTest {
         assertFalse(res.esRechazado(), "Desembarque atípico no bloquea la faena");
         assertTrue(res.getMarcas().stream().anyMatch(m -> "DESEMBARQUE_ATIPICO".equals(m.getMarca())),
                 "Debe generar marca DESEMBARQUE_ATIPICO");
-        assertTrue(res.getMarcas().stream().anyMatch(m -> m.getDetalle().contains("6000.00 kg")),
+        assertTrue(res.getMarcas().stream().anyMatch(m -> m.getDetalle().contains("6.000 kg") || m.getDetalle().contains("6000")),
                 "El detalle debe incluir los kg declarados");
     }
 

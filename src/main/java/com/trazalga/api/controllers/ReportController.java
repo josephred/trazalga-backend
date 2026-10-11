@@ -4,10 +4,14 @@ import com.trazalga.api.dto.ReportDTO;
 import com.trazalga.api.services.ReportService;
 import com.trazalga.api.services.PerfiladorRiesgoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.trazalga.api.dto.FiltroDesembarqueAtipico;
+import com.trazalga.api.dto.FiltroSobrepasos;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
@@ -24,6 +28,8 @@ public class ReportController {
 
     private final ReportService reportService;
     private final PerfiladorRiesgoService perfiladorRiesgoService;
+    private final com.trazalga.api.services.indicadores.DesembarqueAtipicoService desembarqueAtipicoService;
+    private final com.trazalga.api.services.cuotas.CuotaSobrepasoService cuotaSobrepasoService;
 
     @GetMapping
     public ResponseEntity<?> generateReport(
@@ -1007,6 +1013,101 @@ public class ReportController {
             return ResponseEntity.ok(reportService.getRetencionBodegaMetrics());
         } catch (Exception e) {
             System.err.println("Error obteniendo retención en bodega: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // TD.1: HALLAZGOS DE DESEMBARQUE ATÍPICO CON CRITERIO ESTRUCTURADO
+    // =========================================================================
+
+    @GetMapping("/desembarque-fisico/atipicos")
+    public ResponseEntity<?> getDesembarquesAtipicos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long comunaId,
+            @RequestParam(required = false) Long provinciaId,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long caletaId,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false, defaultValue = "TODOS") String perfil,
+            @RequestParam(required = false, defaultValue = "TODAS") String fuente,
+            @RequestParam(required = false) String estadoGestion,
+            @RequestParam(required = false) String criterioTipo,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size) {
+        try {
+            FiltroDesembarqueAtipico filtro = FiltroDesembarqueAtipico.builder()
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .especieId(especieId)
+                    .comunaId(comunaId)
+                    .provinciaId(provinciaId)
+                    .regionId(regionId)
+                    .caletaId(caletaId)
+                    .usuarioId(usuarioId)
+                    .perfil(perfil)
+                    .fuente(fuente)
+                    .estadoGestion(estadoGestion)
+                    .criterioTipo(criterioTipo)
+                    .build();
+            Pageable pageable = PageRequest.of(page, size);
+            return ResponseEntity.ok(desembarqueAtipicoService.buscar(filtro, pageable));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo desembarques atípicos: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // TQ.1: DETALLE AUDITABLE DE SOBREPASOS DE CUOTA Y PERSONAS
+    // =========================================================================
+
+    @GetMapping("/cuotas/sobrepasos")
+    public ResponseEntity<?> getCuotasSobrepasos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long cuotaId,
+            @RequestParam(required = false) Long comunaId,
+            @RequestParam(required = false) Long extraccionTipoId,
+            @RequestParam(required = false) List<String> marcas,
+            @RequestParam(required = false) String estadoGestion,
+            @RequestParam(required = false) Boolean resuelta,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size) {
+        try {
+            FiltroSobrepasos filtro = FiltroSobrepasos.builder()
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .cuotaId(cuotaId)
+                    .comunaId(comunaId)
+                    .extraccionTipoId(extraccionTipoId)
+                    .marcas(marcas)
+                    .estadoGestion(estadoGestion)
+                    .resuelta(resuelta)
+                    .build();
+            Pageable pageable = PageRequest.of(page, size);
+            return ResponseEntity.ok(cuotaSobrepasoService.buscar(filtro, pageable));
+        } catch (Exception e) {
+            System.err.println("Error obteniendo sobrepasos de cuotas: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/cuotas/{id}/personas")
+    public ResponseEntity<?> getCuotaPersonas(
+            @PathVariable("id") Long id,
+            @RequestParam(required = false, defaultValue = "false") Boolean soloSobreLimite) {
+        try {
+            return ResponseEntity.ok(cuotaSobrepasoService.obtenerPersonasCuota(id, soloSobreLimite));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            System.err.println("Error obteniendo consumo individual por personas para cuota #" + id + ": " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }

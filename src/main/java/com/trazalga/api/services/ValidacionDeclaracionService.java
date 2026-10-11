@@ -228,12 +228,17 @@ public class ValidacionDeclaracionService {
         // ---------------------------------------------------------------------
         double umbralAtipico = configuracionGeneralService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
         if (ctx.getDesembarqueKg() != null && ctx.getDesembarqueKg().doubleValue() > umbralAtipico) {
-            String msgAtipico = String.format(java.util.Locale.US, "Faena de %.2f kg supera el umbral operativo de %.2f kg",
-                    ctx.getDesembarqueKg().doubleValue(), umbralAtipico);
+            com.trazalga.api.services.hallazgos.CriterioHallazgo crit = com.trazalga.api.services.hallazgos.CriterioHallazgo.deKilos(
+                    "desembarque_umbral_atipico_kg",
+                    umbralAtipico,
+                    ctx.getDesembarqueKg().doubleValue()
+            );
+            String msgAtipico = crit.texto();
             marcas.add(MarcaItem.builder()
                     .marca("DESEMBARQUE_ATIPICO")
                     .detalle(msgAtipico)
                     .reglaId(null)
+                    .criterio(crit)
                     .build());
             advertencias.add(msgAtipico);
         }

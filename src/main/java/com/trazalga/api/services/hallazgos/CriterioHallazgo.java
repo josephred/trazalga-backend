@@ -54,6 +54,11 @@ public record CriterioHallazgo(
             return String.format("Fecha observada %s es posterior al cierre del %s", valorObservado, umbral);
         }
 
+        // Formato para sigma / z-score
+        if ("sigma".equals(u)) {
+            return String.format("z = %s supera el umbral de %s desviaciones estándar", valorObservado, umbral);
+        }
+
         // Formato genérico
         if (!u.isEmpty()) {
             return String.format("%s %s supera el umbral de %s %s", valorObservado, u, umbral, u);
