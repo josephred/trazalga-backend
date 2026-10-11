@@ -964,13 +964,7 @@ public class CadenaCustodiaService {
     }
 
     public String normalizarEstadoHumedad(String hum) {
-        if (hum == null) return "HÚMEDO";
-        String h = hum.toUpperCase().trim();
-        if (h.contains("SEMI") && (h.contains("HUM") || h.contains("HÚM"))) return "SEMI HÚMEDO";
-        if (h.contains("SEMI") && (h.contains("SEC"))) return "SEMI SECO";
-        if (h.contains("HUM") || h.contains("HÚM")) return "HÚMEDO";
-        if (h.contains("SEC")) return "SECO";
-        return "HÚMEDO";
+        return com.trazalga.api.services.retencion.PoliticaRetencion.normalizarEstadoHumedad(hum);
     }
 
     public List<String> getPossibleParentTypes(String tipo) {

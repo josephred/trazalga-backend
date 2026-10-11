@@ -27,19 +27,28 @@ public class BloqueoCargaService {
     @Autowired
     private ConfiguracionGeneralService configService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService;
+
     public boolean isBloqueoActivo() {
         return configService.getBoolean("bloqueo_carga_activo", true);
     }
 
     public Set<String> getMarcasBloqueantes() {
         String raw = configService.getValor("marcas_bloqueantes_carga", "LED_EXCEDIDO");
-        if (raw == null || raw.isBlank()) {
-            return Collections.emptySet();
+        Set<String> set = new HashSet<>();
+        if (raw != null && !raw.isBlank()) {
+            for (String s : raw.split(",")) {
+                String clean = s.trim();
+                if (!clean.isEmpty()) set.add(clean);
+            }
         }
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
+        boolean retBloqueoActivo = configService.getBoolean("retencion_bloqueo_activo", false);
+        if (retBloqueoActivo) {
+            set.add("RETENCION_EXCEDIDA");
+        }
+        return set;
     }
 
     /**
@@ -49,6 +58,12 @@ public class BloqueoCargaService {
         if (!isBloqueoActivo() || tipo == null || id == null) {
             return false;
         }
+
+        // Just-in-time: evaluar retención si el bloqueo de retención está habilitado
+        if (configService.getBoolean("retencion_bloqueo_activo", false) && retencionCustodiaService != null) {
+            retencionCustodiaService.evaluarYBloquearJustInTime(tipo, id);
+        }
+
         Set<String> marcas = getMarcasBloqueantes();
         if (marcas.isEmpty()) {
             return false;
@@ -64,12 +79,33 @@ public class BloqueoCargaService {
         if (!isBloqueoActivo() || csvTokens == null || csvTokens.isBlank()) {
             return Collections.emptyMap();
         }
+
+        Map<String, List<Long>> parsed = SeleccionTokens.parse(csvTokens);
+
+        // Just-in-time: evaluar si alguna de las cargas ha superado el tiempo máximo de retención
+        if (configService.getBoolean("retencion_bloqueo_activo", false) && retencionCustodiaService != null) {
+            for (Map.Entry<String, List<Long>> entry : parsed.entrySet()) {
+                String tipo = entry.getKey();
+                List<Long> ids = entry.getValue();
+                if (ids == null || ids.isEmpty()) continue;
+
+                List<String> tiposAEvaluar = SeleccionTokens.LEGACY.equals(tipo)
+                        ? List.of("ARMADOR", "RECOLECTOR", "AREA", "COMERCIALIZADOR")
+                        : List.of(tipo.toUpperCase());
+
+                for (String t : tiposAEvaluar) {
+                    for (Long id : ids) {
+                        retencionCustodiaService.evaluarYBloquearJustInTime(t, id);
+                    }
+                }
+            }
+        }
+
         Set<String> marcasBloqueantes = getMarcasBloqueantes();
         if (marcasBloqueantes.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        Map<String, List<Long>> parsed = SeleccionTokens.parse(csvTokens);
         Map<String, MotivoBloqueoDTO> bloqueadas = new HashMap<>();
 
         for (Map.Entry<String, List<Long>> entry : parsed.entrySet()) {

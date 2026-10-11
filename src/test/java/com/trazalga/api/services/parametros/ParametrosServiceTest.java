@@ -67,6 +67,11 @@ public class ParametrosServiceTest {
     @Test
     @DisplayName("TA.2: Invalida y recarga dinámicamente cuando cambia un parámetro sin reiniciar")
     void testRecargaDinamicaConInvalidacion() {
+        lenient().when(configService.getInt(anyString(), anyInt())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(configService.getBoolean(anyString(), anyBoolean())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(configService.getDouble(anyString(), anyDouble())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(configService.getValor(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
+
         when(configService.getInt(eq("retencion_bloqueo_humedo_horas"), anyInt()))
                 .thenReturn(120)
                 .thenReturn(72);

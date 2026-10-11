@@ -56,6 +56,14 @@ public class ConfiguracionGeneralService {
         createIfNotExist("retencion_semiseco_max_horas", "216", "Horas máximas de retención para recurso semiseco (Res. 3602)", "CADENA");
         createIfNotExist("retencion_preaviso_pct", "80", "% del plazo a partir del cual el semáforo es amarillo", "CADENA");
 
+        // Bloqueo Automático de Carga por Retención Excedida (D3 / TR.3)
+        createIfNotExist("retencion_bloqueo_activo", "false", "Habilita el bloqueo automático de carga en bodega al superar umbrales", "CADENA");
+        createIfNotExist("retencion_bloqueo_humedo_horas", "120", "Horas en bodega para bloqueo automático en recurso húmedo (5 días)", "CADENA");
+        createIfNotExist("retencion_bloqueo_semihumedo_horas", "0", "Horas en bodega para bloqueo automático en semihúmedo (0 = deshabilitado)", "CADENA");
+        createIfNotExist("retencion_bloqueo_semiseco_horas", "0", "Horas en bodega para bloqueo automático en semiseco (0 = deshabilitado)", "CADENA");
+        createIfNotExist("retencion_bloqueo_especies", "TODAS", "Especies sujetas a bloqueo automático ('TODAS' o códigos separados por coma)", "CADENA");
+        createIfNotExist("retencion_bloqueo_preaviso_pct", "80.0", "% del umbral de bloqueo para emitir alerta de preaviso", "CADENA");
+
         // Deprecados desde 25-sep (Res. 3602): conservados para retrocompatibilidad
         createIfNotExist("retencion_bodega_dias_amarilla", "3", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");
         createIfNotExist("retencion_bodega_dias_naranja", "5", "[DEPRECADO desde 25-sep] Reemplazado por retencion_humedo_max_horas et al.", "CADENA");

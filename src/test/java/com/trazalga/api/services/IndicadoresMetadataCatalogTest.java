@@ -136,7 +136,9 @@ public class IndicadoresMetadataCatalogTest {
                 "CUOTA_EXCEDIDA",
                 "POSTERIOR_CIERRE",
                 "DOBLE_OPERACION",
-                "ORIGEN_GEO_INCONSISTENTE"
+                "ORIGEN_GEO_INCONSISTENTE",
+                "RETENCION_EXCEDIDA",
+                "DECLARACION_EXTEMPORANEA"
         );
 
         assertTrue(validMarcas.contains("EN_VEDA"));
@@ -146,6 +148,8 @@ public class IndicadoresMetadataCatalogTest {
         assertTrue(validMarcas.contains("POSTERIOR_CIERRE"));
         assertTrue(validMarcas.contains("DOBLE_OPERACION"));
         assertTrue(validMarcas.contains("ORIGEN_GEO_INCONSISTENTE"));
+        assertTrue(validMarcas.contains("RETENCION_EXCEDIDA"));
+        assertTrue(validMarcas.contains("DECLARACION_EXTEMPORANEA"));
 
         assertFalse(validMarcas.contains("PESO_FUERA_UMBRAL"),
                 "PESO_FUERA_UMBRAL es una marca obsoleta prohibida por R X.3");

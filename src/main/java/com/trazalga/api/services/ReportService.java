@@ -59,17 +59,32 @@ public class ReportService {
     private final ConfiguracionGeneralService configService;
     private final VariacionPesoService variacionPesoService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService;
+
     public ReportService(ReportRepository reportRepository, ConfiguracionGeneralService configService) {
-        this(reportRepository, configService, null);
+        this(reportRepository, configService, null, null);
+    }
+
+    public ReportService(ReportRepository reportRepository,
+                         ConfiguracionGeneralService configService,
+                         VariacionPesoService variacionPesoService) {
+        this(reportRepository, configService, variacionPesoService, null);
     }
 
     @Autowired
     public ReportService(ReportRepository reportRepository,
                          ConfiguracionGeneralService configService,
-                         @Autowired(required = false) VariacionPesoService variacionPesoService) {
+                         @Autowired(required = false) VariacionPesoService variacionPesoService,
+                         @Autowired(required = false) com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
         this.reportRepository = reportRepository;
         this.configService = configService;
         this.variacionPesoService = variacionPesoService;
+        this.retencionCustodiaService = retencionCustodiaService;
+    }
+
+    public void setRetencionCustodiaService(com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
+        this.retencionCustodiaService = retencionCustodiaService;
     }
 
     /**
@@ -665,6 +680,10 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getRetencionBodegaMetrics(Date startDate, Date endDate) {
+        if (retencionCustodiaService != null) {
+            return retencionCustodiaService.obtenerMetricasRetencion(startDate, endDate);
+        }
+
         boolean activo = configService.getBoolean("retencion_bodega_activo", true);
         int humedoMaxH = configService.getInt("retencion_humedo_max_horas", 24);
         int semihumedoMaxH = configService.getInt("retencion_semihumedo_max_horas", 72);

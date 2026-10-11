@@ -47,13 +47,17 @@ public class ParametrosService {
         ParametrosRetencion cached = retencionCache.get();
         if (cached == null) {
             cached = new ParametrosRetencion(
+                    getBoolean("retencion_bodega_activo", true),
+                    getInt("retencion_humedo_max_horas", 24),
+                    getInt("retencion_semihumedo_max_horas", 72),
+                    getInt("retencion_semiseco_max_horas", 216),
+                    getDouble("retencion_preaviso_pct", 80.0),
                     getBoolean("retencion_bloqueo_activo", false),
                     getInt("retencion_bloqueo_humedo_horas", 120),
                     getInt("retencion_bloqueo_semihumedo_horas", 0),
                     getInt("retencion_bloqueo_semiseco_horas", 0),
                     getString("retencion_bloqueo_especies", "TODAS"),
-                    getDouble("retencion_bloqueo_preaviso_pct", 80.0),
-                    getInt("retencion_humedo_max_horas", 120)
+                    getDouble("retencion_bloqueo_preaviso_pct", 80.0)
             );
             retencionCache.compareAndSet(null, cached);
         }
