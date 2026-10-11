@@ -114,8 +114,10 @@ public class ConfiguracionGeneralService {
         createIfNotExist("consulta_folio_dias_embarcacion", "30", "Días hacia atrás para buscar desembarques por código de embarcación", "CONSULTAS");
         createIfNotExist("consulta_folio_max_resultados", "20", "Máximo de resultados devueltos en la búsqueda puntual por folio", "CONSULTAS");
 
-        // PRIORIDAD 3 — PLANTA: HUMEDAD EN RECEPCIÓN Y VARIACIÓN EQUIVALENTE (T3.1, T3.2)
-        createIfNotExist("planta_exige_humedad_recepcion", "false", "Exige ingresar el estado de humedad al recibir el camión en planta", "CADENA");
+        // PARTE K — MÓDULO DE PLANTA (TP.1, TP.2, TP.3)
+        createIfNotExist("planta_exige_peso_romana", "true", "Exige ingresar el peso neto en romana mayor a 0 kg en recepción de planta (TP.2)", "CADENA");
+        createIfNotExist("planta_version_minima", "", "Versión mínima de app móvil requerida para registrar recepciones en planta (TP.3)", "CADENA");
+        createIfNotExist("planta_exige_humedad_recepcion", "true", "Exige ingresar el estado de humedad al recibir el camión en planta (TP.3)", "CADENA");
         createIfNotExist("variacion_peso_alerta_equivalente", "false", "Usa la variación equivalente en captura para disparar alertas de peso cuando cambia la humedad", "CADENA");
 
         // PRIORIDAD 4 — PATENTES REGISTRADAS DE PRUEBA (T4.1)

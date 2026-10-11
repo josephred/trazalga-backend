@@ -99,8 +99,9 @@ public class ReportServiceVariacionPesoTest {
     }
 
     @Test
-    @DisplayName("R6.2: variacion_peso_exige_voucher=true rechaza recepcion en planta sin voucher o sin peso")
+    @DisplayName("R6.2 / TP.2: variacion_peso_exige_voucher=true y planta_exige_peso_romana=true rechazan recepcion en planta si falta voucher o peso")
     void testValidarVoucherRomana_ExigeVoucher_RechazaSiFalta() {
+        when(configService.getBoolean("planta_exige_peso_romana", true)).thenReturn(true);
         when(configService.getBoolean("variacion_peso_exige_voucher", true)).thenReturn(true);
 
         DeclaracionPlantaAbastecimientoModel declSinVoucher = new DeclaracionPlantaAbastecimientoModel();
@@ -110,7 +111,7 @@ public class ReportServiceVariacionPesoTest {
         IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () -> {
             plantaService.save(declSinVoucher);
         });
-        assertTrue(ex1.getMessage().contains("exige número de voucher y peso en romana"));
+        assertTrue(ex1.getMessage().contains("variacion_peso_exige_voucher=true"));
 
         DeclaracionPlantaAbastecimientoModel declSinPeso = new DeclaracionPlantaAbastecimientoModel();
         declSinPeso.setVoucherRomanaNumero("VOUCH-12345");
@@ -119,12 +120,13 @@ public class ReportServiceVariacionPesoTest {
         IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () -> {
             plantaService.save(declSinPeso);
         });
-        assertTrue(ex2.getMessage().contains("exige número de voucher y peso en romana"));
+        assertTrue(ex2.getMessage().contains("planta_exige_peso_romana=true"));
     }
 
     @Test
-    @DisplayName("R6.2: variacion_peso_exige_voucher=true acepta recepcion si tiene voucher y peso")
+    @DisplayName("R6.2 / TP.2: variacion_peso_exige_voucher=true y planta_exige_peso_romana=true acepta recepcion si tiene ambos")
     void testValidarVoucherRomana_ExigeVoucher_AceptaConDatos() {
+        when(configService.getBoolean("planta_exige_peso_romana", true)).thenReturn(true);
         when(configService.getBoolean("variacion_peso_exige_voucher", true)).thenReturn(true);
 
         DeclaracionPlantaAbastecimientoModel declValida = new DeclaracionPlantaAbastecimientoModel();
@@ -141,8 +143,9 @@ public class ReportServiceVariacionPesoTest {
     }
 
     @Test
-    @DisplayName("R6.2: variacion_peso_exige_voucher=false permite recepcion sin voucher para transicion documental")
+    @DisplayName("R6.2 / TP.2: Desacoplamiento permite recepcion sin voucher y sin romana cuando no son exigidos")
     void testValidarVoucherRomana_NoExigeVoucher_PermiteSinVoucher() {
+        when(configService.getBoolean("planta_exige_peso_romana", true)).thenReturn(false);
         when(configService.getBoolean("variacion_peso_exige_voucher", true)).thenReturn(false);
 
         DeclaracionPlantaAbastecimientoModel declTransicion = new DeclaracionPlantaAbastecimientoModel();

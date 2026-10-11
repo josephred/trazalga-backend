@@ -29,6 +29,9 @@ public class SecurityConfig {
     private JwtRequestFilter jwtRequestFilter;
 
     @Autowired
+    private com.trazalga.api.security.AppVersionFilter appVersionFilter;
+
+    @Autowired
     private com.trazalga.api.security.RateLimitFilter rateLimitFilter;
 
     @Bean
@@ -139,6 +142,7 @@ public class SecurityConfig {
 
         http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(appVersionFilter, JwtRequestFilter.class);
 
         return http.build();
     }
@@ -148,7 +152,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-App-Version"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

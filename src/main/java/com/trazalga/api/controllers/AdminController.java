@@ -26,6 +26,9 @@ public class AdminController {
     @Autowired
     private TareaProgramadaService tareaProgramadaService;
 
+    @Autowired
+    private com.trazalga.api.services.UsuarioVersionService usuarioVersionService;
+
     @GetMapping("/tareas-programadas")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Obtiene el estado de la última ejecución de cada tarea programada (TA.6)")
@@ -38,5 +41,13 @@ public class AdminController {
     @Operation(summary = "Obtiene el historial reciente de ejecuciones de tareas programadas (TA.6)")
     public ResponseEntity<List<TareaProgramadaEjecucionModel>> getHistorialTareas() {
         return ResponseEntity.ok(tareaProgramadaService.listarHistorial());
+    }
+
+    @GetMapping("/versiones-app")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Obtiene el resumen y listado de versiones de app móvil activas por usuario y plantas (TP.1)")
+    public ResponseEntity<com.trazalga.api.dto.ResumenVersionesAppDTO> getVersionesApp(
+            @org.springframework.web.bind.annotation.RequestParam(value = "perfil", required = false) String perfil) {
+        return ResponseEntity.ok(usuarioVersionService.listarUsuariosVersion(perfil));
     }
 }

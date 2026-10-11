@@ -29,6 +29,13 @@ public class UsuarioModel {
     private String estado;
     private String clave;
 
+    @Column(name = "app_version", length = 50)
+    private String appVersion;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "app_version_at")
+    private Date appVersionAt;
+
     // MEJORA: Nombre estándar Java y anotación para fecha y hora completa
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "fecha_creacion", updatable = false)

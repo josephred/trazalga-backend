@@ -26,6 +26,9 @@ import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.exceptions.CargaBloqueadaException;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 public class DeclaracionPlantaAbastecimientoService {
@@ -130,8 +133,10 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Transactional
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
+        validarVersionMinima();
         validarCargasNoBloqueadas(declaracion.getDeclaracionesSeleccionadas());
-        validarVoucherRomana(declaracion);
+        validarPesoRomana(declaracion);
+        validarVoucher(declaracion);
         validarHumedadRecepcion(declaracion);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
@@ -158,6 +163,7 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Transactional
     public DeclaracionPlantaAbastecimientoModel updateById(DeclaracionPlantaAbastecimientoModel request, Long id) {
+        validarVersionMinima();
         DeclaracionPlantaAbastecimientoModel model = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Declaración no encontrada: " + id));
 
@@ -165,7 +171,8 @@ public class DeclaracionPlantaAbastecimientoService {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
         validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
-        validarVoucherRomana(request);
+        validarPesoRomana(request);
+        validarVoucher(request);
         validarHumedadRecepcion(request);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
@@ -226,29 +233,69 @@ public class DeclaracionPlantaAbastecimientoService {
         return model;
     }
 
-    private void validarVoucherRomana(DeclaracionPlantaAbastecimientoModel model) {
+    public void validarPesoRomana(DeclaracionPlantaAbastecimientoModel model) {
         if (configuracionGeneralService == null || model == null) return;
-        boolean exigeVoucher = configuracionGeneralService.getBoolean("variacion_peso_exige_voucher", true);
-        if (exigeVoucher) {
-            boolean tieneVoucher = model.getVoucherRomanaNumero() != null && !model.getVoucherRomanaNumero().trim().isEmpty();
+        boolean exigePeso = configuracionGeneralService.getBoolean("planta_exige_peso_romana", true);
+        if (exigePeso) {
             boolean tienePesoRomana = model.getPesoRomanaKg() != null && model.getPesoRomanaKg().compareTo(BigDecimal.ZERO) > 0;
-            if (!tieneVoucher || !tienePesoRomana) {
-                throw new IllegalArgumentException(
-                    "El registro de recepción en planta exige número de voucher y peso en romana según la normativa vigente (variacion_peso_exige_voucher=true)."
+            if (!tienePesoRomana) {
+                throw new ValidacionPlantaException(
+                    "El peso en romana es obligatorio según la configuración planta_exige_peso_romana=true."
                 );
             }
         }
     }
 
-    private void validarHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
+    public void validarVoucher(DeclaracionPlantaAbastecimientoModel model) {
         if (configuracionGeneralService == null || model == null) return;
-        boolean exigeHumedad = configuracionGeneralService.getBoolean("planta_exige_humedad_recepcion", false);
+        boolean exigeVoucher = configuracionGeneralService.getBoolean("variacion_peso_exige_voucher", true);
+        if (exigeVoucher) {
+            boolean tieneVoucher = model.getVoucherRomanaNumero() != null && !model.getVoucherRomanaNumero().trim().isEmpty();
+            if (!tieneVoucher) {
+                throw new ValidacionPlantaException(
+                    "El número de voucher de romana es obligatorio según la configuración variacion_peso_exige_voucher=true."
+                );
+            }
+        }
+    }
+
+    public void validarVoucherRomana(DeclaracionPlantaAbastecimientoModel model) {
+        validarPesoRomana(model);
+        validarVoucher(model);
+    }
+
+    public void validarHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
+        if (configuracionGeneralService == null || model == null) return;
+        boolean exigeHumedad = configuracionGeneralService.getBoolean("planta_exige_humedad_recepcion", true);
         if (exigeHumedad) {
             if (model.getHumedadEstadoRecepcion() == null || model.getHumedadEstadoRecepcion().getId() == null) {
-                throw new IllegalArgumentException(
+                throw new ValidacionPlantaException(
                     "El registro de recepción en planta exige el estado de humedad al recibir el camión según la normativa vigente (planta_exige_humedad_recepcion=true)."
                 );
             }
+        }
+    }
+
+    public void validarVersionMinima() {
+        if (configuracionGeneralService == null) return;
+        String versionMinima = configuracionGeneralService.getValor("planta_version_minima", "");
+        if (versionMinima == null || versionMinima.isBlank()) {
+            return;
+        }
+
+        String appVersion = null;
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null && attrs.getRequest() != null) {
+                appVersion = attrs.getRequest().getHeader("X-App-Version");
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (appVersion == null || appVersion.isBlank() || UsuarioVersionService.esVersionMenorQue(appVersion, versionMinima.trim())) {
+            throw new ValidacionPlantaException(
+                "Actualice TrazAlga a la versión " + versionMinima.trim() + " o superior para registrar recepciones."
+            );
         }
     }
 
