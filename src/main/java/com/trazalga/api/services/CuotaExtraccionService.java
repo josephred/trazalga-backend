@@ -824,6 +824,23 @@ public class CuotaExtraccionService {
             BigDecimal desembarqueKg,
             BigDecimal capturaKg,
             boolean esEdicion) {
+        return evaluarCuotaDeclaracion(perfil, usuarioId, amerbId, especieId, extraccionTipoId,
+                comunaImputacionId, fechaExtraccion, fechaDeclaracion, desembarqueKg, capturaKg, esEdicion, null);
+    }
+
+    public EvaluacionCuotaResult evaluarCuotaDeclaracion(
+            String perfil,
+            Long usuarioId,
+            Long amerbId,
+            Long especieId,
+            Long extraccionTipoId,
+            Long comunaImputacionId,
+            Date fechaExtraccion,
+            Date fechaDeclaracion,
+            BigDecimal desembarqueKg,
+            BigDecimal capturaKg,
+            boolean esEdicion,
+            Long declaracionExcluidaId) {
 
         String modo = getModoImputacion();
         Date fechaEval;
