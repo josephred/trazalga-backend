@@ -30,14 +30,18 @@ public class CierreCuotaService {
     @Autowired
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
     @Transactional
-    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR') or hasRole('SYSTEM') or (authentication == null)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM') or (authentication == null)")
     public CuotaExtraccionModel cerrar(Long id, String motivo, String observacion, Long usuarioId) {
         CuotaExtraccionModel c = cuotaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
 
+        Long usuarioFinal = resolverUsuarioId(usuarioId);
         String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo.trim().toUpperCase() : "ADMINISTRATIVO";
-        c.cerrar(motivoFinal, new Date(), usuarioId);
+        c.cerrar(motivoFinal, new Date(), usuarioFinal);
 
         CuotaExtraccionModel guardada = cuotaRepository.save(c);
 
@@ -47,7 +51,7 @@ public class CierreCuotaService {
                 .tipo("CERRADA")
                 .motivo(motivoFinal)
                 .detalle(observacion != null && !observacion.isBlank() ? observacion.trim() : "Cierre de cuota")
-                .usuarioId(usuarioId)
+                .usuarioId(usuarioFinal)
                 .createdAt(new Date())
                 .build();
         cuotaEventoRepository.save(evento);
@@ -55,17 +59,18 @@ public class CierreCuotaService {
         // Publicar evento de dominio (TA.5)
         eventPublisher.publishEvent(new com.trazalga.api.events.CuotaCerrada(id, motivoFinal));
 
-        log.info("Cuota ID {} cerrada exitosamente con motivo {} por usuario {}", id, motivoFinal, usuarioId);
+        log.info("Cuota ID {} cerrada exitosamente con motivo {} por usuario {}", id, motivoFinal, usuarioFinal);
         return guardada;
     }
 
     @Transactional
-    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR') or hasRole('SYSTEM') or (authentication == null)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM') or (authentication == null)")
     public CuotaExtraccionModel reabrir(Long id, String motivo, Long usuarioId) {
         CuotaExtraccionModel c = cuotaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cuota no encontrada con id: " + id));
 
-        c.reabrir(motivo, usuarioId);
+        Long usuarioFinal = resolverUsuarioId(usuarioId);
+        c.reabrir(motivo, usuarioFinal);
 
         CuotaExtraccionModel guardada = cuotaRepository.save(c);
 
@@ -75,13 +80,26 @@ public class CierreCuotaService {
                 .tipo("REABIERTA")
                 .motivo(motivo != null ? motivo.trim() : null)
                 .detalle("Reapertura de cuota: " + (motivo != null ? motivo.trim() : ""))
-                .usuarioId(usuarioId)
+                .usuarioId(usuarioFinal)
                 .createdAt(new Date())
                 .build();
         cuotaEventoRepository.save(evento);
 
-        log.info("Cuota ID {} reabierta exitosamente con motivo {} por usuario {}", id, motivo, usuarioId);
+        log.info("Cuota ID {} reabierta exitosamente con motivo {} por usuario {}", id, motivo, usuarioFinal);
         return guardada;
+    }
+
+    private Long resolverUsuarioId(Long usuarioId) {
+        if (usuarioId != null) return usuarioId;
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null && usuarioRepository != null) {
+                return usuarioRepository.findByRut(auth.getName())
+                        .map(com.trazalga.api.models.UsuarioModel::getId)
+                        .orElse(null);
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 }
 

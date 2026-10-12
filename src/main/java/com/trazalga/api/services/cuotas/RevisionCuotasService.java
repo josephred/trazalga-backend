@@ -68,10 +68,6 @@ public class RevisionCuotasService {
             if ("CERRADA".equalsIgnoreCase(cuota.getEstado())) {
                 continue;
             }
-            if (Boolean.TRUE.equals(cuota.getEsPlantilla()) && cuota.getUsuario() == null) {
-                continue;
-            }
-
             LocalDate cInicio = cuota.getFechaInicio() != null ? CuotaExtraccionService.toLocalDateSafe(cuota.getFechaInicio()) : null;
             LocalDate cFin = cuota.getFechaFin() != null ? CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin()) : null;
 
@@ -97,6 +93,31 @@ public class RevisionCuotasService {
                     log.info("TC.3: Cuota ID {} cerrada automáticamente por VENCIMIENTO (fecha término {}).", cuota.getId(), cFin);
                     procesadas++;
                 }
+                continue;
+            }
+
+            // TC.6 / Defecto 12: Las plantillas sin usuario no tienen consumo individual acumulado,
+            // pero sí se evalúa el aviso de expiración próxima hacia administradores.
+            if (Boolean.TRUE.equals(cuota.getEsPlantilla()) && cuota.getUsuario() == null) {
+                if (cuota.getFechaFin() != null) {
+                    LocalDate fechaFinLocal = CuotaExtraccionService.toLocalDateSafe(cuota.getFechaFin());
+                    long diasRestantes = ChronoUnit.DAYS.between(hoyLocal, fechaFinLocal);
+                    if (diasRestantes >= 0 && diasRestantes <= diasPreviosExpiracion) {
+                        if (!tieneSucesoraContigua(cuota, fechaFinLocal, cuotasActivas)) {
+                            String alcance = cuotaExtraccionService.describirAlcance(cuota);
+                            String especieNombre = (cuota.getEspecie() != null) ? cuota.getEspecie().getNombre() : "General";
+                            String claveAviso = String.format("CUOTA:%d:VENCIMIENTO:0", cuota.getId());
+                            if (debeEnviarAviso(claveAviso)) {
+                                String titulo = "Aviso de Expiración de Cuota";
+                                String mensaje = String.format("La cuota de %s (%s) vencerá en %d día(s) (fecha de término: %s).",
+                                        alcance, especieNombre, diasRestantes, cuota.getFechaFin());
+                                notificar(null, titulo, mensaje);
+                                registrarAviso(claveAviso);
+                            }
+                        }
+                    }
+                }
+                procesadas++;
                 continue;
             }
 

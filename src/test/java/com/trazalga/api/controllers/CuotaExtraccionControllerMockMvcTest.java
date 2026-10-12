@@ -171,7 +171,7 @@ public class CuotaExtraccionControllerMockMvcTest {
                 .estado("CERRADA")
                 .build();
 
-        when(cuotaService.cerrarCuota(eq(10L), eq("ADMINISTRATIVO"), eq("Cierre de prueba"))).thenReturn(cerrada);
+        when(cuotaService.cerrarCuota(eq(10L), eq("ADMINISTRATIVO"), eq("Cierre de prueba"), any())).thenReturn(cerrada);
 
         String payload = """
         {
@@ -200,7 +200,7 @@ public class CuotaExtraccionControllerMockMvcTest {
     @Test
     @DisplayName("TC.2 MockMvc: GET /api/cuotas/{id}/eventos devuelve lista")
     void testGetEventos_DevuelveLista() throws Exception {
-        com.trazalga.api.models.CuotaExtraccionEventoModel ev = com.trazalga.api.models.CuotaExtraccionEventoModel.builder()
+        com.trazalga.api.dto.EventoCuotaDTO ev = com.trazalga.api.dto.EventoCuotaDTO.builder()
                 .id(1L)
                 .tipo("CREADA")
                 .motivo("INICIO")

@@ -75,7 +75,7 @@ public class ConsumoIndividualQuery {
         String modo = (configService != null) ? configService.getValor("cuota_fecha_imputacion", "EXTRACCION") : "EXTRACCION";
         String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
         boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
-        String colVolumen = esCaptura ? "captura_kg" : "desembarque_kg";
+        String colVolumen = esCaptura ? "captura" : "desembarque";
 
         Long especieId = cuota.getEspecie() != null ? cuota.getEspecie().getId() : null;
         Long extraccionTipoId = cuota.getExtraccionTipo() != null ? cuota.getExtraccionTipo().getId() : null;

@@ -172,26 +172,54 @@ public class CuotaExtraccionService {
         return cuotaRepository.findAll();
     }
 
-    public List<com.trazalga.api.models.CuotaExtraccionEventoModel> getEventos(Long cuotaId) {
+    public List<com.trazalga.api.dto.EventoCuotaDTO> getEventos(Long cuotaId) {
         if (cuotaEventoRepository == null || cuotaId == null) {
             return java.util.Collections.emptyList();
         }
-        return cuotaEventoRepository.findByCuotaIdOrderByCreatedAtDesc(cuotaId);
+        List<com.trazalga.api.models.CuotaExtraccionEventoModel> eventos = cuotaEventoRepository.findByCuotaIdOrderByCreatedAtDesc(cuotaId);
+        return eventos.stream().map(e -> {
+            String usuarioNombre = null;
+            if (e.getUsuarioId() != null && usuarioRepository != null) {
+                usuarioNombre = usuarioRepository.findById(e.getUsuarioId())
+                        .map(com.trazalga.api.models.UsuarioModel::getNombreCompleto)
+                        .orElse(null);
+            }
+            return com.trazalga.api.dto.EventoCuotaDTO.builder()
+                    .id(e.getId())
+                    .cuotaId(cuotaId)
+                    .tipo(e.getTipo())
+                    .motivo(e.getMotivo())
+                    .detalle(e.getDetalle())
+                    .usuarioId(e.getUsuarioId())
+                    .usuarioNombre(usuarioNombre)
+                    .createdAt(e.getCreatedAt())
+                    .build();
+        }).toList();
+    }
+
+    @Transactional
+    public CuotaExtraccionModel cerrarCuota(Long id, String motivo, String observacion, Long usuarioId) {
+        return cierreCuotaService.cerrar(id, motivo, observacion, usuarioId);
     }
 
     @Transactional
     public CuotaExtraccionModel cerrarCuota(Long id, String motivo, String observacion) {
-        return cierreCuotaService.cerrar(id, motivo, observacion, null);
+        return cerrarCuota(id, motivo, observacion, null);
     }
 
     @Transactional
     public CuotaExtraccionModel cerrarCuota(Long id) {
-        return cerrarCuota(id, "ADMINISTRATIVO", "Cierre administrativo");
+        return cerrarCuota(id, "ADMINISTRATIVO", "Cierre administrativo", null);
+    }
+
+    @Transactional
+    public CuotaExtraccionModel reabrirCuota(Long id, String motivo, Long usuarioId) {
+        return cierreCuotaService.reabrir(id, motivo, usuarioId);
     }
 
     @Transactional
     public CuotaExtraccionModel reabrirCuota(Long id, String motivo) {
-        return cierreCuotaService.reabrir(id, motivo, null);
+        return reabrirCuota(id, motivo, null);
     }
 
     public Optional<CuotaExtraccionModel> getById(Long id) {
@@ -828,6 +856,7 @@ public class CuotaExtraccionService {
                 comunaImputacionId, fechaExtraccion, fechaDeclaracion, desembarqueKg, capturaKg, esEdicion, null);
     }
 
+    @Transactional
     public EvaluacionCuotaResult evaluarCuotaDeclaracion(
             String perfil,
             Long usuarioId,
@@ -965,7 +994,7 @@ public class CuotaExtraccionService {
             }
 
             // B. Consumo acumulado y límite efectivo
-            BigDecimal consumoAcumulado = ejecutarConsultaConsumo(c, fechaEval, perfil, usuarioId);
+            BigDecimal consumoAcumulado = ejecutarConsultaConsumo(c, fechaEval, perfil, usuarioId, declaracionExcluidaId);
             boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(c.getMetrica());
             BigDecimal limiteEfectivo = calcularLimiteEfectivo(c, fechaEval);
 
@@ -1377,11 +1406,11 @@ public class CuotaExtraccionService {
             cuota.setPerfil("AMERB".equalsIgnoreCase(cuota.getAmbito()) ? "AREA" : "RECOLECTOR");
         }
         if (cuota.getNivelAgregacion() == null || cuota.getNivelAgregacion().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL).");
+            throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (NACIONAL, MACROZONA, REGION, PROVINCIA, COMUNA, AMERB, AREA, INDIVIDUAL).");
         }
         String nivelNorm = cuota.getNivelAgregacion().trim().toUpperCase();
-        if (!java.util.Set.of("COMUNA", "PROVINCIA", "REGION", "MACROZONA", "INDIVIDUAL", "NACIONAL").contains(nivelNorm)) {
-            throw new IllegalArgumentException("Nivel de agregación inválido: " + cuota.getNivelAgregacion() + ". Los valores permitidos son COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL.");
+        if (!java.util.Set.of("COMUNA", "PROVINCIA", "REGION", "MACROZONA", "INDIVIDUAL", "NACIONAL", "AMERB", "AREA").contains(nivelNorm)) {
+            throw new IllegalArgumentException("Nivel de agregación inválido: " + cuota.getNivelAgregacion() + ". Los valores permitidos son COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL, AMERB, AREA.");
         }
         cuota.setNivelAgregacion(nivelNorm);
 
@@ -1906,7 +1935,7 @@ public class CuotaExtraccionService {
     }
 
     private BigDecimal ejecutarQueryConsumo(
-            String tableName, String colMetrica, FiltroTerritorialCuota filtro, CuotaExtraccionModel cuota, java.sql.Date[] rango) {
+            String tableName, String colMetrica, FiltroTerritorialCuota filtro, CuotaExtraccionModel cuota, java.sql.Date[] rango, Long declaracionExcluidaId) {
         String modo = getModoImputacion();
         String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
 
@@ -1918,20 +1947,24 @@ public class CuotaExtraccionService {
         if (cuota.getExtraccionTipo() != null) {
             sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
         }
-        sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate");
+        sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate ");
+        if (declaracionExcluidaId != null) {
+            sql.append("AND d.id <> :declaracionExcluidaId ");
+        }
 
         Query q = entityManager.createNativeQuery(sql.toString());
         q.setParameter("startDate", rango[0]);
         q.setParameter("endDate", rango[1]);
         if (cuota.getEspecie() != null) q.setParameter("especieId", cuota.getEspecie().getId());
         if (cuota.getExtraccionTipo() != null) q.setParameter("extraccionTipoId", cuota.getExtraccionTipo().getId());
+        if (declaracionExcluidaId != null) q.setParameter("declaracionExcluidaId", declaracionExcluidaId);
         filtro.aplicarParametros(q);
 
         Object singleResult = q.getSingleResult();
         return (singleResult != null) ? new BigDecimal(singleResult.toString()) : BigDecimal.ZERO;
     }
 
-    private BigDecimal consumoAreaLibre(CuotaExtraccionModel cuota, Date fechaEval, Long targetUsuarioId) {
+    private BigDecimal consumoAreaLibre(CuotaExtraccionModel cuota, Date fechaEval, Long targetUsuarioId, Long declaracionExcluidaId) {
         java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
         boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
         String colMetrica = esCaptura ? "captura" : "desembarque";
@@ -1939,17 +1972,17 @@ public class CuotaExtraccionService {
         // 1. Consumo de recolectores — imputación por comuna de inscripción del usuario (u.comuna_id)
         FiltroTerritorialCuota filtroRecolector = construirFiltroTerritorial(cuota, "declaracion_recolector", targetUsuarioId);
         BigDecimal consumoRecolector = ejecutarQueryConsumo(
-                "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango);
+                "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango, declaracionExcluidaId);
 
         // 2. Consumo de armadores — imputación por caleta de desembarque (d.comuna_id)
         FiltroTerritorialCuota filtroArmador = construirFiltroTerritorial(cuota, "declaracion_armador", targetUsuarioId);
         BigDecimal consumoArmador = ejecutarQueryConsumo(
-                "declaracion_armador", colMetrica, filtroArmador, cuota, rango);
+                "declaracion_armador", colMetrica, filtroArmador, cuota, rango, declaracionExcluidaId);
 
         return consumoRecolector.add(consumoArmador);
     }
 
-    private BigDecimal consumoTablaUnica(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId) {
+    private BigDecimal consumoTablaUnica(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId, Long declaracionExcluidaId) {
         boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
         String colMetrica = esCaptura ? "captura" : "desembarque";
         String tableName = "declaracion_recolector";
@@ -1960,10 +1993,14 @@ public class CuotaExtraccionService {
 
         java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
         FiltroTerritorialCuota filtro = construirFiltroTerritorial(cuota, tableName, targetUsuarioId);
-        return ejecutarQueryConsumo(tableName, colMetrica, filtro, cuota, rango);
+        return ejecutarQueryConsumo(tableName, colMetrica, filtro, cuota, rango, declaracionExcluidaId);
     }
 
     public BigDecimal ejecutarConsultaConsumo(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId) {
+        return ejecutarConsultaConsumo(cuota, fechaEval, perfil, targetUsuarioId, null);
+    }
+
+    public BigDecimal ejecutarConsultaConsumo(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId, Long declaracionExcluidaId) {
         String alcance = alcanceDe(cuota);
         boolean esAlcanceAmplio = "MACROZONA".equals(alcance) || "NACIONAL".equals(alcance) || "REGION".equals(alcance) || "GLOBAL".equals(alcance);
 
@@ -1980,7 +2017,7 @@ public class CuotaExtraccionService {
         long ahora = System.currentTimeMillis();
         BigDecimal limiteEfectivo = (cuota.getLimiteKg() != null) ? BigDecimal.valueOf(cuota.getLimiteKg()) : BigDecimal.ZERO;
 
-        if (esAlcanceAmplio) {
+        if (esAlcanceAmplio && declaracionExcluidaId == null) {
             CacheConsumoEntry cached = cacheConsumoL2.get(cacheKey);
             if (cached != null && (ahora - cached.timestamp < 30_000)) {
                 // Zona operativa normal (< 90%): responder desde memoria sin colapso de base de datos
@@ -1993,12 +2030,12 @@ public class CuotaExtraccionService {
 
         BigDecimal consumo;
         if (esAreaLibre) {
-            consumo = consumoAreaLibre(cuota, fechaEval, targetUsuarioId);
+            consumo = consumoAreaLibre(cuota, fechaEval, targetUsuarioId, declaracionExcluidaId);
         } else {
-            consumo = consumoTablaUnica(cuota, fechaEval, perfil, targetUsuarioId);
+            consumo = consumoTablaUnica(cuota, fechaEval, perfil, targetUsuarioId, declaracionExcluidaId);
         }
 
-        if (esAlcanceAmplio) {
+        if (esAlcanceAmplio && declaracionExcluidaId == null) {
             cacheConsumoL2.put(cacheKey, new CacheConsumoEntry(consumo, ahora));
         }
 

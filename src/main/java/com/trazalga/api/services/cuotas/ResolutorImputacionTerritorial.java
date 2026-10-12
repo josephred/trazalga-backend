@@ -45,7 +45,7 @@ public class ResolutorImputacionTerritorial {
             String modo = (parametrosService != null && parametrosService.cuotas() != null)
                     ? parametrosService.cuotas().imputacionArmador()
                     : "INSCRIPCION";
-            if ("CALETA_DESEMBARQUE".equalsIgnoreCase(modo)) {
+            if ("CALETA_DESEMBARQUE".equalsIgnoreCase(modo) || "CALETA".equalsIgnoreCase(modo)) {
                 return caletaDesembarque;
             }
             return inscripcion; // Default acordado en D1

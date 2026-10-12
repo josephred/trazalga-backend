@@ -151,4 +151,37 @@ public class RevisionCuotasVencimientoTest {
         verify(cuotaRepository, never()).save(any());
         verify(cuotaEventoRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("TC.3 / Defecto 12: Cuota plantilla vencida sin usuario se cierra automáticamente con motivo VENCIMIENTO")
+    void testCuotaPlantillaVencida_CierraAutomaticamente() {
+        LocalDate hoy = LocalDate.of(2026, 4, 1);
+        Date hoyDate = Date.valueOf(hoy);
+
+        CuotaExtraccionModel plantillaVencida = CuotaExtraccionModel.builder()
+                .id(104L)
+                .periodo("MENSUAL")
+                .esPlantilla(true)
+                .usuario(null)
+                .fechaInicio(Date.valueOf("2026-03-01"))
+                .fechaFin(Date.valueOf("2026-03-31"))
+                .limiteKg(50_000.0)
+                .activo(true)
+                .build();
+
+        when(configuracionGeneralService.getBoolean("cuota_cierre_automatico_vencimiento", false)).thenReturn(true);
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(plantillaVencida));
+
+        int procesadas = service.revisar(hoy, hoyDate);
+
+        assertEquals(1, procesadas);
+        assertEquals("CERRADA", plantillaVencida.getEstado());
+        assertEquals("VENCIMIENTO", plantillaVencida.getMotivoCierre());
+        verify(cuotaRepository).save(plantillaVencida);
+        verify(cuotaEventoRepository).save(argThat(ev ->
+                "CERRADA".equals(ev.getTipo()) &&
+                "VENCIMIENTO".equals(ev.getMotivo()) &&
+                plantillaVencida.equals(ev.getCuota())
+        ));
+    }
 }

@@ -147,8 +147,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testRecolector_CaletaComunaCoinciden_PermiteGuardar() {
         DeclaracionRecolectorModel req = new DeclaracionRecolectorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setCaleta(caletaChepiquillaFreirina);
         req.setComuna(comunaFreirina);
         req.setUsuario(usuarioMock);
@@ -175,8 +176,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testRecolector_CaletaComunaDiscrepan_Lanza422ConMensajeDescriptivo() {
         DeclaracionRecolectorModel req = new DeclaracionRecolectorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setCaleta(caletaChepiquillaFreirina);
         req.setComuna(comunaAndacollo);
 
@@ -194,8 +196,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testRecolector_CaletaSinComuna_AutocompletaComunaDesdeCaleta() {
         DeclaracionRecolectorModel req = new DeclaracionRecolectorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setCaleta(caletaChepiquillaFreirina);
         req.setComuna(null);
         req.setUsuario(usuarioMock);
@@ -226,8 +229,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testArmador_CaletaComunaCoinciden_PermiteGuardar() {
         DeclaracionArmadorModel req = new DeclaracionArmadorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setHora("12:00:00");
         req.setDesembarque(BigDecimal.valueOf(2000.0));
         req.setCaleta(caletaChepiquillaFreirina);
@@ -268,8 +272,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testArmador_CaletaComunaDiscrepan_Lanza422ConMensajeDescriptivo() {
         DeclaracionArmadorModel req = new DeclaracionArmadorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setHora("12:00:00");
         req.setDesembarque(BigDecimal.valueOf(2000.0));
         req.setCaleta(caletaChepiquillaFreirina);
@@ -302,8 +307,9 @@ public class DeclaracionTerritorialValidationTest {
     @Test
     void testArmador_CaletaSinComuna_AutocompletaComunaDesdeCaleta() {
         DeclaracionArmadorModel req = new DeclaracionArmadorModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setHora("12:00:00");
         req.setDesembarque(BigDecimal.valueOf(2000.0));
         req.setCaleta(caletaChepiquillaFreirina);
@@ -351,8 +357,9 @@ public class DeclaracionTerritorialValidationTest {
         amerb.setComuna(comunaFreirina);
 
         DeclaracionAreaModel req = new DeclaracionAreaModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setAmerb(amerb);
         req.setCaleta(caletaChepiquillaFreirina);
         req.setUsuario(usuarioMock);
@@ -381,8 +388,9 @@ public class DeclaracionTerritorialValidationTest {
         amerbAndacollo.setComuna(comunaAndacollo);
 
         DeclaracionAreaModel req = new DeclaracionAreaModel();
-        req.setFechaDeclaracion(new Date());
-        req.setFechaExtraccion(new Date());
+        Date fechaActual = new Date();
+        req.setFechaDeclaracion(fechaActual);
+        req.setFechaExtraccion(fechaActual);
         req.setAmerb(amerbAndacollo);
         req.setCaleta(caletaChepiquillaFreirina);
 

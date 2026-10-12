@@ -128,7 +128,8 @@ public class CuotaRevalidacionEdicionTest {
 
         when(validacionDeclaracionService.validar(argThat(ctx ->
                 Boolean.TRUE.equals(ctx.getEsEdicion()) &&
-                "RECOLECTOR".equals(ctx.getTipoDeclaracion())
+                "RECOLECTOR".equals(ctx.getTipoDeclaracion()) &&
+                Long.valueOf(100L).equals(ctx.getDeclaracionId())
         ))).thenReturn(rechazo);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
@@ -180,7 +181,8 @@ public class CuotaRevalidacionEdicionTest {
                 .build();
 
         when(validacionDeclaracionService.validar(argThat(ctx ->
-                Boolean.TRUE.equals(ctx.getEsEdicion())
+                Boolean.TRUE.equals(ctx.getEsEdicion()) &&
+                Long.valueOf(200L).equals(ctx.getDeclaracionId())
         ))).thenReturn(aprobacionConAlerta);
 
         DeclaracionRecolectorModel resultado = declaracionRecolectorService.updateById(request, 200L);

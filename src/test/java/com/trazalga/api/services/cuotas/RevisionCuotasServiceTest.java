@@ -237,4 +237,29 @@ public class RevisionCuotasServiceTest {
         assertNotNull(cuota.getFechaCierreAutomatico());
         verify(cuotaRepository).save(cuota);
     }
+
+    @Test
+    @DisplayName("TC.6 / Defecto 12: Cuota plantilla próxima a expirar sí genera aviso a administradores")
+    void testCuotaPlantilla_AvisaExpiracion() {
+        CuotaExtraccionModel plantillaDiciembre = crearCuotaMes(16L, 2026, 12);
+        plantillaDiciembre.setEsPlantilla(true);
+        plantillaDiciembre.setUsuario(null);
+
+        when(cuotaRepository.findActivasConRelaciones()).thenReturn(List.of(plantillaDiciembre));
+
+        LocalDate hoy28Dic = LocalDate.of(2026, 12, 28);
+        Date hoyDate = Date.valueOf(hoy28Dic);
+
+        when(cuotaExtraccionService.describirAlcance(plantillaDiciembre)).thenReturn("Comuna La Serena");
+
+        int procesadas = service.revisar(hoy28Dic, hoyDate);
+
+        assertEquals(1, procesadas);
+        verify(notificationService, atLeastOnce()).sendPushNotificationToUser(
+                eq(1L), // admin ID
+                contains("Aviso de Expiración de Cuota"),
+                contains("vencerá en 3 día(s)")
+        );
+        verify(avisoEnviadoRepository).save(any(AvisoEnviadoModel.class));
+    }
 }

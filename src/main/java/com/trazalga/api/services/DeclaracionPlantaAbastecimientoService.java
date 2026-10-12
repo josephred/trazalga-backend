@@ -266,7 +266,7 @@ public class DeclaracionPlantaAbastecimientoService {
 
     public void validarHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
         if (configuracionGeneralService == null || model == null) return;
-        boolean exigeHumedad = configuracionGeneralService.getBoolean("planta_exige_humedad_recepcion", true);
+        boolean exigeHumedad = configuracionGeneralService.getBoolean("planta_exige_humedad_recepcion", false);
         if (exigeHumedad) {
             if (model.getHumedadEstadoRecepcion() == null || model.getHumedadEstadoRecepcion().getId() == null) {
                 throw new ValidacionPlantaException(

@@ -282,6 +282,7 @@ public class RetencionCustodiaService {
      * TR.3: Registra de forma transaccional independiente (REQUIRES_NEW) la marca bloqueante
      * RETENCION_EXCEDIDA delegando en MarcaRetencionExecutorService para garantizar proxy AOP.
      */
+    @Transactional
     public DeclaracionMarcaModel registrarMarcaRetencionExcedida(
             String tipo,
             Long declaracionId,
@@ -289,15 +290,95 @@ public class RetencionCustodiaService {
             Long usuarioDeclaranteId,
             Long regionId
     ) {
-        return marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
-                tipo,
+        return registrarMarcaRetencionExcedida(tipo, declaracionId, motivo, usuarioDeclaranteId, regionId, null, null, "VALIDACION");
+    }
+
+    @Transactional
+    public DeclaracionMarcaModel registrarMarcaRetencionExcedida(
+            String tipo,
+            Long declaracionId,
+            String motivo,
+            Long usuarioDeclaranteId,
+            Long regionId,
+            String umbralParam,
+            String valorParam,
+            String origenParam
+    ) {
+        if (marcaRetencionExecutorService != null) {
+            return marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
+                    tipo,
+                    declaracionId,
+                    motivo,
+                    usuarioDeclaranteId,
+                    regionId,
+                    umbralParam,
+                    valorParam,
+                    origenParam
+            );
+        }
+
+        // Fallback cuando se ejecuta en pruebas unitarias aisladas sin proxy AOP
+        String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
+        List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
+        boolean yaLiberada = marcasPrevias.stream()
+                .anyMatch(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()) && "LIBERADA".equalsIgnoreCase(m.getResolucionTipo()));
+
+        if (yaLiberada) {
+            log.info("Carga {}:{} ya fue formalmente LIBERADA por fiscalizador. Se omite re-bloqueo.", tipoNorm, declaracionId);
+            return marcasPrevias.stream()
+                    .filter(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        String valorObs = valorParam;
+        if (valorObs == null || valorObs.isBlank()) {
+            if (motivo != null) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*h", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(motivo);
+                if (matcher.find()) {
+                    valorObs = matcher.group(1);
+                } else {
+                    valorObs = motivo.length() <= 40 ? motivo : motivo.substring(0, 40);
+                }
+            } else {
+                valorObs = "120+";
+            }
+        }
+        if (valorObs.length() > 40) {
+            valorObs = valorObs.substring(0, 40);
+        }
+
+        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam : "120";
+        if (umbral.length() > 40) {
+            umbral = umbral.substring(0, 40);
+        }
+
+        String origen = (origenParam != null && !origenParam.isBlank()) ? origenParam.trim().toUpperCase() : "VALIDACION";
+        if (origen.length() > 20) {
+            origen = origen.substring(0, 20);
+        }
+
+        CriterioHallazgo criterio = new CriterioHallazgo(
+                "retencion_horas",
+                umbral,
+                valorObs,
+                "h"
+        );
+
+        String detalleCausa = (motivo != null && !motivo.isBlank())
+                ? motivo
+                : String.format("Carga de %s supera el umbral de retención máxima de %s h.", tipoNorm, umbral);
+
+        return hallazgoService.registrar(
+                tipoNorm,
                 declaracionId,
-                motivo,
+                "RETENCION_EXCEDIDA",
+                "D3",
+                criterio,
+                detalleCausa,
+                "BODEGA_VIRTUAL_AUTOMA",
                 usuarioDeclaranteId,
-                regionId,
-                null,
-                null,
-                "VALIDACION"
+                regionId
         );
     }
 
@@ -332,7 +413,7 @@ public class RetencionCustodiaService {
             if (eval.isBloqueoRequerido() && params.bloqueoActivo()) {
                 if (!Boolean.TRUE.equals(lote.getBloqueada())) {
                     try {
-                        marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
+                        registrarMarcaRetencionExcedida(
                                 lote.getTipo(),
                                 lote.getId(),
                                 eval.getMotivoDetalle(),

@@ -105,4 +105,14 @@ public class ImputacionTerritorialTest {
         assertNotNull(reglaDesconocido);
         assertEquals("CALETA_DESEMBARQUE", reglaDesconocido.clave());
     }
+
+    @Test
+    void testResolutor_ArmadorModoCaletaAlias_ResuelveCaletaDesembarque() {
+        ParametrosCuota paramsCaleta = new ParametrosCuota(false, 0, "ALERTA", "CALETA", 10.0);
+        when(parametrosService.cuotas()).thenReturn(paramsCaleta);
+
+        ReglaImputacionTerritorial regla = resolutor.resolver("ARMADOR");
+        assertNotNull(regla);
+        assertEquals("CALETA_DESEMBARQUE", regla.clave());
+    }
 }

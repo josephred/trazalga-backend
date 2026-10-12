@@ -85,13 +85,15 @@ ALTER TABLE cuota_extraccion
 SET @chk_ce_na = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuota_extraccion' AND CONSTRAINT_NAME = 'chk_cuota_nivel_agregacion');
 
-SET @sql_chk_ce_na = IF(@chk_ce_na = 0,
-    'ALTER TABLE cuota_extraccion ADD CONSTRAINT chk_cuota_nivel_agregacion CHECK (nivel_agregacion IN ("INDIVIDUAL", "AMERB", "COMUNA", "PROVINCIA", "REGION", "MACROZONA", "IRRESOLUBLE"));',
-    'SELECT "chk_cuota_nivel_agregacion ya existe";');
+SET @sql_chk_ce_na = IF(@chk_ce_na > 0,
+    'ALTER TABLE cuota_extraccion DROP CONSTRAINT chk_cuota_nivel_agregacion;',
+    'SELECT "sin constraint previo";');
+PREPARE stmt_drop_na FROM @sql_chk_ce_na;
+EXECUTE stmt_drop_na;
+DEALLOCATE PREPARE stmt_drop_na;
 
-PREPARE stmt_chk_na FROM @sql_chk_ce_na;
-EXECUTE stmt_chk_na;
-DEALLOCATE PREPARE stmt_chk_na;
+ALTER TABLE cuota_extraccion ADD CONSTRAINT chk_cuota_nivel_agregacion 
+    CHECK (nivel_agregacion IN ('INDIVIDUAL', 'AMERB', 'AREA', 'COMUNA', 'PROVINCIA', 'REGION', 'MACROZONA', 'NACIONAL', 'IRRESOLUBLE'));
 
 SET @chk_ce_met = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuota_extraccion' AND CONSTRAINT_NAME = 'chk_cuota_metrica');

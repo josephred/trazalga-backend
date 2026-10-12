@@ -20,6 +20,7 @@ public class ContextoDeclaracion {
     private Long especieId;
     private Long humedadEstadoId;
     private Long extraccionTipoId;
+    private Long caletaId;
     private Long comunaDesembarqueId;
     private Long comunaInscripcionId;
     private Long regionId;

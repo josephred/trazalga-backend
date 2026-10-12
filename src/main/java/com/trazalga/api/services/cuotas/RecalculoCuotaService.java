@@ -3,8 +3,11 @@ package com.trazalga.api.services.cuotas;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
@@ -64,6 +67,10 @@ public class RecalculoCuotaService {
     @Lazy
     private ConfiguracionGeneralService configService;
 
+    private final ConcurrentHashMap<String, CacheCandidatasEntry> cacheCandidatas = new ConcurrentHashMap<>();
+
+    private record CacheCandidatasEntry(List<DeclaracionCandidata> lista, long timestamp) {}
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -90,6 +97,7 @@ public class RecalculoCuotaService {
      */
     @Transactional
     public ResumenRecalculoCuotaDTO recalcularHallazgos(Long cuotaId, LocalDate desde, LocalDate hasta) {
+        cacheCandidatas.clear();
         CuotaExtraccionModel cuota = cuotaRepository.findById(cuotaId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuota de extracción no encontrada con id: " + cuotaId));
 
@@ -313,6 +321,11 @@ public class RecalculoCuotaService {
             return 0;
         }
 
+        LocalDate fCreacionCuota = toLocalDate(cuota.getCreatedAt());
+        if (fCreacionCuota != null && !fCreacionCuota.isAfter(fInicio)) {
+            return 0;
+        }
+
         List<DeclaracionCandidata> candidatas = cargarDeclaracionesCandidatas(fInicio, fFin);
         Date cuotaCreatedAt = cuota.getCreatedAt();
 
@@ -331,8 +344,14 @@ public class RecalculoCuotaService {
 
     private List<DeclaracionCandidata> cargarDeclaracionesCandidatas(LocalDate fInicio, LocalDate fFin) {
         String modo = cuotaService != null ? cuotaService.getModoImputacion() : "DECLARACION";
-        String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
+        String cacheKey = fInicio + "_" + fFin + "_" + modo;
+        long ahora = System.currentTimeMillis();
+        CacheCandidatasEntry cached = cacheCandidatas.get(cacheKey);
+        if (cached != null && (ahora - cached.timestamp < 10_000)) {
+            return cached.lista;
+        }
 
+        String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
         List<DeclaracionCandidata> lista = new ArrayList<>();
 
         java.sql.Date sqlInicio = java.sql.Date.valueOf(fInicio);
@@ -381,6 +400,7 @@ public class RecalculoCuotaService {
             lista.add(mapearCandidata("AREA", r, modo));
         }
 
+        cacheCandidatas.put(cacheKey, new CacheCandidatasEntry(lista, ahora));
         return lista;
     }
 
@@ -395,7 +415,8 @@ public class RecalculoCuotaService {
         String hora = r[7] != null ? r[7].toString() : null;
         BigDecimal desembarque = r[8] != null ? new BigDecimal(r[8].toString()) : BigDecimal.ZERO;
         BigDecimal captura = r[9] != null ? new BigDecimal(r[9].toString()) : desembarque;
-        Date fCreacion = (Date) r[10];
+        Date fCreacionRaw = (Date) r[10];
+        Date fCreacion = (fCreacionRaw != null) ? combinarFechaYHoraADate(fCreacionRaw, hora) : null;
 
         Date fEvalDate = "DECLARACION".equalsIgnoreCase(modo) ? (fDec != null ? fDec : fExt) : (fExt != null ? fExt : fDec);
         LocalDate fechaEval = toLocalDate(fEvalDate);
@@ -416,6 +437,21 @@ public class RecalculoCuotaService {
                 .captura(captura)
                 .fechaEval(fechaEval != null ? fechaEval : LocalDate.now())
                 .build();
+    }
+
+    private Date combinarFechaYHoraADate(Date fecha, String horaStr) {
+        if (fecha == null) return null;
+        LocalDate ld = toLocalDate(fecha);
+        LocalTime lt = LocalTime.MIDNIGHT;
+        if (horaStr != null && !horaStr.isBlank()) {
+            try {
+                String h = horaStr.trim();
+                lt = LocalTime.parse(h.length() == 5 ? h + ":00" : h);
+            } catch (Exception ignored) {
+                lt = LocalTime.MIDNIGHT;
+            }
+        }
+        return Date.from(LocalDateTime.of(ld, lt).atZone(ZoneId.systemDefault()).toInstant());
     }
 
     private LocalDate toLocalDate(Date date) {

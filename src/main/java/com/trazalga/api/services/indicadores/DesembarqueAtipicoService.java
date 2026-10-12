@@ -545,4 +545,108 @@ public class DesembarqueAtipicoService {
             return str;
         }
     }
+
+    public List<Double> obtenerHistoricoKilos(
+            String tipo,
+            Long caletaId,
+            Long comunaId,
+            Long especieId,
+            Long humedadEstadoId,
+            Date fechaRef,
+            Long declaracionExcluidaId) {
+
+        if (especieId == null) {
+            return Collections.emptyList();
+        }
+
+        int ventanaDias = (configService != null)
+                ? configService.getInt("desembarque_atipico_ventana_dias", 90)
+                : 90;
+
+        Date ref = fechaRef != null ? fechaRef : new Date();
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(ref);
+        cal.add(Calendar.DAY_OF_YEAR, -ventanaDias);
+        Date fechaInicio = cal.getTime();
+
+        String entidad = "DeclaracionRecolectorModel";
+        if ("ARMADOR".equalsIgnoreCase(tipo)) {
+            entidad = "DeclaracionArmadorModel";
+        } else if ("AREA".equalsIgnoreCase(tipo)) {
+            entidad = "DeclaracionAreaModel";
+        }
+
+        StringBuilder jpql = new StringBuilder("SELECT d.desembarque FROM " + entidad + " d WHERE d.especie.id = :especieId ");
+        jpql.append("AND d.fechaDeclaracion BETWEEN :fechaInicio AND :fechaRef ");
+
+        if (humedadEstadoId != null) {
+            jpql.append("AND d.humedadEstado.id = :humedadEstadoId ");
+        }
+        if (caletaId != null) {
+            jpql.append("AND d.caleta.id = :caletaId ");
+        } else if (comunaId != null) {
+            if ("AREA".equalsIgnoreCase(tipo)) {
+                jpql.append("AND d.amerb.comuna.id = :comunaId ");
+            } else {
+                jpql.append("AND d.comuna.id = :comunaId ");
+            }
+        }
+        if (declaracionExcluidaId != null) {
+            jpql.append("AND d.id <> :declaracionExcluidaId ");
+        }
+
+        var query = em.createQuery(jpql.toString(), BigDecimal.class);
+        query.setParameter("especieId", especieId);
+        query.setParameter("fechaInicio", fechaInicio);
+        query.setParameter("fechaRef", ref);
+        if (humedadEstadoId != null) query.setParameter("humedadEstadoId", humedadEstadoId);
+        if (caletaId != null) {
+            query.setParameter("caletaId", caletaId);
+        } else if (comunaId != null) {
+            query.setParameter("comunaId", comunaId);
+        }
+        if (declaracionExcluidaId != null) {
+            query.setParameter("declaracionExcluidaId", declaracionExcluidaId);
+        }
+
+        List<BigDecimal> resultados = query.getResultList();
+        if (resultados == null || resultados.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return resultados.stream()
+                .filter(Objects::nonNull)
+                .map(BigDecimal::doubleValue)
+                .collect(Collectors.toList());
+    }
+
+    public List<ResultadoCriterioAtipico> evaluarAtipicos(ContextoEvaluacionAtipico ctx) {
+        if (ctx == null || ctx.getKilos() == null) {
+            return Collections.emptyList();
+        }
+        List<ResultadoCriterioAtipico> hallazgos = new ArrayList<>();
+        if (criterios != null && !criterios.isEmpty()) {
+            for (CriterioAtipico c : criterios) {
+                ResultadoCriterioAtipico res = c.evaluar(ctx);
+                if (res != null && res.isAtipico()) {
+                    hallazgos.add(res);
+                }
+            }
+        } else {
+            double umbral = (configService != null)
+                    ? configService.getDouble("desembarque_umbral_atipico_kg", 5000.0) : 5000.0;
+            if (ctx.getKilos() > umbral) {
+                hallazgos.add(ResultadoCriterioAtipico.builder()
+                        .atipico(true)
+                        .criterioClave("UMBRAL_ABSOLUTO")
+                        .parametro("desembarque_umbral_atipico_kg")
+                        .umbral(String.valueOf(umbral))
+                        .valor(String.valueOf(ctx.getKilos()))
+                        .unidad("kg")
+                        .texto(CriterioHallazgo.deKilos("desembarque_umbral_atipico_kg", umbral, ctx.getKilos()).texto())
+                        .build());
+            }
+        }
+        return hallazgos;
+    }
 }

@@ -1938,7 +1938,8 @@ public class ReportRepository {
             "COALESCE(p_via_c.hora, p_directa.hora) as hora_planta, " +        // 20
             "COALESCE(c_tot.tot_orig, p_tot.tot_orig_directo, orig.kg_origen) as kg_origen_despacho, " + // 21
             "c.id as id_comercializador, " +                                   // 22
-            "COALESCE(p_via_c.id, p_directa.id) as id_planta " +               // 23
+            "COALESCE(p_via_c.id, p_directa.id) as id_planta, " +              // 23
+            "COALESCE(hp_c.nombre, hp_d.nombre, hc.nombre, orig.humedad_origen) as humedad_destino " + // 24
             "FROM (" +
             "    SELECT 'RECOLECTOR' as eslabon_origen, r.id as orig_id, r.declaracion_destinatario_id as dest_id, r.consumida_por_tipo as dest_tipo, " +
             "    COALESCE(r.folio_origen, r.folio_desembarque_ro, CONCAT('RO-', r.id)) as folio_origen, r.fecha_declaracion as fecha_origen, r.hora as hora_origen, " +
@@ -1983,14 +1984,17 @@ public class ReportRepository {
             "LEFT JOIN declaracion_comercializador c " +
             "    ON (orig.dest_tipo = 'COMERCIALIZADOR' AND c.id = orig.dest_id) " +
             "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND c.folio_origen = orig.folio_origen) " +
+            "LEFT JOIN humedad_estado hc ON c.humedad_estado_id = hc.id " +
             "LEFT JOIN usuario uc ON c.usuario_id = uc.id " +
             "LEFT JOIN declaracion_planta_abastecimiento p_via_c " +
             "    ON (c.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND p_via_c.id = c.declaracion_destinatario_id) " +
             "    OR (c.declaracion_destinatario_id IS NULL AND c.folio_origen IS NOT NULL AND c.folio_origen <> '' AND p_via_c.folio_origen = c.folio_origen) " +
+            "LEFT JOIN humedad_estado hp_c ON COALESCE(p_via_c.humedad_estado_recepcion_id, p_via_c.humedad_estado_id) = hp_c.id " +
             "LEFT JOIN usuario up_c ON p_via_c.usuario_id = up_c.id " +
             "LEFT JOIN declaracion_planta_abastecimiento p_directa " +
             "    ON (orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = orig.dest_id) " +
             "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND p_directa.folio_origen = orig.folio_origen) " +
+            "LEFT JOIN humedad_estado hp_d ON COALESCE(p_directa.humedad_estado_recepcion_id, p_directa.humedad_estado_id) = hp_d.id " +
             "LEFT JOIN usuario up_d ON p_directa.usuario_id = up_d.id " +
             "LEFT JOIN (" +
             "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig " +
@@ -2060,6 +2064,7 @@ public class ReportRepository {
                 }
             }
             Double kgOrigenDespacho = row.length > 21 && row[21] != null ? ((Number) row[21]).doubleValue() : null;
+            String humedadDestino = row.length > 24 && row[24] != null ? row[24].toString() : humedadOrigen;
 
             // TV.4: El deltaPct de un lote es el del último tramo cerrado:
             // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o venta directa a planta);
@@ -2135,17 +2140,18 @@ public class ReportRepository {
                         ? evaluadorCoherenciaBiologica
                         : new com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica();
 
+                double riesgoRojo = (umbralVariacion != null ? umbralVariacion * 2.0 : 10.0);
                 com.trazalga.api.services.parametros.ParametrosVariacion pVar = new com.trazalga.api.services.parametros.ParametrosVariacion(
                         true, diasMinHumedo,
                         mermaMinHumedo != null ? mermaMinHumedo : 5.0,
                         mermaMaxSeco != null ? mermaMaxSeco : 3.0,
                         false,
                         umbralVariacion != null ? umbralVariacion : 5.0,
-                        10.0
+                        riesgoRojo
                 );
 
                 com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica.ResultadoEvaluacion resBio =
-                        evaluador.evaluar(humedadOrigen, humedadOrigen, deltaPct, null, diasTranscurridos, pVar);
+                        evaluador.evaluar(humedadOrigen, humedadDestino, deltaPct, null, diasTranscurridos, pVar);
 
                 severidadBiologica = resBio.semaforo().toSeveridadIndicador8();
                 inconsistenciaBiologica = resBio.criterio();
@@ -2162,6 +2168,7 @@ public class ReportRepository {
             map.put("rutOrigen", rutOrigen);
             map.put("especie", especie);
             map.put("humedadOrigen", humedadOrigen);
+            map.put("humedadDestino", humedadDestino);
             map.put("fechaOrigen", fechaOrigen);
             map.put("kgOrigen", Math.round(kgOrigen * 100.0) / 100.0);
             map.put("capturaOrigen", Math.round(capturaOrigen * 100.0) / 100.0);

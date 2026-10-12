@@ -53,6 +53,10 @@ public class ValidacionDeclaracionService {
     @Autowired(required = false)
     private com.trazalga.api.services.cuotas.ResolutorImputacionTerritorial resolutorImputacion;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.indicadores.DesembarqueAtipicoService desembarqueAtipicoService;
+
     /**
      * Orquesta las 5 validaciones del servidor antes de persistir una declaración.
      */
@@ -225,23 +229,82 @@ public class ValidacionDeclaracionService {
         }
 
         // ---------------------------------------------------------------------
-        // 5. Desembarque Atípico (Auditoría de Pesaje)
+        // 5. Desembarque Atípico (Auditoría de Pesaje) (TD.1 / TD.2)
         // ---------------------------------------------------------------------
-        double umbralAtipico = configuracionGeneralService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
-        if (ctx.getDesembarqueKg() != null && ctx.getDesembarqueKg().doubleValue() > umbralAtipico) {
-            com.trazalga.api.services.hallazgos.CriterioHallazgo crit = com.trazalga.api.services.hallazgos.CriterioHallazgo.deKilos(
-                    "desembarque_umbral_atipico_kg",
-                    umbralAtipico,
-                    ctx.getDesembarqueKg().doubleValue()
-            );
-            String msgAtipico = crit.texto();
-            marcas.add(MarcaItem.builder()
-                    .marca("DESEMBARQUE_ATIPICO")
-                    .detalle(msgAtipico)
-                    .reglaId(null)
-                    .criterio(crit)
-                    .build());
-            advertencias.add(msgAtipico);
+        if (ctx.getDesembarqueKg() != null) {
+            double kilos = ctx.getDesembarqueKg().doubleValue();
+            Date fDecl = ctx.getFechaDeclaracion() != null ? ctx.getFechaDeclaracion() : new Date();
+            Long comId = ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId();
+
+            List<Double> historico = java.util.Collections.emptyList();
+            boolean estadisticoActivo = configuracionGeneralService != null
+                    && configuracionGeneralService.getBoolean("desembarque_atipico_estadistico_activo", false);
+
+            if (estadisticoActivo && desembarqueAtipicoService != null) {
+                historico = desembarqueAtipicoService.obtenerHistoricoKilos(
+                        ctx.getTipoDeclaracion(),
+                        ctx.getCaletaId(),
+                        comId,
+                        ctx.getEspecieId(),
+                        ctx.getHumedadEstadoId(),
+                        fDecl,
+                        ctx.getDeclaracionId());
+            }
+
+            com.trazalga.api.services.indicadores.ContextoEvaluacionAtipico ctxAtipico =
+                    com.trazalga.api.services.indicadores.ContextoEvaluacionAtipico.builder()
+                            .tipo(ctx.getTipoDeclaracion())
+                            .declaracionId(ctx.getDeclaracionId())
+                            .kilos(kilos)
+                            .perfil(ctx.getTipoDeclaracion())
+                            .especieId(ctx.getEspecieId())
+                            .humedadId(ctx.getHumedadEstadoId())
+                            .caletaId(ctx.getCaletaId())
+                            .comunaId(comId)
+                            .usuarioId(ctx.getUsuarioId())
+                            .fechaDeclaracion(fDecl)
+                            .historicoKilos(historico)
+                            .build();
+
+            List<com.trazalga.api.services.indicadores.ResultadoCriterioAtipico> resultadosAtipicos;
+            if (desembarqueAtipicoService != null) {
+                resultadosAtipicos = desembarqueAtipicoService.evaluarAtipicos(ctxAtipico);
+            } else {
+                double umbralAtipico = configuracionGeneralService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
+                if (kilos > umbralAtipico) {
+                    com.trazalga.api.services.hallazgos.CriterioHallazgo crit =
+                            com.trazalga.api.services.hallazgos.CriterioHallazgo.deKilos(
+                                    "desembarque_umbral_atipico_kg", umbralAtipico, kilos);
+                    resultadosAtipicos = List.of(com.trazalga.api.services.indicadores.ResultadoCriterioAtipico.builder()
+                            .atipico(true)
+                            .criterioClave("UMBRAL_ABSOLUTO")
+                            .parametro("desembarque_umbral_atipico_kg")
+                            .umbral(String.valueOf(umbralAtipico))
+                            .valor(String.valueOf(kilos))
+                            .unidad("kg")
+                            .texto(crit.texto())
+                            .build());
+                } else {
+                    resultadosAtipicos = java.util.Collections.emptyList();
+                }
+            }
+
+            for (com.trazalga.api.services.indicadores.ResultadoCriterioAtipico resAtipico : resultadosAtipicos) {
+                com.trazalga.api.services.hallazgos.CriterioHallazgo crit =
+                        new com.trazalga.api.services.hallazgos.CriterioHallazgo(
+                                resAtipico.getParametro(),
+                                resAtipico.getUmbral(),
+                                resAtipico.getValor(),
+                                resAtipico.getUnidad());
+                String msgAtipico = resAtipico.getTexto();
+                marcas.add(MarcaItem.builder()
+                        .marca("DESEMBARQUE_ATIPICO")
+                        .detalle(msgAtipico)
+                        .reglaId(null)
+                        .criterio(crit)
+                        .build());
+                advertencias.add(msgAtipico);
+            }
         }
 
         DecisionValidacion decision = marcas.isEmpty() ? DecisionValidacion.PERMITIR : DecisionValidacion.MARCAR;

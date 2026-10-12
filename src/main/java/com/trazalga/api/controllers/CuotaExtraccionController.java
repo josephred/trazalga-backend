@@ -124,21 +124,38 @@ public class CuotaExtraccionController {
         return "ERROR al eliminar cuota";
     }
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
+    private Long extractUserId(java.security.Principal principal) {
+        if (principal == null || usuarioRepository == null) return null;
+        try {
+            return usuarioRepository.findByRut(principal.getName())
+                    .map(com.trazalga.api.models.UsuarioModel::getId)
+                    .orElse(null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     @PutMapping(path = "/{id}/cerrar")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public CuotaExtraccionModel cerrar(
             @PathVariable("id") Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            java.security.Principal principal) {
         String motivo = (body != null) ? body.get("motivo") : null;
         String observacion = (body != null) ? body.get("observacion") : null;
-        return cuotaService.cerrarCuota(id, motivo, observacion);
+        Long usuarioId = extractUserId(principal);
+        return cuotaService.cerrarCuota(id, motivo, observacion, usuarioId);
     }
 
     @PutMapping(path = "/{id}/reabrir")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public CuotaExtraccionModel reabrir(
             @PathVariable("id") Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            java.security.Principal principal) {
         String motivo = (body != null) ? body.get("motivo") : null;
         if (motivo == null || motivo.trim().isEmpty()) {
             throw new org.springframework.web.server.ResponseStatusException(
@@ -146,11 +163,12 @@ public class CuotaExtraccionController {
                     "El motivo de reapertura es obligatorio."
             );
         }
-        return cuotaService.reabrirCuota(id, motivo.trim());
+        Long usuarioId = extractUserId(principal);
+        return cuotaService.reabrirCuota(id, motivo.trim(), usuarioId);
     }
 
     @GetMapping(path = "/{id}/eventos")
-    public List<com.trazalga.api.models.CuotaExtraccionEventoModel> getEventos(@PathVariable("id") Long id) {
+    public List<com.trazalga.api.dto.EventoCuotaDTO> getEventos(@PathVariable("id") Long id) {
         return cuotaService.getEventos(id);
     }
 
