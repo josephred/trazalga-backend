@@ -27,6 +27,8 @@ public class UsuarioModel {
     private String apellidom;
     private String correo;
     private String estado;
+
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     private String clave;
 
     @Column(name = "app_version", length = 50)

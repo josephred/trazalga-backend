@@ -531,6 +531,7 @@ public class DeclaracionArmadorService {
                 .fechaDeclaracion(new Date())
                 .desembarqueKg(declaracionArmadorModel.getDesembarque())
                 .esEdicion(true)
+                .declaracionId(declaracionArmadorModel.getId())
                 .build();
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);

@@ -416,6 +416,7 @@ public class DeclaracionAreaService {
                 .fechaDeclaracion(new Date())
                 .desembarqueKg(desembarqueBd)
                 .esEdicion(true)
+                .declaracionId(declaracion.getId())
                 .build();
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);

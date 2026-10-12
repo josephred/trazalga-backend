@@ -95,7 +95,7 @@ public class CuotaCierreMarcasTest {
     @Test
     @DisplayName("TC.4 Escenario A: Extracción posterior al cierre de cuota genera POSTERIOR_CIERRE con criterio estructurado")
     void testExtraccionPosteriorAlCierre_GeneraPosteriorCierre() {
-        // Cuota de Marzo 2026 cerrada el 31-03-2026
+        // Cuota de Marzo 2026 cerrada anticipadamente por AGOTAMIENTO el 20-03-2026
         CuotaExtraccionModel cuotaMarzo = CuotaExtraccionModel.builder()
                 .id(100L)
                 .ambito("AREA_LIBRE")
@@ -111,7 +111,7 @@ public class CuotaCierreMarcasTest {
                 .modoAccion("SOLO_ALERTA")
                 .activo(true)
                 .build();
-        cuotaMarzo.cerrar("VENCIMIENTO", Date.valueOf("2026-03-31"), null);
+        cuotaMarzo.cerrar("AGOTAMIENTO", Date.valueOf("2026-03-20"), null);
 
         when(cuotaRepository.findByActivoTrue()).thenReturn(List.of(cuotaMarzo));
 
@@ -119,9 +119,9 @@ public class CuotaCierreMarcasTest {
         when(qConsumo.getSingleResult()).thenReturn("10000.00");
         when(entityManager.createNativeQuery(anyString())).thenReturn(qConsumo);
 
-        // Extracción el 10 de abril (posterior al cierre del 31 de marzo)
-        java.util.Date fechaExt = Date.valueOf("2026-04-10");
-        java.util.Date fechaDec = Date.valueOf("2026-04-10");
+        // Extracción el 25 de marzo (dentro de marzo, pero posterior al cierre del 20 de marzo)
+        java.util.Date fechaExt = Date.valueOf("2026-03-25");
+        java.util.Date fechaDec = Date.valueOf("2026-03-25");
 
         EvaluacionCuotaResult res = cuotaExtraccionService.evaluarCuotaDeclaracion(
                 "RECOLECTOR", 1L, null, 1L, 10L, 4101L,
@@ -138,8 +138,8 @@ public class CuotaCierreMarcasTest {
         assertNotNull(marcaPostCierre.getCriterio());
         assertEquals("fecha", marcaPostCierre.getCriterio().unidad());
         assertEquals("fecha_cierre", marcaPostCierre.getCriterio().parametro());
-        assertEquals("2026-03-31", marcaPostCierre.getCriterio().umbral());
-        assertEquals("2026-04-10", marcaPostCierre.getCriterio().valorObservado());
+        assertEquals("2026-03-20", marcaPostCierre.getCriterio().umbral());
+        assertEquals("2026-03-25", marcaPostCierre.getCriterio().valorObservado());
     }
 
     @Test

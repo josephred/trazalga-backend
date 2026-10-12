@@ -780,17 +780,6 @@ public class CuotaExtraccionService {
         if (c.getFechaInicio() != null && fecha.isBefore(toLocalDateSafe(c.getFechaInicio()))) {
             return false;
         }
-        if (cierre != null) {
-            // Si la cuota cerró, aplica para evaluar POSTERIOR_CIERRE si la extracción ocurrió
-            // posterior al cierre dentro de la misma temporada o período anual
-            if (fecha.isAfter(cierre)) {
-                if (c.getFechaInicio() != null && toLocalDateSafe(c.getFechaInicio()).getYear() != fecha.getYear()) {
-                    return false;
-                }
-                return true;
-            }
-            return true;
-        }
         if (c.getFechaFin() != null && fecha.isAfter(toLocalDateSafe(c.getFechaFin()))) {
             return false;
         }

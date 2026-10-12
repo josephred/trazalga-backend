@@ -148,7 +148,8 @@ public class ValidacionDeclaracionService {
                     ctx.getFechaDeclaracion(),
                     ctx.getDesembarqueKg(),
                     capturaCalculada,
-                    true);
+                    true,
+                    ctx.getDeclaracionId());
         } else {
             cuotaRes = cuotaExtraccionService.evaluarCuotaDeclaracion(
                     ctx.getTipoDeclaracion(),

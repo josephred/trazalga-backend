@@ -48,4 +48,17 @@ public interface IUsuarioRepository extends JpaRepository<UsuarioModel, Long> {
         @Query("SELECT u.id, u.rut FROM UsuarioModel u WHERE u.perfil.id IN :perfiles AND u.embarcaciones IS EMPTY")
         List<Object[]> findIdRutSinEmbarcacionByPerfiles(@Param("perfiles") List<Long> perfiles);
 
+        // 8. Búsqueda paginada con JOIN FETCH para mantenedores y selectores (TM.1)
+        @Query("SELECT DISTINCT u FROM UsuarioModel u " +
+               "LEFT JOIN FETCH u.perfil p " +
+               "LEFT JOIN FETCH u.comuna c " +
+               "LEFT JOIN FETCH c.region " +
+               "WHERE (:term = '' OR LOWER(u.rut) LIKE :likeTerm OR LOWER(u.nombres) LIKE :likeTerm OR LOWER(u.apellidop) LIKE :likeTerm) " +
+               "AND (:perfil IS NULL OR LOWER(p.nombre) = LOWER(:perfil))")
+        List<UsuarioModel> buscarUsuariosConFiltro(
+                @Param("term") String term,
+                @Param("likeTerm") String likeTerm,
+                @Param("perfil") String perfil,
+                org.springframework.data.domain.Pageable pageable);
+
 }

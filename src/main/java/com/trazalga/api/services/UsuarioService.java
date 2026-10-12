@@ -111,38 +111,23 @@ public class UsuarioService {
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<com.trazalga.api.dto.UsuarioBusquedaDTO> buscarUsuarios(String q, String perfil, Integer limit) {
         int max = (limit != null && limit > 0) ? Math.min(limit, 50) : 20;
         String term = q != null ? q.trim().toLowerCase() : "";
         String termLimpio = term.replace(".", "").replace("-", "").trim();
+        String likeTerm = "%" + (term.isEmpty() ? "" : term) + "%";
+        String perfilParam = (perfil != null && !perfil.isBlank()) ? perfil.trim() : null;
 
-        List<UsuarioModel> todos = usuarioRepository.findAll();
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, max);
+        List<UsuarioModel> usuarios = usuarioRepository.buscarUsuariosConFiltro(term, likeTerm, perfilParam, pageable);
+
+        if (usuarios.isEmpty() && !termLimpio.isEmpty() && !termLimpio.equals(term)) {
+            usuarios = usuarioRepository.buscarUsuariosConFiltro(termLimpio, "%" + termLimpio + "%", perfilParam, pageable);
+        }
+
         List<com.trazalga.api.dto.UsuarioBusquedaDTO> res = new ArrayList<>();
-
-        for (UsuarioModel u : todos) {
-            if (perfil != null && !perfil.isBlank()) {
-                String perfNom = (u.getPerfil() != null && u.getPerfil().getNombre() != null)
-                        ? u.getPerfil().getNombre() : "";
-                if (!perfNom.equalsIgnoreCase(perfil.trim())) {
-                    continue;
-                }
-            }
-
-            if (!term.isEmpty()) {
-                String rut = u.getRut() != null ? u.getRut().toLowerCase() : "";
-                String rutLimpio = rut.replace(".", "").replace("-", "").trim();
-                String nombres = u.getNombres() != null ? u.getNombres().toLowerCase() : "";
-                String apellidop = u.getApellidop() != null ? u.getApellidop().toLowerCase() : "";
-                String nombreCompleto = (nombres + " " + apellidop).trim();
-
-                boolean coincideRut = rut.contains(term) || (!termLimpio.isEmpty() && rutLimpio.contains(termLimpio));
-                boolean coincideNombre = nombres.contains(term) || apellidop.contains(term) || nombreCompleto.contains(term);
-
-                if (!coincideRut && !coincideNombre) {
-                    continue;
-                }
-            }
-
+        for (UsuarioModel u : usuarios) {
             String nom = ((u.getNombres() != null ? u.getNombres() : "") + " " +
                           (u.getApellidop() != null ? u.getApellidop() : "")).trim();
             String perfilNombre = u.getPerfil() != null ? u.getPerfil().getNombre() : null;
@@ -160,12 +145,7 @@ public class UsuarioService {
                     .comunaId(comunaId)
                     .regionId(regionId)
                     .build());
-
-            if (res.size() >= max) {
-                break;
-            }
         }
-
         return res;
     }
 }

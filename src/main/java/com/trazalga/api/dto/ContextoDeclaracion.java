@@ -27,4 +27,5 @@ public class ContextoDeclaracion {
     private Date fechaDeclaracion;
     private BigDecimal desembarqueKg;
     private Boolean esEdicion;
+    private Long declaracionId;
 }

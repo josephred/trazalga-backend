@@ -733,7 +733,12 @@ public class VariacionPesoService {
 
     private LocalDateTime combinarFechaHora(Date fecha, String horaStr) {
         if (fecha == null) return null;
-        LocalDate ld = fecha.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate ld;
+        if (fecha instanceof java.sql.Date sqlDate) {
+            ld = sqlDate.toLocalDate();
+        } else {
+            ld = fecha.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
         LocalTime lt = LocalTime.MIDNIGHT;
         if (horaStr != null && !horaStr.isBlank()) {
             try {

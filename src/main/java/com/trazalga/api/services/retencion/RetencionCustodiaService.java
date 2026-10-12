@@ -53,6 +53,9 @@ public class RetencionCustodiaService {
     private IDeclaracionMarcaRepository marcaRepository;
 
     @Autowired
+    private MarcaRetencionExecutorService marcaRetencionExecutorService;
+
+    @Autowired
     @Lazy
     private BloqueoCargaService bloqueoCargaService;
 
@@ -277,9 +280,8 @@ public class RetencionCustodiaService {
 
     /**
      * TR.3: Registra de forma transaccional independiente (REQUIRES_NEW) la marca bloqueante
-     * RETENCION_EXCEDIDA. No re-bloquea si la marca ya fue resuelta como LIBERADA por fiscalización.
+     * RETENCION_EXCEDIDA delegando en MarcaRetencionExecutorService para garantizar proxy AOP.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public DeclaracionMarcaModel registrarMarcaRetencionExcedida(
             String tipo,
             Long declaracionId,
@@ -287,38 +289,15 @@ public class RetencionCustodiaService {
             Long usuarioDeclaranteId,
             Long regionId
     ) {
-        String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
-
-        // Verificar si existe una marca previa resuelta como LIBERADA
-        List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
-        boolean yaLiberada = marcasPrevias.stream()
-                .anyMatch(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()) && "LIBERADA".equalsIgnoreCase(m.getResolucionTipo()));
-
-        if (yaLiberada) {
-            log.info("Carga {}:{} ya fue formalmente LIBERADA por fiscalizador. Se omite re-bloqueo.", tipoNorm, declaracionId);
-            return marcasPrevias.stream()
-                    .filter(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()))
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        CriterioHallazgo criterio = new CriterioHallazgo(
-                "retencion_horas",
-                "120",
-                motivo != null ? motivo : "Tiempo máximo de retención excedido",
-                "h"
-        );
-
-        return hallazgoService.registrar(
-                tipoNorm,
+        return marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
+                tipo,
                 declaracionId,
-                "RETENCION_EXCEDIDA",
-                "D3",
-                criterio,
                 motivo,
-                "BODEGA_VIRTUAL_AUTOMA",
                 usuarioDeclaranteId,
-                regionId
+                regionId,
+                null,
+                null,
+                "VALIDACION"
         );
     }
 
@@ -349,16 +328,19 @@ public class RetencionCustodiaService {
                     params
             );
 
-            // 1. Bloqueo automático D3 si corresponde
+            // 1. Bloqueo automático D3 si corresponde y bloqueo está activo
             if (eval.isBloqueoRequerido() && params.bloqueoActivo()) {
                 if (!Boolean.TRUE.equals(lote.getBloqueada())) {
                     try {
-                        registrarMarcaRetencionExcedida(
+                        marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
                                 lote.getTipo(),
                                 lote.getId(),
                                 eval.getMotivoDetalle(),
                                 lote.getOrigenId(),
-                                null
+                                null,
+                                String.valueOf(eval.getPlazoMaxHoras()),
+                                String.valueOf(Math.round(lote.getHorasTranscurridas())),
+                                "BARRIDO"
                         );
                         bloqueosAplicados++;
                         log.warn("Bloqueo automático RETENCION_EXCEDIDA aplicado a lote {}:{} ({} h en bodega)",
@@ -369,18 +351,18 @@ public class RetencionCustodiaService {
                 }
             }
 
-            // 2. Preaviso informativo de retención (idempotente)
-            if (eval.isEnPreavisoBloqueo() || eval.isEnPreavisoSemaforo()) {
+            // 2. Preaviso informativo de retención: SÓLO cuando el bloqueo esté activo (plan 09-10)
+            if (params.bloqueoActivo() && (eval.isEnPreavisoBloqueo() || eval.isEnPreavisoSemaforo())) {
                 try {
                     String reglaPreaviso = "PREAVISO_" + (eval.isEnPreavisoBloqueo() ? "BLOQUEO" : "SEMAFORO");
+                    int umbralHoras = (int) Math.round(eval.getPlazoMaxHoras() * (params.semaforoPreavisoPct() / 100.0));
                     CriterioHallazgo crit = new CriterioHallazgo(
                             "preaviso_retencion",
-                            "96",
+                            String.valueOf(umbralHoras > 0 ? umbralHoras : 96),
                             String.valueOf(Math.round(lote.getHorasTranscurridas())),
                             "h"
                     );
 
-                    // Preaviso registrado como hallazgo informativo con clave idempotente
                     hallazgoService.registrar(
                             lote.getTipo(),
                             lote.getId(),
@@ -388,7 +370,7 @@ public class RetencionCustodiaService {
                             reglaPreaviso,
                             crit,
                             eval.getMotivoDetalle(),
-                            "BARRIDO_RETENCION_BODEGA",
+                            "BARRIDO",
                             lote.getOrigenId(),
                             null
                     );
@@ -410,7 +392,7 @@ public class RetencionCustodiaService {
     /**
      * TR.3: Evaluación Just-In-Time de una carga específica al momento de intentar despacharla o recibirla.
      * Si ha excedido el plazo de retención configurado para bloqueo y retencion_bloqueo_activo es true,
-     * persiste inmediatamente la marca RETENCION_EXCEDIDA con REQUIRES_NEW.
+     * persiste inmediatamente la marca RETENCION_EXCEDIDA con REQUIRES_NEW mediante MarcaRetencionExecutorService.
      */
     public Optional<DeclaracionMarcaModel> evaluarYBloquearJustInTime(String tipo, Long id) {
         ParametrosRetencion params = parametrosService.retencion();
@@ -453,8 +435,11 @@ public class RetencionCustodiaService {
 
             ResultadoEvaluacionRetencion eval = politicaRetencion.evaluar(espId, espNom, hum, horas, params);
             if (eval.isBloqueoRequerido()) {
-                DeclaracionMarcaModel marca = registrarMarcaRetencionExcedida(
-                        tipo, id, eval.getMotivoDetalle(), usuarioId, null);
+                DeclaracionMarcaModel marca = marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
+                        tipo, id, eval.getMotivoDetalle(), usuarioId, null,
+                        String.valueOf(eval.getPlazoMaxHoras()),
+                        String.valueOf(Math.round(horas)),
+                        "VALIDACION");
                 return Optional.ofNullable(marca);
             }
         } catch (Exception ex) {
@@ -471,7 +456,7 @@ public class RetencionCustodiaService {
         String dateFilterArea = "";
         String dateFilterComercializador = "";
 
-        if (filtro != null) {
+        if (filtro != null && !Boolean.TRUE.equals(filtro.getSoloEnBodega())) {
             if (filtro.getStartDate() != null && filtro.getEndDate() != null) {
                 dateFilterRecolector = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
                 dateFilterArmador = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
@@ -502,10 +487,11 @@ public class RetencionCustodiaService {
                 "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
                 "FROM declaracion_recolector d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
-                "LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil pud ON ud.perfil_id = pud.id AND pud.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
-                "WHERE d.declaracion_destinatario_id IS NULL AND d.estado NOT IN ('ANULADA', 'RECHAZADA') " + dateFilterRecolector + " " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterRecolector + " " +
                 "UNION ALL " +
                 "SELECT d.id, 'ARMADOR', " +
                 "COALESCE(d.folio_origen, d.folio_desembarque_da, CONCAT('DA-', d.id)), " +
@@ -519,11 +505,12 @@ public class RetencionCustodiaService {
                 "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) " +
                 "FROM declaracion_armador d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
-                "LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil pud ON ud.perfil_id = pud.id AND pud.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
                 "LEFT JOIN embarcacion emb ON d.embarcacion_id = emb.id " +
-                "WHERE d.declaracion_destinatario_id IS NULL AND d.estado NOT IN ('ANULADA', 'RECHAZADA') " + dateFilterArmador + " " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterArmador + " " +
                 "UNION ALL " +
                 "SELECT d.id, 'AREA', " +
                 "COALESCE(d.folio_origen, d.folio_desembarque_amerb, CONCAT('DAM-', d.id)), " +
@@ -537,10 +524,11 @@ public class RetencionCustodiaService {
                 "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) " +
                 "FROM declaracion_area d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
-                "LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil pud ON ud.perfil_id = pud.id AND pud.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
-                "WHERE d.declaracion_destinatario_id IS NULL AND d.estado NOT IN ('ANULADA', 'RECHAZADA') " + dateFilterArea + " " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterArea + " " +
                 "UNION ALL " +
                 "SELECT d.id, 'COMERCIALIZADOR', " +
                 "COALESCE(d.folio_origen, CONCAT('DC-', d.id)), " +
@@ -554,14 +542,15 @@ public class RetencionCustodiaService {
                 "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.resuelta = false) " +
                 "FROM declaracion_comercializador d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
+                "INNER JOIN perfil puo ON uo.perfil_id = puo.id AND puo.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
-                "WHERE d.declaracion_destinatario_id IS NULL AND d.estado NOT IN ('ANULADA', 'RECHAZADA') " + dateFilterComercializador + " " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND d.consumida_por_tipo IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterComercializador + " " +
                 "ORDER BY fecha_declaracion DESC";
     }
 
     private void bindSqlLotesBodegaParams(Query query, FiltroRetencionBodega filtro) {
-        if (filtro != null) {
+        if (filtro != null && !Boolean.TRUE.equals(filtro.getSoloEnBodega())) {
             if (filtro.getStartDate() != null) {
                 query.setParameter("startDate", filtro.getStartDate());
             }

@@ -315,6 +315,7 @@ public class DeclaracionRecolectorService {
                 .fechaDeclaracion(new Date())
                 .desembarqueKg(declaracionRecolectorModel.getDesembarque())
                 .esEdicion(true)
+                .declaracionId(declaracionRecolectorModel.getId())
                 .build();
 
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
