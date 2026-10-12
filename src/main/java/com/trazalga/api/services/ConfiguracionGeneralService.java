@@ -46,6 +46,10 @@ public class ConfiguracionGeneralService {
         createIfNotExist("cuota_dias_previos_expiracion", "5", "Días antes del fin de vigencia para avisar expiración de cuota", "CUOTA");
         createIfNotExist("cuota_accion_post_cierre", "ALERTA_CRITICA", "Acción ante declaración post cierre administrativo (ALERTA_CRITICA o BLOQUEO_TOTAL)", "CUOTA");
         createIfNotExist("cuota_accion_exceso_limite", "ALERTA_EXCESO", "[DEPRECADO] Reemplazado por modo_accion en cada cuota y cuota_umbral_restante_pct", "CUOTA");
+        createIfNotExist("cuota_cierre_automatico_vencimiento", "false", "Cierra automáticamente las cuotas que superen su fecha_fin oficial (D5 / TC.3)", "CUOTA");
+        createIfNotExist("cuota_dias_gracia_declaracion", "0", "Días de gracia posteriores al cierre antes de considerar una declaración como extemporánea (D4 / TC.4)", "CUOTA");
+        createIfNotExist("cuota_accion_extemporanea", "ALERTA_CRITICA", "Acción ante declaración extemporánea: ALERTA_CRITICA o BLOQUEO_TOTAL (TC.4)", "CUOTA");
+        createIfNotExist("cuota_imputacion_armador", "INSCRIPCION", "Criterio de imputación territorial para armadores: INSCRIPCION o CALETA (D1 / TC.8)", "CUOTA");
 
         // 4. Vedas
         createIfNotExist("veda_modo_operacion", "BLOQUEO_ESTRICTO", "Modo de operación ante veda (BLOQUEO_ESTRICTO o ALERTA_FISCALIZACION)", "VEDA");
