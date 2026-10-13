@@ -55,4 +55,15 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
 
     @EntityGraph(attributePaths = {"usuario", "amerb", "caleta", "especie", "usuarioDestinatario", "composicion", "humedadEstado", "embarcacion", "buzo"})
     List<DeclaracionAreaModel> findByIdInOrderByFechaDeclaracionDesc(List<Long> ids);
+
+    /**
+     * Declaraciones consumidas por puntero por las declaraciones destino indicadas
+     * (tipo = 'PLANTA_ABASTECIMIENTO' o 'COMERCIALIZADOR'). Reemplaza el findAll() + filtro en memoria de TV.1.
+     * El tipo se compara en mayúsculas: pasar el valor ya normalizado.
+     */
+    @EntityGraph(attributePaths = {"usuario", "humedadEstado"})
+    @Query("SELECT d FROM DeclaracionAreaModel d "
+            + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
+    List<DeclaracionAreaModel> findConsumidasPorDestinos(
+            @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
 }

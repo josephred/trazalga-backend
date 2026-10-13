@@ -16,6 +16,8 @@ import java.util.List;
 @AllArgsConstructor
 public class ResumenComercializadorPlantaDTO {
     private long totalRecepciones;
+    /** Recepciones con romana cuyos despachos no se encontraron: no evaluables, fuera del semáforo y del promedio. */
+    private long recepcionesSinDespachos;
     private long recepcionesVerde;
     private long recepcionesAmarillo;
     private long recepcionesRojo;

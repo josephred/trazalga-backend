@@ -133,7 +133,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(100L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -172,7 +172,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(101L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -210,7 +210,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(102L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -248,7 +248,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(103L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -286,7 +286,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(104L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -333,7 +333,7 @@ class VariacionPesoServiceTest {
         com2.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com2.setDeclaracionDestinatario(105L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com1, com2));
+        stubComercializadores(com1, com2);
         when(plantaRepository.findById(105L)).thenReturn(Optional.of(planta));
 
         // Simulamos que el comercializador 21 tiene 2 orígenes asignados
@@ -353,7 +353,7 @@ class VariacionPesoServiceTest {
 
         when(comercializadorRepository.findById(21L)).thenReturn(Optional.of(com1));
         when(comercializadorRepository.findById(22L)).thenReturn(Optional.of(com2));
-        when(recolectorRepository.findAll()).thenReturn(List.of(orig1, orig2));
+        stubRecolectores(orig1, orig2);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -396,7 +396,7 @@ class VariacionPesoServiceTest {
         rec.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         rec.setDeclaracionDestinatario(106L);
 
-        when(recolectorRepository.findAll()).thenReturn(List.of(rec));
+        stubRecolectores(rec);
 
         ResultadoVariacionPesoDTO res = service.evaluarRecepcion(planta);
 
@@ -434,7 +434,7 @@ class VariacionPesoServiceTest {
         com.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
         com.setDeclaracionDestinatario(107L);
 
-        when(comercializadorRepository.findAll()).thenReturn(List.of(com));
+        stubComercializadores(com);
 
         // Factores: Húmedo = 1.13 -> 3.000 * 1.13 = 3.390 kg captura
         //           Semiseco = 2.70 -> 1.300 * 2.70 = 3.510 kg captura
@@ -467,5 +467,34 @@ class VariacionPesoServiceTest {
         ResultadoVariacionPesoDTO res2 = service.evaluarRecepcion(planta);
         assertEquals("VERDE", res2.getSemaforo());
         assertEquals("CAMBIO_HUMEDAD_COHERENTE", res2.getCriterio());
+    }
+
+    // -------------------------------------------------------------------------
+    // Stubs de findConsumidasPorDestinos: emulan el WHERE de la consulta real
+    // (UPPER(consumida_por_tipo) = :tipo AND declaracion_destinatario_id IN :ids),
+    // para que las pruebas sigan verificando que sólo entran las declaraciones vinculadas.
+    // -------------------------------------------------------------------------
+
+    private void stubComercializadores(DeclaracionComercializadorModel... decls) {
+        when(comercializadorRepository.findConsumidasPorDestinos(anyString(), anyList()))
+                .thenAnswer(inv -> filtrarPorPuntero(Arrays.asList(decls), inv.getArgument(0), inv.getArgument(1),
+                        DeclaracionComercializadorModel::getConsumidaPorTipo,
+                        DeclaracionComercializadorModel::getDeclaracionDestinatario));
+    }
+
+    private void stubRecolectores(DeclaracionRecolectorModel... decls) {
+        when(recolectorRepository.findConsumidasPorDestinos(anyString(), anyList()))
+                .thenAnswer(inv -> filtrarPorPuntero(Arrays.asList(decls), inv.getArgument(0), inv.getArgument(1),
+                        DeclaracionRecolectorModel::getConsumidaPorTipo,
+                        DeclaracionRecolectorModel::getDeclaracionDestinatario));
+    }
+
+    private static <T> List<T> filtrarPorPuntero(List<T> decls, String tipo, List<Long> destinoIds,
+                                                 java.util.function.Function<T, String> tipoDe,
+                                                 java.util.function.Function<T, Long> destinoDe) {
+        return decls.stream()
+                .filter(d -> tipoDe.apply(d) != null && tipoDe.apply(d).toUpperCase().equals(tipo))
+                .filter(d -> destinoDe.apply(d) != null && destinoIds.contains(destinoDe.apply(d)))
+                .toList();
     }
 }

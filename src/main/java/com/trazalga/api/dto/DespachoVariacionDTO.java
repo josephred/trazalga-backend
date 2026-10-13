@@ -11,7 +11,7 @@ import java.util.Date;
  * TV.1 · DTO para un despacho que fue consumido por una recepción en planta.
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class DespachoVariacionDTO {

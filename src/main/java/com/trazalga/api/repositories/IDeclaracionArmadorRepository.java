@@ -114,4 +114,15 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
 
     @EntityGraph(attributePaths = {"usuario", "embarcacion", "buzo", "usuarioDestinatario", "caleta", "comuna", "especie", "composicion", "humedadEstado"})
     List<DeclaracionArmadorModel> findByIdInOrderByFechaDeclaracionDesc(List<Long> ids);
+
+    /**
+     * Declaraciones consumidas por puntero por las declaraciones destino indicadas
+     * (tipo = 'PLANTA_ABASTECIMIENTO' o 'COMERCIALIZADOR'). Reemplaza el findAll() + filtro en memoria de TV.1.
+     * El tipo se compara en mayúsculas: pasar el valor ya normalizado.
+     */
+    @EntityGraph(attributePaths = {"usuario", "humedadEstado", "caleta", "caleta.comuna"})
+    @Query("SELECT d FROM DeclaracionArmadorModel d "
+            + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
+    List<DeclaracionArmadorModel> findConsumidasPorDestinos(
+            @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
 }

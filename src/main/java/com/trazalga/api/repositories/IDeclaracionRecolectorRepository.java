@@ -82,4 +82,15 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
             @Param("usuarioId") Long usuarioId,
             @Param("especieId") Long especieId,
             @Param("fecha") Date fecha);
+
+    /**
+     * Declaraciones consumidas por puntero por las declaraciones destino indicadas
+     * (tipo = 'PLANTA_ABASTECIMIENTO' o 'COMERCIALIZADOR'). Reemplaza el findAll() + filtro en memoria de TV.1.
+     * El tipo se compara en mayúsculas: pasar el valor ya normalizado.
+     */
+    @EntityGraph(attributePaths = {"usuario", "humedadEstado", "caleta", "caleta.comuna"})
+    @Query("SELECT d FROM DeclaracionRecolectorModel d "
+            + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
+    List<DeclaracionRecolectorModel> findConsumidasPorDestinos(
+            @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
 }

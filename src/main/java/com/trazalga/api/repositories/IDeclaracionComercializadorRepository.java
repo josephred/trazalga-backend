@@ -58,4 +58,15 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
 
     @EntityGraph(attributePaths = {"usuario", "especie", "composicion", "humedadEstado", "usuarioDestinatario"})
     List<DeclaracionComercializadorModel> findByIdInOrderByFechaDeclaracionDesc(List<Long> ids);
+
+    /**
+     * Declaraciones consumidas por puntero por las declaraciones destino indicadas
+     * (p. ej. tipo = 'PLANTA_ABASTECIMIENTO'). Reemplaza el findAll() + filtro en memoria de TV.1.
+     * El tipo se compara en mayúsculas: pasar el valor ya normalizado.
+     */
+    @EntityGraph(attributePaths = {"usuario", "humedadEstado"})
+    @Query("SELECT d FROM DeclaracionComercializadorModel d "
+            + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
+    List<DeclaracionComercializadorModel> findConsumidasPorDestinos(
+            @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
 }
