@@ -192,4 +192,30 @@ public class SeguridadReportesHallazgosTest {
         mockMvc.perform(get("/usuario"))
                 .andExpect(status().isOk());
     }
+
+    // 17. GET /usuario/all-usuarios sin token -> 401 Unauthorized
+    @Test
+    @DisplayName("Seguridad: GET /usuario/all-usuarios sin token devuelve 401 Unauthorized")
+    void testAllUsuarios_SinToken_Retorna401() throws Exception {
+        mockMvc.perform(get("/usuario/all-usuarios"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // 18. GET /usuario/all-usuarios con rol no-admin (FISCALIZADOR o USER) -> 403 Forbidden
+    @Test
+    @WithMockUser(username = "fiscalizador", roles = {"FISCALIZADOR"})
+    @DisplayName("Seguridad: GET /usuario/all-usuarios con FISCALIZADOR devuelve 403 Forbidden")
+    void testAllUsuarios_ConFiscalizador_Retorna403() throws Exception {
+        mockMvc.perform(get("/usuario/all-usuarios"))
+                .andExpect(status().isForbidden());
+    }
+
+    // 19. GET /usuario/all-usuarios con ADMIN -> 200 OK
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @DisplayName("Seguridad: GET /usuario/all-usuarios con ADMIN devuelve 200 OK")
+    void testAllUsuarios_ConAdmin_Retorna200() throws Exception {
+        mockMvc.perform(get("/usuario/all-usuarios"))
+                .andExpect(status().isOk());
+    }
 }

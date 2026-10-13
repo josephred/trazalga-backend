@@ -87,6 +87,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/amerb-especies-habilitadas/**", "/amerbespecieshabilitada/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/usuarios/all-usuarios", "/usuario/all-usuarios").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")

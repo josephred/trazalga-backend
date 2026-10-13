@@ -49,6 +49,7 @@ public class UsuarioController {
     }
 
     @GetMapping("/all-usuarios")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public List<UsuarioModel> getAllUsuarios() {
         return usuarioService.getAllUsuarios();
     }
