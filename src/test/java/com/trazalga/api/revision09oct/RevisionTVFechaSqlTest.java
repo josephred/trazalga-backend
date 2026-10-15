@@ -24,7 +24,11 @@ import com.trazalga.api.services.parametros.ParametrosVariacion;
 
 import jakarta.persistence.EntityManager;
 
-/** Revisión 12-10 · Caso A del plan, con las fechas como las entrega Hibernate (java.sql.Date). */
+/**
+ * Revisión 12-10 · Caso A del plan, con las fechas como las entrega Hibernate (java.sql.Date).
+ * Actualizada el 13-10: el servicio ya no usa findAll() sino findConsumidasPorDestinos (defecto 1); sólo cambia el stub,
+ * las aserciones son las mismas.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RevisionTVFechaSqlTest {
@@ -56,7 +60,7 @@ class RevisionTVFechaSqlTest {
         c.setId(10L); c.setCantidad(new BigDecimal("2400")); c.setHora("08:00");
         c.setFechaTraslado(java.sql.Date.valueOf("2026-10-10"));
         c.setHumedadEstado(hum); c.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO"); c.setDeclaracionDestinatario(100L);
-        when(comRepo.findAll()).thenReturn(List.of(c));
+        when(comRepo.findConsumidasPorDestinos(anyString(), anyList())).thenReturn(List.of(c));
 
         var res = assertDoesNotThrow(() -> service.evaluarRecepcion(p));
         assertEquals(-2.9, res.getDeltaPct(), 0.05);

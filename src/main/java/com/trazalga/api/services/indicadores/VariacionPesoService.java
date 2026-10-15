@@ -517,13 +517,6 @@ public class VariacionPesoService {
         // Consulta en la base: WHERE declaracion_destinatario_id IN (:lote) AND consumida_por_tipo = 'PLANTA_ABASTECIMIENTO'.
         for (List<Long> lote : particionar(plantaIds)) {
             List<DeclaracionComercializadorModel> comList = comercializadorRepository.findConsumidasPorDestinos(TIPO_PLANTA, lote);
-            if ((comList == null || comList.isEmpty()) && isMock(comercializadorRepository)) {
-                comList = comercializadorRepository.findAll().stream()
-                        .filter(c -> TIPO_PLANTA.equalsIgnoreCase(c.getConsumidaPorTipo())
-                                && c.getDeclaracionDestinatario() != null
-                                && lote.contains(c.getDeclaracionDestinatario()))
-                        .toList();
-            }
             if (comList != null) {
                 for (DeclaracionComercializadorModel c : comList) {
                     map.computeIfAbsent(c.getDeclaracionDestinatario(), k -> new ArrayList<>()).add(mapComercializador(c));
@@ -531,13 +524,6 @@ public class VariacionPesoService {
             }
 
             List<DeclaracionRecolectorModel> recList = recolectorRepository.findConsumidasPorDestinos(TIPO_PLANTA, lote);
-            if ((recList == null || recList.isEmpty()) && isMock(recolectorRepository)) {
-                recList = recolectorRepository.findAll().stream()
-                        .filter(r -> TIPO_PLANTA.equalsIgnoreCase(r.getConsumidaPorTipo())
-                                && r.getDeclaracionDestinatario() != null
-                                && lote.contains(r.getDeclaracionDestinatario()))
-                        .toList();
-            }
             if (recList != null) {
                 for (DeclaracionRecolectorModel r : recList) {
                     map.computeIfAbsent(r.getDeclaracionDestinatario(), k -> new ArrayList<>()).add(mapRecolector(r));
@@ -545,13 +531,6 @@ public class VariacionPesoService {
             }
 
             List<DeclaracionArmadorModel> armList = armadorRepository.findConsumidasPorDestinos(TIPO_PLANTA, lote);
-            if ((armList == null || armList.isEmpty()) && isMock(armadorRepository)) {
-                armList = armadorRepository.findAll().stream()
-                        .filter(a -> TIPO_PLANTA.equalsIgnoreCase(a.getConsumidaPorTipo())
-                                && a.getDeclaracionDestinatario() != null
-                                && lote.contains(a.getDeclaracionDestinatario()))
-                        .toList();
-            }
             if (armList != null) {
                 for (DeclaracionArmadorModel a : armList) {
                     map.computeIfAbsent(a.getDeclaracionDestinatario(), k -> new ArrayList<>()).add(mapArmador(a));
@@ -559,13 +538,6 @@ public class VariacionPesoService {
             }
 
             List<DeclaracionAreaModel> arList = areaRepository.findConsumidasPorDestinos(TIPO_PLANTA, lote);
-            if ((arList == null || arList.isEmpty()) && isMock(areaRepository)) {
-                arList = areaRepository.findAll().stream()
-                        .filter(ar -> TIPO_PLANTA.equalsIgnoreCase(ar.getConsumidaPorTipo())
-                                && ar.getDeclaracionDestinatario() != null
-                                && lote.contains(ar.getDeclaracionDestinatario()))
-                        .toList();
-            }
             if (arList != null) {
                 for (DeclaracionAreaModel ar : arList) {
                     map.computeIfAbsent(ar.getDeclaracionDestinatario(), k -> new ArrayList<>()).add(mapArea(ar));
@@ -637,12 +609,6 @@ public class VariacionPesoService {
                 destino.add(d.toBuilder().build());
             }
         }
-    }
-
-    private static boolean isMock(Object repo) {
-        if (repo == null) return false;
-        String name = repo.getClass().getName();
-        return name.contains("Mockito") || name.contains("Mock") || name.contains("ByteBuddy");
     }
 
     private DespachoVariacionDTO mapComercializador(DeclaracionComercializadorModel c) {
@@ -737,30 +703,12 @@ public class VariacionPesoService {
         // Por puntero: consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id = c.id (consulta en la base).
         List<Long> destino = List.of(c.getId());
         List<DeclaracionRecolectorModel> recList = recolectorRepository.findConsumidasPorDestinos(TIPO_COMERCIALIZADOR, destino);
-        if ((recList == null || recList.isEmpty()) && isMock(recolectorRepository)) {
-            recList = recolectorRepository.findAll().stream()
-                    .filter(r -> TIPO_COMERCIALIZADOR.equalsIgnoreCase(r.getConsumidaPorTipo())
-                            && Objects.equals(r.getDeclaracionDestinatario(), c.getId()))
-                    .toList();
-        }
         if (recList != null) recList.forEach(r -> origenes.add(mapOrigenRecolector(r)));
 
         List<DeclaracionArmadorModel> armList = armadorRepository.findConsumidasPorDestinos(TIPO_COMERCIALIZADOR, destino);
-        if ((armList == null || armList.isEmpty()) && isMock(armadorRepository)) {
-            armList = armadorRepository.findAll().stream()
-                    .filter(a -> TIPO_COMERCIALIZADOR.equalsIgnoreCase(a.getConsumidaPorTipo())
-                            && Objects.equals(a.getDeclaracionDestinatario(), c.getId()))
-                    .toList();
-        }
         if (armList != null) armList.forEach(a -> origenes.add(mapOrigenArmador(a)));
 
         List<DeclaracionAreaModel> arList = areaRepository.findConsumidasPorDestinos(TIPO_COMERCIALIZADOR, destino);
-        if ((arList == null || arList.isEmpty()) && isMock(areaRepository)) {
-            arList = areaRepository.findAll().stream()
-                    .filter(ar -> TIPO_COMERCIALIZADOR.equalsIgnoreCase(ar.getConsumidaPorTipo())
-                            && Objects.equals(ar.getDeclaracionDestinatario(), c.getId()))
-                    .toList();
-        }
         if (arList != null) arList.forEach(ar -> origenes.add(mapOrigenArea(ar)));
 
         // Fallback tokens de comercializador
