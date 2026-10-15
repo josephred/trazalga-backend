@@ -135,6 +135,9 @@ public class CuotaExtraccionService {
     @Lazy
     private com.trazalga.api.services.cuotas.RecalculoCuotaService recalculoCuotaService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.cuotas.AvisoCuotaService avisoCuotaService;
+
     @Transactional
     public com.trazalga.api.dto.ResumenRecalculoCuotaDTO recalcularHallazgos(Long cuotaId, java.time.LocalDate desde, java.time.LocalDate hasta) {
         if (recalculoCuotaService == null) {
@@ -1013,16 +1016,20 @@ public class CuotaExtraccionService {
                 limiteCuello = limiteEfectivo;
             }
 
-            // C. Alerta de umbral en tiempo real (TC.6)
+            // C. Alerta de umbral en tiempo real (TC.6 / 5.2)
             double umbralRestantePct = configuracionGeneralService.getDouble("cuota_umbral_restante_pct", 10.0);
             double umbralDisparo = 100.0 - umbralRestantePct;
             if (pct >= umbralDisparo) {
-                Long personaId = c.getUsuario() != null ? c.getUsuario().getId() : (usuarioId != null ? usuarioId : 0L);
-                String claveAviso = String.format("CUOTA:%d:UMBRAL:%d", c.getId(), personaId);
-                if (avisoEnviadoRepository != null && !avisoEnviadoRepository.existsById(claveAviso)) {
-                    avisoEnviadoRepository.save(new com.trazalga.api.models.AvisoEnviadoModel(claveAviso, new Date()));
-                    if (eventPublisher != null) {
-                        eventPublisher.publishEvent(new com.trazalga.api.events.CuotaUmbralAlcanzado(c.getId(), personaId, pct));
+                if (avisoCuotaService != null) {
+                    avisoCuotaService.registrarAvisoUmbralSiNoExiste(c, usuarioId, pct);
+                } else {
+                    Long personaId = com.trazalga.api.services.cuotas.AvisoCuotaService.resolverPersonaId(c, usuarioId);
+                    String claveAviso = com.trazalga.api.services.cuotas.AvisoCuotaService.construirClaveUmbral(c, usuarioId);
+                    if (avisoEnviadoRepository != null && !avisoEnviadoRepository.existsById(claveAviso)) {
+                        avisoEnviadoRepository.save(new com.trazalga.api.models.AvisoEnviadoModel(claveAviso, new Date()));
+                        if (eventPublisher != null) {
+                            eventPublisher.publishEvent(new com.trazalga.api.events.CuotaUmbralAlcanzado(c.getId(), personaId, pct));
+                        }
                     }
                 }
             }
