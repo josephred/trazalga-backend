@@ -101,20 +101,13 @@ public class RetencionCustodiaServiceTest {
     }
 
     @Test
-    @DisplayName("TR.2: Cuando control de retención está activo, delega en reportRepository y enriquece contadores")
+    @DisplayName("TR.2: Cuando control de retención está activo, calcula métricas canónicas sobre lotes en bodega")
     void testObtenerMetricasRetencion_Activo() {
         when(parametrosService.retencion()).thenReturn(paramsActivo);
 
-        Map<String, Object> repoMock = new HashMap<>();
-        repoMock.put("totalLotes", 5);
-        repoMock.put("lotesDestinados", 2L);
-        repoMock.put("lotes", new ArrayList<Map<String, Object>>());
-
-        when(reportRepository.getRetencionPorHumedad(null, null, 24, 72, 216, 80))
-                .thenReturn(repoMock);
-
         when(entityManager.createNativeQuery(anyString())).thenReturn(mockQuery);
         when(mockQuery.getResultList()).thenReturn(Collections.emptyList());
+        when(mockQuery.getSingleResult()).thenReturn(2L);
 
         Map<String, Object> result = service.obtenerMetricasRetencion(null, null);
 
@@ -125,6 +118,7 @@ public class RetencionCustodiaServiceTest {
         assertEquals(0L, result.get("totalLotesEnBodega"));
         assertEquals(0L, result.get("cargasRetenidas"));
         assertNotNull(result.get("parametros"));
+        assertNotNull(result.get("matriz"));
     }
 
     @Test

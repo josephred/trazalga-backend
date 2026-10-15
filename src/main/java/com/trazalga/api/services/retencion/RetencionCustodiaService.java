@@ -63,6 +63,10 @@ public class RetencionCustodiaService {
     @Lazy
     private ReportRepository reportRepository;
 
+    public ParametrosRetencion getParametros() {
+        return parametrosService != null ? parametrosService.retencion() : null;
+    }
+
     /**
      * TR.1: Consulta canónica de lotes actualmente en bodega virtual de comercializadores.
      * Cero consultas N+1 y enriquecimiento con política de semáforo y estado de bloqueo.
@@ -206,16 +210,7 @@ public class RetencionCustodiaService {
             return disabled;
         }
 
-        // Obtener la evaluación canónica por tramos de humedad desde el repositorio de reportes
-        Map<String, Object> metrics = reportRepository.getRetencionPorHumedad(
-                startDate, endDate,
-                params.humedoMaxHoras(),
-                params.semihumedoMaxHoras(),
-                params.semisecoMaxHoras(),
-                (int) Math.round(params.semaforoPreavisoPct())
-        );
-
-        // Contar cargas activas retenidas / bloqueadas en bodega
+        // TR.2: Obtener lotes en bodega canónica (TR.1)
         FiltroRetencionBodega filtroBodega = FiltroRetencionBodega.builder()
                 .startDate(startDate)
                 .endDate(endDate)
@@ -227,39 +222,100 @@ public class RetencionCustodiaService {
                 .filter(l -> Boolean.TRUE.equals(l.getBloqueada()))
                 .count();
 
-        // Enriquecer el listado de lotes para reflejar titularidad de comercializador y marcas de retención
-        Map<String, LoteBodegaDTO> mapaBodega = lotesBodega.stream()
-                .filter(l -> l.getFolio() != null && !l.getFolio().isBlank())
-                .collect(Collectors.toMap(LoteBodegaDTO::getFolio, l -> l, (a, b) -> a));
+        // Estructura de la Matriz 4x3 canónica (Filas = Estados de Humedad, Columnas = Semáforo)
+        Map<String, Map<String, Object>> matriz = new LinkedHashMap<>();
+        String[] estados = {"HUMEDO", "SEMI_HUMEDO", "SEMI_SECO", "SECO"};
+        for (String est : estados) {
+            Map<String, Object> fila = new LinkedHashMap<>();
+            fila.put("VERDE", 0L);
+            fila.put("AMARILLO", 0L);
+            fila.put("ROJO", 0L);
+            fila.put("totalLotes", 0L);
+            fila.put("totalKg", 0.0);
+            matriz.put(est, fila);
+        }
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> lotesOriginales = (List<Map<String, Object>>) metrics.get("lotes");
-        if (lotesOriginales != null) {
-            for (Map<String, Object> loteMap : lotesOriginales) {
-                String folio = (String) loteMap.get("folio");
-                if (folio != null && mapaBodega.containsKey(folio)) {
-                    LoteBodegaDTO bDto = mapaBodega.get(folio);
-                    loteMap.put("actorComercializador", bDto.getActorComercializador());
-                    loteMap.put("bloqueada", bDto.getBloqueada());
-                    loteMap.put("motivoBloqueo", bDto.getMotivoBloqueo());
-                    loteMap.put("marcaId", bDto.getMarcaId());
-                    loteMap.put("marcasActivas", bDto.getMarcasActivas());
+        long verdeTotal = 0;
+        long amarilloTotal = 0;
+        long rojoTotal = 0;
+        double totalKgEnBodega = 0.0;
+        List<Map<String, Object>> lotesEvaluados = new ArrayList<>();
+        List<Map<String, Object>> lotesRojos = new ArrayList<>();
+
+        for (LoteBodegaDTO lote : lotesBodega) {
+            String sem = lote.getSemaforo() != null ? lote.getSemaforo().toUpperCase() : "VERDE";
+            switch (sem) {
+                case "VERDE" -> verdeTotal++;
+                case "AMARILLO" -> amarilloTotal++;
+                case "ROJO" -> rojoTotal++;
+                default -> verdeTotal++;
+            }
+
+            double kg = lote.getKg() != null ? lote.getKg() : 0.0;
+            totalKgEnBodega += kg;
+
+            String claveMatriz = PoliticaRetencion.claveMatrizHumedad(lote.getEstadoDeclarado());
+            Map<String, Object> fila = matriz.get(claveMatriz);
+            if (fila != null) {
+                if (fila.containsKey(sem)) {
+                    fila.put(sem, ((Number) fila.get(sem)).longValue() + 1);
                 }
+                fila.put("totalLotes", ((Number) fila.get("totalLotes")).longValue() + 1);
+                fila.put("totalKg", Math.round((((Number) fila.get("totalKg")).doubleValue() + kg) * 100.0) / 100.0);
+            }
+
+            Map<String, Object> lMap = new LinkedHashMap<>();
+            lMap.put("id", lote.getId());
+            lMap.put("tipo", lote.getTipo());
+            lMap.put("folio", lote.getFolio());
+            lMap.put("especieId", lote.getEspecieId());
+            lMap.put("especie", lote.getEspecie());
+            lMap.put("estadoDeclarado", lote.getEstadoDeclarado());
+            lMap.put("tramoReal", lote.getTramoReal());
+            lMap.put("kg", lote.getKg());
+            lMap.put("fechaDeclaracion", lote.getFechaDeclaracion());
+            lMap.put("horaDeclaracion", lote.getHoraDeclaracion());
+            lMap.put("horasTranscurridas", lote.getHorasTranscurridas());
+            lMap.put("diasTranscurridos", lote.getDiasTranscurridos());
+            lMap.put("plazoMaxHoras", lote.getPlazoMaxHoras());
+            lMap.put("semaforo", lote.getSemaforo());
+            lMap.put("enBodega", true);
+            lMap.put("destinado", false);
+            lMap.put("inconsistenciaHumedad", lote.getInconsistenciaHumedad());
+            lMap.put("comercializadorId", lote.getComercializadorId());
+            lMap.put("actorComercializador", lote.getActorComercializador());
+            lMap.put("rutComercializador", lote.getRutComercializador());
+            lMap.put("origenId", lote.getOrigenId());
+            lMap.put("actorOrigen", lote.getActorOrigen());
+            lMap.put("rutOrigen", lote.getRutOrigen());
+            lMap.put("embarcacion", lote.getEmbarcacion());
+            lMap.put("bloqueada", lote.getBloqueada());
+            lMap.put("motivoBloqueo", lote.getMotivoBloqueo());
+            lMap.put("marcaId", lote.getMarcaId());
+            lMap.put("marcasActivas", lote.getMarcasActivas());
+
+            lotesEvaluados.add(lMap);
+            if ("ROJO".equals(sem)) {
+                lotesRojos.add(lMap);
             }
         }
 
-        // Calcular lotes en tránsito a planta: lotes que no están en bodega y fueron destinados
-        long lotesDestinados = metrics.containsKey("lotesDestinados")
-                ? ((Number) metrics.get("lotesDestinados")).longValue()
-                : 0L;
-        long totalLotesEnBodega = lotesBodega.size();
-        long totalLotesEnTransitoAPlanta = Math.max(0L, lotesDestinados);
+        // TR.2: Contar en tránsito a planta (declaraciones con destinatario planta aún no recibidas)
+        long totalLotesEnTransitoAPlanta = contarLotesEnTransitoAPlanta(startDate, endDate);
 
+        Map<String, Object> metrics = new LinkedHashMap<>();
         metrics.put("activo", true);
         metrics.put("controlDesactivado", false);
-        metrics.put("totalLotesEnBodega", totalLotesEnBodega);
+        metrics.put("totalLotesEnBodega", (long) lotesBodega.size());
+        metrics.put("totalKgEnBodega", Math.round(totalKgEnBodega * 100.0) / 100.0);
         metrics.put("totalLotesEnTransitoAPlanta", totalLotesEnTransitoAPlanta);
         metrics.put("cargasRetenidas", cargasRetenidas);
+        metrics.put("semaforoVerde", verdeTotal);
+        metrics.put("semaforoAmarillo", amarilloTotal);
+        metrics.put("semaforoRojo", rojoTotal);
+        metrics.put("matriz", matriz);
+        metrics.put("lotes", lotesEvaluados);
+        metrics.put("lotesRojos", lotesRojos);
 
         // Parámetros normativos dinámicos
         Map<String, Object> pMap = new LinkedHashMap<>();
@@ -276,6 +332,66 @@ public class RetencionCustodiaService {
         metrics.put("parametros", pMap);
 
         return metrics;
+    }
+
+    /**
+     * TR.2: Cuenta las declaraciones asignadas a una planta que aún no han sido recibidas en la romana.
+     */
+    private long contarLotesEnTransitoAPlanta(Date startDate, Date endDate) {
+        String dateFilterRecolector = "";
+        String dateFilterArmador = "";
+        String dateFilterArea = "";
+        String dateFilterComercializador = "";
+
+        if (startDate != null && endDate != null) {
+            dateFilterRecolector = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+            dateFilterArmador = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+            dateFilterArea = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+            dateFilterComercializador = " AND d.fecha_declaracion BETWEEN :startDate AND :endDate";
+        } else if (startDate != null) {
+            dateFilterRecolector = " AND d.fecha_declaracion >= :startDate";
+            dateFilterArmador = " AND d.fecha_declaracion >= :startDate";
+            dateFilterArea = " AND d.fecha_declaracion >= :startDate";
+            dateFilterComercializador = " AND d.fecha_declaracion >= :startDate";
+        } else if (endDate != null) {
+            dateFilterRecolector = " AND d.fecha_declaracion <= :endDate";
+            dateFilterArmador = " AND d.fecha_declaracion <= :endDate";
+            dateFilterArea = " AND d.fecha_declaracion <= :endDate";
+            dateFilterComercializador = " AND d.fecha_declaracion <= :endDate";
+        }
+
+        String sql = "SELECT (" +
+                "SELECT COUNT(*) FROM declaracion_recolector d " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil p ON ud.perfil_id = p.id AND p.nombre = 'PLANTA' " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA'))" + dateFilterRecolector +
+                ") + (" +
+                "SELECT COUNT(*) FROM declaracion_armador d " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil p ON ud.perfil_id = p.id AND p.nombre = 'PLANTA' " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA'))" + dateFilterArmador +
+                ") + (" +
+                "SELECT COUNT(*) FROM declaracion_area d " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil p ON ud.perfil_id = p.id AND p.nombre = 'PLANTA' " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA'))" + dateFilterArea +
+                ") + (" +
+                "SELECT COUNT(*) FROM declaracion_comercializador d " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil p ON ud.perfil_id = p.id AND p.nombre = 'PLANTA' " +
+                "WHERE d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA'))" + dateFilterComercializador +
+                ")";
+
+        try {
+            Query q = entityManager.createNativeQuery(sql);
+            if (startDate != null) q.setParameter("startDate", startDate);
+            if (endDate != null) q.setParameter("endDate", endDate);
+            Object res = q.getSingleResult();
+            return res != null ? ((Number) res).longValue() : 0L;
+        } catch (Exception ex) {
+            log.warn("Error contando cargas en tránsito a planta: {}", ex.getMessage());
+            return 0L;
+        }
     }
 
     /**
@@ -419,7 +535,7 @@ public class RetencionCustodiaService {
                                 eval.getMotivoDetalle(),
                                 lote.getOrigenId(),
                                 null,
-                                String.valueOf(eval.getPlazoMaxHoras()),
+                                String.valueOf(eval.getUmbralBloqueoHoras()),
                                 String.valueOf(Math.round(lote.getHorasTranscurridas())),
                                 "BARRIDO"
                         );
@@ -490,11 +606,14 @@ public class RetencionCustodiaService {
             default: return Optional.empty();
         }
 
-        String sql = "SELECT d.id, d.fecha_declaracion, d.hora, d.especie_id, e.nombre, COALESCE(h.nombre, 'HÚMEDO'), d.usuario_id " +
+        String sql = "SELECT d.id, d.fecha_declaracion, d.hora, d.especie_id, e.nombre, COALESCE(h.nombre, 'HÚMEDO'), d.usuario_destinatario_id " +
                 "FROM " + tabla + " d " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil pud ON ud.perfil_id = pud.id AND pud.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
-                "WHERE d.id = :id";
+                "WHERE d.id = :id AND d.usuario_destinatario_id IS NOT NULL AND d.declaracion_destinatario_id IS NULL " +
+                "AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA'))";
 
         try {
             Query q = entityManager.createNativeQuery(sql);
@@ -509,7 +628,7 @@ public class RetencionCustodiaService {
             Long espId = r[3] != null ? ((Number) r[3]).longValue() : null;
             String espNom = r[4] != null ? r[4].toString() : "";
             String hum = r[5] != null ? r[5].toString() : "HÚMEDO";
-            Long usuarioId = r[6] != null ? ((Number) r[6]).longValue() : null;
+            Long usuarioDestinatarioId = r[6] != null ? ((Number) r[6]).longValue() : null;
 
             LocalDateTime inicioTs = ReportService.parseTimestamp(fecha, hora);
             double horas = CadenaCustodiaService.horasEnBodega(inicioTs, LocalDateTime.now());
@@ -517,8 +636,8 @@ public class RetencionCustodiaService {
             ResultadoEvaluacionRetencion eval = politicaRetencion.evaluar(espId, espNom, hum, horas, params);
             if (eval.isBloqueoRequerido()) {
                 DeclaracionMarcaModel marca = marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
-                        tipo, id, eval.getMotivoDetalle(), usuarioId, null,
-                        String.valueOf(eval.getPlazoMaxHoras()),
+                        tipo, id, eval.getMotivoDetalle(), usuarioDestinatarioId, null,
+                        String.valueOf(eval.getUmbralBloqueoHoras()),
                         String.valueOf(Math.round(horas)),
                         "VALIDACION");
                 return Optional.ofNullable(marca);
@@ -614,8 +733,8 @@ public class RetencionCustodiaService {
                 "SELECT d.id, 'COMERCIALIZADOR', " +
                 "COALESCE(d.folio_origen, CONCAT('DC-', d.id)), " +
                 "d.fecha_declaracion, d.hora, d.cantidad, d.especie_id, e.nombre, " +
-                "COALESCE(h.nombre, 'HÚMEDO'), d.usuario_id, " +
-                "TRIM(CONCAT(COALESCE(uo.nombres, ''), ' ', COALESCE(uo.apellidop, ''))), uo.rut, " +
+                "COALESCE(h.nombre, 'HÚMEDO'), d.usuario_destinatario_id, " +
+                "TRIM(CONCAT(COALESCE(ud.nombres, ''), ' ', COALESCE(ud.apellidop, ''))), ud.rut, " +
                 "d.usuario_id, TRIM(CONCAT(COALESCE(uo.nombres, ''), ' ', COALESCE(uo.apellidop, ''))), uo.rut, " +
                 "NULL, " +
                 "(SELECT dm.id FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.marca = 'RETENCION_EXCEDIDA' AND dm.resuelta = false LIMIT 1), " +
@@ -623,10 +742,11 @@ public class RetencionCustodiaService {
                 "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.resuelta = false) " +
                 "FROM declaracion_comercializador d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
-                "INNER JOIN perfil puo ON uo.perfil_id = puo.id AND puo.nombre = 'COMERCIALIZADOR' " +
+                "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
+                "INNER JOIN perfil pud ON ud.perfil_id = pud.id AND pud.nombre = 'COMERCIALIZADOR' " +
                 "INNER JOIN especie e ON d.especie_id = e.id " +
                 "LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id " +
-                "WHERE d.declaracion_destinatario_id IS NULL AND d.consumida_por_tipo IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterComercializador + " " +
+                "WHERE d.usuario_destinatario_id IS NOT NULL AND d.declaracion_destinatario_id IS NULL AND (d.estado IS NULL OR d.estado NOT IN ('ANULADA', 'RECHAZADA')) " + dateFilterComercializador + " " +
                 "ORDER BY fecha_declaracion DESC";
     }
 

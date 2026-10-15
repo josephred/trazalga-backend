@@ -89,14 +89,13 @@ public class BloqueoCargaService {
                 List<Long> ids = entry.getValue();
                 if (ids == null || ids.isEmpty()) continue;
 
-                List<String> tiposAEvaluar = SeleccionTokens.LEGACY.equals(tipo)
-                        ? List.of("ARMADOR", "RECOLECTOR", "AREA", "COMERCIALIZADOR")
-                        : List.of(tipo.toUpperCase());
+                // Si el token es LEGACY (sin tipo), no evaluar retención temporal JIT a ciegas
+                if (SeleccionTokens.LEGACY.equals(tipo)) {
+                    continue;
+                }
 
-                for (String t : tiposAEvaluar) {
-                    for (Long id : ids) {
-                        retencionCustodiaService.evaluarYBloquearJustInTime(t, id);
-                    }
+                for (Long id : ids) {
+                    retencionCustodiaService.evaluarYBloquearJustInTime(tipo.toUpperCase(), id);
                 }
             }
         }

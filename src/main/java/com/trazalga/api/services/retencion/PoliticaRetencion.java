@@ -91,13 +91,17 @@ public class PoliticaRetencion {
             semaforo = "VERDE";
         }
 
-        // Tramo real biológico por evaporación natural en función de las horas
+        // Tramo real biológico por evaporación natural en función de las horas parametrizadas (TR.2)
+        int limHumedo = params != null ? params.humedoMaxHoras() : 24;
+        int limSemihumedo = params != null ? params.semihumedoMaxHoras() : 72;
+        int limSemiseco = params != null ? params.semisecoMaxHoras() : 216;
+
         String tramoReal;
-        if (horas <= 24) {
+        if (horas <= limHumedo) {
             tramoReal = "HÚMEDO";
-        } else if (horas <= 72) {
+        } else if (horas <= limSemihumedo) {
             tramoReal = "SEMI HÚMEDO";
-        } else if (horas <= 216) {
+        } else if (horas <= limSemiseco) {
             tramoReal = "SEMI SECO";
         } else {
             tramoReal = "SECO";
