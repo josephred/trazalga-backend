@@ -53,6 +53,9 @@ public class RetencionCustodiaService {
     private IDeclaracionMarcaRepository marcaRepository;
 
     @Autowired
+    private com.trazalga.api.repositories.IAvisoEnviadoRepository avisoRepository;
+
+    @Autowired
     private MarcaRetencionExecutorService marcaRetencionExecutorService;
 
     @Autowired
@@ -406,7 +409,7 @@ public class RetencionCustodiaService {
             Long usuarioDeclaranteId,
             Long regionId
     ) {
-        return registrarMarcaRetencionExcedida(tipo, declaracionId, motivo, usuarioDeclaranteId, regionId, null, null, "VALIDACION");
+        return registrarMarcaRetencionExcedida(tipo, declaracionId, motivo, usuarioDeclaranteId, regionId, null, null, "VALIDACION", null);
     }
 
     @Transactional
@@ -420,6 +423,21 @@ public class RetencionCustodiaService {
             String valorParam,
             String origenParam
     ) {
+        return registrarMarcaRetencionExcedida(tipo, declaracionId, motivo, usuarioDeclaranteId, regionId, umbralParam, valorParam, origenParam, null);
+    }
+
+    @Transactional
+    public DeclaracionMarcaModel registrarMarcaRetencionExcedida(
+            String tipo,
+            Long declaracionId,
+            String motivo,
+            Long usuarioDeclaranteId,
+            Long regionId,
+            String umbralParam,
+            String valorParam,
+            String origenParam,
+            String parametroNombre
+    ) {
         if (marcaRetencionExecutorService != null) {
             return marcaRetencionExecutorService.registrarMarcaRetencionExcedida(
                     tipo,
@@ -429,12 +447,20 @@ public class RetencionCustodiaService {
                     regionId,
                     umbralParam,
                     valorParam,
-                    origenParam
+                    origenParam,
+                    parametroNombre
             );
         }
 
         // Fallback cuando se ejecuta en pruebas unitarias aisladas sin proxy AOP
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
+
+        // TR.3: Si no hay umbral de bloqueo válido, no registrar con fallback hardcodeado
+        if (umbralParam == null || umbralParam.isBlank()) {
+            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
+            return null;
+        }
+
         List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
         boolean yaLiberada = marcasPrevias.stream()
                 .anyMatch(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()) && "LIBERADA".equalsIgnoreCase(m.getResolucionTipo()));
@@ -464,7 +490,7 @@ public class RetencionCustodiaService {
             valorObs = valorObs.substring(0, 40);
         }
 
-        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam : "120";
+        String umbral = umbralParam.trim();
         if (umbral.length() > 40) {
             umbral = umbral.substring(0, 40);
         }
@@ -474,8 +500,12 @@ public class RetencionCustodiaService {
             origen = origen.substring(0, 20);
         }
 
+        String paramFinal = (parametroNombre != null && !parametroNombre.isBlank())
+                ? parametroNombre.trim()
+                : "retencion_bloqueo_humedo_horas";
+
         CriterioHallazgo criterio = new CriterioHallazgo(
-                "retencion_horas",
+                paramFinal,
                 umbral,
                 valorObs,
                 "h"
@@ -537,7 +567,8 @@ public class RetencionCustodiaService {
                                 null,
                                 String.valueOf(eval.getUmbralBloqueoHoras()),
                                 String.valueOf(Math.round(lote.getHorasTranscurridas())),
-                                "BARRIDO"
+                                "BARRIDO",
+                                eval.getParametroBloqueoNombre()
                         );
                         bloqueosAplicados++;
                         log.warn("Bloqueo automático RETENCION_EXCEDIDA aplicado a lote {}:{} ({} h en bodega)",
@@ -548,32 +579,19 @@ public class RetencionCustodiaService {
                 }
             }
 
-            // 2. Preaviso informativo de retención: SÓLO cuando el bloqueo esté activo (plan 09-10)
-            if (params.bloqueoActivo() && (eval.isEnPreavisoBloqueo() || eval.isEnPreavisoSemaforo())) {
+            // 2. Preaviso informativo de retención al comercializador (TR.3):
+            // SÓLO cuando el bloqueo esté activo y esté en preaviso de bloqueo (ej. 80% de 120h = 96h).
+            // Se registra en aviso_enviado con clave RETENCION_PREAVISO:<TIPO>:<ID>, NO como hallazgo.
+            if (params.bloqueoActivo() && eval.isEnPreavisoBloqueo()) {
                 try {
-                    String reglaPreaviso = "PREAVISO_" + (eval.isEnPreavisoBloqueo() ? "BLOQUEO" : "SEMAFORO");
-                    int umbralHoras = (int) Math.round(eval.getPlazoMaxHoras() * (params.semaforoPreavisoPct() / 100.0));
-                    CriterioHallazgo crit = new CriterioHallazgo(
-                            "preaviso_retencion",
-                            String.valueOf(umbralHoras > 0 ? umbralHoras : 96),
-                            String.valueOf(Math.round(lote.getHorasTranscurridas())),
-                            "h"
-                    );
-
-                    hallazgoService.registrar(
-                            lote.getTipo(),
-                            lote.getId(),
-                            "RETENCION_PREAVISO",
-                            reglaPreaviso,
-                            crit,
-                            eval.getMotivoDetalle(),
-                            "BARRIDO",
-                            lote.getOrigenId(),
-                            null
-                    );
-                    preavisosEmitidos++;
+                    String claveAviso = String.format("RETENCION_PREAVISO:%s:%d", lote.getTipo(), lote.getId());
+                    if (avisoRepository != null && !avisoRepository.existsById(claveAviso)) {
+                        avisoRepository.save(new com.trazalga.api.models.AvisoEnviadoModel(claveAviso, new Date()));
+                        preavisosEmitidos++;
+                        log.info("Preaviso de retención registrado en aviso_enviado para {}:{}", lote.getTipo(), lote.getId());
+                    }
                 } catch (Exception ex) {
-                    log.debug("Preaviso ya registrado o no despachado para {}:{}: {}", lote.getTipo(), lote.getId(), ex.getMessage());
+                    log.debug("Preaviso no registrado para {}:{}: {}", lote.getTipo(), lote.getId(), ex.getMessage());
                 }
             }
         }
@@ -639,7 +657,8 @@ public class RetencionCustodiaService {
                         tipo, id, eval.getMotivoDetalle(), usuarioDestinatarioId, null,
                         String.valueOf(eval.getUmbralBloqueoHoras()),
                         String.valueOf(Math.round(horas)),
-                        "VALIDACION");
+                        "VALIDACION",
+                        eval.getParametroBloqueoNombre());
                 return Optional.ofNullable(marca);
             }
         } catch (Exception ex) {

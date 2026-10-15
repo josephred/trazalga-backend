@@ -43,7 +43,28 @@ public class MarcaRetencionExecutorService {
             String valorParam,
             String origenParam
     ) {
+        return registrarMarcaRetencionExcedida(tipo, declaracionId, motivo, usuarioDeclaranteId, regionId, umbralParam, valorParam, origenParam, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public DeclaracionMarcaModel registrarMarcaRetencionExcedida(
+            String tipo,
+            Long declaracionId,
+            String motivo,
+            Long usuarioDeclaranteId,
+            Long regionId,
+            String umbralParam,
+            String valorParam,
+            String origenParam,
+            String parametroNombre
+    ) {
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
+
+        // TR.3: Si no hay umbral de bloqueo válido, no registrar con fallback hardcodeado
+        if (umbralParam == null || umbralParam.isBlank()) {
+            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
+            return null;
+        }
 
         // Verificar si existe una marca previa resuelta como LIBERADA
         List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
@@ -77,7 +98,7 @@ public class MarcaRetencionExecutorService {
         }
 
         // Determinar umbral (máx 40 chars)
-        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam : "120";
+        String umbral = umbralParam.trim();
         if (umbral.length() > 40) {
             umbral = umbral.substring(0, 40);
         }
@@ -88,8 +109,12 @@ public class MarcaRetencionExecutorService {
             origen = origen.substring(0, 20);
         }
 
+        String paramFinal = (parametroNombre != null && !parametroNombre.isBlank())
+                ? parametroNombre.trim()
+                : "retencion_bloqueo_humedo_horas";
+
         CriterioHallazgo criterio = new CriterioHallazgo(
-                "retencion_horas",
+                paramFinal,
                 umbral,
                 valorObs,
                 "h"

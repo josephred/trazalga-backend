@@ -41,6 +41,15 @@ public class PoliticaRetencion {
     }
 
     /**
+     * Retorna el nombre canónico del parámetro de bloqueo según la clave de humedad (TR.3).
+     */
+    public static String parametroBloqueoNombre(String claveMatriz) {
+        if ("SEMI_HUMEDO".equalsIgnoreCase(claveMatriz)) return "retencion_bloqueo_semihumedo_horas";
+        if ("SEMI_SECO".equalsIgnoreCase(claveMatriz)) return "retencion_bloqueo_semiseco_horas";
+        return "retencion_bloqueo_humedo_horas";
+    }
+
+    /**
      * Evalúa integralmente una carga contra la normativa Res. 3602 y la política de bloqueo.
      */
     public ResultadoEvaluacionRetencion evaluar(
@@ -166,6 +175,7 @@ public class PoliticaRetencion {
                 .enPreavisoBloqueo(enPreavisoBloqueo)
                 .inconsistenciaHumedad(inconsistenciaHumedad)
                 .motivoDetalle(motivoDetalle)
+                .parametroBloqueoNombre(parametroBloqueoNombre(claveMatriz))
                 .build();
     }
 

@@ -44,9 +44,9 @@ public class HallazgoFactory {
             String origen
     ) {
         String clave = generarClaveIdempotencia(tipo, declaracionId, marca, regla);
-        String detalleFinal = (criterio != null && criterio.texto() != null)
-                ? criterio.texto()
-                : (detalleFallback != null ? detalleFallback : marca);
+        String detalleFinal = (detalleFallback != null && !detalleFallback.isBlank())
+                ? detalleFallback
+                : ((criterio != null && criterio.texto() != null) ? criterio.texto() : marca);
 
         Long reglaIdNum = null;
         if (regla != null) {

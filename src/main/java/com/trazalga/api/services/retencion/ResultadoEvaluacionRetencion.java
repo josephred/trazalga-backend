@@ -23,4 +23,5 @@ public class ResultadoEvaluacionRetencion {
     boolean enPreavisoBloqueo;
     boolean inconsistenciaHumedad;
     String motivoDetalle;
+    String parametroBloqueoNombre;
 }
