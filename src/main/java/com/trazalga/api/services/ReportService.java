@@ -81,6 +81,9 @@ public class ReportService {
         this.configService = configService;
         this.variacionPesoService = variacionPesoService;
         this.retencionCustodiaService = retencionCustodiaService;
+        if (this.reportRepository != null && this.variacionPesoService != null) {
+            this.reportRepository.setVariacionPesoService(this.variacionPesoService);
+        }
     }
 
     public void setRetencionCustodiaService(com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {

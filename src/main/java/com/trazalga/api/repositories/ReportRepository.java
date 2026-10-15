@@ -34,6 +34,14 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica evaluadorCoherenciaBiologica;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService;
+
+    public void setVariacionPesoService(com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService) {
+        this.variacionPesoService = variacionPesoService;
+    }
+
     public List<ReportDTO> generateReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
         String tableName;
         String dateColumn = "fecha_declaracion";
@@ -2032,6 +2040,7 @@ public class ReportRepository {
         List<Object[]> results = query.getResultList();
         Date now = new Date();
         List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        java.util.Map<Long, com.trazalga.api.dto.ResultadoVariacionPesoDTO> cacheRecepciones = new java.util.HashMap<>();
 
         for (Object[] row : results) {
             String folioOrigen = row[0] != null ? row[0].toString() : "";
@@ -2064,10 +2073,12 @@ public class ReportRepository {
                 }
             }
             Double kgOrigenDespacho = row.length > 21 && row[21] != null ? ((Number) row[21]).doubleValue() : null;
+            Long idPlanta = row.length > 23 && row[23] != null ? ((Number) row[23]).longValue() : null;
             String humedadDestino = row.length > 24 && row[24] != null ? row[24].toString() : humedadOrigen;
 
             // TV.4: El deltaPct de un lote es el del último tramo cerrado:
-            // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o venta directa a planta);
+            // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o venta directa a planta),
+            //    reutilizando la evaluación canónica TV.1 de esa recepción para todos sus lotes;
             // 2) si sólo declaró el comercializador, es el acopio, origen -> comercializador por despacho (T2.5);
             // 3) si no hay ninguno, queda nulo, con el rótulo «sin tramo cerrado».
             double kgBase;
@@ -2075,8 +2086,29 @@ public class ReportRepository {
             Double deltaKg = null;
             Double deltaPct = null;
             String tramoCerrado;
+            int diasTranscurridos;
 
-            if (kgPlanta != null && kgPlanta > 0) {
+            com.trazalga.api.dto.ResultadoVariacionPesoDTO resTV1 = null;
+            if (idPlanta != null && variacionPesoService != null) {
+                resTV1 = cacheRecepciones.computeIfAbsent(idPlanta, id -> {
+                    try {
+                        return variacionPesoService.evaluarRecepcionPorId(id);
+                    } catch (Exception e) {
+                        return null;
+                    }
+                });
+            }
+
+            if (resTV1 != null) {
+                // TV.4: Para un lote recibido por una planta, el Δ, los días y la severidad
+                // son los de la evaluación TV.1 canónica de esa recepción
+                deltaPct = resTV1.getDeltaPct();
+                deltaKg = resTV1.getDeltaKg();
+                diasTranscurridos = (int) Math.round(resTV1.getDiasTransito());
+                tramoCerrado = (kgComercializador != null && kgComercializador > 0) ? "COMERCIALIZADOR_PLANTA" : "DIRECTO";
+                kgBase = resTV1.getKgDespacho();
+                kgDestino = resTV1.getKgRomana();
+            } else if (kgPlanta != null && kgPlanta > 0) {
                 if (kgComercializador != null && kgComercializador > 0) {
                     kgBase = kgComercializador;
                     kgDestino = kgPlanta;
@@ -2088,23 +2120,22 @@ public class ReportRepository {
                 }
                 deltaKg = kgDestino - kgBase;
                 deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
+                diasTranscurridos = fechaPlanta != null ? diffDays(fechaOrigen, fechaPlanta) : 0;
             } else if (kgComercializador != null && kgComercializador > 0) {
                 kgBase = (kgOrigenDespacho != null && kgOrigenDespacho > 0) ? kgOrigenDespacho : kgOrigen;
                 kgDestino = kgComercializador;
                 tramoCerrado = "ACOPIO";
                 deltaKg = kgDestino - kgBase;
                 deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
+                diasTranscurridos = fechaComercializador != null ? diffDays(fechaOrigen, fechaComercializador) : (fechaOrigen != null ? diffDays(fechaOrigen, now) : 0);
             } else {
                 kgBase = kgOrigen;
                 kgDestino = kgOrigen;
                 tramoCerrado = "SIN_TRAMO_CERRADO";
-                deltaKg = 0.0;
+                deltaKg = null;
                 deltaPct = null;
+                diasTranscurridos = 0;
             }
-
-            int diasTranscurridos = fechaPlanta != null
-                    ? diffDays(fechaOrigen, fechaPlanta)
-                    : (fechaComercializador != null ? diffDays(fechaOrigen, now) : 0);
 
             int diasEnBodega = (fechaComercializador != null && fechaPlanta != null)
                     ? diffDays(fechaComercializador, fechaPlanta)
@@ -2129,18 +2160,26 @@ public class ReportRepository {
                 }
             }
 
-            // TV.4: Severidad biológica canónica delegada en EvaluadorCoherenciaBiologica
+            // TV.4: Severidad biológica canónica delegada en TV.1 o EvaluadorCoherenciaBiologica
             boolean alertaMerma = false;
             String motivoMerma = null;
             String inconsistenciaBiologica = "NINGUNA";
             String severidadBiologica = "NEUTRA";
 
-            if (deltaPct != null && bioPerdidaActivo) {
+            if (resTV1 != null) {
+                severidadBiologica = resTV1.getSemaforo() != null ? resTV1.getSemaforo() : "NEUTRA";
+                inconsistenciaBiologica = resTV1.getCriterio() != null ? resTV1.getCriterio() : "NINGUNA";
+                alertaMerma = resTV1.isAlerta();
+                motivoMerma = resTV1.getDescripcion();
+            } else if (deltaPct != null && bioPerdidaActivo) {
                 com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica evaluador = evaluadorCoherenciaBiologica != null
                         ? evaluadorCoherenciaBiologica
                         : new com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica();
 
-                double riesgoRojo = (umbralVariacion != null ? umbralVariacion * 2.0 : 10.0);
+                double riesgoRojo = configuracionGeneralService != null
+                        ? configuracionGeneralService.getDouble("riesgo_variacion_rojo_pct", 10.0)
+                        : (umbralVariacion != null ? umbralVariacion * 2.0 : 10.0);
+
                 com.trazalga.api.services.parametros.ParametrosVariacion pVar = new com.trazalga.api.services.parametros.ParametrosVariacion(
                         true, diasMinHumedo,
                         mermaMinHumedo != null ? mermaMinHumedo : 5.0,
