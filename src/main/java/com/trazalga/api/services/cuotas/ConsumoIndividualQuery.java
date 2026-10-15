@@ -101,7 +101,7 @@ public class ConsumoIndividualQuery {
            .append("  u.rut AS rut, ")
            .append("  CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) AS nombre, ")
            .append("  COALESCE(p.nombre, 'RECOLECTOR') AS perfil, ")
-           .append("  c_u.nombre AS comuna_nombre, ")
+           .append("  COALESCE(c_u.nombre, 'Sin comuna') AS comuna_nombre, ")
            .append("  GROUP_CONCAT(DISTINCT emb.nombre SEPARATOR ', ') AS embarcaciones, ")
            .append("  COUNT(DISTINCT t.decl_id) AS cantidad_declaraciones, ")
            .append("  COALESCE(SUM(t.volumen), 0) AS volumen_total ")
@@ -141,7 +141,8 @@ public class ConsumoIndividualQuery {
            .append("JOIN usuario u ON t.usuario_id = u.id ")
            .append("LEFT JOIN perfil p ON u.perfil_id = p.id ")
            .append("LEFT JOIN embarcacion emb ON t.embarcacion_id = emb.id ")
-           .append("LEFT JOIN comuna c_u ON c_u.id = COALESCE(u.comuna_id, t.comuna_imputada_id) ");
+           .append("LEFT JOIN comuna c_u ON c_u.id = u.comuna_id ")
+           .append("LEFT JOIN comuna c_imp ON c_imp.id = COALESCE(u.comuna_id, t.comuna_imputada_id) ");
 
         params.put("fechaInicio", fechaInicio);
         params.put("fechaFin", fechaFin);
@@ -154,13 +155,13 @@ public class ConsumoIndividualQuery {
             sql.append("WHERE 1=1 ");
             Set<Long> cIds = AlcanceComunal.idsComunas(cuota);
             if (!cIds.isEmpty()) {
-                sql.append("  AND c_u.id IN (:filtroComunaIds) ");
+                sql.append("  AND c_imp.id IN (:filtroComunaIds) ");
                 params.put("filtroComunaIds", cIds);
             } else if (cuota.getProvincia() != null) {
-                sql.append("  AND c_u.provincia_id = :filtroProvinciaId ");
+                sql.append("  AND c_imp.provincia_id = :filtroProvinciaId ");
                 params.put("filtroProvinciaId", cuota.getProvincia().getId());
             } else if (cuota.getRegion() != null) {
-                sql.append("  AND c_u.region_id = :filtroRegionId ");
+                sql.append("  AND c_imp.region_id = :filtroRegionId ");
                 params.put("filtroRegionId", cuota.getRegion().getId());
             }
 

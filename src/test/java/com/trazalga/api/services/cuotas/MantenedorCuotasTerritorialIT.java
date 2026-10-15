@@ -14,11 +14,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.trazalga.api.IntegracionBase;
+import com.trazalga.api.dto.ConsumoPersonaDTO;
 import com.trazalga.api.dto.ResumenPlantillaDTO;
+import com.trazalga.api.models.BuzoModel;
 import com.trazalga.api.models.CaletaModel;
 import com.trazalga.api.models.ComunaModel;
 import com.trazalga.api.models.CuotaExtraccionModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
+import com.trazalga.api.models.EmbarcacionModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.ExtraccionTipoModel;
 import com.trazalga.api.models.FactorConversionModel;
@@ -27,10 +31,13 @@ import com.trazalga.api.models.PerfilModel;
 import com.trazalga.api.models.ProvinciaModel;
 import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IBuzoRepository;
 import com.trazalga.api.repositories.ICaletaRepository;
 import com.trazalga.api.repositories.IComunaRepository;
 import com.trazalga.api.repositories.ICuotaExtraccionRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
+import com.trazalga.api.repositories.IEmbarcacionRepository;
 import com.trazalga.api.repositories.IEspecieRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
 import com.trazalga.api.repositories.IFactorConversionRepository;
@@ -66,6 +73,15 @@ public class MantenedorCuotasTerritorialIT extends IntegracionBase {
 
     @Autowired
     private IDeclaracionRecolectorRepository declaracionRecolectorRepository;
+
+    @Autowired
+    private IDeclaracionArmadorRepository declaracionArmadorRepository;
+
+    @Autowired
+    private IEmbarcacionRepository embarcacionRepository;
+
+    @Autowired
+    private IBuzoRepository buzoRepository;
 
     @Autowired
     private IEspecieRepository especieRepository;
@@ -619,5 +635,97 @@ public class MantenedorCuotasTerritorialIT extends IntegracionBase {
                 .captura(capturaKg)
                 .build();
         return declaracionRecolectorRepository.saveAndFlush(decl);
+    }
+
+    @Test
+    @DisplayName("TM.2: Un armador sin comuna de inscripción declara en dos comunas de la plantilla y aparece en una sola fila consolidada con 'Sin comuna'")
+    void testArmadorSinComuna_ApareceEnUnaSolaFilaConTotal() {
+        RegionModel region = regionRepository.saveAndFlush(RegionModel.builder().nombre("Región Coquimbo TM2").codigo("04").build());
+        ProvinciaModel prov = provinciaRepository.saveAndFlush(ProvinciaModel.builder().nombre("Provincia Elqui TM2").region(region).build());
+        ComunaModel com1 = comunaRepository.saveAndFlush(ComunaModel.builder().nombre("Coquimbo TM2").region(region).provincia(prov).build());
+        ComunaModel com2 = comunaRepository.saveAndFlush(ComunaModel.builder().nombre("La Serena TM2").region(region).provincia(prov).build());
+        CaletaModel cal1 = caletaRepository.saveAndFlush(CaletaModel.builder().nombre("Caleta Coquimbo TM2").region(region).comuna(com1).build());
+        CaletaModel cal2 = caletaRepository.saveAndFlush(CaletaModel.builder().nombre("Caleta La Serena TM2").region(region).comuna(com2).build());
+
+        EspecieModel esp = especieRepository.saveAndFlush(EspecieModel.builder().nombre("Huiro negro TM2").build());
+        ExtraccionTipoModel ext = extraccionTipoRepository.saveAndFlush(ExtraccionTipoModel.builder().nombre("Barreteado TM2").build());
+        HumedadEstadoModel hum = humedadEstadoRepository.saveAndFlush(HumedadEstadoModel.builder().nombre("Húmedo TM2").build());
+
+        PerfilModel perfilArmador = perfilRepository.findAll().stream()
+                .filter(p -> "ARMADOR".equalsIgnoreCase(p.getNombre()))
+                .findFirst()
+                .orElseGet(() -> perfilRepository.saveAndFlush(PerfilModel.builder().nombre("ARMADOR").build()));
+
+        // Armador sin comuna de inscripción (comuna == null)
+        UsuarioModel armadorSinComuna = usuarioRepository.saveAndFlush(UsuarioModel.builder()
+                .rut("12.345.678-9")
+                .nombres("Armador")
+                .apellidop("Sin Comuna")
+                .perfil(perfilArmador)
+                .comuna(null)
+                .build());
+
+        EmbarcacionModel emb = embarcacionRepository.saveAndFlush(EmbarcacionModel.builder().nombre("Embarcación TM2").build());
+        BuzoModel buzo = buzoRepository.saveAndFlush(BuzoModel.builder().nombre("Buzo TM2").build());
+
+        // Declaración en Comuna 1: 500 kg
+        Date fecha = Date.valueOf("2026-10-10");
+        DeclaracionArmadorModel da1 = DeclaracionArmadorModel.builder()
+                .usuario(armadorSinComuna).especie(esp).extraccionTipo(ext).humedadEstado(hum).comuna(com1).caleta(cal1)
+                .embarcacion(emb).buzo(buzo)
+                .fechaDeclaracion(fecha).fechaExtraccion(fecha).hora("08:00")
+                .folioDesembarqueDa("DA-TM2-1")
+                .tipoDestinatario("comercializador").codigoDestinatario("DEST-1").usuarioDestinatario(destinatarioDefault)
+                .desembarque(new BigDecimal("500.00")).captura(500.0)
+                .build();
+        declaracionArmadorRepository.saveAndFlush(da1);
+
+        // Declaración en Comuna 2: 700 kg
+        DeclaracionArmadorModel da2 = DeclaracionArmadorModel.builder()
+                .usuario(armadorSinComuna).especie(esp).extraccionTipo(ext).humedadEstado(hum).comuna(com2).caleta(cal2)
+                .embarcacion(emb).buzo(buzo)
+                .fechaDeclaracion(fecha).fechaExtraccion(fecha).hora("14:00")
+                .folioDesembarqueDa("DA-TM2-2")
+                .tipoDestinatario("comercializador").codigoDestinatario("DEST-1").usuarioDestinatario(destinatarioDefault)
+                .desembarque(new BigDecimal("700.00")).captura(700.0)
+                .build();
+        declaracionArmadorRepository.saveAndFlush(da2);
+        entityManager.clear();
+
+        // Plantilla territorial que abarca ambas comunas
+        Set<ComunaModel> comunasPlantilla = new LinkedHashSet<>();
+        comunasPlantilla.add(com1);
+        comunasPlantilla.add(com2);
+
+        CuotaExtraccionModel plantilla = CuotaExtraccionModel.builder()
+                .nivelAgregacion("INDIVIDUAL")
+                .esPlantilla(true)
+                .ambito("AREA_LIBRE")
+                .perfil("ARMADOR")
+                .region(region)
+                .provincia(prov)
+                .comunas(comunasPlantilla)
+                .especie(esp)
+                .extraccionTipo(ext)
+                .periodo("MENSUAL")
+                .fechaInicio(Date.valueOf("2026-10-01"))
+                .fechaFin(Date.valueOf("2026-10-31"))
+                .limiteKg(2000.0)
+                .metrica("DESEMBARQUE")
+                .resolucion("RES-TM2-PROV")
+                .activo(true)
+                .estado("ABIERTA")
+                .build();
+        plantilla = cuotaRepository.saveAndFlush(plantilla);
+
+        ResumenPlantillaDTO resumen = consumoIndividualQuery.resumenPlantilla(plantilla, fecha);
+        assertNotNull(resumen);
+        assertEquals(1, resumen.getPersonasConActividad(), "El armador sin comuna debe aparecer en UNA sola fila");
+        assertEquals(0, new BigDecimal("1200.00").compareTo(resumen.getConsumoTotal()), "El consumo total debe sumar 500 + 700 = 1200 kg");
+
+        ConsumoPersonaDTO p = resumen.getDetallePersonas().get(0);
+        assertEquals(armadorSinComuna.getId(), p.getUsuarioId());
+        assertEquals("Sin comuna", p.getComunaInscripcion());
+        assertEquals(0, new BigDecimal("1200.00").compareTo(p.getConsumo()));
     }
 }
