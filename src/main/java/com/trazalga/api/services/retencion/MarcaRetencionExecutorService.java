@@ -60,8 +60,16 @@ public class MarcaRetencionExecutorService {
     ) {
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
 
-        // TR.3: Si no hay umbral de bloqueo válido, no registrar con fallback hardcodeado
-        if (umbralParam == null || umbralParam.isBlank()) {
+        // TR.3: Determinar umbral. Si no viene en umbralParam, intentar resolverlo desde el motivo
+        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam.trim() : null;
+        if (umbral == null && motivo != null) {
+            Matcher m = Pattern.compile("(?:límite de bloqueo de|bloqueo automático a las|retención máxima de)\\s*(\\d+(?:\\.\\d+)?)\\s*h", Pattern.CASE_INSENSITIVE).matcher(motivo);
+            if (m.find()) {
+                umbral = m.group(1);
+            }
+        }
+
+        if (umbral == null || umbral.isBlank()) {
             log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
             return null;
         }
@@ -98,7 +106,6 @@ public class MarcaRetencionExecutorService {
         }
 
         // Determinar umbral (máx 40 chars)
-        String umbral = umbralParam.trim();
         if (umbral.length() > 40) {
             umbral = umbral.substring(0, 40);
         }
@@ -111,7 +118,11 @@ public class MarcaRetencionExecutorService {
 
         String paramFinal = (parametroNombre != null && !parametroNombre.isBlank())
                 ? parametroNombre.trim()
-                : "retencion_bloqueo_humedo_horas";
+                : (motivo != null && (motivo.contains("SEMI HÚMEDO") || motivo.contains("SEMI_HUMEDO"))
+                        ? "retencion_bloqueo_semihumedo_horas"
+                        : (motivo != null && (motivo.contains("SEMI SECO") || motivo.contains("SEMI_SECO"))
+                                ? "retencion_bloqueo_semiseco_horas"
+                                : "retencion_bloqueo_humedo_horas"));
 
         CriterioHallazgo criterio = new CriterioHallazgo(
                 paramFinal,
