@@ -297,9 +297,13 @@ public class ValidacionDeclaracionService {
                                 resAtipico.getValor(),
                                 resAtipico.getUnidad());
                 String msgAtipico = resAtipico.getTexto();
+                String reglaAtipico = (resAtipico.getCriterioClave() != null && !resAtipico.getCriterioClave().isBlank())
+                        ? resAtipico.getCriterioClave().trim()
+                        : (resAtipico.getParametro() != null && resAtipico.getParametro().contains("sigma") ? "DESVIACION_ESTADISTICA" : "UMBRAL_ABSOLUTO");
                 marcas.add(MarcaItem.builder()
                         .marca("DESEMBARQUE_ATIPICO")
                         .detalle(msgAtipico)
+                        .regla(reglaAtipico)
                         .reglaId(null)
                         .criterio(crit)
                         .build());

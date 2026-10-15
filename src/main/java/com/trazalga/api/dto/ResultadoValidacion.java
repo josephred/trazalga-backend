@@ -28,6 +28,7 @@ public class ResultadoValidacion {
         private String marca; // EN_VEDA | LED_EXCEDIDO | CUOTA_EXCEDIDA | POSTERIOR_CIERRE | DECLARACION_EXTEMPORANEA | DESEMBARQUE_ATIPICO
         private String detalle;
         private Long reglaId;
+        private String regla;
         private com.trazalga.api.services.hallazgos.CriterioHallazgo criterio;
     }
 

@@ -42,7 +42,9 @@ public class AlertaTriggerService {
         }
 
         for (MarcaItem m : marcas) {
-            String reglaStr = m.getReglaId() != null ? String.valueOf(m.getReglaId()) : "GENERAL";
+            String reglaStr = (m.getRegla() != null && !m.getRegla().isBlank())
+                    ? m.getRegla().trim()
+                    : (m.getReglaId() != null ? String.valueOf(m.getReglaId()) : "GENERAL");
             hallazgoService.registrar(
                     declaracionTipo,
                     declaracionId,
