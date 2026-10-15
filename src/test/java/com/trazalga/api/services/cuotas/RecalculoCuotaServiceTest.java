@@ -95,7 +95,8 @@ public class RecalculoCuotaServiceTest {
         lenient().when(cuotaService.ambitoAplica(any(), any())).thenReturn(true);
         lenient().when(cuotaService.amerbAplica(any(), any())).thenReturn(true);
         lenient().when(cuotaService.usuarioAplica(any(), any())).thenReturn(true);
-        lenient().when(cuotaService.getModoImputacion()).thenReturn("EXTRACCION");
+        lenient().when(cuotaService.construirFiltroTerritorial(any(), any(), any()))
+                .thenReturn(new CuotaExtraccionService.FiltroTerritorialCuota("WHERE 1=1 ", Collections.emptyMap()));
         lenient().when(configService.getInt(eq("cuota_dias_gracia_declaracion"), anyInt())).thenReturn(0);
         lenient().when(configService.getValor(eq("cuota_fecha_imputacion"), anyString())).thenReturn("EXTRACCION");
     }
@@ -234,18 +235,15 @@ public class RecalculoCuotaServiceTest {
 
         Query qRec = mock(Query.class);
         Query qArm = mock(Query.class);
-        Query qArea = mock(Query.class);
 
         when(em.createNativeQuery(contains("declaracion_recolector"))).thenReturn(qRec);
         when(em.createNativeQuery(contains("declaracion_armador"))).thenReturn(qArm);
-        when(em.createNativeQuery(contains("declaracion_area"))).thenReturn(qArea);
 
-        when(qRec.getResultList()).thenReturn(Arrays.asList(rowPrevia, rowPosterior));
-        when(qArm.getResultList()).thenReturn(Collections.emptyList());
-        when(qArea.getResultList()).thenReturn(Collections.emptyList());
+        when(qRec.getSingleResult()).thenReturn(1L);
+        when(qArm.getSingleResult()).thenReturn(0L);
 
         int previasSinEvaluar = recalculoService.contarDeclaracionesPreviasSinEvaluar(cuota);
 
-        assertEquals(1, previasSinEvaluar, "Solo la declaración rowPrevia fue ingresada antes de la carga de la cuota");
+        assertEquals(1, previasSinEvaluar, "Solo la declaración recolectora previa fue ingresada antes de la carga de la cuota");
     }
 }

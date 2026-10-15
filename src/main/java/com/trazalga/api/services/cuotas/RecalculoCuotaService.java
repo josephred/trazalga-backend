@@ -67,10 +67,6 @@ public class RecalculoCuotaService {
     @Lazy
     private ConfiguracionGeneralService configService;
 
-    private final ConcurrentHashMap<String, CacheCandidatasEntry> cacheCandidatas = new ConcurrentHashMap<>();
-
-    private record CacheCandidatasEntry(List<DeclaracionCandidata> lista, long timestamp) {}
-
     @Data
     @Builder
     @NoArgsConstructor
@@ -97,7 +93,6 @@ public class RecalculoCuotaService {
      */
     @Transactional
     public ResumenRecalculoCuotaDTO recalcularHallazgos(Long cuotaId, LocalDate desde, LocalDate hasta) {
-        cacheCandidatas.clear();
         CuotaExtraccionModel cuota = cuotaRepository.findById(cuotaId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuota de extracción no encontrada con id: " + cuotaId));
 
@@ -308,6 +303,8 @@ public class RecalculoCuotaService {
 
     /**
      * Cuenta cuántas declaraciones del período de la cuota ingresaron antes de la carga de la cuota (TQ.3).
+     * Ejecuta una consulta agregada COUNT(*) en SQL por tabla candidata respetando filtros de
+     * aplicabilidad territorial, especie, método, actor y la condición TIMESTAMP(fecha_declaracion, hora) < :creadaEn.
      */
     @Transactional(readOnly = true)
     public int contarDeclaracionesPreviasSinEvaluar(CuotaExtraccionModel cuota) {
@@ -326,31 +323,115 @@ public class RecalculoCuotaService {
             return 0;
         }
 
-        List<DeclaracionCandidata> candidatas = cargarDeclaracionesCandidatas(fInicio, fFin);
-        Date cuotaCreatedAt = cuota.getCreatedAt();
+        java.sql.Date sqlInicio = java.sql.Date.valueOf(fInicio);
+        java.sql.Date sqlFin = java.sql.Date.valueOf(fFin);
+        Date creadaEn = cuota.getCreatedAt();
 
-        long count = candidatas.stream()
-                .filter(d -> d.getFechaCreacion() != null && d.getFechaCreacion().before(cuotaCreatedAt))
-                .filter(d -> cuotaService.especieAplica(cuota, d.getEspecieId()))
-                .filter(d -> cuotaService.metodoAplica(cuota, d.getExtraccionTipoId()))
-                .filter(d -> cuotaService.ambitoAplica(cuota, d.getTipo()))
-                .filter(d -> cuotaService.amerbAplica(cuota, d.getAmerbId()))
-                .filter(d -> cuotaService.usuarioAplica(cuota, d.getUsuarioId()))
-                .filter(d -> d.getComunaImputacionId() == null || cuotaService.contieneComuna(cuota, d.getComunaImputacionId()))
-                .count();
+        int total = 0;
+        total += contarPreviasPorTabla("declaracion_recolector", "RECOLECTOR", cuota, sqlInicio, sqlFin, creadaEn);
+        total += contarPreviasPorTabla("declaracion_armador", "ARMADOR", cuota, sqlInicio, sqlFin, creadaEn);
+        total += contarPreviasPorTabla("declaracion_area", "AREA", cuota, sqlInicio, sqlFin, creadaEn);
+        return total;
+    }
 
-        return (int) count;
+    private int contarPreviasPorTabla(String tableName, String actor, CuotaExtraccionModel cuota,
+                                      java.sql.Date sqlInicio, java.sql.Date sqlFin, Date creadaEn) {
+        if (!aplicaActor(cuota, actor)) {
+            return 0;
+        }
+
+        CuotaExtraccionModel cuotaParaFiltro = cuota;
+        if (Boolean.TRUE.equals(cuota.getEsPlantilla()) && cuota.getUsuario() == null) {
+            String nivel = (cuota.getComunas() != null && !cuota.getComunas().isEmpty()) ? "COMUNA"
+                    : (cuota.getProvincia() != null ? "PROVINCIA" : (cuota.getRegion() != null ? "REGION" : "NACIONAL"));
+            cuotaParaFiltro = CuotaExtraccionModel.builder()
+                    .id(cuota.getId())
+                    .especie(cuota.getEspecie())
+                    .extraccionTipo(cuota.getExtraccionTipo())
+                    .humedadEstado(cuota.getHumedadEstado())
+                    .region(cuota.getRegion())
+                    .provincia(cuota.getProvincia())
+                    .comuna(cuota.getComuna())
+                    .comunas(cuota.getComunas())
+                    .macrozona(cuota.getMacrozona())
+                    .amerb(cuota.getAmerb())
+                    .nivelAgregacion(nivel)
+                    .esPlantilla(false)
+                    .ambito(cuota.getAmbito())
+                    .perfil(cuota.getPerfil())
+                    .metrica(cuota.getMetrica())
+                    .fechaInicio(cuota.getFechaInicio())
+                    .fechaFin(cuota.getFechaFin())
+                    .build();
+        }
+
+        CuotaExtraccionService.FiltroTerritorialCuota filtro = cuotaService.construirFiltroTerritorial(cuotaParaFiltro, tableName, null);
+        String modo = cuotaService != null ? cuotaService.getModoImputacion() : "DECLARACION";
+        String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
+
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ").append(tableName).append(" d ");
+        sql.append(filtro.getSqlFragment());
+        if (cuota.getEspecie() != null) {
+            sql.append("AND d.especie_id = :especieId ");
+        }
+        if (cuota.getExtraccionTipo() != null) {
+            sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
+        }
+        sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate ");
+        LocalDate ldCorte = toLocalDate(creadaEn);
+        java.sql.Date fechaCorteDate = (ldCorte != null) ? java.sql.Date.valueOf(ldCorte) : java.sql.Date.valueOf(LocalDate.now());
+        LocalTime ltCorte;
+        try {
+            ltCorte = creadaEn.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+        } catch (Exception e) {
+            ltCorte = LocalTime.MIDNIGHT;
+        }
+        String horaCorteStr = String.format("%02d:%02d:%02d", ltCorte.getHour(), ltCorte.getMinute(), ltCorte.getSecond());
+
+        sql.append("AND (d.fecha_declaracion < :fechaCorte OR (d.fecha_declaracion = :fechaCorte AND COALESCE(NULLIF(TRIM(d.hora), ''), '00:00:00') < :horaCorte)) ");
+
+        Query q = em.createNativeQuery(sql.toString());
+        q.setParameter("startDate", sqlInicio);
+        q.setParameter("endDate", sqlFin);
+        if (cuota.getEspecie() != null) q.setParameter("especieId", cuota.getEspecie().getId());
+        if (cuota.getExtraccionTipo() != null) q.setParameter("extraccionTipoId", cuota.getExtraccionTipo().getId());
+        q.setParameter("fechaCorte", fechaCorteDate);
+        q.setParameter("horaCorte", horaCorteStr);
+        filtro.aplicarParametros(q);
+
+        Object singleResult = q.getSingleResult();
+        return (singleResult != null) ? ((Number) singleResult).intValue() : 0;
+    }
+
+    private boolean aplicaActor(CuotaExtraccionModel cuota, String actor) {
+        if (!cuotaService.ambitoAplica(cuota, actor)) {
+            return false;
+        }
+        if ("declaracion_area".equals(actor) || "AREA".equalsIgnoreCase(actor)) {
+            if ("AREA_LIBRE".equalsIgnoreCase(cuota.getAmbito())) {
+                return false;
+            }
+        }
+        if ("declaracion_recolector".equals(actor) || "RECOLECTOR".equalsIgnoreCase(actor)) {
+            if (cuota.getAmerb() != null || "AMERB".equalsIgnoreCase(cuota.getAmbito())) {
+                return false;
+            }
+        }
+        if ("declaracion_armador".equals(actor) || "ARMADOR".equalsIgnoreCase(actor)) {
+            if (cuota.getAmerb() != null || "AMERB".equalsIgnoreCase(cuota.getAmbito())) {
+                return false;
+            }
+        }
+        if (cuota.getPerfil() != null && !cuota.getPerfil().isBlank() && !"TODOS".equalsIgnoreCase(cuota.getPerfil())) {
+            if (!cuota.getPerfil().equalsIgnoreCase(actor)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<DeclaracionCandidata> cargarDeclaracionesCandidatas(LocalDate fInicio, LocalDate fFin) {
         String modo = cuotaService != null ? cuotaService.getModoImputacion() : "DECLARACION";
-        String cacheKey = fInicio + "_" + fFin + "_" + modo;
-        long ahora = System.currentTimeMillis();
-        CacheCandidatasEntry cached = cacheCandidatas.get(cacheKey);
-        if (cached != null && (ahora - cached.timestamp < 10_000)) {
-            return cached.lista;
-        }
-
         String colFecha = "DECLARACION".equalsIgnoreCase(modo) ? "fecha_declaracion" : "fecha_extraccion";
         List<DeclaracionCandidata> lista = new ArrayList<>();
 
@@ -400,7 +481,6 @@ public class RecalculoCuotaService {
             lista.add(mapearCandidata("AREA", r, modo));
         }
 
-        cacheCandidatas.put(cacheKey, new CacheCandidatasEntry(lista, ahora));
         return lista;
     }
 
