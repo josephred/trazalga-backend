@@ -61,4 +61,13 @@ public interface IUsuarioRepository extends JpaRepository<UsuarioModel, Long> {
                 @Param("perfil") String perfil,
                 org.springframework.data.domain.Pageable pageable);
 
+        // 9. IDs de usuarios con perfil fiscalizador / sernapesca / admin (TA.5 / 5.1)
+        @Query("SELECT DISTINCT u.id FROM UsuarioModel u " +
+               "JOIN u.perfil p " +
+               "LEFT JOIN u.comuna c " +
+               "LEFT JOIN c.region r " +
+               "WHERE (UPPER(p.nombre) LIKE '%FISCALIZADOR%' OR UPPER(p.nombre) LIKE '%SERNAPESCA%' OR UPPER(p.nombre) LIKE '%ADMIN%') " +
+               "AND (:regionId IS NULL OR r.id IS NULL OR r.id = :regionId)")
+        List<Long> findFiscalizadoresIds(@Param("regionId") Long regionId);
+
 }

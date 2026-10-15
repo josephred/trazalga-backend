@@ -145,7 +145,9 @@ public class NotificationService {
     /**
      * R4.5: Envía notificación al perfil fiscalizador de la región de la faena ante un hallazgo o marca (ej: LED_EXCEDIDO).
      * Incluye datos de navegación con enlace a la vista de hallazgos (/alertas?marca=LED_EXCEDIDO).
+     * Anotado con @Transactional(readOnly = true) para asegurar sesión en hilos asíncronos (TA.5 / 5.1).
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public void notificarFiscalizadores(Long regionId, String titulo, String mensaje, Map<String, String> data) {
         if (usuarioRepository == null) {
             System.out.println("NotificationService: usuarioRepository no disponible para notificar fiscalizadores.");
@@ -163,23 +165,9 @@ public class NotificationService {
             payload.put("tipo", "HALLAZGO_FISCALIZACION");
         }
 
-        List<UsuarioModel> destinatarios = usuarioRepository.findAll().stream()
-                .filter(u -> u.getPerfil() != null && (
-                        u.getPerfil().getNombre().toUpperCase().contains("FISCALIZADOR") ||
-                        u.getPerfil().getNombre().toUpperCase().contains("SERNAPESCA") ||
-                        u.getPerfil().getNombre().toUpperCase().contains("ADMIN")
-                ))
-                .filter(u -> {
-                    if (regionId == null) return true;
-                    if (u.getComuna() != null && u.getComuna().getRegion() != null) {
-                        return regionId.equals(u.getComuna().getRegion().getId());
-                    }
-                    return true;
-                })
-                .collect(Collectors.toList());
-
-        for (UsuarioModel fiscalizador : destinatarios) {
-            sendPushNotificationToUser(fiscalizador.getId(), titulo, mensaje, payload);
+        List<Long> destinatarioIds = usuarioRepository.findFiscalizadoresIds(regionId);
+        for (Long fiscalizadorId : destinatarioIds) {
+            sendPushNotificationToUser(fiscalizadorId, titulo, mensaje, payload);
         }
     }
 }
