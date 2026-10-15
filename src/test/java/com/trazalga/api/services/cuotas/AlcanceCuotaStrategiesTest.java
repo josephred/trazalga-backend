@@ -273,5 +273,69 @@ public class AlcanceCuotaStrategiesTest {
         c4.setRegion(regionCoquimbo);
         c4.setNivelAgregacion("REGION");
         assertEquals(AlcanceRegional.CLAVE, registry.resolver(c4).clave());
+
+        CuotaExtraccionModel c5 = new CuotaExtraccionModel();
+        AmerbModel amerb = new AmerbModel();
+        amerb.setId(77L);
+        c5.setAmerb(amerb);
+        assertEquals(AlcanceAmerb.CLAVE, registry.resolver(c5).clave());
+
+        CuotaExtraccionModel c6 = new CuotaExtraccionModel();
+        c6.setPerfil("AREA");
+        assertEquals(AlcanceAmerb.CLAVE, registry.resolver(c6).clave());
+    }
+
+    @Test
+    void testAlcanceAmerb_ValidacionYNormalizacion() {
+        AlcanceAmerb alcance = new AlcanceAmerb();
+        CuotaExtraccionModel c = new CuotaExtraccionModel();
+
+        // Sin AMERB debe fallar
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> alcance.validarYNormalizar(c));
+        assertTrue(ex.getMessage().contains("área de manejo"));
+
+        AmerbModel amerb1 = new AmerbModel();
+        amerb1.setId(77L);
+        amerb1.setNombre("Punta de Choros");
+        amerb1.setRegionModel(regionCoquimbo);
+        amerb1.setComuna(comLaSerena);
+        c.setAmerb(amerb1);
+
+        alcance.validarYNormalizar(c);
+        assertEquals("AMERB", c.getNivelAgregacion());
+        assertEquals("AMERB", c.getAmbito());
+        assertNotNull(c.getRegion());
+        assertEquals(regionCoquimbo.getId(), c.getRegion().getId());
+        assertNotNull(c.getComuna());
+        assertEquals(comLaSerena.getId(), c.getComuna().getId());
+        assertTrue(alcance.comparableEnJerarquia());
+
+        CuotaExtraccionModel cMisma = new CuotaExtraccionModel();
+        AmerbModel amerbMisma = new AmerbModel();
+        amerbMisma.setId(77L);
+        amerbMisma.setNombre("Punta de Choros");
+        cMisma.setAmerb(amerbMisma);
+        assertTrue(alcance.mismoAlcance(c, cMisma));
+
+        CuotaExtraccionModel cOtra = new CuotaExtraccionModel();
+        AmerbModel amerbOtra = new AmerbModel();
+        amerbOtra.setId(99L);
+        cOtra.setAmerb(amerbOtra);
+        assertFalse(alcance.mismoAlcance(c, cOtra));
+
+        assertEquals("AMERB Punta de Choros", alcance.describir(c));
+        assertTrue(alcance.describirConflicto(c, cMisma).contains("Punta de Choros"));
+    }
+
+    @Test
+    void testRegistry_SoportaAliasArea() {
+        AlcanceCuota alcanceAmerb = registry.getPorClave(AlcanceAmerb.CLAVE);
+        assertNotNull(alcanceAmerb);
+        assertEquals("AMERB", alcanceAmerb.clave());
+
+        AlcanceCuota alcanceArea = registry.getPorClave("AREA");
+        assertNotNull(alcanceArea, "El registry debe resolver el alias 'AREA' hacia AlcanceAmerb");
+        assertEquals("AMERB", alcanceArea.clave());
+        assertSame(alcanceAmerb, alcanceArea);
     }
 }

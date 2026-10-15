@@ -25,6 +25,11 @@ SET nivel_agregacion = 'AMERB'
 WHERE (nivel_agregacion IS NULL OR TRIM(nivel_agregacion) = '')
   AND amerb_id IS NOT NULL;
 
+-- Normalización TM.5: Unificar cualquier nivel histórico 'AREA' a 'AMERB'
+UPDATE cuota_extraccion
+SET nivel_agregacion = 'AMERB'
+WHERE nivel_agregacion = 'AREA';
+
 -- Nivel COMUNA si tiene comuna asignada
 UPDATE cuota_extraccion
 SET nivel_agregacion = 'COMUNA'
@@ -93,7 +98,7 @@ EXECUTE stmt_drop_na;
 DEALLOCATE PREPARE stmt_drop_na;
 
 ALTER TABLE cuota_extraccion ADD CONSTRAINT chk_cuota_nivel_agregacion 
-    CHECK (nivel_agregacion IN ('INDIVIDUAL', 'AMERB', 'AREA', 'COMUNA', 'PROVINCIA', 'REGION', 'MACROZONA', 'NACIONAL', 'IRRESOLUBLE'));
+    CHECK (nivel_agregacion IN ('INDIVIDUAL', 'AMERB', 'COMUNA', 'PROVINCIA', 'REGION', 'MACROZONA', 'NACIONAL', 'IRRESOLUBLE'));
 
 SET @chk_ce_met = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuota_extraccion' AND CONSTRAINT_NAME = 'chk_cuota_metrica');
@@ -140,3 +145,19 @@ WHERE activo = FALSE
   AND provincia_id IS NULL
   AND region_id IS NULL
   AND macrozona_id IS NULL;
+
+-- ============================================================================
+-- 7. ACTUALIZACIÓN DE PARÁMETROS (TX.2)
+-- Corrige la descripción del parámetro de imputación territorial de armadores
+-- ============================================================================
+UPDATE configuracion_general
+SET descripcion = 'Criterio de imputación territorial para armadores: INSCRIPCION o CALETA_DESEMBARQUE (D1 / TC.8)'
+WHERE clave = 'cuota_imputacion_armador';
+
+-- ============================================================================
+-- 8. UNIFICACIÓN TM.5 (AUDITORÍA)
+-- Valida que no quede ninguna cuota con nivel_agregacion descartado 'AREA'
+-- ============================================================================
+SELECT COUNT(*) AS cuotas_con_nivel_area_descartado
+FROM cuota_extraccion
+WHERE nivel_agregacion = 'AREA';

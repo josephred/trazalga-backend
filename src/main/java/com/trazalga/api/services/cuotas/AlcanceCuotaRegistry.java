@@ -23,6 +23,9 @@ public class AlcanceCuotaRegistry {
             for (AlcanceCuota a : lista) {
                 estrategias.put(a.clave(), a);
             }
+            if (estrategias.containsKey(AlcanceAmerb.CLAVE) && !estrategias.containsKey("AREA")) {
+                estrategias.put("AREA", estrategias.get(AlcanceAmerb.CLAVE));
+            }
         }
     }
 
@@ -58,7 +61,7 @@ public class AlcanceCuotaRegistry {
             return estrategias.get(AlcanceIndividualPersona.CLAVE);
         }
 
-        if (c.getAmerb() != null || "AREA".equalsIgnoreCase(c.getPerfil())) {
+        if (c.getAmerb() != null || "AREA".equalsIgnoreCase(c.getPerfil()) || "AMERB".equalsIgnoreCase(c.getPerfil()) || "AMERB".equalsIgnoreCase(c.getAmbito())) {
             return estrategias.get(AlcanceAmerb.CLAVE);
         }
 

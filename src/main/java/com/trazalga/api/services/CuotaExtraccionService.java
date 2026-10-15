@@ -1413,11 +1413,14 @@ public class CuotaExtraccionService {
             cuota.setPerfil("AMERB".equalsIgnoreCase(cuota.getAmbito()) ? "AREA" : "RECOLECTOR");
         }
         if (cuota.getNivelAgregacion() == null || cuota.getNivelAgregacion().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (NACIONAL, MACROZONA, REGION, PROVINCIA, COMUNA, AMERB, AREA, INDIVIDUAL).");
+            throw new IllegalArgumentException("El nivel de agregación de la cuota es obligatorio (NACIONAL, MACROZONA, REGION, PROVINCIA, COMUNA, AMERB, INDIVIDUAL).");
         }
         String nivelNorm = cuota.getNivelAgregacion().trim().toUpperCase();
-        if (!java.util.Set.of("COMUNA", "PROVINCIA", "REGION", "MACROZONA", "INDIVIDUAL", "NACIONAL", "AMERB", "AREA").contains(nivelNorm)) {
-            throw new IllegalArgumentException("Nivel de agregación inválido: " + cuota.getNivelAgregacion() + ". Los valores permitidos son COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL, AMERB, AREA.");
+        if ("AREA".equals(nivelNorm)) {
+            nivelNorm = "AMERB";
+        }
+        if (!java.util.Set.of("COMUNA", "PROVINCIA", "REGION", "MACROZONA", "INDIVIDUAL", "NACIONAL", "AMERB").contains(nivelNorm)) {
+            throw new IllegalArgumentException("Nivel de agregación inválido: " + cuota.getNivelAgregacion() + ". Los valores permitidos son COMUNA, PROVINCIA, REGION, MACROZONA, INDIVIDUAL, NACIONAL, AMERB.");
         }
         cuota.setNivelAgregacion(nivelNorm);
 
@@ -1526,7 +1529,7 @@ public class CuotaExtraccionService {
         // 1. Validar contra AMERB si es usuario en AMERB
         if ("USUARIO".equals(alcance) && cuota.getAmerb() != null) {
             for (CuotaExtraccionModel padre : activas) {
-                if ("AREA".equals(alcanceDe(padre))
+                if (("AREA".equals(alcanceDe(padre)) || "AMERB".equals(alcanceDe(padre)))
                         && padre.getAmerb().getId().equals(cuota.getAmerb().getId())
                         && seSolapan(cuota, padre) && especiesComparables(cuota, padre)) {
                     BigDecimal limPadre = calcularLimiteEfectivo(padre, fEval);
@@ -1557,7 +1560,7 @@ public class CuotaExtraccionService {
         }
 
         // 3. Validar Comunal o Provincial subordinada contra Regional (orden Provincial <= Regional)
-        if (("USUARIO".equals(alcance) || "AREA".equals(alcance) || "COMUNA".equals(alcance) || "PROVINCIA".equals(alcance)) && regionId != null) {
+        if (("USUARIO".equals(alcance) || "AREA".equals(alcance) || "AMERB".equals(alcance) || "COMUNA".equals(alcance) || "PROVINCIA".equals(alcance)) && regionId != null) {
             String etiqueta = "COMUNA".equals(alcance) ? "subordinada" : ("PROVINCIA".equals(alcance) ? "provincial" : "subordinada");
             validarContraRegion(cuota, activas, regionId, etiqueta, fEval, limHija);
         }
@@ -1662,7 +1665,7 @@ public class CuotaExtraccionService {
     public String alcanceDe(CuotaExtraccionModel c) {
         if (Boolean.TRUE.equals(c.getEsPlantilla())) return "PLANTILLA";
         if (c.getUsuario() != null) return "USUARIO";
-        if (c.getAmerb() != null) return "AREA";
+        if (c.getAmerb() != null) return "AMERB";
         if (!idsComunas(c).isEmpty()) return "COMUNA";
         if (c.getProvincia() != null) return "PROVINCIA";
         if (c.getRegion() != null) return "REGION";
@@ -1818,10 +1821,13 @@ public class CuotaExtraccionService {
 
         boolean esPlantilla = Boolean.TRUE.equals(cuota.getEsPlantilla());
         String nivelAgregacion = cuota.getNivelAgregacion() != null ? cuota.getNivelAgregacion().toUpperCase().trim() : "";
+        if ("AREA".equals(nivelAgregacion)) {
+            nivelAgregacion = "AMERB";
+        }
 
         if (nivelAgregacion.isEmpty()) {
             if (cuota.getUsuario() != null) nivelAgregacion = "INDIVIDUAL";
-            else if (cuota.getAmerb() != null) nivelAgregacion = "AREA";
+            else if (cuota.getAmerb() != null) nivelAgregacion = "AMERB";
             else if (cuota.getComuna() != null) nivelAgregacion = "COMUNA";
             else if (cuota.getProvincia() != null) nivelAgregacion = "PROVINCIA";
             else if (cuota.getRegion() != null) nivelAgregacion = "REGION";

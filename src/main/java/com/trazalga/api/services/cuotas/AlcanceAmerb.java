@@ -7,7 +7,7 @@ import com.trazalga.api.models.CuotaExtraccionModel;
 @Component("alcanceAmerb")
 public class AlcanceAmerb implements AlcanceCuota {
 
-    public static final String CLAVE = "AREA";
+    public static final String CLAVE = "AMERB";
 
     @Override
     public String clave() {
@@ -19,7 +19,7 @@ public class AlcanceAmerb implements AlcanceCuota {
         if (c.getAmerb() == null) {
             throw new IllegalArgumentException("Las cuotas de ámbito AMERB deben especificar un área de manejo.");
         }
-        c.setNivelAgregacion("AREA");
+        c.setNivelAgregacion("AMERB");
         c.setAmbito("AMERB");
         if (c.getAmerb().getRegionModel() != null) {
             c.setRegion(c.getAmerb().getRegionModel());
