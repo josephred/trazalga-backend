@@ -1971,20 +1971,35 @@ public class CuotaExtraccionService {
         return (singleResult != null) ? new BigDecimal(singleResult.toString()) : BigDecimal.ZERO;
     }
 
-    private BigDecimal consumoAreaLibre(CuotaExtraccionModel cuota, Date fechaEval, Long targetUsuarioId, Long declaracionExcluidaId) {
+    private BigDecimal consumoAreaLibre(CuotaExtraccionModel cuota, Date fechaEval, String perfil, Long targetUsuarioId, Long declaracionExcluidaId) {
         java.sql.Date[] rango = calcularRangoFechas(cuota, fechaEval);
         boolean esCaptura = !"DESEMBARQUE".equalsIgnoreCase(cuota.getMetrica());
         String colMetrica = esCaptura ? "captura" : "desembarque";
 
+        // TC.1 / TC.5: Excluir sólo en la tabla del tipo de declaración que se está editando
+        boolean excluirEnRecolector = declaracionExcluidaId != null && (perfil != null && ("RECOLECTOR".equalsIgnoreCase(perfil.trim()) || "RO".equalsIgnoreCase(perfil.trim())));
+        boolean excluirEnArmador = declaracionExcluidaId != null && (perfil != null && ("ARMADOR".equalsIgnoreCase(perfil.trim()) || "DA".equalsIgnoreCase(perfil.trim())));
+
+        if (declaracionExcluidaId != null && !excluirEnRecolector && !excluirEnArmador) {
+            if ("RECOLECTOR".equalsIgnoreCase(cuota.getPerfil())) {
+                excluirEnRecolector = true;
+            } else if ("ARMADOR".equalsIgnoreCase(cuota.getPerfil())) {
+                excluirEnArmador = true;
+            }
+        }
+
+        Long idExcluirRecolector = excluirEnRecolector ? declaracionExcluidaId : null;
+        Long idExcluirArmador = excluirEnArmador ? declaracionExcluidaId : null;
+
         // 1. Consumo de recolectores — imputación por comuna de inscripción del usuario (u.comuna_id)
         FiltroTerritorialCuota filtroRecolector = construirFiltroTerritorial(cuota, "declaracion_recolector", targetUsuarioId);
         BigDecimal consumoRecolector = ejecutarQueryConsumo(
-                "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango, declaracionExcluidaId);
+                "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango, idExcluirRecolector);
 
         // 2. Consumo de armadores — imputación por caleta de desembarque (d.comuna_id)
         FiltroTerritorialCuota filtroArmador = construirFiltroTerritorial(cuota, "declaracion_armador", targetUsuarioId);
         BigDecimal consumoArmador = ejecutarQueryConsumo(
-                "declaracion_armador", colMetrica, filtroArmador, cuota, rango, declaracionExcluidaId);
+                "declaracion_armador", colMetrica, filtroArmador, cuota, rango, idExcluirArmador);
 
         return consumoRecolector.add(consumoArmador);
     }
@@ -2037,7 +2052,7 @@ public class CuotaExtraccionService {
 
         BigDecimal consumo;
         if (esAreaLibre) {
-            consumo = consumoAreaLibre(cuota, fechaEval, targetUsuarioId, declaracionExcluidaId);
+            consumo = consumoAreaLibre(cuota, fechaEval, perfil, targetUsuarioId, declaracionExcluidaId);
         } else {
             consumo = consumoTablaUnica(cuota, fechaEval, perfil, targetUsuarioId, declaracionExcluidaId);
         }
