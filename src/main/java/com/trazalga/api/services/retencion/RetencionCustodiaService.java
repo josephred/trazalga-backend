@@ -455,20 +455,6 @@ public class RetencionCustodiaService {
         // Fallback cuando se ejecuta en pruebas unitarias aisladas sin proxy AOP
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
 
-        // TR.3: Determinar umbral. Si no viene en umbralParam, intentar resolverlo desde el motivo
-        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam.trim() : null;
-        if (umbral == null && motivo != null) {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:límite de bloqueo de|bloqueo automático a las|retención máxima de)\\s*(\\d+(?:\\.\\d+)?)\\s*h", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(motivo);
-            if (m.find()) {
-                umbral = m.group(1);
-            }
-        }
-
-        if (umbral == null || umbral.isBlank()) {
-            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
-            return null;
-        }
-
         List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
         boolean yaLiberada = marcasPrevias.stream()
                 .anyMatch(m -> "RETENCION_EXCEDIDA".equalsIgnoreCase(m.getMarca()) && "LIBERADA".equalsIgnoreCase(m.getResolucionTipo()));
@@ -481,6 +467,20 @@ public class RetencionCustodiaService {
                     .orElse(null);
         }
 
+        // TR.3: Determinar umbral. Si no viene en umbralParam, intentar resolverlo desde el motivo
+        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam.trim() : null;
+        if (umbral == null && motivo != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:límite de bloqueo de|bloqueo automático a las|retención máxima de|excedió\\s+)?(\\d+(?:\\.\\d+)?)\\s*(?:h|horas)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(motivo);
+            if (m.find()) {
+                umbral = m.group(1);
+            }
+        }
+
+        if (umbral == null || umbral.isBlank()) {
+            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
+            return null;
+        }
+
         String valorObs = valorParam;
         if (valorObs == null || valorObs.isBlank()) {
             if (motivo != null) {
@@ -491,7 +491,7 @@ public class RetencionCustodiaService {
                     valorObs = motivo.length() <= 40 ? motivo : motivo.substring(0, 40);
                 }
             } else {
-                valorObs = "120+";
+                valorObs = (valorParam != null && !valorParam.isBlank()) ? valorParam : (umbral != null ? umbral : "");
             }
         }
         if (valorObs.length() > 40) {
@@ -510,10 +510,10 @@ public class RetencionCustodiaService {
         String paramFinal = (parametroNombre != null && !parametroNombre.isBlank())
                 ? parametroNombre.trim()
                 : (motivo != null && (motivo.contains("SEMI HÚMEDO") || motivo.contains("SEMI_HUMEDO"))
-                        ? "retencion_bloqueo_semihumedo_horas"
+                        ? PoliticaRetencion.parametroBloqueoNombre("SEMI_HUMEDO")
                         : (motivo != null && (motivo.contains("SEMI SECO") || motivo.contains("SEMI_SECO"))
-                                ? "retencion_bloqueo_semiseco_horas"
-                                : "retencion_bloqueo_humedo_horas"));
+                                ? PoliticaRetencion.parametroBloqueoNombre("SEMI_SECO")
+                                : PoliticaRetencion.parametroBloqueoNombre("HUMEDO")));
 
         CriterioHallazgo criterio = new CriterioHallazgo(
                 paramFinal,
@@ -617,7 +617,7 @@ public class RetencionCustodiaService {
 
     /**
      * TR.3: Evaluación Just-In-Time de una carga específica al momento de intentar despacharla o recibirla.
-     * Si ha excedido el plazo de retención configurado para bloqueo y retencion_bloqueo_activo es true,
+     * Si ha excedido el plazo de retención configurado para bloqueo y la política de bloqueo está activa,
      * persiste inmediatamente la marca RETENCION_EXCEDIDA con REQUIRES_NEW mediante MarcaRetencionExecutorService.
      */
     public Optional<DeclaracionMarcaModel> evaluarYBloquearJustInTime(String tipo, Long id) {

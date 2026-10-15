@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class ResultadoCriterioAtipico {
     private boolean atipico;
     private String criterioClave; // UMBRAL_ABSOLUTO | DESVIACION_ESTADISTICA
-    private String parametro;     // "desembarque_umbral_atipico_kg" | "desembarque_atipico_sigma"
+    private String parametro;     // Nombre canónico del parámetro normativo en ParametrosService
     private String umbral;
     private String valor;
     private String unidad;

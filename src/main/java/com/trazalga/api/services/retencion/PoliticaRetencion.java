@@ -44,9 +44,9 @@ public class PoliticaRetencion {
      * Retorna el nombre canónico del parámetro de bloqueo según la clave de humedad (TR.3).
      */
     public static String parametroBloqueoNombre(String claveMatriz) {
-        if ("SEMI_HUMEDO".equalsIgnoreCase(claveMatriz)) return "retencion_bloqueo_semihumedo_horas";
-        if ("SEMI_SECO".equalsIgnoreCase(claveMatriz)) return "retencion_bloqueo_semiseco_horas";
-        return "retencion_bloqueo_humedo_horas";
+        if ("SEMI_HUMEDO".equalsIgnoreCase(claveMatriz)) return com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BLOQUEO_SEMIHUMEDO;
+        if ("SEMI_SECO".equalsIgnoreCase(claveMatriz)) return com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BLOQUEO_SEMISECO;
+        return com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BLOQUEO_HUMEDO;
     }
 
     /**
@@ -59,19 +59,21 @@ public class PoliticaRetencion {
             double horas,
             ParametrosRetencion params
     ) {
+        java.util.Objects.requireNonNull(params, "ParametrosRetencion no puede ser nulo para evaluar retención");
+
         String estadoDeclarado = normalizarEstadoHumedad(humedadRaw);
         String claveMatriz = claveMatrizHumedad(estadoDeclarado);
 
         int plazoMaxHoras;
         switch (claveMatriz) {
             case "HUMEDO":
-                plazoMaxHoras = params != null ? params.humedoMaxHoras() : 24;
+                plazoMaxHoras = params.humedoMaxHoras();
                 break;
             case "SEMI_HUMEDO":
-                plazoMaxHoras = params != null ? params.semihumedoMaxHoras() : 72;
+                plazoMaxHoras = params.semihumedoMaxHoras();
                 break;
             case "SEMI_SECO":
-                plazoMaxHoras = params != null ? params.semisecoMaxHoras() : 216;
+                plazoMaxHoras = params.semisecoMaxHoras();
                 break;
             case "SECO":
             default:
@@ -79,7 +81,7 @@ public class PoliticaRetencion {
                 break;
         }
 
-        double semaforoPreavisoPct = params != null ? params.semaforoPreavisoPct() : 80.0;
+        double semaforoPreavisoPct = params.semaforoPreavisoPct();
         int preavisoHoras = (plazoMaxHoras == Integer.MAX_VALUE)
                 ? Integer.MAX_VALUE
                 : (int) Math.round(plazoMaxHoras * (semaforoPreavisoPct / 100.0));
@@ -100,10 +102,10 @@ public class PoliticaRetencion {
             semaforo = "VERDE";
         }
 
-        // Tramo real biológico por evaporación natural en función de las horas parametrizadas (TR.2)
-        int limHumedo = params != null ? params.humedoMaxHoras() : 24;
-        int limSemihumedo = params != null ? params.semihumedoMaxHoras() : 72;
-        int limSemiseco = params != null ? params.semisecoMaxHoras() : 216;
+        // Tramo real biológico por evaporación natural en función de las horas parametrizadas (TR.2 / TA.2)
+        int limHumedo = params.humedoMaxHoras();
+        int limSemihumedo = params.semihumedoMaxHoras();
+        int limSemiseco = params.semisecoMaxHoras();
 
         String tramoReal;
         if (horas <= limHumedo) {

@@ -19,9 +19,46 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ParametrosService {
 
+    // Nombres canónicos de parámetros normativos
+    public static final String PARAM_DESEMBARQUE_ATIPICO_SIGMA = "desembarque_atipico_sigma";
+    public static final String PARAM_DESEMBARQUE_UMBRAL_KG = "desembarque_umbral_atipico_kg";
+    public static final String PARAM_DESEMBARQUE_ATIPICO_ESTADISTICO_ACTIVO = "desembarque_atipico_estadistico_activo";
+    public static final String PARAM_DESEMBARQUE_ATIPICO_VENTANA_DIAS = "desembarque_atipico_ventana_dias";
+    public static final String PARAM_DESEMBARQUE_ATIPICO_MIN_MUESTRAS = "desembarque_atipico_min_muestras";
+
+    public static final String PARAM_RETENCION_BLOQUEO_HUMEDO = "retencion_bloqueo_humedo_horas";
+    public static final String PARAM_RETENCION_BLOQUEO_SEMIHUMEDO = "retencion_bloqueo_semihumedo_horas";
+    public static final String PARAM_RETENCION_BLOQUEO_SEMISECO = "retencion_bloqueo_semiseco_horas";
+    public static final String PARAM_RETENCION_BODEGA_ACTIVO = "retencion_bodega_activo";
+    public static final String PARAM_RETENCION_HUMEDO_MAX_HORAS = "retencion_humedo_max_horas";
+    public static final String PARAM_RETENCION_SEMIHUMEDO_MAX_HORAS = "retencion_semihumedo_max_horas";
+    public static final String PARAM_RETENCION_SEMISECO_MAX_HORAS = "retencion_semiseco_max_horas";
+    public static final String PARAM_RETENCION_PREAVISO_PCT = "retencion_preaviso_pct";
+    public static final String PARAM_RETENCION_BLOQUEO_ACTIVO = "retencion_bloqueo_activo";
+    public static final String PARAM_RETENCION_BLOQUEO_ESPECIES = "retencion_bloqueo_especies";
+    public static final String PARAM_RETENCION_BLOQUEO_PREAVISO_PCT = "retencion_bloqueo_preaviso_pct";
+    public static final String PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS = "retencion_bodega_estados_sujetos";
+    public static final String PARAM_RETENCION_BODEGA_DIAS_AMARILLA = "retencion_bodega_dias_amarilla";
+    public static final String PARAM_RETENCION_BODEGA_DIAS_NARANJA = "retencion_bodega_dias_naranja";
+    public static final String PARAM_RETENCION_BODEGA_DIAS_ROJA = "retencion_bodega_dias_roja";
+
+    public static final String PARAM_RIESGO_VARIACION_ROJO_PCT = "riesgo_variacion_rojo_pct";
+    public static final String PARAM_RIESGO_VARIACION_AMARILLO_PCT = "riesgo_variacion_amarillo_pct";
+
+    public static final String PARAM_BIO_PERDIDA_ACTIVO = "bio_perdida_activo";
+    public static final String PARAM_BIO_HUMEDO_DIAS_MINIMOS_TRANSITO = "bio_humedo_dias_minimos_transito";
+    public static final String PARAM_BIO_HUMEDO_MERMA_MINIMA_PCT = "bio_humedo_merma_minima_pct";
+    public static final String PARAM_BIO_SECO_MERMA_MAXIMA_PCT = "bio_seco_merma_maxima_pct";
+
     @Autowired
     @Lazy
     private ConfiguracionGeneralService configService;
+
+    public ParametrosService() {}
+
+    public ParametrosService(ConfiguracionGeneralService configService) {
+        this.configService = configService;
+    }
 
     private final AtomicReference<ParametrosCuota> cuotaCache = new AtomicReference<>();
     private final AtomicReference<ParametrosRetencion> retencionCache = new AtomicReference<>();
@@ -47,17 +84,17 @@ public class ParametrosService {
         ParametrosRetencion cached = retencionCache.get();
         if (cached == null) {
             cached = new ParametrosRetencion(
-                    getBoolean("retencion_bodega_activo", true),
-                    getInt("retencion_humedo_max_horas", 24),
-                    getInt("retencion_semihumedo_max_horas", 72),
-                    getInt("retencion_semiseco_max_horas", 216),
-                    getDouble("retencion_preaviso_pct", 80.0),
-                    getBoolean("retencion_bloqueo_activo", false),
-                    getInt("retencion_bloqueo_humedo_horas", 120),
-                    getInt("retencion_bloqueo_semihumedo_horas", 0),
-                    getInt("retencion_bloqueo_semiseco_horas", 0),
-                    getString("retencion_bloqueo_especies", "TODAS"),
-                    getDouble("retencion_bloqueo_preaviso_pct", 80.0)
+                    getBoolean(PARAM_RETENCION_BODEGA_ACTIVO, true),
+                    getInt(PARAM_RETENCION_HUMEDO_MAX_HORAS, 24),
+                    getInt(PARAM_RETENCION_SEMIHUMEDO_MAX_HORAS, 72),
+                    getInt(PARAM_RETENCION_SEMISECO_MAX_HORAS, 216),
+                    getDouble(PARAM_RETENCION_PREAVISO_PCT, 80.0),
+                    getBoolean(PARAM_RETENCION_BLOQUEO_ACTIVO, false),
+                    getInt(PARAM_RETENCION_BLOQUEO_HUMEDO, 120),
+                    getInt(PARAM_RETENCION_BLOQUEO_SEMIHUMEDO, 0),
+                    getInt(PARAM_RETENCION_BLOQUEO_SEMISECO, 0),
+                    getString(PARAM_RETENCION_BLOQUEO_ESPECIES, "TODAS"),
+                    getDouble(PARAM_RETENCION_BLOQUEO_PREAVISO_PCT, 80.0)
             );
             retencionCache.compareAndSet(null, cached);
         }
@@ -68,13 +105,14 @@ public class ParametrosService {
         ParametrosVariacion cached = variacionCache.get();
         if (cached == null) {
             cached = new ParametrosVariacion(
-                    getBoolean("bio_perdida_activo", true),
-                    getInt("bio_humedo_dias_minimos_transito", 3),
-                    getDouble("bio_humedo_merma_minima_pct", 5.0),
-                    getDouble("bio_seco_merma_maxima_pct", 3.0),
+                    getBoolean(PARAM_BIO_PERDIDA_ACTIVO, true),
+                    getInt(PARAM_BIO_HUMEDO_DIAS_MINIMOS_TRANSITO, 3),
+                    getDouble(PARAM_BIO_HUMEDO_MERMA_MINIMA_PCT, 5.0),
+                    getDouble(PARAM_BIO_SECO_MERMA_MAXIMA_PCT, 3.0),
                     getBoolean("variacion_peso_alerta_equivalente", false),
                     getDouble("variacion_peso_umbral_general_pct", 5.0),
-                    getDouble("riesgo_variacion_rojo_pct", 10.0)
+                    getDouble(PARAM_RIESGO_VARIACION_ROJO_PCT, 10.0),
+                    getDouble(PARAM_RIESGO_VARIACION_AMARILLO_PCT, 5.0)
             );
             variacionCache.compareAndSet(null, cached);
         }
@@ -85,11 +123,11 @@ public class ParametrosService {
         ParametrosDesembarque cached = desembarqueCache.get();
         if (cached == null) {
             cached = new ParametrosDesembarque(
-                    getDouble("desembarque_umbral_atipico_kg", 5000.0),
-                    getBoolean("desembarque_atipico_estadistico_activo", false),
-                    getDouble("desembarque_atipico_sigma", 2.5),
-                    getInt("desembarque_atipico_ventana_dias", 90),
-                    getInt("desembarque_atipico_min_muestras", 10)
+                    getDouble(PARAM_DESEMBARQUE_UMBRAL_KG, 5000.0),
+                    getBoolean(PARAM_DESEMBARQUE_ATIPICO_ESTADISTICO_ACTIVO, false),
+                    getDouble(PARAM_DESEMBARQUE_ATIPICO_SIGMA, 2.5),
+                    getInt(PARAM_DESEMBARQUE_ATIPICO_VENTANA_DIAS, 90),
+                    getInt(PARAM_DESEMBARQUE_ATIPICO_MIN_MUESTRAS, 10)
             );
             desembarqueCache.compareAndSet(null, cached);
         }

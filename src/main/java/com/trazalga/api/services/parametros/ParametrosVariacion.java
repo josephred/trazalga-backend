@@ -10,5 +10,24 @@ public record ParametrosVariacion(
         double bioSecoMermaMaximaPct,
         boolean variacionPesoAlertaEquivalente,
         double variacionPesoUmbralGeneralPct,
-        double riesgoVariacionRojoPct
-) {}
+        double riesgoVariacionRojoPct,
+        double riesgoVariacionAmarilloPct
+) {
+    public ParametrosVariacion(
+            boolean bioPerdidaActivo,
+            int bioHumedoDiasMinimosTransito,
+            double bioHumedoMermaMinimaPct,
+            double bioSecoMermaMaximaPct,
+            boolean variacionPesoAlertaEquivalente,
+            double variacionPesoUmbralGeneralPct,
+            double riesgoVariacionRojoPct
+    ) {
+        this(bioPerdidaActivo, bioHumedoDiasMinimosTransito, bioHumedoMermaMinimaPct,
+                bioSecoMermaMaximaPct, variacionPesoAlertaEquivalente,
+                variacionPesoUmbralGeneralPct, riesgoVariacionRojoPct, 5.0);
+    }
+
+    public double riesgoRojoPct() {
+        return riesgoVariacionRojoPct;
+    }
+}

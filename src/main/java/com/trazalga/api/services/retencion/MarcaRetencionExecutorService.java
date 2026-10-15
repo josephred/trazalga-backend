@@ -60,20 +60,6 @@ public class MarcaRetencionExecutorService {
     ) {
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
 
-        // TR.3: Determinar umbral. Si no viene en umbralParam, intentar resolverlo desde el motivo
-        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam.trim() : null;
-        if (umbral == null && motivo != null) {
-            Matcher m = Pattern.compile("(?:límite de bloqueo de|bloqueo automático a las|retención máxima de)\\s*(\\d+(?:\\.\\d+)?)\\s*h", Pattern.CASE_INSENSITIVE).matcher(motivo);
-            if (m.find()) {
-                umbral = m.group(1);
-            }
-        }
-
-        if (umbral == null || umbral.isBlank()) {
-            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
-            return null;
-        }
-
         // Verificar si existe una marca previa resuelta como LIBERADA
         List<DeclaracionMarcaModel> marcasPrevias = marcaRepository.findByDeclaracionTipoAndDeclaracionId(tipoNorm, declaracionId);
         boolean yaLiberada = marcasPrevias.stream()
@@ -87,6 +73,20 @@ public class MarcaRetencionExecutorService {
                     .orElse(null);
         }
 
+        // TR.3: Determinar umbral. Si no viene en umbralParam, intentar resolverlo desde el motivo
+        String umbral = (umbralParam != null && !umbralParam.isBlank()) ? umbralParam.trim() : null;
+        if (umbral == null && motivo != null) {
+            Matcher m = Pattern.compile("(?:límite de bloqueo de|bloqueo automático a las|retención máxima de|excedió\\s+)?(\\d+(?:\\.\\d+)?)\\s*(?:h|horas)", Pattern.CASE_INSENSITIVE).matcher(motivo);
+            if (m.find()) {
+                umbral = m.group(1);
+            }
+        }
+
+        if (umbral == null || umbral.isBlank()) {
+            log.warn("Se intentó registrar RETENCION_EXCEDIDA para {}:{} sin umbral de bloqueo válido.", tipoNorm, declaracionId);
+            return null;
+        }
+
         // Determinar valor numérico observado (máx 40 chars para VARCHAR(40))
         String valorObs = valorParam;
         if (valorObs == null || valorObs.isBlank()) {
@@ -98,7 +98,7 @@ public class MarcaRetencionExecutorService {
                     valorObs = motivo.length() <= 40 ? motivo : motivo.substring(0, 40);
                 }
             } else {
-                valorObs = "120+";
+                valorObs = (valorParam != null && !valorParam.isBlank()) ? valorParam : (umbral != null ? umbral : "");
             }
         }
         if (valorObs.length() > 40) {
@@ -119,10 +119,10 @@ public class MarcaRetencionExecutorService {
         String paramFinal = (parametroNombre != null && !parametroNombre.isBlank())
                 ? parametroNombre.trim()
                 : (motivo != null && (motivo.contains("SEMI HÚMEDO") || motivo.contains("SEMI_HUMEDO"))
-                        ? "retencion_bloqueo_semihumedo_horas"
+                        ? PoliticaRetencion.parametroBloqueoNombre("SEMI_HUMEDO")
                         : (motivo != null && (motivo.contains("SEMI SECO") || motivo.contains("SEMI_SECO"))
-                                ? "retencion_bloqueo_semiseco_horas"
-                                : "retencion_bloqueo_humedo_horas"));
+                                ? PoliticaRetencion.parametroBloqueoNombre("SEMI_SECO")
+                                : PoliticaRetencion.parametroBloqueoNombre("HUMEDO")));
 
         CriterioHallazgo criterio = new CriterioHallazgo(
                 paramFinal,

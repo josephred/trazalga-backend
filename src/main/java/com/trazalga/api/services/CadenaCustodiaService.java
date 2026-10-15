@@ -36,6 +36,21 @@ public class CadenaCustodiaService {
 
     private final ConfiguracionGeneralService configService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService == null && this.configService != null) {
+            this.parametrosService = new com.trazalga.api.services.parametros.ParametrosService(this.configService);
+        }
+        return this.parametrosService;
+    }
+
     // Constructor con inyección de dependencias
     @Autowired
     public CadenaCustodiaService(EntityManager entityManager,
@@ -880,10 +895,12 @@ public class CadenaCustodiaService {
     }
 
     public SemaforoInfo evaluarSemaforo(double horas, String estadoHumedad) {
-        int humedoMaxH = configService != null ? configService.getInt("retencion_humedo_max_horas", 24) : 24;
-        int semihumedoMaxH = configService != null ? configService.getInt("retencion_semihumedo_max_horas", 72) : 72;
-        int semisecoMaxH = configService != null ? configService.getInt("retencion_semiseco_max_horas", 216) : 216;
-        int preavisoPct = configService != null ? configService.getInt("retencion_preaviso_pct", 80) : 80;
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        com.trazalga.api.services.parametros.ParametrosRetencion pRet = ps != null ? ps.retencion() : null;
+        int humedoMaxH = pRet != null ? pRet.humedoMaxHoras() : 24;
+        int semihumedoMaxH = pRet != null ? pRet.semihumedoMaxHoras() : 72;
+        int semisecoMaxH = pRet != null ? pRet.semisecoMaxHoras() : 216;
+        int preavisoPct = pRet != null ? (int) Math.round(pRet.semaforoPreavisoPct()) : 80;
 
         String estadoNorm = normalizarEstadoHumedad(estadoHumedad);
         int plazoMaxHoras;

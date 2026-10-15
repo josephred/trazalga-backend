@@ -57,6 +57,24 @@ public class ValidacionDeclaracionService {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.indicadores.DesembarqueAtipicoService desembarqueAtipicoService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService != null) {
+            return this.parametrosService;
+        }
+        if (this.configuracionGeneralService != null) {
+            return new com.trazalga.api.services.parametros.ParametrosService(this.configuracionGeneralService);
+        }
+        return null;
+    }
+
     /**
      * Orquesta las 5 validaciones del servidor antes de persistir una declaración.
      */
@@ -237,8 +255,9 @@ public class ValidacionDeclaracionService {
             Long comId = ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId();
 
             List<Double> historico = java.util.Collections.emptyList();
-            boolean estadisticoActivo = configuracionGeneralService != null
-                    && configuracionGeneralService.getBoolean("desembarque_atipico_estadistico_activo", false);
+            com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+            boolean estadisticoActivo = ps != null && ps.desembarque() != null
+                    && ps.desembarque().estadisticoActivo();
 
             if (estadisticoActivo && desembarqueAtipicoService != null) {
                 historico = desembarqueAtipicoService.obtenerHistoricoKilos(

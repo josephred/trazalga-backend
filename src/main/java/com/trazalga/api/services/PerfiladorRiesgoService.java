@@ -12,6 +12,24 @@ public class PerfiladorRiesgoService {
     @Autowired
     private ConfiguracionGeneralService configService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService != null) {
+            return this.parametrosService;
+        }
+        if (this.configService != null) {
+            return new com.trazalga.api.services.parametros.ParametrosService(this.configService);
+        }
+        return null;
+    }
+
     @Autowired
     private ReportService reportService;
 
@@ -21,14 +39,18 @@ public class PerfiladorRiesgoService {
 
     public Map<String, Object> evaluarRiesgo(Date startDate, Date endDate, Long regionId, Long actorId, String nivelFiltro) {
         boolean activo = configService.getBoolean("riesgo_activo", true);
-        double varAmarillo = configService.getDouble("riesgo_variacion_amarillo_pct", 5.0);
-        double varRojo = configService.getDouble("riesgo_variacion_rojo_pct", 10.0);
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        com.trazalga.api.services.parametros.ParametrosVariacion pVar = ps != null ? ps.variacion() : null;
+        double varAmarillo = pVar != null ? pVar.riesgoVariacionAmarilloPct() : 5.0;
+        double varRojo = pVar != null ? pVar.riesgoVariacionRojoPct() : 10.0;
         int diasAmarillo = configService.getInt("riesgo_dias_amarillo", 3);
         int diasRojo = configService.getInt("riesgo_dias_rojo", 7);
         String escalaHumedoSinMerma = configService.getValor("riesgo_escala_humedo_sin_merma", "ROJO");
         int agravanteVeda = configService.getInt("riesgo_agravante_veda_niveles", 1);
         int agravanteLed = configService.getInt("riesgo_agravante_led_niveles", 1);
-        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+        String estadosSujetos = configService != null
+                ? configService.getValor(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO")
+                : "HUMEDO";
 
         Map<String, Object> response = new HashMap<>();
         response.put("activo", activo);
@@ -230,8 +252,8 @@ public class PerfiladorRiesgoService {
         response.put("lotes", lotesEvaluados);
 
         Map<String, Object> configVigente = new HashMap<>();
-        configVigente.put("riesgo_variacion_amarillo_pct", varAmarillo);
-        configVigente.put("riesgo_variacion_rojo_pct", varRojo);
+        configVigente.put(com.trazalga.api.services.parametros.ParametrosService.PARAM_RIESGO_VARIACION_AMARILLO_PCT, varAmarillo);
+        configVigente.put(com.trazalga.api.services.parametros.ParametrosService.PARAM_RIESGO_VARIACION_ROJO_PCT, varRojo);
         configVigente.put("riesgo_dias_amarillo", diasAmarillo);
         configVigente.put("riesgo_dias_rojo", diasRojo);
         configVigente.put("riesgo_escala_humedo_sin_merma", escalaHumedoSinMerma);

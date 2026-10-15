@@ -31,6 +31,26 @@ public class BloqueoCargaService {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService == null && this.configService != null) {
+            this.parametrosService = new com.trazalga.api.services.parametros.ParametrosService(this.configService);
+        }
+        return this.parametrosService;
+    }
+
+    private boolean isRetencionBloqueoActivo() {
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        return ps != null && ps.retencion() != null && ps.retencion().bloqueoActivo();
+    }
+
     public boolean isBloqueoActivo() {
         return configService.getBoolean("bloqueo_carga_activo", true);
     }
@@ -44,7 +64,7 @@ public class BloqueoCargaService {
                 if (!clean.isEmpty()) set.add(clean);
             }
         }
-        boolean retBloqueoActivo = configService.getBoolean("retencion_bloqueo_activo", false);
+        boolean retBloqueoActivo = isRetencionBloqueoActivo();
         if (retBloqueoActivo) {
             set.add("RETENCION_EXCEDIDA");
         }
@@ -60,7 +80,7 @@ public class BloqueoCargaService {
         }
 
         // Just-in-time: evaluar retención si el bloqueo de retención está habilitado
-        if (configService.getBoolean("retencion_bloqueo_activo", false) && retencionCustodiaService != null) {
+        if (isRetencionBloqueoActivo() && retencionCustodiaService != null) {
             retencionCustodiaService.evaluarYBloquearJustInTime(tipo, id);
         }
 
@@ -83,7 +103,7 @@ public class BloqueoCargaService {
         Map<String, List<Long>> parsed = SeleccionTokens.parse(csvTokens);
 
         // Just-in-time: evaluar si alguna de las cargas ha superado el tiempo máximo de retención
-        if (configService.getBoolean("retencion_bloqueo_activo", false) && retencionCustodiaService != null) {
+        if (isRetencionBloqueoActivo() && retencionCustodiaService != null) {
             for (Map.Entry<String, List<Long>> entry : parsed.entrySet()) {
                 String tipo = entry.getKey();
                 List<Long> ids = entry.getValue();

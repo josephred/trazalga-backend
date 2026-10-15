@@ -62,6 +62,24 @@ public class ReportService {
     @Autowired(required = false)
     private com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService != null) {
+            return this.parametrosService;
+        }
+        if (this.configService != null) {
+            return new com.trazalga.api.services.parametros.ParametrosService(this.configService);
+        }
+        return null;
+    }
+
     public ReportService(ReportRepository reportRepository, ConfiguracionGeneralService configService) {
         this(reportRepository, configService, null, null);
     }
@@ -594,18 +612,19 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate, Double umbralVariacion) {
-        boolean bioPerdidaActivo = configService.getBoolean("bio_perdida_activo", true);
-        double umbral = umbralVariacion != null ? umbralVariacion : configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
-        double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
-        double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
-        int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
-
-        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
-        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
-        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        com.trazalga.api.services.parametros.ParametrosVariacion pVar = ps != null ? ps.variacion() : null;
+        boolean bioPerdidaActivo = pVar != null ? pVar.bioPerdidaActivo() : true;
+        double umbral = umbralVariacion != null ? umbralVariacion : (pVar != null ? pVar.variacionPesoUmbralGeneralPct() : 5.0);
+        double mermaMinHumedo = pVar != null ? pVar.bioHumedoMermaMinimaPct() : 5.0;
+        double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
+        int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : null;
+                ? retencionCustodiaService.getParametros() : (ps != null ? ps.retencion() : null);
+        int diasAmarilla = 3;
+        int diasNaranja = 5;
+        int diasRoja = 7;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
@@ -613,7 +632,7 @@ public class ReportService {
             diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
             diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
         }
-        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+        String estadosSujetos = configService != null ? configService.getValor(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO") : "HUMEDO";
 
         java.util.Map<String, Object> res = reportRepository.getTrazabilidadLoteMetrics(
                 startDate, endDate, umbral, mermaMinHumedo, mermaMaxSeco,
@@ -624,18 +643,19 @@ public class ReportService {
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(Date startDate, Date endDate, String semaforo) {
-        boolean bioPerdidaActivo = configService.getBoolean("bio_perdida_activo", true);
-        double umbral = configService.getDouble("variacion_peso_umbral_general_pct", 5.0);
-        double mermaMinHumedo = configService.getDouble("bio_humedo_merma_minima_pct", 5.0);
-        double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
-        int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
-
-        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
-        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
-        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        com.trazalga.api.services.parametros.ParametrosVariacion pVar = ps != null ? ps.variacion() : null;
+        boolean bioPerdidaActivo = pVar != null ? pVar.bioPerdidaActivo() : true;
+        double umbral = pVar != null ? pVar.variacionPesoUmbralGeneralPct() : 5.0;
+        double mermaMinHumedo = pVar != null ? pVar.bioHumedoMermaMinimaPct() : 5.0;
+        double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
+        int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : null;
+                ? retencionCustodiaService.getParametros() : (ps != null ? ps.retencion() : null);
+        int diasAmarilla = 3;
+        int diasNaranja = 5;
+        int diasRoja = 7;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
@@ -643,7 +663,7 @@ public class ReportService {
             diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
             diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
         }
-        String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
+        String estadosSujetos = configService != null ? configService.getValor(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO") : "HUMEDO";
 
         return reportRepository.getTrazabilidadLoteDetalle(
                 startDate, endDate, semaforo, umbral, mermaMinHumedo, mermaMaxSeco,
@@ -654,7 +674,10 @@ public class ReportService {
     public java.util.Map<String, Object> getDesembarqueFisicoMetrics(
             Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
             Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String agruparPor, String perfil) {
-        double umbralAtipico = configService.getDouble("desembarque_umbral_atipico_kg", 5000.0);
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        double umbralAtipico = (ps != null && ps.desembarque() != null)
+                ? ps.desembarque().umbralAtipicoKg()
+                : 5000.0;
         boolean fRecolector = configService.getBoolean("desembarque_fuente_recolector_activa", true);
         boolean fArmador = configService.getBoolean("desembarque_fuente_armador_activa", true);
         boolean fArea = configService.getBoolean("desembarque_fuente_area_activa", true);
@@ -718,11 +741,13 @@ public class ReportService {
             return retencionCustodiaService.obtenerMetricasRetencion(startDate, endDate);
         }
 
-        boolean activo = configService.getBoolean("retencion_bodega_activo", true);
-        int humedoMaxH = configService.getInt("retencion_humedo_max_horas", 24);
-        int semihumedoMaxH = configService.getInt("retencion_semihumedo_max_horas", 72);
-        int semisecoMaxH = configService.getInt("retencion_semiseco_max_horas", 216);
-        int preavisoPct = configService.getInt("retencion_preaviso_pct", 80);
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        com.trazalga.api.services.parametros.ParametrosRetencion pRet = ps != null ? ps.retencion() : null;
+        boolean activo = pRet != null ? pRet.retencionActivo() : true;
+        int humedoMaxH = pRet != null ? pRet.humedoMaxHoras() : 24;
+        int semihumedoMaxH = pRet != null ? pRet.semihumedoMaxHoras() : 72;
+        int semisecoMaxH = pRet != null ? pRet.semisecoMaxHoras() : 216;
+        int preavisoPct = pRet != null ? (int) Math.round(pRet.semaforoPreavisoPct()) : 80;
 
         if (!activo) {
             java.util.Map<String, Object> disabled = new java.util.HashMap<>();

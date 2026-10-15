@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.trazalga.api.services.ConfiguracionGeneralService;
+import com.trazalga.api.services.parametros.ParametrosDesembarque;
 import com.trazalga.api.services.parametros.ParametrosService;
 
 import lombok.NoArgsConstructor;
@@ -16,13 +17,14 @@ import lombok.NoArgsConstructor;
 /**
  * Criterio de desviación estadística para desembarques atípicos (TD.2 / D7).
  * Evalúa si la faena supera en z > sigma el promedio histórico del grupo (perfil, caleta, especie, humedad).
- * Controlado por el parámetro 'desembarque_atipico_estadistico_activo' (default false).
+ * Controlado por el parámetro estadístico tipado en ParametrosDesembarque.
  */
 @Component
 @NoArgsConstructor
 public class DesviacionEstadisticaCriterio implements CriterioAtipico {
 
     private ConfiguracionGeneralService configService;
+    @Autowired(required = false)
     private ParametrosService parametrosService;
 
     private static final Locale LOCALE_CL = Locale.forLanguageTag("es-CL");
@@ -35,6 +37,16 @@ public class DesviacionEstadisticaCriterio implements CriterioAtipico {
 
     public DesviacionEstadisticaCriterio(ConfiguracionGeneralService configService) {
         this.configService = configService;
+        if (configService != null) {
+            this.parametrosService = new ParametrosService(configService);
+        }
+    }
+
+    private ParametrosService getParametrosService() {
+        if (this.parametrosService == null && this.configService != null) {
+            this.parametrosService = new ParametrosService(this.configService);
+        }
+        return this.parametrosService;
     }
 
     @Override
@@ -48,23 +60,16 @@ public class DesviacionEstadisticaCriterio implements CriterioAtipico {
             return ResultadoCriterioAtipico.builder().atipico(false).build();
         }
 
-        boolean activo = false;
-        if (parametrosService != null && parametrosService.desembarque() != null) {
-            activo = parametrosService.desembarque().estadisticoActivo();
-        } else if (configService != null) {
-            activo = configService.getBoolean("desembarque_atipico_estadistico_activo", false);
-        }
+        ParametrosService ps = getParametrosService();
+        ParametrosDesembarque pDes = ps != null ? ps.desembarque() : null;
 
+        boolean activo = pDes != null && pDes.estadisticoActivo();
         if (!activo) {
             return ResultadoCriterioAtipico.builder().atipico(false).build();
         }
 
-        double sigma = (configService != null)
-                ? configService.getDouble("desembarque_atipico_sigma", 2.5)
-                : 2.5;
-        int minMuestras = (configService != null)
-                ? configService.getInt("desembarque_atipico_min_muestras", 10)
-                : 10;
+        double sigma = pDes.sigma();
+        int minMuestras = pDes.minMuestras();
 
         List<Double> historico = ctx.getHistoricoKilos();
         if (historico == null || historico.size() < minMuestras) {
@@ -111,7 +116,7 @@ public class DesviacionEstadisticaCriterio implements CriterioAtipico {
             return ResultadoCriterioAtipico.builder()
                     .atipico(true)
                     .criterioClave(clave())
-                    .parametro("desembarque_atipico_sigma")
+                    .parametro(ParametrosService.PARAM_DESEMBARQUE_ATIPICO_SIGMA)
                     .umbral(String.valueOf(sigma))
                     .valor(String.format(Locale.US, "%.2f", z))
                     .unidad("sigma")
@@ -122,3 +127,4 @@ public class DesviacionEstadisticaCriterio implements CriterioAtipico {
         return ResultadoCriterioAtipico.builder().atipico(false).build();
     }
 }
+

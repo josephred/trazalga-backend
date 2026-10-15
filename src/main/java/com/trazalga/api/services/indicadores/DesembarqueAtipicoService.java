@@ -44,13 +44,32 @@ public class DesembarqueAtipicoService {
     private ConfiguracionGeneralService configService;
 
     @Autowired(required = false)
+    @Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService != null) {
+            return this.parametrosService;
+        }
+        if (this.configService != null) {
+            return new com.trazalga.api.services.parametros.ParametrosService(this.configService);
+        }
+        return null;
+    }
+
+    @Autowired(required = false)
     private List<CriterioAtipico> criterios;
 
     private static final Locale LOCALE_CL = Locale.forLanguageTag("es-CL");
 
     public Page<DesembarqueAtipicoDTO> buscar(FiltroDesembarqueAtipico filtro, Pageable pageable) {
-        double umbralVigente = (configService != null)
-                ? configService.getDouble("desembarque_umbral_atipico_kg", 5000.0)
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        double umbralVigente = (ps != null && ps.desembarque() != null)
+                ? ps.desembarque().umbralAtipicoKg()
                 : 5000.0;
 
         String fuenteFiltro = (filtro != null && filtro.getFuente() != null)
@@ -104,9 +123,9 @@ public class DesembarqueAtipicoService {
             if (filtro.getCriterioTipo() != null && !filtro.getCriterioTipo().isBlank()) {
                 String ct = filtro.getCriterioTipo().trim().toUpperCase();
                 if ("ESTADISTICO".equals(ct)) {
-                    if (!"desembarque_atipico_sigma".equalsIgnoreCase(r.getCriterioParametro())) return false;
+                    if (!com.trazalga.api.services.parametros.ParametrosService.PARAM_DESEMBARQUE_ATIPICO_SIGMA.equalsIgnoreCase(r.getCriterioParametro())) return false;
                 } else if ("UMBRAL".equals(ct)) {
-                    if (!"desembarque_umbral_atipico_kg".equalsIgnoreCase(r.getCriterioParametro())) return false;
+                    if (!com.trazalga.api.services.parametros.ParametrosService.PARAM_DESEMBARQUE_UMBRAL_KG.equalsIgnoreCase(r.getCriterioParametro())) return false;
                 }
             }
 
@@ -192,7 +211,7 @@ public class DesembarqueAtipicoService {
 
             // Criterio estructurado con conservación del umbral original registrado
             if (m.getCriterioParametro() != null) {
-                if ("desembarque_atipico_sigma".equalsIgnoreCase(m.getCriterioParametro())) {
+                if (com.trazalga.api.services.parametros.ParametrosService.PARAM_DESEMBARQUE_ATIPICO_SIGMA.equalsIgnoreCase(m.getCriterioParametro())) {
                     dto.setCriterioTexto(m.getDetalle());
                 } else {
                     String umbralReg = m.getCriterioUmbral() != null ? formatearKilos(m.getCriterioUmbral()) : "5.000";
@@ -559,8 +578,9 @@ public class DesembarqueAtipicoService {
             return Collections.emptyList();
         }
 
-        int ventanaDias = (configService != null)
-                ? configService.getInt("desembarque_atipico_ventana_dias", 90)
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        int ventanaDias = (ps != null && ps.desembarque() != null)
+                ? ps.desembarque().ventanaDias()
                 : 90;
 
         Date ref = fechaRef != null ? fechaRef : new Date();

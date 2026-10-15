@@ -38,6 +38,24 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.parametros.ParametrosService parametrosService;
+
+    public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
+        this.parametrosService = parametrosService;
+    }
+
+    private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
+        if (this.parametrosService != null) {
+            return this.parametrosService;
+        }
+        if (this.configuracionGeneralService != null) {
+            return new com.trazalga.api.services.parametros.ParametrosService(this.configuracionGeneralService);
+        }
+        return null;
+    }
+
     public void setVariacionPesoService(com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService) {
         this.variacionPesoService = variacionPesoService;
     }
@@ -2176,9 +2194,10 @@ public class ReportRepository {
                         ? evaluadorCoherenciaBiologica
                         : new com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica();
 
-                double riesgoRojo = configuracionGeneralService != null
-                        ? configuracionGeneralService.getDouble("riesgo_variacion_rojo_pct", 10.0)
-                        : (umbralVariacion != null ? umbralVariacion * 2.0 : 10.0);
+                com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+                double riesgoRojo = (ps != null && ps.variacion() != null)
+                        ? ps.variacion().riesgoVariacionRojoPct()
+                        : 10.0;
 
                 com.trazalga.api.services.parametros.ParametrosVariacion pVar = new com.trazalga.api.services.parametros.ParametrosVariacion(
                         true, diasMinHumedo,
