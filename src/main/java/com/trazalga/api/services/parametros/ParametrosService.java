@@ -88,13 +88,13 @@ public class ParametrosService {
                     getInt(PARAM_RETENCION_HUMEDO_MAX_HORAS, 24),
                     getInt(PARAM_RETENCION_SEMIHUMEDO_MAX_HORAS, 72),
                     getInt(PARAM_RETENCION_SEMISECO_MAX_HORAS, 216),
-                    getDouble(PARAM_RETENCION_PREAVISO_PCT, 80.0),
+                    getInt(PARAM_RETENCION_PREAVISO_PCT, 80),
                     getBoolean(PARAM_RETENCION_BLOQUEO_ACTIVO, false),
                     getInt(PARAM_RETENCION_BLOQUEO_HUMEDO, 120),
                     getInt(PARAM_RETENCION_BLOQUEO_SEMIHUMEDO, 0),
                     getInt(PARAM_RETENCION_BLOQUEO_SEMISECO, 0),
                     getString(PARAM_RETENCION_BLOQUEO_ESPECIES, "TODAS"),
-                    getDouble(PARAM_RETENCION_BLOQUEO_PREAVISO_PCT, 80.0)
+                    getInt(PARAM_RETENCION_BLOQUEO_PREAVISO_PCT, 80)
             );
             retencionCache.compareAndSet(null, cached);
         }

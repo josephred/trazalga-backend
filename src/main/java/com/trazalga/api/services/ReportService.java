@@ -620,11 +620,11 @@ public class ReportService {
         double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
         int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
+        int diasAmarilla = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3) : 3;
+        int diasNaranja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5) : 5;
+        int diasRoja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7) : 7;
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : (ps != null ? ps.retencion() : null);
-        int diasAmarilla = 3;
-        int diasNaranja = 5;
-        int diasRoja = 7;
+                ? retencionCustodiaService.getParametros() : null;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
@@ -651,11 +651,11 @@ public class ReportService {
         double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
         int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
+        int diasAmarilla = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3) : 3;
+        int diasNaranja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5) : 5;
+        int diasRoja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7) : 7;
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : (ps != null ? ps.retencion() : null);
-        int diasAmarilla = 3;
-        int diasNaranja = 5;
-        int diasRoja = 7;
+                ? retencionCustodiaService.getParametros() : null;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
