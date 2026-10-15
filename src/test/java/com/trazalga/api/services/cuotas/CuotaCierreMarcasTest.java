@@ -272,7 +272,7 @@ public class CuotaCierreMarcasTest {
         when(qConsumo.getSingleResult()).thenReturn("91000.00").thenReturn("0.00"); // 91% de consumo (umbral restante = 10% -> disparo en >= 90%)
         when(entityManager.createNativeQuery(anyString())).thenReturn(qConsumo);
 
-        when(avisoEnviadoRepository.existsById("CUOTA:400:UMBRAL:1")).thenReturn(false);
+        when(avisoEnviadoRepository.existsById("CUOTA:400:UMBRAL:0")).thenReturn(false);
 
         java.util.Date fecha = Date.valueOf("2026-03-15");
         cuotaExtraccionService.evaluarCuotaDeclaracion(

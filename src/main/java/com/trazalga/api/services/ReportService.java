@@ -600,14 +600,19 @@ public class ReportService {
         double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
         int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
 
+        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
+        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
+        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
                 ? retencionCustodiaService.getParametros() : null;
-        int horasHumedo = retParams != null ? retParams.humedoMaxHoras() : configService.getInt("retencion_humedo_max_horas", 24);
-        double preavisoPct = retParams != null ? retParams.semaforoPreavisoPct() : configService.getDouble("retencion_preaviso_pct", 80.0);
-
-        int diasAmarilla = Math.max(1, (int) Math.round((horasHumedo * (preavisoPct / 100.0)) / 24.0));
-        int diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
-        int diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
+        if (retParams != null) {
+            int horasHumedo = retParams.humedoMaxHoras();
+            double preavisoPct = retParams.semaforoPreavisoPct();
+            diasAmarilla = Math.max(1, (int) Math.round((horasHumedo * (preavisoPct / 100.0)) / 24.0));
+            diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
+            diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
+        }
         String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
 
         java.util.Map<String, Object> res = reportRepository.getTrazabilidadLoteMetrics(
@@ -625,14 +630,19 @@ public class ReportService {
         double mermaMaxSeco = configService.getDouble("bio_seco_merma_maxima_pct", 3.0);
         int diasMinHumedo = configService.getInt("bio_humedo_dias_minimos_transito", 3);
 
+        int diasAmarilla = configService.getInt("retencion_bodega_dias_amarilla", 3);
+        int diasNaranja = configService.getInt("retencion_bodega_dias_naranja", 5);
+        int diasRoja = configService.getInt("retencion_bodega_dias_roja", 7);
+
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
                 ? retencionCustodiaService.getParametros() : null;
-        int horasHumedo = retParams != null ? retParams.humedoMaxHoras() : configService.getInt("retencion_humedo_max_horas", 24);
-        double preavisoPct = retParams != null ? retParams.semaforoPreavisoPct() : configService.getDouble("retencion_preaviso_pct", 80.0);
-
-        int diasAmarilla = Math.max(1, (int) Math.round((horasHumedo * (preavisoPct / 100.0)) / 24.0));
-        int diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
-        int diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
+        if (retParams != null) {
+            int horasHumedo = retParams.humedoMaxHoras();
+            double preavisoPct = retParams.semaforoPreavisoPct();
+            diasAmarilla = Math.max(1, (int) Math.round((horasHumedo * (preavisoPct / 100.0)) / 24.0));
+            diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
+            diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
+        }
         String estadosSujetos = configService.getValor("retencion_bodega_estados_sujetos", "HUMEDO");
 
         return reportRepository.getTrazabilidadLoteDetalle(
