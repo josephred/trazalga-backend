@@ -10,6 +10,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +39,9 @@ public class CuotaExtraccionControllerMockMvcTest {
     @Mock
     private CuotaExtraccionService cuotaService;
 
+    @Mock
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper()
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -49,6 +53,7 @@ public class CuotaExtraccionControllerMockMvcTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "objectMapper", objectMapper);
+        ReflectionTestUtils.setField(controller, "usuarioRepository", usuarioRepository);
         org.springframework.http.converter.json.MappingJackson2HttpMessageConverter converter =
                 new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(objectMapper);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -186,6 +191,58 @@ public class CuotaExtraccionControllerMockMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.estado").value("CERRADA"));
+    }
+
+    @Test
+    @DisplayName("TC.2 MockMvc: PUT /api/cuotas/{id}/cerrar con motivo AGOTAMIENTO responde 422")
+    void testCerrarCuota_MotivoAgotamientoResponde422() throws Exception {
+        String payload = """
+        {
+            "motivo": "AGOTAMIENTO",
+            "observacion": "Intento de cierre con motivo indebido"
+        }
+        """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cuotas/10/cerrar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("El cierre manual sólo admite motivo ADMINISTRATIVO."));
+    }
+
+    @Test
+    @DisplayName("TC.2 MockMvc: PUT /api/cuotas/{id}/cerrar propaga el usuario_id del ADMIN autenticado")
+    void testCerrarCuota_PropagaUsuarioIdAdminAutenticado() throws Exception {
+        CuotaExtraccionModel cerrada = CuotaExtraccionModel.builder()
+                .id(10L)
+                .estado("CERRADA")
+                .build();
+
+        com.trazalga.api.models.UsuarioModel admin = com.trazalga.api.models.UsuarioModel.builder()
+                .id(99L)
+                .rut("11.111.111-1")
+                .build();
+
+        when(usuarioRepository.findByRut("11.111.111-1")).thenReturn(Optional.of(admin));
+        when(cuotaService.cerrarCuota(eq(10L), eq("ADMINISTRATIVO"), eq("Cierre auditado"), eq(99L))).thenReturn(cerrada);
+
+        java.security.Principal principal = () -> "11.111.111-1";
+
+        String payload = """
+        {
+            "observacion": "Cierre auditado"
+        }
+        """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cuotas/10/cerrar")
+                .principal(principal)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.estado").value("CERRADA"));
+
+        verify(cuotaService).cerrarCuota(10L, "ADMINISTRATIVO", "Cierre auditado", 99L);
     }
 
     @Test

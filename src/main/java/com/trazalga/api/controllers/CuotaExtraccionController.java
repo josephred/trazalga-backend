@@ -145,9 +145,12 @@ public class CuotaExtraccionController {
             @RequestBody(required = false) Map<String, String> body,
             java.security.Principal principal) {
         String motivo = (body != null) ? body.get("motivo") : null;
+        if (motivo != null && !motivo.isBlank() && !"ADMINISTRATIVO".equalsIgnoreCase(motivo.trim())) {
+            throw new IllegalArgumentException("El cierre manual sólo admite motivo ADMINISTRATIVO.");
+        }
         String observacion = (body != null) ? body.get("observacion") : null;
         Long usuarioId = extractUserId(principal);
-        return cuotaService.cerrarCuota(id, motivo, observacion, usuarioId);
+        return cuotaService.cerrarCuota(id, "ADMINISTRATIVO", observacion, usuarioId);
     }
 
     @PutMapping(path = "/{id}/reabrir")

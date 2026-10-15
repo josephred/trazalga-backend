@@ -204,6 +204,9 @@ public class CuotaExtraccionModel {
             throw new IllegalStateException("La cuota ID " + this.id + " ya se encuentra cerrada.");
         }
         String motivoNorm = (motivo != null && !motivo.isBlank()) ? motivo.trim().toUpperCase() : "ADMINISTRATIVO";
+        if (!"ADMINISTRATIVO".equals(motivoNorm) && !"AGOTAMIENTO".equals(motivoNorm) && !"VENCIMIENTO".equals(motivoNorm)) {
+            throw new IllegalArgumentException("Motivo de cierre no válido: " + motivoNorm + ". Debe ser ADMINISTRATIVO, AGOTAMIENTO o VENCIMIENTO.");
+        }
         Date fechaEfectiva = (fecha != null) ? fecha : new Date();
 
         if ("AGOTAMIENTO".equals(motivoNorm)) {

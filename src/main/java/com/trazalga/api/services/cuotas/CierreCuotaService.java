@@ -41,6 +41,9 @@ public class CierreCuotaService {
 
         Long usuarioFinal = resolverUsuarioId(usuarioId);
         String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo.trim().toUpperCase() : "ADMINISTRATIVO";
+        if (!"ADMINISTRATIVO".equals(motivoFinal) && !"AGOTAMIENTO".equals(motivoFinal) && !"VENCIMIENTO".equals(motivoFinal)) {
+            throw new IllegalArgumentException("Motivo de cierre no válido: " + motivoFinal + ". Debe ser ADMINISTRATIVO, AGOTAMIENTO o VENCIMIENTO.");
+        }
         c.cerrar(motivoFinal, new Date(), usuarioFinal);
 
         CuotaExtraccionModel guardada = cuotaRepository.save(c);
