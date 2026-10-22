@@ -59,4 +59,13 @@ public class AmerbModel {
     @Column(nullable = true)
     private Double longitud;
 
+    @Column(name = "fuente_coordenada", length = 100, nullable = true)
+    private String fuenteCoordenada;
+
+    @Column(name = "coordenada_actualizada_en", nullable = true)
+    private java.time.LocalDateTime coordenadaActualizadaEn;
+
+    @Column(name = "coordenada_actualizada_por", length = 100, nullable = true)
+    private String coordenadaActualizadaPor;
+
 }
