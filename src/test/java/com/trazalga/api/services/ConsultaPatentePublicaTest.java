@@ -83,10 +83,11 @@ public class ConsultaPatentePublicaTest {
         assertEquals("ABCD12", result.get("patente"));
         assertEquals(true, result.get("vigente"));
         assertFalse((Boolean) result.getOrDefault("sinRegistros", false));
-        assertEquals("Caldera", result.get("comunaOrigen"));
-        assertEquals("Planta Pacific Algas", result.get("destino"));
         assertEquals("Huiro Negro", result.get("especie"));
-        assertEquals(5200.0, (Double) result.get("kg"), 0.5);
+        assertFalse(result.containsKey("comunaOrigen"), "No debe exponer comunaOrigen");
+        assertFalse(result.containsKey("destino"), "No debe exponer destino");
+        assertFalse(result.containsKey("kg"), "No debe exponer kg");
+        assertFalse(result.containsKey("folio"), "No debe exponer folio");
 
         Double horas = (Double) result.get("horasTranscurridas");
         assertTrue(horas >= 16.5 && horas <= 17.5, "Debería calcular aprox 17 horas");
@@ -173,9 +174,10 @@ public class ConsultaPatentePublicaTest {
         assertFalse(result.containsKey("choferTransporte"), "No debe exponer 'choferTransporte'");
         assertFalse(result.containsKey("nombreComercializador"), "No debe exponer 'nombreComercializador'");
         assertFalse(result.containsKey("usuarioId"), "No debe exponer 'usuarioId'");
-
-        String destino = (String) result.get("destino");
-        assertFalse(destino.contains("76.123.456-7"), "El RUT debe ser sanitizado del destino");
+        assertFalse(result.containsKey("folio"), "No debe exponer 'folio'");
+        assertFalse(result.containsKey("kg"), "No debe exponer 'kg'");
+        assertFalse(result.containsKey("destino"), "No debe exponer 'destino'");
+        assertFalse(result.containsKey("comunaOrigen"), "No debe exponer 'comunaOrigen'");
     }
 
     /**
@@ -247,52 +249,4 @@ public class ConsultaPatentePublicaTest {
         assertEquals(true, result72.get("vigente"));
     }
 
-    /**
-     * Caso 7: Listar patentes de camiones de comerciantes
-     */
-    @Test
-    void testCaso7_ObtenerPatentesCamionesComerciantes_RetornaListaFormateada() {
-        LocalDateTime movReciente = LocalDateTime.now().minusHours(5);
-        Date fechaMov = Date.from(movReciente.atZone(ZoneId.systemDefault()).toInstant());
-        String horaMov = String.format("%02d:%02d:00", movReciente.getHour(), movReciente.getMinute());
-
-        Object[] row1 = new Object[]{
-                "ZZXX00",                 // 0: patente_norm
-                null,                     // 1: placa_patente_carro
-                "camion_sin_acoplado",   // 2: vehiculo_transporte
-                "Carmen Comer A.",        // 3: comerciante
-                "5555",                   // 4: rut_comerciante
-                "Pato Lol",               // 5: chofer_transporte
-                "22333444-5",             // 6: rut_chofer
-                fechaMov,                 // 7: fecha_mov
-                horaMov,                  // 8: hora
-                "CHASCA",                 // 9: especie
-                4500.0,                   // 10: kg
-                "Illapel",                // 11: comuna_origen
-                "Planta ABAS L. H.",      // 12: destino
-                "ENVIADA",                // 13: estado
-                "1781036393129",          // 14: folio
-                2L                        // 15: total_movs
-        };
-
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row1));
-
-        List<Map<String, Object>> lista = patenteService.obtenerPatentesCamionesComerciantes();
-
-        assertNotNull(lista);
-        assertEquals(1, lista.size());
-        Map<String, Object> camion = lista.get(0);
-        assertEquals("ZZXX00", camion.get("patente"));
-        assertEquals("Camión sin acoplado", camion.get("vehiculo"));
-        assertEquals("Carmen Comer A.", camion.get("comerciante"));
-        assertEquals("5555", camion.get("rutComerciante"));
-        assertEquals("Pato Lol", camion.get("chofer"));
-        assertEquals("22333444-5", camion.get("rutChofer"));
-        assertEquals("CHASCA", camion.get("especie"));
-        assertEquals(4500.0, camion.get("kg"));
-        assertEquals("Illapel", camion.get("comunaOrigen"));
-        assertEquals(true, camion.get("vigente")); // movReciente es hace 5h (< 48h)
-        assertEquals(2, camion.get("totalMovimientos"));
-    }
 }

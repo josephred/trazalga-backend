@@ -1,6 +1,5 @@
 package com.trazalga.api.controllers;
 
-import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,18 +24,15 @@ public class ConsultaPatentePublicaController {
     @Autowired
     private ConsultaPatenteService patenteService;
 
-    @GetMapping({"/comerciantes", "/camiones-comerciantes"})
-    @Operation(summary = "Lista todas las patentes de los camiones de los comerciantes registradas en la base de datos")
-    public ResponseEntity<List<Map<String, Object>>> listarPatentesComerciantes() {
-        List<Map<String, Object>> lista = patenteService.obtenerPatentesCamionesComerciantes();
-        return ResponseEntity.ok(lista);
-    }
 
     @GetMapping("/{patente}")
     @Operation(summary = "Consulta el último movimiento y vigencia de traslado para una patente de camión o carro (sin datos personales)")
     public ResponseEntity<Map<String, Object>> consultarPatente(
             @PathVariable String patente,
             HttpServletRequest request) {
+        if ("comerciantes".equalsIgnoreCase(patente) || "camiones-comerciantes".equalsIgnoreCase(patente)) {
+            return ResponseEntity.notFound().build();
+        }
         Map<String, Object> resultado = patenteService.consultar(patente, request);
         return ResponseEntity.ok(resultado);
     }
