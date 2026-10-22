@@ -60,6 +60,10 @@ public class DeclaracionRecolectorModel {
     private String varadero;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "varadero_id", nullable = true)
+    private VaraderoModel varaderoRelacion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caleta_id", nullable = false)
     private CaletaModel caleta;
 

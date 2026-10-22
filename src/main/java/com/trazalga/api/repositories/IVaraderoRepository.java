@@ -7,5 +7,5 @@ import com.trazalga.api.models.VaraderoModel;
 
 @Repository
 public interface IVaraderoRepository extends JpaRepository<VaraderoModel, Long> {
-
+    java.util.List<VaraderoModel> findByComunaId(Long comunaId);
 }

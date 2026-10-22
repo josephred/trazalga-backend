@@ -28,6 +28,7 @@ public class ImportarCoordenadasService {
     private final IAmerbRepository amerbRepository;
     private final IRegionRepository regionRepository;
     private final ICoordenadaCambioLogRepository cambioLogRepository;
+    private final ReferenciaOrigenService referenciaOrigenService;
 
     private static final double TOLERANCIA_DIFERENCIA_COORD = 0.0001; // ~11 metros
 
@@ -217,6 +218,9 @@ public class ImportarCoordenadasService {
             amerbRepository.saveAll(todasAmerb);
             if (!logsToSave.isEmpty()) {
                 cambioLogRepository.saveAll(logsToSave);
+            }
+            if (referenciaOrigenService != null) {
+                referenciaOrigenService.invalidarCache();
             }
         }
 
