@@ -79,6 +79,7 @@ public class UsuarioController {
             resp.put("rut", usuario.getRut());
             resp.put("perfil", usuario.getPerfil() != null ? usuario.getPerfil().getNombre() : null);
             resp.put("regionId", usuario.getComuna() != null && usuario.getComuna().getRegion() != null ? usuario.getComuna().getRegion().getId() : null);
+            resp.put("region", usuario.getComuna() != null && usuario.getComuna().getRegion() != null ? usuario.getComuna().getRegion().getNombre() : null);
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Usuario no encontrado"));
