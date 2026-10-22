@@ -67,4 +67,12 @@ public class AdminControllerTest {
         mockMvc.perform(get("/api/admin/tareas-programadas"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @DisplayName("TU.2: DELETE /api/admin/database/vaciar-tablas responde 404 Not Found con rol ADMIN")
+    void testVaciarTablas_Responde404ConRolAdmin() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/database/vaciar-tablas"))
+                .andExpect(status().isNotFound());
+    }
 }
