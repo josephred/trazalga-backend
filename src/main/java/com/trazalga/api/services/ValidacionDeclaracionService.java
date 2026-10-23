@@ -70,6 +70,9 @@ public class ValidacionDeclaracionService {
     private com.trazalga.api.repositories.IAmerbRepository amerbRepository;
 
     @Autowired(required = false)
+    private com.trazalga.api.repositories.IHumedadEstadoRepository humedadEstadoRepository;
+
+    @Autowired(required = false)
     private com.trazalga.api.services.cuotas.ResolutorImputacionTerritorial resolutorImputacion;
 
     @Autowired(required = false)
@@ -365,6 +368,34 @@ public class ValidacionDeclaracionService {
                         .criterio(crit)
                         .build());
                 advertencias.add(msgAtipico);
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // 6. Coherencia de Humedad desde la Extracción (TH.2 / Res. 3602)
+        // ---------------------------------------------------------------------
+        com.trazalga.api.services.parametros.ParametrosService psCoh = getParametrosService();
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia pCoh =
+                psCoh != null ? psCoh.coherenciaHumedad() : null;
+        if (pCoh != null && pCoh.isActivo()) {
+            String humNom = ctx.getHumedadNombre();
+            if ((humNom == null || humNom.isBlank()) && ctx.getHumedadEstadoId() != null && humedadEstadoRepository != null) {
+                humNom = humedadEstadoRepository.findById(ctx.getHumedadEstadoId())
+                        .map(com.trazalga.api.models.HumedadEstadoModel::getNombre)
+                        .orElse(null);
+            }
+            java.time.LocalDateTime momentoDecl = ReportService.parseTimestamp(ctx.getFechaDeclaracion(), ctx.getHora());
+            com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                    com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                            humNom, ctx.getFechaExtraccion(), momentoDecl, pCoh);
+            if (resCoh.isIncoherente()) {
+                marcas.add(MarcaItem.builder()
+                        .marca("HUMEDAD_INCOHERENTE")
+                        .regla("TH2_ORIGEN")
+                        .detalle(resCoh.getExplicacion())
+                        .criterio(resCoh.getCriterio())
+                        .build());
+                advertencias.add(resCoh.getExplicacion());
             }
         }
 
@@ -673,5 +704,65 @@ public class ValidacionDeclaracionService {
         return String.format(
                 "Declaración enviada a %s km %s (referencia: %s). Umbral: %s km. Precisión GPS: %s m. %s",
                 distStr, entidadFrase, fuenteFrase, umbralStr, precStr, conexionFrase);
+    }
+
+    // =========================================================================
+    // TH.2 / TH.3 — COHERENCIA DE HUMEDAD DESDE LA EXTRACCIÓN (Res. 3602)
+    // =========================================================================
+
+    public Optional<DeclaracionMarcaModel> verificarCoherenciaHumedad(
+            String tipo,
+            Long id,
+            String estadoHumedad,
+            Date fechaExtraccion,
+            Date fechaEvento,
+            String horaEvento,
+            Long usuarioId,
+            Long regionId) {
+        com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
+        if (ps == null) {
+            return Optional.empty();
+        }
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia pCoh = ps.coherenciaHumedad();
+        if (pCoh == null || !pCoh.isActivo()) {
+            return Optional.empty();
+        }
+        java.time.LocalDateTime momentoEvento = ReportService.parseTimestamp(fechaEvento, horaEvento);
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                        estadoHumedad, fechaExtraccion, momentoEvento, pCoh);
+        if (!resCoh.isIncoherente()) {
+            return Optional.empty();
+        }
+
+        CriterioHallazgo criterio = resCoh.getCriterio();
+        String motivo = resCoh.getExplicacion();
+        DeclaracionMarcaModel construida = getHallazgoFactory().crear(
+                tipo, id, "HUMEDAD_INCOHERENTE", null, criterio, motivo, "VALIDACION");
+
+        if (hallazgoService != null) {
+            return Optional.of(hallazgoService.registrar(
+                    tipo, id, "HUMEDAD_INCOHERENTE", null, criterio, motivo, "VALIDACION", usuarioId, regionId));
+        }
+        if (declaracionMarcaService != null) {
+            DeclaracionMarcaModel marcada = declaracionMarcaService.marcar(
+                    tipo, id, "HUMEDAD_INCOHERENTE", motivo, null);
+            if (marcada != null) {
+                if (marcada.getClaveIdempotencia() == null) {
+                    marcada.setClaveIdempotencia(construida.getClaveIdempotencia());
+                }
+                if (marcada.getCriterioParametro() == null && criterio != null) {
+                    marcada.setCriterioParametro(criterio.parametro());
+                    marcada.setCriterioUmbral(criterio.umbral());
+                    marcada.setCriterioValor(criterio.valorObservado());
+                    marcada.setCriterioUnidad(criterio.unidad());
+                }
+                if (marcada.getDetalle() == null) {
+                    marcada.setDetalle(motivo);
+                }
+                return Optional.of(marcada);
+            }
+        }
+        return Optional.of(construida);
     }
 }

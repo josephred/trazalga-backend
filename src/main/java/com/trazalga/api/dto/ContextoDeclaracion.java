@@ -19,6 +19,7 @@ public class ContextoDeclaracion {
     private Long amerbId;
     private Long especieId;
     private Long humedadEstadoId;
+    private String humedadNombre;
     private Long extraccionTipoId;
     private Long caletaId;
     private Long comunaDesembarqueId;
@@ -26,6 +27,7 @@ public class ContextoDeclaracion {
     private Long regionId;
     private Date fechaExtraccion;
     private Date fechaDeclaracion;
+    private String hora;
     private BigDecimal desembarqueKg;
     private Boolean esEdicion;
     private Long declaracionId;

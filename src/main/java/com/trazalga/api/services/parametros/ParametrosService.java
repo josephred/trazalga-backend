@@ -7,11 +7,12 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.trazalga.api.services.ConfiguracionGeneralService;
+import com.trazalga.api.services.indicadores.CoherenciaHumedad;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Servicio centralizado de parámetros tipados (TA.2).
+ * Servicio centralizado de parámetros tipados (TA.2 / TH.1).
  * Expone registros inmutables por dominio evitando el uso de cadenas de texto arbitrarias
  * en los servicios y se invalida automáticamente cuando cambia cualquier configuración.
  */
@@ -42,6 +43,13 @@ public class ParametrosService {
     public static final String PARAM_RETENCION_BODEGA_DIAS_NARANJA = "retencion_bodega_dias_naranja";
     public static final String PARAM_RETENCION_BODEGA_DIAS_ROJA = "retencion_bodega_dias_roja";
 
+    // TH.1 / TH.2: Coherencia de humedad (Res. 3602, art. 1)
+    public static final String PARAM_HUMEDAD_COHERENCIA_ACTIVO = "humedad_coherencia_activo";
+    public static final String PARAM_HUMEDAD_COHERENCIA_MODO = "humedad_coherencia_modo";
+    public static final String PARAM_HUMEDAD_EDAD_MAX_HUMEDO_HORAS = "humedad_edad_max_humedo_horas";
+    public static final String PARAM_HUMEDAD_EDAD_MAX_SEMIHUMEDO_HORAS = "humedad_edad_max_semihumedo_horas";
+    public static final String PARAM_HUMEDAD_EDAD_MAX_SEMISECO_HORAS = "humedad_edad_max_semiseco_horas";
+
     public static final String PARAM_RIESGO_VARIACION_ROJO_PCT = "riesgo_variacion_rojo_pct";
     public static final String PARAM_RIESGO_VARIACION_AMARILLO_PCT = "riesgo_variacion_amarillo_pct";
 
@@ -64,6 +72,7 @@ public class ParametrosService {
     private final AtomicReference<ParametrosRetencion> retencionCache = new AtomicReference<>();
     private final AtomicReference<ParametrosVariacion> variacionCache = new AtomicReference<>();
     private final AtomicReference<ParametrosDesembarque> desembarqueCache = new AtomicReference<>();
+    private final AtomicReference<CoherenciaHumedad.ParametrosCoherencia> coherenciaHumedadCache = new AtomicReference<>();
 
     public ParametrosCuota cuotas() {
         ParametrosCuota cached = cuotaCache.get();
@@ -97,6 +106,21 @@ public class ParametrosService {
                     getInt(PARAM_RETENCION_BLOQUEO_PREAVISO_PCT, 80)
             );
             retencionCache.compareAndSet(null, cached);
+        }
+        return cached;
+    }
+
+    public CoherenciaHumedad.ParametrosCoherencia coherenciaHumedad() {
+        CoherenciaHumedad.ParametrosCoherencia cached = coherenciaHumedadCache.get();
+        if (cached == null) {
+            cached = CoherenciaHumedad.ParametrosCoherencia.builder()
+                    .activo(getBoolean(PARAM_HUMEDAD_COHERENCIA_ACTIVO, false))
+                    .modo(getString(PARAM_HUMEDAD_COHERENCIA_MODO, CoherenciaHumedad.MODO_DIRECCIONAL))
+                    .edadMaxHumedoHoras(getInt(PARAM_HUMEDAD_EDAD_MAX_HUMEDO_HORAS, 24))
+                    .edadMaxSemihumedoHoras(getInt(PARAM_HUMEDAD_EDAD_MAX_SEMIHUMEDO_HORAS, 72))
+                    .edadMaxSemisecoHoras(getInt(PARAM_HUMEDAD_EDAD_MAX_SEMISECO_HORAS, 216))
+                    .build();
+            coherenciaHumedadCache.compareAndSet(null, cached);
         }
         return cached;
     }
@@ -142,6 +166,7 @@ public class ParametrosService {
         retencionCache.set(null);
         variacionCache.set(null);
         desembarqueCache.set(null);
+        coherenciaHumedadCache.set(null);
         log.debug("Caché de parámetros tipados invalidado exitosamente.");
     }
 

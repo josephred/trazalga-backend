@@ -3296,17 +3296,16 @@ public class ReportRepository {
                 semaforo = "VERDE";
             }
 
-            // Tramo real biológico según horas transcurridas
-            String tramoReal;
-            if (horas <= 24) {
-                tramoReal = "HÚMEDO";
-            } else if (horas <= 72) {
-                tramoReal = "SEMI HÚMEDO";
-            } else if (horas <= 216) {
-                tramoReal = "SEMI SECO";
-            } else {
-                tramoReal = "SECO";
-            }
+            // TH.1: Tramo esperado por edad y coherencia delegados a CoherenciaHumedad
+            com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia cohParams =
+                    com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia.builder()
+                            .edadMaxHumedoHoras(humedoMaxH)
+                            .edadMaxSemihumedoHoras(semihumedoMaxH)
+                            .edadMaxSemisecoHoras(semisecoMaxH)
+                            .build();
+            String tramoReal = com.trazalga.api.services.indicadores.CoherenciaHumedad.tramoPorEdad(horas, cohParams);
+            boolean inconsistenciaHumedad = com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(estadoDeclarado)
+                    < com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(tramoReal);
 
             double kgLote = kgComercializador != null ? kgComercializador : (kgPlanta != null ? kgPlanta : kgOrigen);
 
@@ -3359,7 +3358,7 @@ public class ReportRepository {
             loteMap.put("kgPlanta", kgPlanta != null ? Math.round(kgPlanta * 100.0) / 100.0 : null);
             loteMap.put("fechaOrigen", fechaInicioLote);
             loteMap.put("fechaDestino", fechaPlanta);
-            loteMap.put("inconsistenciaHumedad", !estadoDeclarado.equalsIgnoreCase(tramoReal));
+            loteMap.put("inconsistenciaHumedad", inconsistenciaHumedad);
 
             lotesEvaluados.add(loteMap);
             if ("ROJO".equals(semaforo)) {

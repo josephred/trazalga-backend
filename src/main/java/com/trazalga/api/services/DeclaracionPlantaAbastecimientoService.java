@@ -54,6 +54,15 @@ public class DeclaracionPlantaAbastecimientoService {
     @Autowired
     private BloqueoCargaService bloqueoCargaService;
 
+    @Autowired(required = false)
+    private ValidacionDeclaracionService validacionDeclaracionService;
+
+    @Autowired(required = false)
+    private CadenaCustodiaService cadenaCustodiaService;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IHumedadEstadoRepository humedadEstadoRepository;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -153,10 +162,12 @@ public class DeclaracionPlantaAbastecimientoService {
                 saved.getDeclaracionesSeleccionadas(), 
                 saved.getId(), 
                 "PLANTA_ABASTECIMIENTO", 
-                saved.getUsuario().getId()
+                saved.getUsuario() != null ? saved.getUsuario().getId() : null
             );
             congelarResumenDocumento(saved.getId());
         }
+
+        evaluarCoherenciaHumedadRecepcion(saved);
 
         return saved;
     }
@@ -222,13 +233,15 @@ public class DeclaracionPlantaAbastecimientoService {
                 request.getDeclaracionesSeleccionadas(),
                 id,
                 "PLANTA_ABASTECIMIENTO",
-                model.getUsuario().getId()
+                model.getUsuario() != null ? model.getUsuario().getId() : null
             );
             congelarResumenDocumento(id);
         } else {
             model.setResumenDocumento(null);
             repository.save(model);
         }
+
+        evaluarCoherenciaHumedadRecepcion(model);
 
         return model;
     }
@@ -463,5 +476,133 @@ public class DeclaracionPlantaAbastecimientoService {
         if (model.getPatente() != null) {
             model.setPatente(ConsultaPatenteService.normalizarPatente(model.getPatente()));
         }
+    }
+
+    /**
+     * TH.3 · Evalúa la coherencia de la humedad verificada en recepción (o humedad_estado si falta)
+     * frente a la fecha de extracción más reciente entre los orígenes de la recepción.
+     */
+    private void evaluarCoherenciaHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
+        if (model == null || model.getId() == null || validacionDeclaracionService == null) {
+            return;
+        }
+        try {
+            String estadoHumedad = resolverEstadoHumedadRecepcion(model);
+            Date fechaExtraccionMasReciente = resolverFechaExtraccionMasReciente(model);
+            if (estadoHumedad == null || fechaExtraccionMasReciente == null) {
+                return;
+            }
+            Long usuarioId = model.getUsuario() != null ? model.getUsuario().getId() : null;
+            Long regionId = (model.getUsuario() != null && model.getUsuario().getComuna() != null
+                    && model.getUsuario().getComuna().getRegion() != null)
+                    ? model.getUsuario().getComuna().getRegion().getId()
+                    : null;
+
+            validacionDeclaracionService.verificarCoherenciaHumedad(
+                    "PLANTA_ABASTECIMIENTO",
+                    model.getId(),
+                    estadoHumedad,
+                    fechaExtraccionMasReciente,
+                    model.getFechaIngresoPlanta(),
+                    model.getHora(),
+                    usuarioId,
+                    regionId
+            );
+        } catch (Exception ex) {
+            // No bloquear la recepción si falla la resolución informativa/no bloqueante
+        }
+    }
+
+    private String resolverEstadoHumedadRecepcion(DeclaracionPlantaAbastecimientoModel model) {
+        if (model.getHumedadEstadoRecepcion() != null) {
+            if (model.getHumedadEstadoRecepcion().getNombre() != null && !model.getHumedadEstadoRecepcion().getNombre().isBlank()) {
+                return model.getHumedadEstadoRecepcion().getNombre();
+            }
+            if (model.getHumedadEstadoRecepcion().getId() != null && humedadEstadoRepository != null) {
+                return humedadEstadoRepository.findById(model.getHumedadEstadoRecepcion().getId())
+                        .map(com.trazalga.api.models.HumedadEstadoModel::getNombre)
+                        .orElse(null);
+            }
+        }
+        if (model.getHumedadEstado() != null) {
+            if (model.getHumedadEstado().getNombre() != null && !model.getHumedadEstado().getNombre().isBlank()) {
+                return model.getHumedadEstado().getNombre();
+            }
+            if (model.getHumedadEstado().getId() != null && humedadEstadoRepository != null) {
+                return humedadEstadoRepository.findById(model.getHumedadEstado().getId())
+                        .map(com.trazalga.api.models.HumedadEstadoModel::getNombre)
+                        .orElse(null);
+            }
+        }
+        return null;
+    }
+
+    private Date resolverFechaExtraccionMasReciente(DeclaracionPlantaAbastecimientoModel model) {
+        Date maxFecha = null;
+        if (cadenaCustodiaService != null && model.getId() != null) {
+            try {
+                CadenaCustodiaService.Cadena cadena = cadenaCustodiaService.resolver("PLANTA_ABASTECIMIENTO", model.getId());
+                if (cadena != null && cadena.getOrigenes() != null) {
+                    for (CadenaCustodiaService.OrigenRef o : cadena.getOrigenes()) {
+                        Date f = o.getFechaExtraccion();
+                        if (f != null && (maxFecha == null || f.after(maxFecha))) {
+                            maxFecha = f;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (maxFecha != null) {
+            return maxFecha;
+        }
+        // Respaldo recorriendo declaracionesSeleccionadas con repositorios inyectados
+        return buscarMaxFechaExtraccionEnSeleccionadas(model.getDeclaracionesSeleccionadas(), new java.util.HashSet<>());
+    }
+
+    private Date buscarMaxFechaExtraccionEnSeleccionadas(String selCsv, java.util.Set<String> visitados) {
+        if (selCsv == null || selCsv.isBlank()) {
+            return null;
+        }
+        Date maxFecha = null;
+        Map<String, List<Long>> sel = SeleccionTokens.parse(selCsv);
+
+        List<Long> recIds = SeleccionTokens.idsParaTipo(sel, "RECOLECTOR");
+        if (!recIds.isEmpty() && recolectorRepository != null) {
+            for (DeclaracionRecolectorModel r : recolectorRepository.findAllById(recIds)) {
+                if (r.getFechaExtraccion() != null && (maxFecha == null || r.getFechaExtraccion().after(maxFecha))) {
+                    maxFecha = r.getFechaExtraccion();
+                }
+            }
+        }
+        List<Long> armIds = SeleccionTokens.idsParaTipo(sel, "ARMADOR");
+        if (!armIds.isEmpty() && armadorRepository != null) {
+            for (DeclaracionArmadorModel a : armadorRepository.findAllById(armIds)) {
+                if (a.getFechaExtraccion() != null && (maxFecha == null || a.getFechaExtraccion().after(maxFecha))) {
+                    maxFecha = a.getFechaExtraccion();
+                }
+            }
+        }
+        List<Long> areaIds = SeleccionTokens.idsParaTipo(sel, "AREA");
+        if (!areaIds.isEmpty() && areaRepository != null) {
+            for (DeclaracionAreaModel ar : areaRepository.findAllById(areaIds)) {
+                if (ar.getFechaExtraccion() != null && (maxFecha == null || ar.getFechaExtraccion().after(maxFecha))) {
+                    maxFecha = ar.getFechaExtraccion();
+                }
+            }
+        }
+        List<Long> comIds = SeleccionTokens.idsParaTipo(sel, "COMERCIALIZADOR");
+        if (!comIds.isEmpty() && comercializadorRepository != null) {
+            for (DeclaracionComercializadorModel c : comercializadorRepository.findAllById(comIds)) {
+                String key = "COMERCIALIZADOR:" + c.getId();
+                if (visitados.add(key)) {
+                    Date sub = buscarMaxFechaExtraccionEnSeleccionadas(c.getDeclaracionesSeleccionadas(), visitados);
+                    if (sub != null && (maxFecha == null || sub.after(maxFecha))) {
+                        maxFecha = sub;
+                    }
+                }
+            }
+        }
+        return maxFecha;
     }
 }

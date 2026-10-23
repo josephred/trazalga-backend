@@ -1,31 +1,30 @@
 package com.trazalga.api.services.retencion;
 
-import java.util.Arrays;
+import java.time.LocalDateTime;
+import java.util.Date;
 
 import org.springframework.stereotype.Component;
 
+import com.trazalga.api.services.indicadores.CoherenciaHumedad;
 import com.trazalga.api.services.parametros.ParametrosRetencion;
 
 /**
- * Motor canónico de evaluación de políticas de retención en bodega virtual (TR.1, TR.3).
+ * Motor canónico de evaluación de políticas de retención en bodega virtual (TR.1, TR.3, TH.1).
  * Unifica la normalización de humedad y el semáforo de la Resolución Exenta 3602/2017
- * con las reglas de bloqueo automático de carga en bodega (D3).
+ * con las reglas de bloqueo automático de carga en bodega (D3), delegando la evaluación
+ * del tramo esperado por edad desde la extracción en {@link CoherenciaHumedad}.
  */
 @Component
 public class PoliticaRetencion {
 
     /**
-     * Normaliza cualquier variante textual de humedad a los cuatro estados canónicos:
-     * HÚMEDO, SEMI HÚMEDO, SEMI SECO, SECO.
+     * Normaliza cualquier variante textual de humedad a los cuatro estados canónicos
+     * para el semáforo de retención: HÚMEDO, SEMI HÚMEDO, SEMI SECO, SECO.
+     * Para la evaluación de coherencia sin fallback se usa {@link CoherenciaHumedad#normalizarEstadoDeclarado(String)}.
      */
     public static String normalizarEstadoHumedad(String hum) {
-        if (hum == null) return "HÚMEDO";
-        String h = hum.toUpperCase().trim();
-        if (h.contains("SEMI") && (h.contains("HUM") || h.contains("HÚM"))) return "SEMI HÚMEDO";
-        if (h.contains("SEMI") && h.contains("SEC")) return "SEMI SECO";
-        if (h.contains("HUM") || h.contains("HÚM")) return "HÚMEDO";
-        if (h.contains("SEC")) return "SECO";
-        return "HÚMEDO";
+        String sinFallback = CoherenciaHumedad.normalizarEstadoDeclarado(hum);
+        return sinFallback != null ? sinFallback : "HÚMEDO";
     }
 
     /**
@@ -49,15 +48,29 @@ public class PoliticaRetencion {
         return com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BLOQUEO_HUMEDO;
     }
 
-    /**
-     * Evalúa integralmente una carga contra la normativa Res. 3602 y la política de bloqueo.
-     */
     public ResultadoEvaluacionRetencion evaluar(
             Long especieId,
             String especieNombre,
             String humedadRaw,
             double horas,
             ParametrosRetencion params
+    ) {
+        return evaluar(especieId, especieNombre, humedadRaw, horas, null, null, params, null);
+    }
+
+    /**
+     * Evalúa integralmente una carga contra la normativa Res. 3602 y la política de bloqueo,
+     * delegando el cálculo del tramo esperado por edad y su coherencia en {@link CoherenciaHumedad} (TH.1).
+     */
+    public ResultadoEvaluacionRetencion evaluar(
+            Long especieId,
+            String especieNombre,
+            String humedadRaw,
+            double horas,
+            Date fechaExtraccion,
+            LocalDateTime momentoEvento,
+            ParametrosRetencion params,
+            CoherenciaHumedad.ParametrosCoherencia paramsCoherencia
     ) {
         java.util.Objects.requireNonNull(params, "ParametrosRetencion no puede ser nulo para evaluar retención");
 
@@ -102,26 +115,40 @@ public class PoliticaRetencion {
             semaforo = "VERDE";
         }
 
-        // Tramo real biológico por evaporación natural en función de las horas parametrizadas (TR.2 / TA.2)
-        int limHumedo = params.humedoMaxHoras();
-        int limSemihumedo = params.semihumedoMaxHoras();
-        int limSemiseco = params.semisecoMaxHoras();
+        // TH.1: Delegación canónica del tramo esperado por edad y coherencia a CoherenciaHumedad
+        CoherenciaHumedad.ParametrosCoherencia cohParams = paramsCoherencia != null
+                ? paramsCoherencia
+                : CoherenciaHumedad.ParametrosCoherencia.builder()
+                        .edadMaxHumedoHoras(params.humedoMaxHoras())
+                        .edadMaxSemihumedoHoras(params.semihumedoMaxHoras())
+                        .edadMaxSemisecoHoras(params.semisecoMaxHoras())
+                        .modo(CoherenciaHumedad.MODO_DIRECCIONAL)
+                        .build();
 
         String tramoReal;
-        if (horas <= limHumedo) {
-            tramoReal = "HÚMEDO";
-        } else if (horas <= limSemihumedo) {
-            tramoReal = "SEMI HÚMEDO";
-        } else if (horas <= limSemiseco) {
-            tramoReal = "SEMI SECO";
+        boolean inconsistenciaHumedad;
+        if (fechaExtraccion != null && momentoEvento != null) {
+            CoherenciaHumedad.ResultadoCoherencia resCoh =
+                    CoherenciaHumedad.evaluar(humedadRaw, fechaExtraccion, momentoEvento, cohParams);
+            tramoReal = resCoh.getTramoMinimo() != null
+                    ? resCoh.getTramoMinimo()
+                    : CoherenciaHumedad.tramoPorEdad(horas, cohParams);
+            inconsistenciaHumedad = resCoh.isIncoherente();
         } else {
-            tramoReal = "SECO";
+            tramoReal = CoherenciaHumedad.tramoPorEdad(horas, cohParams);
+            int seqDec = CoherenciaHumedad.ordenSequedad(CoherenciaHumedad.normalizarEstadoDeclarado(humedadRaw));
+            int seqTramo = CoherenciaHumedad.ordenSequedad(tramoReal);
+            if (seqDec < 0) {
+                inconsistenciaHumedad = false;
+            } else if (CoherenciaHumedad.MODO_ESTRICTO.equalsIgnoreCase(cohParams.getModo())) {
+                inconsistenciaHumedad = (seqDec != seqTramo);
+            } else {
+                inconsistenciaHumedad = (seqDec < seqTramo);
+            }
         }
 
-        boolean inconsistenciaHumedad = !estadoDeclarado.equalsIgnoreCase(tramoReal);
-
         // Evaluación de Bloqueo Automático de Carga (D3)
-        boolean bloqueoActivo = params != null && params.bloqueoActivo();
+        boolean bloqueoActivo = params.bloqueoActivo();
         boolean aplicaEspecie = false;
         int umbralBloqueo = 0;
         boolean bloqueoRequerido = false;

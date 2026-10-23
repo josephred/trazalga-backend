@@ -436,7 +436,7 @@ public class CadenaCustodiaService {
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, NULL as fecha_extraccion ";
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_traslado as fecha_extraccion ";
                 break;
             case "PLANTA_ABASTECIMIENTO":
                 tableName = "declaracion_planta_abastecimiento";
@@ -446,8 +446,9 @@ public class CadenaCustodiaService {
                 folioCol = "folio_declaracion_a_pla";
                 hasSeleccionadas = true;
                 extraJoins = "LEFT JOIN especie e ON d.especie_id = e.id " +
-                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id ";
-                extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
+                             "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
+                             "LEFT JOIN humedad_estado her ON d.humedad_estado_recepcion_id = her.id ";
+                extraCols = "d.especie_id, e.nombre as esp_nom, COALESCE(d.humedad_estado_recepcion_id, d.humedad_estado_id), COALESCE(her.nombre, he.nombre) as hum_nom, " +
                             "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
                             "NULL as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
                             "'RECEPCIONADA' as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, NULL as n_dest_dir, " +
@@ -456,7 +457,7 @@ public class CadenaCustodiaService {
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion ";
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, d.fecha_traslado as fecha_extraccion ";
                 break;
             case "PLANTA_PRODUCCION":
                 tableName = "declaracion_planta_produccion";
@@ -850,6 +851,7 @@ public class CadenaCustodiaService {
                         .cantidad(cNode.getCantidad())
                         .fechaDeclaracion(cNode.getFecha())
                         .hora(cNode.getHora())
+                        .fechaTraslado(cNode.getFechaExtraccion())
                         .build());
             }
 
@@ -906,6 +908,51 @@ public class CadenaCustodiaService {
         }
 
         cadena.setComercializadoresTramos(tramos);
+
+        // TH.4 / TH.5: Poblar edad desde extracción y estado esperado de humedad en los nodos DTO
+        com.trazalga.api.services.parametros.ParametrosService psCoh = getParametrosService();
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia pCoh =
+                psCoh != null ? psCoh.coherenciaHumedad() : com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia.porDefecto();
+
+        Date maxFechaExtraccionCadena = origenes.stream()
+                .map(OrigenRef::getFechaExtraccion)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(null);
+
+        for (RawNodeData n : allNodes.values()) {
+            TrazabilidadNodoDTO dto = n.getDto();
+            if (dto == null) continue;
+            if (ReferenciaOrigenService.esEslabonOrigen(n.getTipoStr())) {
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                        com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                                n.getHumedadNombre(), n.getFechaExtraccion(), n.getTimestamp(), pCoh);
+                dto.setEdadExtraccionHoras(resCoh.getHMin());
+                dto.setEstadoEsperadoHumedad(resCoh.getTramoMinimo());
+                dto.setResultadoCoherenciaHumedad(resCoh.getResultado());
+            } else if ("COMERCIALIZADOR".equals(n.getTipoStr())) {
+                Date fechaEventoCom = n.getFechaExtraccion() != null ? n.getFechaExtraccion() : n.getFecha();
+                LocalDateTime momentoDespacho = ReportService.parseTimestamp(fechaEventoCom, n.getHora());
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                        com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                                n.getHumedadNombre() != null ? n.getHumedadNombre() : estadoHumedadPredominante,
+                                maxFechaExtraccionCadena, momentoDespacho, pCoh);
+                dto.setFechaExtraccion(maxFechaExtraccionCadena);
+                dto.setEdadExtraccionHoras(resCoh.getHMin());
+                dto.setEstadoEsperadoHumedad(resCoh.getTramoMinimo());
+                dto.setResultadoCoherenciaHumedad(resCoh.getResultado());
+            } else if ("PLANTA_ABASTECIMIENTO".equals(n.getTipoStr())) {
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                        com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                                n.getHumedadNombre() != null ? n.getHumedadNombre() : estadoHumedadPredominante,
+                                maxFechaExtraccionCadena, n.getTimestamp(), pCoh);
+                dto.setFechaExtraccion(maxFechaExtraccionCadena);
+                dto.setEdadExtraccionHoras(resCoh.getHMin());
+                dto.setEstadoEsperadoHumedad(resCoh.getTramoMinimo());
+                dto.setResultadoCoherenciaHumedad(resCoh.getResultado());
+            }
+        }
+
         return cadena;
     }
 

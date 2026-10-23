@@ -92,6 +92,13 @@ public class FichaTrazabilidadService {
         return configService != null ? configService.getDouble("origen_geo_precision_max_m", 500.0) : 500.0;
     }
 
+    private com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia getParametrosCoherencia() {
+        if (configService == null) {
+            return com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia.porDefecto();
+        }
+        return new com.trazalga.api.services.parametros.ParametrosService(configService).coherenciaHumedad();
+    }
+
     private PuntoReferencia resolverRefFallbackEntidad(Object entidad) {
         if (referenciaOrigenService != null) {
             if (entidad instanceof DeclaracionRecolectorModel dr) return referenciaOrigenService.resolverRecolector(dr);
@@ -176,9 +183,15 @@ public class FichaTrazabilidadService {
         }
 
         // 3. Construir lista de comercializadores por tramos/saltos
+        Date maxFechaExtraccion = origenesDTO.stream()
+                .map(FichaOrigenDTO::getFechaExtraccion)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(null);
+
         List<FichaComercializadorDTO> comDTOList = new ArrayList<>();
         for (CadenaCustodiaService.ComercializadorTramo tramo : cadena.getComercializadoresTramos()) {
-            FichaComercializadorDTO cDTO = construirComercializadorDTO(tramo);
+            FichaComercializadorDTO cDTO = construirComercializadorDTO(tramo, maxFechaExtraccion, cadena.getEstadoHumedadPredominante());
             if (cDTO != null) {
                 comDTOList.add(cDTO);
             }
@@ -190,8 +203,8 @@ public class FichaTrazabilidadService {
             totalCapturaOrigen = totalCapturaOrigen.add(cap);
         }
 
-        // 4. Construir bloque de planta de abastecimiento (T3.3)
-        FichaPlantaDTO plantaDTO = construirPlantaDTO(cadena.getPlantaAbastecimientoId(), totalKgOrigen, totalCapturaOrigen);
+        // 4. Construir bloque de planta de abastecimiento (T3.3 / TH.3 / TH.5)
+        FichaPlantaDTO plantaDTO = construirPlantaDTO(cadena.getPlantaAbastecimientoId(), totalKgOrigen, totalCapturaOrigen, maxFechaExtraccion);
 
         // 5. Construir resumen superior de alertas y retenciones de toda la cadena
         FichaAlertasDTO alertasDTO = construirAlertasDTO(origenesDTO, comDTOList, plantaDTO);
@@ -262,6 +275,7 @@ public class FichaTrazabilidadService {
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
+                 .fechaExtraccion(ref.getFechaExtraccion())
                  .fechaDeclaracion(ref.getFecha())
                  .hora(ref.getHora())
                  .especie(ref.getEspecieNombre())
@@ -320,6 +334,7 @@ public class FichaTrazabilidadService {
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
+                 .fechaExtraccion(ref.getFechaExtraccion())
                  .fechaDeclaracion(ref.getFecha())
                  .hora(ref.getHora())
                  .especie(ref.getEspecieNombre())
@@ -359,6 +374,7 @@ public class FichaTrazabilidadService {
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
+                 .fechaExtraccion(ref.getFechaExtraccion())
                  .fechaDeclaracion(ref.getFecha())
                  .hora(ref.getHora())
                  .especie(ref.getEspecieNombre())
@@ -381,16 +397,31 @@ public class FichaTrazabilidadService {
             b.retenida(false);
         }
 
-        return b.build();
+        FichaOrigenDTO built = b.build();
+
+        // TH.5: Calcular coherencia de humedad del origen
+        LocalDateTime momentoOrigen = ReportService.parseTimestamp(built.getFechaDeclaracion(), built.getHora());
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                        built.getEstadoHumedad(), built.getFechaExtraccion(), momentoOrigen, getParametrosCoherencia());
+        built.setEdadExtraccionHoras(resCoh.getHMin());
+        built.setEstadoEsperadoHumedad(resCoh.getTramoMinimo());
+        built.setResultadoCoherenciaHumedad(resCoh.getResultado());
+
+        return built;
     }
 
     // =========================================================================
     // CONSTRUCCIÓN DE COMERCIALIZADOR
     // =========================================================================
 
-    private FichaComercializadorDTO construirComercializadorDTO(CadenaCustodiaService.ComercializadorTramo tramo) {
+    private FichaComercializadorDTO construirComercializadorDTO(
+            CadenaCustodiaService.ComercializadorTramo tramo,
+            Date fechaExtraccionOrigen,
+            String humedadPredominante) {
         double umbralKm = getUmbralGeoKm();
         double precisionMaxM = getPrecisionMaxM();
+        String estadoHumedadDecl = humedadPredominante;
 
         FichaComercializadorDTO.FichaComercializadorDTOBuilder b = FichaComercializadorDTO.builder()
                 .id(tramo.getId())
@@ -410,6 +441,9 @@ public class FichaTrazabilidadService {
 
             if (opt.isPresent()) {
                 DeclaracionComercializadorModel c = opt.get();
+                if (c.getHumedadEstado() != null && c.getHumedadEstado().getNombre() != null) {
+                    estadoHumedadDecl = c.getHumedadEstado().getNombre();
+                }
                 String capEn = c.getGpsCapturadoEn() != null ? c.getGpsCapturadoEn().toString() : null;
                 GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
                         "COMERCIALIZADOR", c.getLatitud(), c.getLongitud(), c.getPrecisionGpsM(), capEn, c.getEnvioOffline(),
@@ -463,14 +497,33 @@ public class FichaTrazabilidadService {
              .geo(ReferenciaOrigenService.construirGeoDeclaracion("COMERCIALIZADOR", null, null, null, null, false, null, umbralKm, precisionMaxM));
         }
 
-        return b.build();
+        FichaComercializadorDTO built = b.build();
+        built.setEstadoHumedadDeclarado(estadoHumedadDecl);
+
+        // TH.4 / TH.5: Estado esperado al despacho (informativo, sin crear hallazgo)
+        if (built.isDespachado()) {
+            Date fEvento = built.getFechaTraslado() != null ? built.getFechaTraslado() : built.getFechaDespacho();
+            LocalDateTime mDespacho = ReportService.parseTimestamp(fEvento, built.getHoraDespacho());
+            com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCoh =
+                    com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                            estadoHumedadDecl, fechaExtraccionOrigen, mDespacho, getParametrosCoherencia());
+            built.setEdadExtraccionAlDespachoHoras(resCoh.getHMin());
+            built.setEstadoEsperadoAlDespacho(resCoh.getTramoMinimo());
+            built.setResultadoCoherenciaAlDespacho(resCoh.getResultado());
+        }
+
+        return built;
     }
 
     // =========================================================================
     // CONSTRUCCIÓN DE PLANTA
     // =========================================================================
 
-    private FichaPlantaDTO construirPlantaDTO(Long plantaId, BigDecimal totalKgOrigen, BigDecimal totalCapturaOrigen) {
+    private FichaPlantaDTO construirPlantaDTO(
+            Long plantaId,
+            BigDecimal totalKgOrigen,
+            BigDecimal totalCapturaOrigen,
+            Date fechaExtraccionOrigen) {
         double umbralKm = getUmbralGeoKm();
         double precisionMaxM = getPrecisionMaxM();
 
@@ -618,7 +671,18 @@ public class FichaTrazabilidadService {
             b.retenida(false);
         }
 
-        return b.build();
+        FichaPlantaDTO builtPlanta = b.build();
+
+        // TH.3 / TH.5: Coherencia de humedad en recepción en planta
+        LocalDateTime momentoPlanta = ReportService.parseTimestamp(p.getFechaIngresoPlanta(), p.getHora());
+        com.trazalga.api.services.indicadores.CoherenciaHumedad.ResultadoCoherencia resCohPlanta =
+                com.trazalga.api.services.indicadores.CoherenciaHumedad.evaluar(
+                        humRecepcion, fechaExtraccionOrigen, momentoPlanta, getParametrosCoherencia());
+        builtPlanta.setEdadExtraccionEnPlantaHoras(resCohPlanta.getHMin());
+        builtPlanta.setEstadoEsperadoEnPlanta(resCohPlanta.getTramoMinimo());
+        builtPlanta.setResultadoCoherenciaEnPlanta(resCohPlanta.getResultado());
+
+        return builtPlanta;
     }
 
     // =========================================================================

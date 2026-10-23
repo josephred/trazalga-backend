@@ -108,11 +108,22 @@ public class RetencionCustodiaService {
             Long retencionMarcaId = col(r, 16) != null ? ((Number) col(r, 16)).longValue() : null;
             String resolucionTipo = col(r, 17) != null ? col(r, 17).toString().trim() : null;
             String marcasActivasStr = col(r, 18) != null ? col(r, 18).toString().trim() : null;
+            Date fechaExtraccion = toDate(col(r, 19));
 
             LocalDateTime inicioTs = ReportService.parseTimestamp(fecha, hora);
             double horas = CadenaCustodiaService.horasEnBodega(inicioTs, ahora);
 
-            ResultadoEvaluacionRetencion eval = politicaRetencion.evaluar(especieId, especieNombre, humedadRaw, horas, params);
+            ResultadoEvaluacionRetencion eval = null;
+            if (fechaExtraccion != null) {
+                eval = politicaRetencion.evaluar(
+                        especieId, especieNombre, humedadRaw, horas,
+                        fechaExtraccion, ahora, params,
+                        parametrosService != null ? parametrosService.coherenciaHumedad() : null
+                );
+            }
+            if (eval == null) {
+                eval = politicaRetencion.evaluar(especieId, especieNombre, humedadRaw, horas, params);
+            }
 
             // Determinar si está bloqueada
             boolean bloqueada = false;
@@ -714,7 +725,8 @@ public class RetencionCustodiaService {
                 "NULL as embarcacion, " +
                 "(SELECT dm.id FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.marca = 'RETENCION_EXCEDIDA' AND dm.resuelta = false LIMIT 1) as retencion_marca_id, " +
                 "(SELECT dm.resolucion_tipo FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.marca = 'RETENCION_EXCEDIDA' ORDER BY dm.id DESC LIMIT 1) as retencion_resolucion, " +
-                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
+                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas, " +
+                "d.fecha_extraccion as fecha_extraccion " +
                 "FROM declaracion_recolector d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
                 "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
@@ -732,7 +744,8 @@ public class RetencionCustodiaService {
                 "emb.nombre as embarcacion, " +
                 "(SELECT dm.id FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.marca = 'RETENCION_EXCEDIDA' AND dm.resuelta = false LIMIT 1), " +
                 "(SELECT dm.resolucion_tipo FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.marca = 'RETENCION_EXCEDIDA' ORDER BY dm.id DESC LIMIT 1), " +
-                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) " +
+                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false), " +
+                "d.fecha_extraccion " +
                 "FROM declaracion_armador d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
                 "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
@@ -751,7 +764,8 @@ public class RetencionCustodiaService {
                 "NULL, " +
                 "(SELECT dm.id FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'AREA' AND dm.marca = 'RETENCION_EXCEDIDA' AND dm.resuelta = false LIMIT 1), " +
                 "(SELECT dm.resolucion_tipo FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'AREA' AND dm.marca = 'RETENCION_EXCEDIDA' ORDER BY dm.id DESC LIMIT 1), " +
-                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) " +
+                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false), " +
+                "d.fecha_extraccion " +
                 "FROM declaracion_area d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
                 "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
@@ -769,7 +783,8 @@ public class RetencionCustodiaService {
                 "NULL, " +
                 "(SELECT dm.id FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.marca = 'RETENCION_EXCEDIDA' AND dm.resuelta = false LIMIT 1), " +
                 "(SELECT dm.resolucion_tipo FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.marca = 'RETENCION_EXCEDIDA' ORDER BY dm.id DESC LIMIT 1), " +
-                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.resuelta = false) " +
+                "(SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = d.id AND dm.declaracion_tipo = 'COMERCIALIZADOR' AND dm.resuelta = false), " +
+                "NULL " +
                 "FROM declaracion_comercializador d " +
                 "INNER JOIN usuario uo ON d.usuario_id = uo.id " +
                 "INNER JOIN usuario ud ON d.usuario_destinatario_id = ud.id " +
