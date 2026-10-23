@@ -1,9 +1,11 @@
 package com.trazalga.api.services;
 
 import com.trazalga.api.dto.*;
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
+import com.trazalga.api.dto.geo.PuntoReferencia;
 import com.trazalga.api.models.*;
 import com.trazalga.api.repositories.*;
-import lombok.RequiredArgsConstructor;
+import com.trazalga.api.services.geo.ReferenciaOrigenService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,8 +19,9 @@ import java.time.ZoneId;
 import java.util.*;
 
 /**
- * Servicio para la construcción y consolidación de la Ficha de Trazabilidad (T2.3).
- * Utiliza CadenaCustodiaService para el recorrido canónico del grafo de custodia.
+ * Servicio para la construcción y consolidación de la Ficha de Trazabilidad (T2.3 / TG.3).
+ * Utiliza CadenaCustodiaService para el recorrido canónico del grafo de custodia y
+ * ReferenciaOrigenService para la doble georreferenciación.
  */
 @Service
 @Slf4j
@@ -40,6 +43,20 @@ public class FichaTrazabilidadService {
 
     @Autowired(required = false)
     private com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService;
+
+    @Autowired(required = false)
+    private ReferenciaOrigenService referenciaOrigenService;
+
+    @Autowired(required = false)
+    private ConfiguracionGeneralService configService;
+
+    public void setReferenciaOrigenService(ReferenciaOrigenService referenciaOrigenService) {
+        this.referenciaOrigenService = referenciaOrigenService;
+    }
+
+    public void setConfigService(ConfiguracionGeneralService configService) {
+        this.configService = configService;
+    }
 
     @Autowired
     public FichaTrazabilidadService(
@@ -65,6 +82,58 @@ public class FichaTrazabilidadService {
         this.buzosRepository = buzosRepository;
         this.factorConversionService = factorConversionService;
         this.variacionPesoService = variacionPesoService;
+    }
+
+    private double getUmbralGeoKm() {
+        return configService != null ? configService.getDouble("origen_geo_distancia_max_km", 30.0) : 30.0;
+    }
+
+    private double getPrecisionMaxM() {
+        return configService != null ? configService.getDouble("origen_geo_precision_max_m", 500.0) : 500.0;
+    }
+
+    private PuntoReferencia resolverRefFallbackEntidad(Object entidad) {
+        if (referenciaOrigenService != null) {
+            if (entidad instanceof DeclaracionRecolectorModel dr) return referenciaOrigenService.resolverRecolector(dr);
+            if (entidad instanceof DeclaracionArmadorModel da) return referenciaOrigenService.resolverArmador(da);
+            if (entidad instanceof DeclaracionAreaModel dam) return referenciaOrigenService.resolverArea(dam);
+        }
+        // Fallback directo desde relaciones cargadas en la entidad (útil en tests sin ReferenciaOrigenService)
+        if (entidad instanceof DeclaracionRecolectorModel dr) {
+            if (dr.getVaraderoRelacion() != null && dr.getVaraderoRelacion().getLatitud() != null && dr.getVaraderoRelacion().getLongitud() != null) {
+                VaraderoModel v = dr.getVaraderoRelacion();
+                return new PuntoReferencia("VARADERO", v.getId(), v.getNombre(), v.getLatitud(), v.getLongitud(), "VARADERO_DECLARADO");
+            }
+            if (dr.getCaleta() != null && dr.getCaleta().getLatitud() != null && dr.getCaleta().getLongitud() != null) {
+                CaletaModel c = dr.getCaleta();
+                return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
+            }
+            if (dr.getCaleta() != null && dr.getCaleta().getVaradero() != null
+                    && dr.getCaleta().getVaradero().getLatitud() != null && dr.getCaleta().getVaradero().getLongitud() != null) {
+                VaraderoModel vc = dr.getCaleta().getVaradero();
+                return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
+            }
+        } else if (entidad instanceof DeclaracionArmadorModel da) {
+            if (da.getCaleta() != null && da.getCaleta().getLatitud() != null && da.getCaleta().getLongitud() != null) {
+                CaletaModel c = da.getCaleta();
+                return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
+            }
+            if (da.getCaleta() != null && da.getCaleta().getVaradero() != null
+                    && da.getCaleta().getVaradero().getLatitud() != null && da.getCaleta().getVaradero().getLongitud() != null) {
+                VaraderoModel vc = da.getCaleta().getVaradero();
+                return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
+            }
+        } else if (entidad instanceof DeclaracionAreaModel dam) {
+            if (dam.getAmerb() != null && dam.getAmerb().getLatitud() != null && dam.getAmerb().getLongitud() != null) {
+                AmerbModel am = dam.getAmerb();
+                return new PuntoReferencia("AMERB", am.getId(), am.getNombre(), am.getLatitud(), am.getLongitud(), "AMERB");
+            }
+            if (dam.getCaleta() != null && dam.getCaleta().getLatitud() != null && dam.getCaleta().getLongitud() != null) {
+                CaletaModel c = dam.getCaleta();
+                return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
+            }
+        }
+        return null;
     }
 
     /**
@@ -151,6 +220,9 @@ public class FichaTrazabilidadService {
         boolean consultada = t.equalsIgnoreCase(tipoConsulta) && oId.equals(idConsulta);
         boolean mismaCarga = !consultada;
 
+        double umbralKm = getUmbralGeoKm();
+        double precisionMaxM = getPrecisionMaxM();
+
         FichaOrigenDTO.FichaOrigenDTOBuilder b = FichaOrigenDTO.builder()
                 .id(oId)
                 .tipo(t)
@@ -161,6 +233,12 @@ public class FichaTrazabilidadService {
             Optional<DeclaracionRecolectorModel> opt = recolectorRepository != null ? recolectorRepository.findById(oId) : Optional.empty();
             if (opt.isPresent()) {
                 DeclaracionRecolectorModel r = opt.get();
+                PuntoReferencia puntoRef = resolverRefFallbackEntidad(r);
+                String capEn = r.getGpsCapturadoEn() != null ? r.getGpsCapturadoEn().toString() : null;
+                GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
+                        "RECOLECTOR", r.getLatitud(), r.getLongitud(), r.getPrecisionGpsM(), capEn, r.getEnvioOffline(),
+                        puntoRef, umbralKm, precisionMaxM);
+
                 b.rut(r.getUsuario() != null ? r.getUsuario().getRut() : null)
                  .nombre(r.getUsuario() != null ? formatNombre(r.getUsuario()) : r.getNombre())
                  .perfil(r.getUsuario() != null && r.getUsuario().getPerfil() != null ? r.getUsuario().getPerfil().getNombre() : "Recolector de orilla")
@@ -179,7 +257,8 @@ public class FichaTrazabilidadService {
                  .capturaKg(r.getCaptura())
                  .folioOrigen(r.getFolioOrigen())
                  .folioDesembarque(r.getFolioDesembarqueRo())
-                 .estado(r.getEstado() != null ? r.getEstado() : "ENVIADA");
+                 .estado(r.getEstado() != null ? r.getEstado() : "ENVIADA")
+                 .geo(geo);
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
@@ -188,12 +267,19 @@ public class FichaTrazabilidadService {
                  .especie(ref.getEspecieNombre())
                  .estadoHumedad(ref.getHumedadNombre())
                  .nombre(ref.getActor())
-                 .rut(ref.getRut());
+                 .rut(ref.getRut())
+                 .geo(ReferenciaOrigenService.construirGeoDeclaracion("RECOLECTOR", null, null, null, null, false, null, umbralKm, precisionMaxM));
             }
         } else if ("ARMADOR".equalsIgnoreCase(t)) {
             Optional<DeclaracionArmadorModel> opt = armadorRepository != null ? armadorRepository.findById(oId) : Optional.empty();
             if (opt.isPresent()) {
                 DeclaracionArmadorModel a = opt.get();
+                PuntoReferencia puntoRef = resolverRefFallbackEntidad(a);
+                String capEn = a.getGpsCapturadoEn() != null ? a.getGpsCapturadoEn().toString() : null;
+                GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
+                        "ARMADOR", a.getLatitud(), a.getLongitud(), a.getPrecisionGpsM(), capEn, a.getEnvioOffline(),
+                        puntoRef, umbralKm, precisionMaxM);
+
                 String embNom = a.getEmbarcacion() != null ? a.getEmbarcacion().getNombre() : null;
                 String embCod = a.getEmbarcacion() != null ? a.getEmbarcacion().getCodigo() : a.getCodigoSernapescaEmbarcacion();
                 String buzoNom = a.getBuzo() != null ? a.getBuzo().getNombre() : null;
@@ -229,7 +315,8 @@ public class FichaTrazabilidadService {
                  .capturaKg(a.getCaptura() != null ? BigDecimal.valueOf(a.getCaptura()) : null)
                  .folioOrigen(a.getFolioOrigen())
                  .folioDesembarque(a.getFolioDesembarqueDa())
-                 .estado(a.getEstado() != null ? a.getEstado() : "ENVIADA");
+                 .estado(a.getEstado() != null ? a.getEstado() : "ENVIADA")
+                 .geo(geo);
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
@@ -238,12 +325,19 @@ public class FichaTrazabilidadService {
                  .especie(ref.getEspecieNombre())
                  .estadoHumedad(ref.getHumedadNombre())
                  .nombre(ref.getActor())
-                 .rut(ref.getRut());
+                 .rut(ref.getRut())
+                 .geo(ReferenciaOrigenService.construirGeoDeclaracion("ARMADOR", null, null, null, null, false, null, umbralKm, precisionMaxM));
             }
         } else if ("AREA".equalsIgnoreCase(t)) {
             Optional<DeclaracionAreaModel> opt = areaRepository != null ? areaRepository.findById(oId) : Optional.empty();
             if (opt.isPresent()) {
                 DeclaracionAreaModel ar = opt.get();
+                PuntoReferencia puntoRef = resolverRefFallbackEntidad(ar);
+                String capEn = ar.getGpsCapturadoEn() != null ? ar.getGpsCapturadoEn().toString() : null;
+                GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
+                        "AREA", ar.getLatitud(), ar.getLongitud(), ar.getPrecisionGpsM(), capEn, ar.getEnvioOffline(),
+                        puntoRef, umbralKm, precisionMaxM);
+
                 String amerbNom = ar.getAmerb() != null ? ar.getAmerb().getNombre() : ar.getCodigoSernapescaAmerb();
 
                 b.rut(ar.getUsuario() != null ? ar.getUsuario().getRut() : null)
@@ -260,7 +354,8 @@ public class FichaTrazabilidadService {
                  .capturaKg(ar.getCaptura() != null ? BigDecimal.valueOf(ar.getCaptura()) : null)
                  .folioOrigen(ar.getFolioOrigen())
                  .folioDesembarque(ar.getFolioDesembarqueAmerb())
-                 .estado("ENVIADA");
+                 .estado("ENVIADA")
+                 .geo(geo);
             } else {
                 b.desembarqueKg(ref.getCantidad())
                  .folioOrigen(ref.getFolio())
@@ -269,7 +364,8 @@ public class FichaTrazabilidadService {
                  .especie(ref.getEspecieNombre())
                  .estadoHumedad(ref.getHumedadNombre())
                  .nombre(ref.getActor())
-                 .rut(ref.getRut());
+                 .rut(ref.getRut())
+                 .geo(ReferenciaOrigenService.construirGeoDeclaracion("AREA", null, null, null, null, false, null, umbralKm, precisionMaxM));
             }
         }
 
@@ -293,6 +389,9 @@ public class FichaTrazabilidadService {
     // =========================================================================
 
     private FichaComercializadorDTO construirComercializadorDTO(CadenaCustodiaService.ComercializadorTramo tramo) {
+        double umbralKm = getUmbralGeoKm();
+        double precisionMaxM = getPrecisionMaxM();
+
         FichaComercializadorDTO.FichaComercializadorDTOBuilder b = FichaComercializadorDTO.builder()
                 .id(tramo.getId())
                 .salto(tramo.getSalto())
@@ -311,6 +410,11 @@ public class FichaTrazabilidadService {
 
             if (opt.isPresent()) {
                 DeclaracionComercializadorModel c = opt.get();
+                String capEn = c.getGpsCapturadoEn() != null ? c.getGpsCapturadoEn().toString() : null;
+                GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
+                        "COMERCIALIZADOR", c.getLatitud(), c.getLongitud(), c.getPrecisionGpsM(), capEn, c.getEnvioOffline(),
+                        null, umbralKm, precisionMaxM);
+
                 b.rut(c.getUsuario() != null ? c.getUsuario().getRut() : tramo.getRut())
                  .nombre(c.getUsuario() != null ? formatNombre(c.getUsuario()) : (c.getNombreComercializador() != null ? c.getNombreComercializador() : tramo.getActor()))
                  .fechaDespacho(c.getFechaDeclaracion())
@@ -329,7 +433,8 @@ public class FichaTrazabilidadService {
                  .docDestinoFecha(c.getDocumentoTributarioDestinoFecha())
                  .folioOrigen(c.getFolioOrigen())
                  .folioDesembarqueAc(c.getFolioDesembarqueAc())
-                 .estado(c.getEstado() != null ? c.getEstado() : "ENVIADA");
+                 .estado(c.getEstado() != null ? c.getEstado() : "ENVIADA")
+                 .geo(geo);
 
                 // Marcas y bloqueo del comercializador
                 b.marcas(obtenerMarcasDTO("COMERCIALIZADOR", c.getId()));
@@ -346,14 +451,16 @@ public class FichaTrazabilidadService {
                  .cantidadKg(tramo.getCantidad())
                  .fechaDespacho(tramo.getFechaDeclaracion())
                  .horaDespacho(tramo.getHora())
-                 .fechaTraslado(tramo.getFechaTraslado());
+                 .fechaTraslado(tramo.getFechaTraslado())
+                 .geo(ReferenciaOrigenService.construirGeoDeclaracion("COMERCIALIZADOR", null, null, null, null, false, null, umbralKm, precisionMaxM));
             }
         } else {
             // Carga aún sin despachar en bodega virtual
             b.rut(tramo.getRut())
              .nombre(tramo.getActor())
              .cantidadKg(tramo.getCantidad())
-             .notaRecepcion("Carga en bodega virtual; aún sin declaración de despacho");
+             .notaRecepcion("Carga en bodega virtual; aún sin declaración de despacho")
+             .geo(ReferenciaOrigenService.construirGeoDeclaracion("COMERCIALIZADOR", null, null, null, null, false, null, umbralKm, precisionMaxM));
         }
 
         return b.build();
@@ -364,6 +471,9 @@ public class FichaTrazabilidadService {
     // =========================================================================
 
     private FichaPlantaDTO construirPlantaDTO(Long plantaId, BigDecimal totalKgOrigen, BigDecimal totalCapturaOrigen) {
+        double umbralKm = getUmbralGeoKm();
+        double precisionMaxM = getPrecisionMaxM();
+
         if (plantaId == null) {
             return FichaPlantaDTO.builder()
                     .recepcionada(false)
@@ -381,10 +491,14 @@ public class FichaTrazabilidadService {
                     .recepcionada(true)
                     .mensajeEstado("Recepcionada en planta")
                     .rotuloVariacion("Variación de la recepción completa")
+                    .geo(ReferenciaOrigenService.construirGeoDeclaracion("PLANTA_ABASTECIMIENTO", null, null, null, null, false, null, umbralKm, precisionMaxM))
                     .build();
         }
 
         DeclaracionPlantaAbastecimientoModel p = opt.get();
+        GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
+                "PLANTA_ABASTECIMIENTO", p.getLatitud(), p.getLongitud(), null, null, false, null, umbralKm, precisionMaxM);
+
         boolean conRomana = p.getPesoRomanaKg() != null && p.getPesoRomanaKg().compareTo(BigDecimal.ZERO) > 0;
         double pesoPlanta = conRomana
                 ? p.getPesoRomanaKg().doubleValue()
@@ -491,7 +605,8 @@ public class FichaTrazabilidadService {
                 .patenteCarro(p.getPlacaPatenteCarro())
                 .folioOrigen(p.getFolioOrigen())
                 .folioDeclaracionAPla(p.getFolioDeclaracionAPla())
-                .estado(p.getEstado() != null ? p.getEstado() : "ENVIADA");
+                .estado(p.getEstado() != null ? p.getEstado() : "ENVIADA")
+                .geo(geo);
 
         // Marcas y retención de planta
         b.marcas(obtenerMarcasDTO("PLANTA_ABASTECIMIENTO", p.getId()));

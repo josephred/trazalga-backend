@@ -1,5 +1,6 @@
 package com.trazalga.api.dto;
 
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -50,4 +51,13 @@ public class TrazabilidadNodoDTO {
     private String estado;
     private String embarcacion;
     private String buzo;
+
+    // TG.3: Datos de doble georreferenciación
+    private GeoDeclaracionDTO geo;
+
+    // TH.5: Datos de coherencia de humedad por edad (Res. 3602)
+    private Date fechaExtraccion;
+    private Double edadExtraccionHoras;
+    private String estadoEsperadoHumedad;
+    private String resultadoCoherenciaHumedad;
 }

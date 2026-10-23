@@ -1,5 +1,6 @@
 package com.trazalga.api.dto;
 
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -58,4 +59,12 @@ public class FichaOrigenDTO {
     private List<FichaMarcaDTO> marcas = new ArrayList<>();
     private boolean retenida;
     private String motivoBloqueo;
+
+    // TG.3: Doble georreferenciación
+    private GeoDeclaracionDTO geo;
+
+    // TH.5: Coherencia de humedad según edad desde extracción (Res. 3602)
+    private Double edadExtraccionHoras;
+    private String estadoEsperadoHumedad;
+    private String resultadoCoherenciaHumedad;
 }

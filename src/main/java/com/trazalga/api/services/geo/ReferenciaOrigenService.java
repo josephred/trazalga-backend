@@ -1,8 +1,10 @@
 package com.trazalga.api.services.geo;
 
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
 import com.trazalga.api.dto.geo.PuntoReferencia;
 import com.trazalga.api.models.*;
 import com.trazalga.api.repositories.*;
+import com.trazalga.api.services.ReportService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Servicio centralizado de resolución de punto geográfico de referencia (TG.2).
+ * Servicio centralizado de resolución de punto geográfico de referencia (TG.2 / TG.3).
  * Implementa la jerarquía de cascada por tipo de declaración y mantiene
  * una caché en memoria de maestros (caleta, varadero, amerb).
  */
@@ -430,5 +432,139 @@ public class ReferenciaOrigenService {
             }
         }
         return null;
+    }
+
+    // -------------------------------------------------------------
+    // TG.3: Construcción unificada de GeoDeclaracionDTO
+    // -------------------------------------------------------------
+    public static boolean esEslabonOrigen(String tipoDeclaracion) {
+        if (tipoDeclaracion == null) return false;
+        String t = tipoDeclaracion.trim().toUpperCase();
+        return "RECOLECTOR".equals(t) || "ARMADOR".equals(t) || "AREA".equals(t) || "AMERB".equals(t);
+    }
+
+    /**
+     * Función única de construcción de {@link GeoDeclaracionDTO} (TG.3),
+     * compartida por CadenaCustodiaService y FichaTrazabilidadService.
+     */
+    public static GeoDeclaracionDTO construirGeoDeclaracion(
+            String tipoDeclaracion,
+            Double gpsLat,
+            Double gpsLon,
+            Double precisionM,
+            String capturadoEn,
+            Boolean offline,
+            PuntoReferencia puntoRef,
+            double umbralKm,
+            double precisionMaxM) {
+
+        boolean tieneGps = gpsLat != null && gpsLon != null;
+        GeoDeclaracionDTO.GpsInfo gps = tieneGps
+                ? GeoDeclaracionDTO.GpsInfo.builder()
+                        .lat(gpsLat)
+                        .lon(gpsLon)
+                        .precisionM(precisionM)
+                        .capturadoEn(capturadoEn)
+                        .offline(Boolean.TRUE.equals(offline))
+                        .build()
+                : null;
+
+        boolean esOrigen = esEslabonOrigen(tipoDeclaracion);
+        boolean tieneRef = esOrigen && puntoRef != null && puntoRef.getLat() != null && puntoRef.getLon() != null;
+
+        GeoDeclaracionDTO.ReferenciaInfo refInfo = tieneRef
+                ? GeoDeclaracionDTO.ReferenciaInfo.builder()
+                        .tipo(puntoRef.getTipo())
+                        .id(puntoRef.getId())
+                        .nombre(puntoRef.getNombre())
+                        .lat(puntoRef.getLat())
+                        .lon(puntoRef.getLon())
+                        .fuente(puntoRef.getFuente())
+                        .build()
+                : null;
+
+        Double distanciaKm = null;
+        String evaluacion;
+
+        if (!tieneGps) {
+            evaluacion = "SIN_GPS";
+        } else if (esOrigen && !tieneRef) {
+            evaluacion = "SIN_REFERENCIA";
+        } else if (esOrigen) {
+            double dist = ReportService.haversineKm(gpsLat, gpsLon, puntoRef.getLat(), puntoRef.getLon());
+            distanciaKm = Math.round(dist * 10.0) / 10.0;
+            boolean precisionBaja = precisionM != null && precisionM > precisionMaxM;
+            if (precisionBaja) {
+                evaluacion = "PRECISION_BAJA";
+            } else if (distanciaKm > umbralKm) {
+                evaluacion = "LEJANA";
+            } else {
+                evaluacion = "COHERENTE";
+            }
+        } else {
+            // Comercializador y Planta: sin origen propio; su GPS es el lugar de declaración/recepción
+            boolean precisionBaja = precisionM != null && precisionM > precisionMaxM;
+            evaluacion = precisionBaja ? "PRECISION_BAJA" : "COHERENTE";
+        }
+
+        return GeoDeclaracionDTO.builder()
+                .gps(gps)
+                .referencia(refInfo)
+                .distanciaKm(distanciaKm)
+                .evaluacion(evaluacion)
+                .umbralKm(umbralKm)
+                .build();
+    }
+
+    public GeoDeclaracionDTO armarGeoPorIds(
+            String tipoDeclaracion,
+            Double gpsLat,
+            Double gpsLon,
+            Double precisionM,
+            String capturadoEn,
+            Boolean offline,
+            Long caletaId,
+            Long amerbId,
+            Long varaderoId,
+            String textoVaradero,
+            Long comunaId,
+            double umbralKm,
+            double precisionMaxM) {
+        PuntoReferencia puntoRef = esEslabonOrigen(tipoDeclaracion)
+                ? resolverPorIds(tipoDeclaracion, caletaId, amerbId, varaderoId, textoVaradero, comunaId)
+                : null;
+        return construirGeoDeclaracion(
+                tipoDeclaracion, gpsLat, gpsLon, precisionM, capturadoEn, offline, puntoRef, umbralKm, precisionMaxM);
+    }
+
+    public GeoDeclaracionDTO armarGeoDeclaracion(
+            String tipoDeclaracion,
+            Object entidad,
+            double umbralKm,
+            double precisionMaxM) {
+        if (entidad instanceof DeclaracionRecolectorModel dr) {
+            PuntoReferencia ref = resolverRecolector(dr);
+            String capEn = dr.getGpsCapturadoEn() != null ? dr.getGpsCapturadoEn().toString() : null;
+            return construirGeoDeclaracion("RECOLECTOR", dr.getLatitud(), dr.getLongitud(),
+                    dr.getPrecisionGpsM(), capEn, dr.getEnvioOffline(), ref, umbralKm, precisionMaxM);
+        } else if (entidad instanceof DeclaracionArmadorModel da) {
+            PuntoReferencia ref = resolverArmador(da);
+            String capEn = da.getGpsCapturadoEn() != null ? da.getGpsCapturadoEn().toString() : null;
+            return construirGeoDeclaracion("ARMADOR", da.getLatitud(), da.getLongitud(),
+                    da.getPrecisionGpsM(), capEn, da.getEnvioOffline(), ref, umbralKm, precisionMaxM);
+        } else if (entidad instanceof DeclaracionAreaModel dam) {
+            PuntoReferencia ref = resolverArea(dam);
+            String capEn = dam.getGpsCapturadoEn() != null ? dam.getGpsCapturadoEn().toString() : null;
+            return construirGeoDeclaracion("AREA", dam.getLatitud(), dam.getLongitud(),
+                    dam.getPrecisionGpsM(), capEn, dam.getEnvioOffline(), ref, umbralKm, precisionMaxM);
+        } else if (entidad instanceof DeclaracionComercializadorModel dc) {
+            String capEn = dc.getGpsCapturadoEn() != null ? dc.getGpsCapturadoEn().toString() : null;
+            return construirGeoDeclaracion("COMERCIALIZADOR", dc.getLatitud(), dc.getLongitud(),
+                    dc.getPrecisionGpsM(), capEn, dc.getEnvioOffline(), null, umbralKm, precisionMaxM);
+        } else if (entidad instanceof DeclaracionPlantaAbastecimientoModel dp) {
+            return construirGeoDeclaracion("PLANTA_ABASTECIMIENTO", dp.getLatitud(), dp.getLongitud(),
+                    null, null, false, null, umbralKm, precisionMaxM);
+        }
+        return construirGeoDeclaracion(tipoDeclaracion, null, null, null, null, false, null, umbralKm, precisionMaxM);
     }
 }

@@ -3,6 +3,9 @@ package com.trazalga.api.services;
 import com.trazalga.api.dto.TrazabilidadEdgeDTO;
 import com.trazalga.api.dto.TrazabilidadNodoDTO;
 import com.trazalga.api.dto.TrazabilidadResponseDTO;
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
+import com.trazalga.api.dto.geo.PuntoReferencia;
+import com.trazalga.api.services.geo.ReferenciaOrigenService;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -19,11 +22,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Servicio unificado para la resolución y trazabilidad de la cadena de custodia (T2.1).
+ * Servicio unificado para la resolución y trazabilidad de la cadena de custodia (T2.1 / TG.3).
  *
  * <p>Centraliza la lógica de recorrido hacia atrás (declaraciones consumidas)
  * y hacia adelante (destinatarios), cálculo de horas en bodega virtual y semáforos
- * bajo normativa de Retención (Res. 3602).</p>
+ * bajo normativa de Retención (Res. 3602), y doble georreferenciación (TG.3).</p>
  */
 @Service
 @Slf4j
@@ -37,11 +40,18 @@ public class CadenaCustodiaService {
     private final ConfiguracionGeneralService configService;
 
     @Autowired(required = false)
+    private ReferenciaOrigenService referenciaOrigenService;
+
+    @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.parametros.ParametrosService parametrosService;
 
     public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
         this.parametrosService = parametrosService;
+    }
+
+    public void setReferenciaOrigenService(ReferenciaOrigenService referenciaOrigenService) {
+        this.referenciaOrigenService = referenciaOrigenService;
     }
 
     private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
@@ -73,6 +83,7 @@ public class CadenaCustodiaService {
         private Long id;
         private String folio;
         private Date fecha;
+        private Date fechaExtraccion;
         private String hora;
         private LocalDateTime timestamp;
         private BigDecimal cantidad;
@@ -196,6 +207,7 @@ public class CadenaCustodiaService {
         private String nombreActor;
         private String rutActor;
         private Date fecha;
+        private Date fechaExtraccion;
         private String hora;
         private LocalDateTime timestamp;
         private BigDecimal cantidad;
@@ -348,6 +360,7 @@ public class CadenaCustodiaService {
         boolean hasSeleccionadas = false;
         String extraJoins = "";
         String extraCols = "";
+        String geoExtraCols;
 
         switch (tipoStr) {
             case "RECOLECTOR":
@@ -365,6 +378,8 @@ public class CadenaCustodiaService {
                             "d.estado as est, CAST(d.humedad AS CHAR) as hum_higro, d.nombre_destinatario as n_dest_dir, " +
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
+                geoExtraCols = "d.caleta_id, NULL as amerb_id, d.varadero_id, COALESCE(d.comuna_id, cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion ";
                 break;
             case "ARMADOR":
                 tableName = "declaracion_armador";
@@ -384,6 +399,8 @@ public class CadenaCustodiaService {
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "COALESCE(emb.nombre, d.embarcacion_nombre) as emb_nom, COALESCE(buz.nombre, d.buzo_nombre) as buzo_nom, " +
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
+                geoExtraCols = "d.caleta_id, NULL as amerb_id, NULL as varadero_id, COALESCE(cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion ";
                 break;
             case "AREA":
                 tableName = "declaracion_area";
@@ -400,6 +417,8 @@ public class CadenaCustodiaService {
                             "'ENVIADA' as est, NULL as hum_higro, d.nombre_destinatario as n_dest_dir, " +
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
+                geoExtraCols = "d.caleta_id, d.amerb_id, NULL as varadero_id, COALESCE(am.comuna_id, cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion ";
                 break;
             case "COMERCIALIZADOR":
                 tableName = "declaracion_comercializador";
@@ -416,6 +435,8 @@ public class CadenaCustodiaService {
                             "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
+                geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, NULL as fecha_extraccion ";
                 break;
             case "PLANTA_ABASTECIMIENTO":
                 tableName = "declaracion_planta_abastecimiento";
@@ -434,6 +455,8 @@ public class CadenaCustodiaService {
                             "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
+                geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion ";
                 break;
             case "PLANTA_PRODUCCION":
                 tableName = "declaracion_planta_produccion";
@@ -452,6 +475,8 @@ public class CadenaCustodiaService {
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
+                geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion ";
                 break;
             case "PLANTA_DESTINO":
                 tableName = "declaracion_planta_destino";
@@ -472,6 +497,8 @@ public class CadenaCustodiaService {
                             "COALESCE(d.documento_tributario_origen_tipo, d.documento_tributario_tipo) as dt_tipo, " +
                             "COALESCE(d.documento_tributario_origen_numero, d.documento_tributario_numero) as dt_num, " +
                             "COALESCE(d.documento_tributario_origen_fecha, d.documento_tributario_fecha) as dt_fecha ";
+                geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion ";
                 break;
             default:
                 return map;
@@ -479,10 +506,14 @@ public class CadenaCustodiaService {
 
         String selCol = hasSeleccionadas ? "d.declaraciones_seleccionadas" : "NULL as declaraciones_seleccionadas";
 
+        double umbralKm = configService != null ? configService.getDouble("origen_geo_distancia_max_km", 30.0) : 30.0;
+        double precisionMaxM = configService != null ? configService.getDouble("origen_geo_precision_max_m", 500.0) : 500.0;
+
         String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol + ", " +
                 "d.declaracion_destinatario_id, d.consumida_por_tipo, " + selCol + ", d.hora, d.usuario_destinatario_id, " +
                 extraCols + ", " +
-                "udest.rut as rut_dest, TRIM(CONCAT(COALESCE(udest.nombres, ''), ' ', COALESCE(udest.apellidop, ''))) as nom_dest " +
+                "udest.rut as rut_dest, TRIM(CONCAT(COALESCE(udest.nombres, ''), ' ', COALESCE(udest.apellidop, ''))) as nom_dest, " +
+                geoExtraCols +
                 "FROM " + tableName + " d " +
                 "INNER JOIN usuario u ON d.usuario_id = u.id " +
                 extraJoins +
@@ -539,6 +570,22 @@ public class CadenaCustodiaService {
                 String nomDest = getCol(r, 38) != null ? getCol(r, 38).toString() : null;
                 String finalDestNom = (nDestDir != null && !nDestDir.isBlank()) ? nDestDir : nomDest;
 
+                Long caletaId = getCol(r, 39) != null ? ((Number) getCol(r, 39)).longValue() : null;
+                Long amerbId = getCol(r, 40) != null ? ((Number) getCol(r, 40)).longValue() : null;
+                Long varaderoId = getCol(r, 41) != null ? ((Number) getCol(r, 41)).longValue() : null;
+                Long comunaId = getCol(r, 42) != null ? ((Number) getCol(r, 42)).longValue() : null;
+                Double precisionGpsM = getCol(r, 43) != null ? ((Number) getCol(r, 43)).doubleValue() : null;
+                String gpsCapturadoEn = getCol(r, 44) != null ? getCol(r, 44).toString() : null;
+                Boolean envioOffline = getCol(r, 45) != null && (Boolean.TRUE.equals(getCol(r, 45)) || "1".equals(getCol(r, 45).toString()) || "true".equalsIgnoreCase(getCol(r, 45).toString()));
+                Date fechaExt = toDate(getCol(r, 46));
+
+                PuntoReferencia puntoRef = null;
+                if (referenciaOrigenService != null && ReferenciaOrigenService.esEslabonOrigen(tipoStr)) {
+                    puntoRef = referenciaOrigenService.resolverPorIds(tipoStr, caletaId, amerbId, varaderoId, varNom, comunaId);
+                }
+                GeoDeclaracionDTO geoDto = ReferenciaOrigenService.construirGeoDeclaracion(
+                        tipoStr, lat, lon, precisionGpsM, gpsCapturadoEn, envioOffline, puntoRef, umbralKm, precisionMaxM);
+
                 LocalDateTime ts = ReportService.parseTimestamp(d, hora);
 
                 TrazabilidadNodoDTO dto = TrazabilidadNodoDTO.builder()
@@ -548,6 +595,7 @@ public class CadenaCustodiaService {
                         .nombreActor(actor.trim())
                         .rutActor(rut)
                         .fecha(d)
+                        .fechaExtraccion(fechaExt)
                         .hora(hora)
                         .cantidad(cant)
                         .descripcionEvento("Declaración de tipo " + roleName)
@@ -577,6 +625,7 @@ public class CadenaCustodiaService {
                         .docNumero(dtNum)
                         .docFecha(dtFecha)
                         .declaracionesSeleccionadas(decSel)
+                        .geo(geoDto)
                         .build();
 
                 RawNodeData raw = new RawNodeData();
@@ -586,6 +635,7 @@ public class CadenaCustodiaService {
                 raw.setNombreActor(actor.trim());
                 raw.setRutActor(rut);
                 raw.setFecha(d);
+                raw.setFechaExtraccion(fechaExt);
                 raw.setHora(hora);
                 raw.setTimestamp(ts);
                 raw.setCantidad(cant);
@@ -636,6 +686,7 @@ public class CadenaCustodiaService {
                         .id(n.getId())
                         .folio(n.getFolio())
                         .fecha(n.getFecha())
+                        .fechaExtraccion(n.getFechaExtraccion())
                         .hora(n.getHora())
                         .timestamp(n.getTimestamp())
                         .cantidad(n.getCantidad())

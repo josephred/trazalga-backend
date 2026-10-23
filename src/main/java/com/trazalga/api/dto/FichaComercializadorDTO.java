@@ -1,5 +1,6 @@
 package com.trazalga.api.dto;
 
+import com.trazalga.api.dto.geo.GeoDeclaracionDTO;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -62,4 +63,13 @@ public class FichaComercializadorDTO {
     private List<FichaMarcaDTO> marcas = new ArrayList<>();
     private boolean retenida;
     private String motivoBloqueo;
+
+    // TG.3: Doble georreferenciación
+    private GeoDeclaracionDTO geo;
+
+    // TH.4 / TH.5: Estado esperado al despacho (informativo)
+    private String estadoHumedadDeclarado;
+    private Double edadExtraccionAlDespachoHoras;
+    private String estadoEsperadoAlDespacho;
+    private String resultadoCoherenciaAlDespacho;
 }
