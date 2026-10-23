@@ -1,9 +1,12 @@
 package com.trazalga.api.services;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +18,17 @@ import com.trazalga.api.dto.ResultadoValidacion;
 import com.trazalga.api.dto.ResultadoValidacion.DecisionValidacion;
 import com.trazalga.api.dto.ResultadoValidacion.MarcaItem;
 import com.trazalga.api.models.ComunaModel;
+import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.repositories.IComunaRepository;
+import com.trazalga.api.services.geo.ReferenciaOrigenService;
+import com.trazalga.api.services.hallazgos.CriterioHallazgo;
+import com.trazalga.api.services.hallazgos.HallazgoFactory;
+import com.trazalga.api.services.hallazgos.HallazgoService;
 
 @Service
 public class ValidacionDeclaracionService {
+
+    private static final Locale LOCALE_CL = Locale.forLanguageTag("es-CL");
 
     @Autowired
     private CapturaService capturaService;
@@ -42,6 +52,15 @@ public class ValidacionDeclaracionService {
     private DeclaracionMarcaService declaracionMarcaService;
 
     @Autowired(required = false)
+    private HallazgoService hallazgoService;
+
+    @Autowired(required = false)
+    private HallazgoFactory hallazgoFactory;
+
+    @Autowired(required = false)
+    private ReferenciaOrigenService referenciaOrigenService;
+
+    @Autowired(required = false)
     private com.trazalga.api.repositories.ReportRepository reportRepository;
 
     @Autowired(required = false)
@@ -63,6 +82,25 @@ public class ValidacionDeclaracionService {
 
     public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
         this.parametrosService = parametrosService;
+    }
+
+    public void setReferenciaOrigenService(ReferenciaOrigenService referenciaOrigenService) {
+        this.referenciaOrigenService = referenciaOrigenService;
+    }
+
+    public void setHallazgoFactory(HallazgoFactory hallazgoFactory) {
+        this.hallazgoFactory = hallazgoFactory;
+    }
+
+    public void setHallazgoService(HallazgoService hallazgoService) {
+        this.hallazgoService = hallazgoService;
+    }
+
+    private HallazgoFactory getHallazgoFactory() {
+        if (this.hallazgoFactory == null) {
+            this.hallazgoFactory = new HallazgoFactory();
+        }
+        return this.hallazgoFactory;
     }
 
     private com.trazalga.api.services.parametros.ParametrosService getParametrosService() {
@@ -456,50 +494,44 @@ public class ValidacionDeclaracionService {
     }
 
     // =========================================================================
-    // INDICADOR 9 — ORIGEN REAL VS GPS CAPTURADO (Res. 25-sep / T9.3)
+    // INDICADOR 9 — ORIGEN REAL VS GPS CAPTURADO (TG.2 / TG.5)
     // =========================================================================
 
-    public static class PuntoReferencia {
-        private final String tipo;
-        private final String nombre;
-        private final Double lat;
-        private final Double lon;
-
-        public PuntoReferencia(String tipo, String nombre, Double lat, Double lon) {
-            this.tipo = tipo;
-            this.nombre = nombre;
-            this.lat = lat;
-            this.lon = lon;
+    private com.trazalga.api.dto.geo.PuntoReferencia resolverReferenciaConServicioORespaldo(
+            String tipo, Long caletaId, Long amerbId, Long varaderoId, String textoVaradero, Long comunaId) {
+        if (referenciaOrigenService != null) {
+            com.trazalga.api.dto.geo.PuntoReferencia ref =
+                    referenciaOrigenService.resolverPorIds(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
+            if (ref != null) {
+                return ref;
+            }
         }
-
-        public String getTipo() { return tipo; }
-        public String getNombre() { return nombre; }
-        public Double getLat() { return lat; }
-        public Double getLon() { return lon; }
-    }
-
-    public PuntoReferencia resolverReferencia(Long amerbId, Long caletaId) {
-        // 1. AMERB -> centroide
+        // Respaldo para pruebas unitarias sin ReferenciaOrigenService inyectado
         if (amerbId != null && amerbRepository != null) {
             com.trazalga.api.models.AmerbModel amerb = amerbRepository.findById(amerbId).orElse(null);
             if (amerb != null && amerb.getLatitud() != null && amerb.getLongitud() != null) {
-                return new PuntoReferencia("AMERB", amerb.getNombre(), amerb.getLatitud(), amerb.getLongitud());
+                String fuente = amerb.getFuenteCoordenada() != null ? amerb.getFuenteCoordenada() : "AMERB";
+                return new com.trazalga.api.dto.geo.PuntoReferencia(
+                        "AMERB", amerb.getId(), amerb.getNombre(), amerb.getLatitud(), amerb.getLongitud(), fuente);
             }
         }
-        // 2. Caleta con coordenadas directas
         if (caletaId != null && caletaRepository != null) {
             com.trazalga.api.models.CaletaModel caleta = caletaRepository.findById(caletaId).orElse(null);
             if (caleta != null && caleta.getLatitud() != null && caleta.getLongitud() != null) {
-                return new PuntoReferencia("CALETA", caleta.getNombre(), caleta.getLatitud(), caleta.getLongitud());
+                String fuente = caleta.getFuenteCoordenada() != null ? caleta.getFuenteCoordenada() : "CALETA";
+                return new com.trazalga.api.dto.geo.PuntoReferencia(
+                        "CALETA", caleta.getId(), caleta.getNombre(), caleta.getLatitud(), caleta.getLongitud(), fuente);
             }
-            // 3. Varadero asociado de la caleta
-            if (caleta != null && caleta.getVaradero() != null &&
-                    caleta.getVaradero().getLatitud() != null && caleta.getVaradero().getLongitud() != null) {
-                return new PuntoReferencia("VARADERO", caleta.getVaradero().getNombre(),
-                        caleta.getVaradero().getLatitud(), caleta.getVaradero().getLongitud());
+            if (caleta != null && caleta.getVaradero() != null
+                    && caleta.getVaradero().getLatitud() != null && caleta.getVaradero().getLongitud() != null) {
+                String fuente = caleta.getVaradero().getFuenteCoordenada() != null
+                        ? caleta.getVaradero().getFuenteCoordenada() : "VARADERO_CALETA";
+                return new com.trazalga.api.dto.geo.PuntoReferencia(
+                        "VARADERO", caleta.getVaradero().getId(), caleta.getVaradero().getNombre(),
+                        caleta.getVaradero().getLatitud(), caleta.getVaradero().getLongitud(), fuente);
             }
         }
-        return null; // sin referencia
+        return null;
     }
 
     public Optional<com.trazalga.api.models.DeclaracionMarcaModel> verificarOrigenGeo(
@@ -512,6 +544,22 @@ public class ValidacionDeclaracionService {
             Boolean envioOffline,
             Long caletaId,
             Long amerbId) {
+        return verificarOrigenGeo(tipo, id, folio, lat, lon, precisionM, envioOffline, caletaId, amerbId, null, null, null);
+    }
+
+    public Optional<com.trazalga.api.models.DeclaracionMarcaModel> verificarOrigenGeo(
+            String tipo,
+            Long id,
+            String folio,
+            Double lat,
+            Double lon,
+            Double precisionM,
+            Boolean envioOffline,
+            Long caletaId,
+            Long amerbId,
+            Long varaderoId,
+            String textoVaradero,
+            Long comunaId) {
         if (!configuracionGeneralService.getBoolean("origen_geo_activo", true)) {
             return Optional.empty();
         }
@@ -522,8 +570,9 @@ public class ValidacionDeclaracionService {
         double distanciaMaxKm = configuracionGeneralService.getDouble("origen_geo_distancia_max_km", 30.0);
         double precisionMaxM = configuracionGeneralService.getDouble("origen_geo_precision_max_m", 500.0);
 
-        PuntoReferencia ref = resolverReferencia(amerbId, caletaId);
-        if (ref == null) {
+        com.trazalga.api.dto.geo.PuntoReferencia ref =
+                resolverReferenciaConServicioORespaldo(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
+        if (ref == null || ref.getLat() == null || ref.getLon() == null) {
             // Sin referencia: modo degradado, informa pero no marca
             return Optional.empty();
         }
@@ -534,19 +583,95 @@ public class ValidacionDeclaracionService {
             boolean precisionAceptable = precisionM == null || precisionM <= precisionMaxM;
 
             if (precisionAceptable) {
-                String motivo = String.format(java.util.Locale.US,
-                        "GPS a %.1f km de %s (%s). Referencia: (%.4f,%.4f). GPS: (%.4f,%.4f). Precisión: %.0f m. Offline: %s",
-                        distanciaKm, ref.getNombre(), ref.getTipo(),
-                        ref.getLat(), ref.getLon(), lat, lon,
-                        precisionM != null ? precisionM : 0.0,
-                        Boolean.TRUE.equals(envioOffline) ? "sí" : "no");
+                CriterioHallazgo criterio = CriterioHallazgo.deKilometros(
+                        "origen_geo_distancia_max_km", distanciaMaxKm, distanciaKm);
+                String motivo = redactarMotivoOrigenGeoEsCl(
+                        distanciaKm, distanciaMaxKm, precisionM, envioOffline, ref);
 
-                if (declaracionMarcaService != null) {
-                    return Optional.of(declaracionMarcaService.marcar(
-                            tipo, id, "ORIGEN_GEO_INCONSISTENTE", motivo, null));
+                DeclaracionMarcaModel construida = getHallazgoFactory().crear(
+                        tipo, id, "ORIGEN_GEO_INCONSISTENTE", null, criterio, motivo, "VALIDACION");
+
+                if (hallazgoService != null) {
+                    return Optional.of(hallazgoService.registrar(
+                            tipo, id, "ORIGEN_GEO_INCONSISTENTE", null, criterio, motivo, "VALIDACION"));
                 }
+                if (declaracionMarcaService != null) {
+                    DeclaracionMarcaModel marcada = declaracionMarcaService.marcar(
+                            tipo, id, "ORIGEN_GEO_INCONSISTENTE", motivo, null);
+                    if (marcada != null) {
+                        if (marcada.getClaveIdempotencia() == null) {
+                            marcada.setClaveIdempotencia(construida.getClaveIdempotencia());
+                        }
+                        if (marcada.getCriterioParametro() == null) {
+                            marcada.setCriterioParametro(construida.getCriterioParametro());
+                            marcada.setCriterioUmbral(construida.getCriterioUmbral());
+                            marcada.setCriterioValor(construida.getCriterioValor());
+                            marcada.setCriterioUnidad(construida.getCriterioUnidad());
+                        }
+                        if (marcada.getDetalle() == null) {
+                            marcada.setDetalle(motivo);
+                        }
+                        return Optional.of(marcada);
+                    }
+                }
+                return Optional.of(construida);
             }
         }
         return Optional.empty();
+    }
+
+    private String redactarMotivoOrigenGeoEsCl(
+            double distanciaKm,
+            double distanciaMaxKm,
+            Double precisionM,
+            Boolean envioOffline,
+            com.trazalga.api.dto.geo.PuntoReferencia ref) {
+        DecimalFormatSymbols sym = new DecimalFormatSymbols(LOCALE_CL);
+        sym.setDecimalSeparator(',');
+        sym.setGroupingSeparator('.');
+
+        String distStr = new DecimalFormat("#,##0.0", sym).format(distanciaKm);
+        String umbralStr = (distanciaMaxKm == (long) distanciaMaxKm)
+                ? new DecimalFormat("#,##0", sym).format((long) distanciaMaxKm)
+                : new DecimalFormat("#,##0.0", sym).format(distanciaMaxKm);
+        String precStr = new DecimalFormat("#,##0", sym).format(precisionM != null ? Math.round(precisionM) : 0L);
+
+        String tipoEntidad = ref.getTipo() != null ? ref.getTipo().toUpperCase(LOCALE_CL) : "";
+        String entidadFrase;
+        if ("VARADERO".equals(tipoEntidad)) {
+            entidadFrase = "del varadero " + ref.getNombre();
+        } else if ("CALETA".equals(tipoEntidad)) {
+            entidadFrase = "de la caleta " + ref.getNombre();
+        } else if ("AMERB".equals(tipoEntidad)) {
+            entidadFrase = "del área " + ref.getNombre();
+        } else {
+            entidadFrase = "de " + ref.getNombre();
+        }
+
+        String fuenteRaw = ref.getFuente() != null ? ref.getFuente().toUpperCase(LOCALE_CL) : "";
+        String fuenteFrase;
+        if (fuenteRaw.contains("PLANILLA")) {
+            fuenteFrase = "planilla Sernapesca";
+        } else if ("MANUAL".equals(fuenteRaw)) {
+            fuenteFrase = "edición manual";
+        } else if ("VARADERO_DECLARADO".equals(fuenteRaw)) {
+            fuenteFrase = "varadero declarado";
+        } else if ("VARADERO_CALETA".equals(fuenteRaw)) {
+            fuenteFrase = "varadero de caleta";
+        } else if ("CALETA".equals(fuenteRaw)) {
+            fuenteFrase = "caleta";
+        } else if ("AMERB".equals(fuenteRaw)) {
+            fuenteFrase = "AMERB";
+        } else {
+            fuenteFrase = "planilla Sernapesca";
+        }
+
+        String conexionFrase = Boolean.TRUE.equals(envioOffline)
+                ? "Enviada sin conexión."
+                : "Enviada con conexión.";
+
+        return String.format(
+                "Declaración enviada a %s km %s (referencia: %s). Umbral: %s km. Precisión GPS: %s m. %s",
+                distStr, entidadFrase, fuenteFrase, umbralStr, precStr, conexionFrase);
     }
 }

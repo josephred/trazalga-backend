@@ -17,14 +17,18 @@ public class HallazgoFactory {
      * Formatos estándar:
      * - General: TIPO:ID:MARCA:REGLA
      * - Retención en bodega: TIPO:ID:RETENCION_EXCEDIDA
+     * - Origen geográfico (TG.5): TIPO:ID:ORIGEN_GEO_INCONSISTENTE
+     * - Coherencia humedad (TH.2): TIPO:ID:HUMEDAD_INCOHERENTE
      */
     public String generarClaveIdempotencia(String tipo, Long id, String marca, String regla) {
         String tipoNorm = tipo != null ? tipo.trim().toUpperCase() : "DESCONOCIDO";
         String marcaNorm = marca != null ? marca.trim().toUpperCase() : "MARCA";
         long idVal = id != null ? id : 0L;
 
-        if ("RETENCION_EXCEDIDA".equals(marcaNorm)) {
-            return String.format("%s:%d:RETENCION_EXCEDIDA", tipoNorm, idVal);
+        if ("RETENCION_EXCEDIDA".equals(marcaNorm)
+                || "ORIGEN_GEO_INCONSISTENTE".equals(marcaNorm)
+                || "HUMEDAD_INCOHERENTE".equals(marcaNorm)) {
+            return String.format("%s:%d:%s", tipoNorm, idVal, marcaNorm);
         }
 
         String reglaNorm = (regla != null && !regla.isBlank()) ? regla.trim() : "GENERAL";

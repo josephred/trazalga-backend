@@ -38,6 +38,9 @@ public class CaletaService {
     @Autowired
     private com.trazalga.api.repositories.ICoordenadaCambioLogRepository cambioLogRepository;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService;
+
     public CaletaModel updateById(CaletaModel request, Long id){
         CaletaModel caleta = caletaRepository.findById(id).orElseThrow();
         if (request.getNombre() != null) caleta.setNombre(request.getNombre());
@@ -80,7 +83,11 @@ public class CaletaService {
                     .build());
         }
 
-        return caletaRepository.save(caleta);
+        CaletaModel saved = caletaRepository.save(caleta);
+        if (cambioCoord && referenciaOrigenService != null) {
+            referenciaOrigenService.invalidarCache();
+        }
+        return saved;
     }
 
     public Boolean deleteCaleta(Long id){

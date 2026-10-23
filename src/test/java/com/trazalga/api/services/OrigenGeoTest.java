@@ -13,12 +13,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.trazalga.api.dto.geo.PuntoReferencia;
 import com.trazalga.api.models.CaletaModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.models.VaraderoModel;
 import com.trazalga.api.repositories.IAmerbRepository;
 import com.trazalga.api.repositories.ICaletaRepository;
 import com.trazalga.api.repositories.ReportRepository;
+import com.trazalga.api.services.geo.ReferenciaOrigenService;
 
 @ExtendWith(MockitoExtension.class)
 public class OrigenGeoTest {
@@ -34,6 +36,9 @@ public class OrigenGeoTest {
 
     @Mock
     private DeclaracionMarcaService marcaService;
+
+    @Mock
+    private ReferenciaOrigenService referenciaOrigenService;
 
     @Mock
     private ReportRepository reportRepository;
@@ -55,7 +60,6 @@ public class OrigenGeoTest {
 
     @Test
     void testSantiagoVsCoquimbo_GeneraMarcaOrigenGeoInconsistente() {
-        // Coquimbo Caleta
         CaletaModel caleta = CaletaModel.builder()
                 .id(10L)
                 .nombre("Caleta Coquimbo")
@@ -67,7 +71,6 @@ public class OrigenGeoTest {
         DeclaracionMarcaModel mockMarca = DeclaracionMarcaModel.builder()
                 .id(1L)
                 .marca("ORIGEN_GEO_INCONSISTENTE")
-                .detalle("GPS a 390.5 km de Caleta Coquimbo")
                 .build();
         when(marcaService.marcar(anyString(), anyLong(), eq("ORIGEN_GEO_INCONSISTENTE"), anyString(), isNull()))
                 .thenReturn(mockMarca);
@@ -78,10 +81,46 @@ public class OrigenGeoTest {
                 -33.4489, -70.6693, 15.0, false, 10L, null);
 
         assertTrue(res.isPresent(), "Debe generar marca ORIGEN_GEO_INCONSISTENTE por distancia extrema");
-        assertEquals("ORIGEN_GEO_INCONSISTENTE", res.get().getMarca());
+        DeclaracionMarcaModel marca = res.get();
+        assertEquals("ORIGEN_GEO_INCONSISTENTE", marca.getMarca());
+        assertEquals("RECOLECTOR:100:ORIGEN_GEO_INCONSISTENTE", marca.getClaveIdempotencia());
+        assertEquals("origen_geo_distancia_max_km", marca.getCriterioParametro());
+        assertEquals("30", marca.getCriterioUmbral());
+        assertEquals("km", marca.getCriterioUnidad());
+        assertNotNull(marca.getDetalle());
+        assertTrue(marca.getDetalle().contains(","), "El texto debe estar en es-CL con coma decimal");
+        assertTrue(marca.getDetalle().contains("Enviada con conexión."));
         verify(marcaService, times(1)).marcar(
                 eq("RECOLECTOR"), eq(100L), eq("ORIGEN_GEO_INCONSISTENTE"),
                 contains("Caleta Coquimbo"), isNull());
+    }
+
+    @Test
+    void testVaraderoDeclaradoConReferenciaOrigenService_CriterioEsCl() {
+        PuntoReferencia puntoVaradero = PuntoReferencia.builder()
+                .tipo("VARADERO")
+                .id(77L)
+                .nombre("Varadero Los Choros")
+                .lat(-29.2900)
+                .lon(-71.4700)
+                .fuente("PLANILLA_SERNAPESCA_2026-10-22")
+                .build();
+        when(referenciaOrigenService.resolverPorIds("RECOLECTOR", 10L, null, 77L, "Varadero Los Choros", 4L))
+                .thenReturn(puntoVaradero);
+
+        Optional<DeclaracionMarcaModel> res = validacionService.verificarOrigenGeo(
+                "RECOLECTOR", 200L, "DR-200",
+                -29.9500, -71.3400, 12.0, false, 10L, null, 77L, "Varadero Los Choros", 4L);
+
+        assertTrue(res.isPresent());
+        DeclaracionMarcaModel m = res.get();
+        assertEquals("RECOLECTOR:200:ORIGEN_GEO_INCONSISTENTE", m.getClaveIdempotencia());
+        assertEquals("origen_geo_distancia_max_km", m.getCriterioParametro());
+        assertEquals("30", m.getCriterioUmbral());
+        assertEquals("74.5", m.getCriterioValor());
+        assertEquals("km", m.getCriterioUnidad());
+        assertTrue(m.getDetalle().contains("Declaración enviada a 74,5 km del varadero Varadero Los Choros (referencia: planilla Sernapesca). Umbral: 30 km. Precisión GPS: 12 m. Enviada con conexión."),
+                "Detalle real: " + m.getDetalle());
     }
 
     @Test

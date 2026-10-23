@@ -87,6 +87,31 @@ public class DeclaracionRecolectorService {
     @Autowired
     private jakarta.persistence.EntityManager entityManager;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService;
+
+    private void resolverVaraderoDeclarado(DeclaracionRecolectorModel model) {
+        if (model == null) return;
+        if (model.getVaraderoRelacion() != null && model.getVaraderoRelacion().getId() != null) {
+            if (entityManager != null) {
+                model.setVaraderoRelacion(entityManager.find(com.trazalga.api.models.VaraderoModel.class, model.getVaraderoRelacion().getId()));
+            }
+            return;
+        }
+        if (referenciaOrigenService != null && model.getVaradero() != null && !model.getVaradero().trim().isEmpty()) {
+            Long comunaId = model.getComuna() != null ? model.getComuna().getId()
+                    : (model.getCaleta() != null && model.getCaleta().getComuna() != null ? model.getCaleta().getComuna().getId() : null);
+            if (comunaId != null) {
+                com.trazalga.api.models.VaraderoModel calzado = referenciaOrigenService.calzarVaradero(model.getVaradero(), comunaId);
+                model.setVaraderoRelacion(calzado);
+            } else {
+                model.setVaraderoRelacion(null);
+            }
+        } else {
+            model.setVaraderoRelacion(null);
+        }
+    }
+
     private void resolveDependencies(DeclaracionRecolectorModel model) {
         if (model.getUsuario() != null && model.getUsuario().getId() != null) {
             model.setUsuario(entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
@@ -159,6 +184,7 @@ public class DeclaracionRecolectorService {
         calcularTasaDiaria(declaracionRecolectorModel);
         resolveDependencies(declaracionRecolectorModel);
         validarYResolverCaletaComuna(declaracionRecolectorModel);
+        resolverVaraderoDeclarado(declaracionRecolectorModel);
 
         // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
         Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
@@ -232,8 +258,11 @@ public class DeclaracionRecolectorService {
             );
         }
 
-        // T9.3: Verificación de origen real vs GPS capturado
+        // T9.3 / TG.2 / TG.5: Verificación de origen real vs GPS capturado (con varadero declarado)
         Long caletaId = saved.getCaleta() != null ? saved.getCaleta().getId() : null;
+        Long varaderoId = saved.getVaraderoRelacion() != null ? saved.getVaraderoRelacion().getId() : null;
+        Long comunaIdGeo = saved.getComuna() != null ? saved.getComuna().getId()
+                : (saved.getCaleta() != null && saved.getCaleta().getComuna() != null ? saved.getCaleta().getComuna().getId() : null);
         validacionDeclaracionService.verificarOrigenGeo(
                 "RECOLECTOR",
                 saved.getId(),
@@ -243,7 +272,10 @@ public class DeclaracionRecolectorService {
                 saved.getPrecisionGpsM(),
                 saved.getEnvioOffline(),
                 caletaId,
-                null
+                null,
+                varaderoId,
+                saved.getVaradero(),
+                comunaIdGeo
         );
 
         return saved;
@@ -289,6 +321,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setLongitud(request.getLongitud());
         declaracionRecolectorModel.setEspecie(request.getEspecie());
         declaracionRecolectorModel.setComuna(request.getComuna());
+        declaracionRecolectorModel.setVaraderoRelacion(request.getVaraderoRelacion());
+        resolverVaraderoDeclarado(declaracionRecolectorModel);
         declaracionRecolectorModel.setExtraccionTipo(request.getExtraccionTipo());
         declaracionRecolectorModel.setComposicion(request.getComposicion());
         declaracionRecolectorModel.setHumedadEstado(request.getHumedadEstado());

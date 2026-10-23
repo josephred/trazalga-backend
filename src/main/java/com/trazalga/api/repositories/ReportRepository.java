@@ -3624,23 +3624,19 @@ public class ReportRepository {
         sql.append("SELECT todas.tipo, todas.id, todas.folio, todas.fecha_declaracion, todas.hora, ");
         sql.append("todas.usuario_id, todas.usuario_rut, todas.usuario_nombre, ");
         sql.append("todas.latitud, todas.longitud, todas.precision_gps_m, todas.gps_capturado_en, todas.envio_offline, ");
-        sql.append("todas.caleta_id, todas.amerb_id, todas.ref_tipo, todas.ref_nombre, todas.ref_lat, todas.ref_lon, todas.region_id ");
+        sql.append("todas.caleta_id, todas.amerb_id, todas.varadero_id, todas.varadero_texto, todas.comuna_id, todas.region_id ");
         sql.append("FROM ( ");
-        // 1. Recolector
+        // 1. Recolector (TG.2: la referencia se resuelve en Java con ReferenciaOrigenService)
         sql.append("  SELECT 'RECOLECTOR' as tipo, r.id, COALESCE(r.folio_origen, CONCAT('DR-', r.id)) as folio, ");
         sql.append("         r.fecha_declaracion, r.hora, r.usuario_id, u.rut as usuario_rut, ");
         sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
         sql.append("         r.latitud, r.longitud, r.precision_gps_m, r.gps_capturado_en, r.envio_offline, ");
-        sql.append("         r.caleta_id, NULL as amerb_id, ");
-        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
-        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
-        sql.append("         COALESCE(cal.latitud, v.latitud) as ref_lat, ");
-        sql.append("         COALESCE(cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         r.caleta_id, NULL as amerb_id, r.varadero_id as varadero_id, r.varadero as varadero_texto, ");
+        sql.append("         COALESCE(r.comuna_id, cal.comuna_id, u.comuna_id) as comuna_id, ");
         sql.append("         COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_recolector r ");
         sql.append("  JOIN usuario u ON u.id = r.usuario_id ");
         sql.append("  LEFT JOIN caleta cal ON cal.id = r.caleta_id ");
-        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
         sql.append("  LEFT JOIN comuna c ON c.id = r.comuna_id ");
         sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
         sql.append("  UNION ALL ");
@@ -3649,16 +3645,12 @@ public class ReportRepository {
         sql.append("         a.fecha_declaracion, a.hora, a.usuario_id, u.rut as usuario_rut, ");
         sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
         sql.append("         a.latitud, a.longitud, a.precision_gps_m, a.gps_capturado_en, a.envio_offline, ");
-        sql.append("         a.caleta_id, NULL as amerb_id, ");
-        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
-        sql.append("         CASE WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
-        sql.append("         COALESCE(cal.latitud, v.latitud) as ref_lat, ");
-        sql.append("         COALESCE(cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         a.caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as varadero_texto, ");
+        sql.append("         COALESCE(cal.comuna_id, u.comuna_id) as comuna_id, ");
         sql.append("         COALESCE(cal.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_armador a ");
         sql.append("  JOIN usuario u ON u.id = a.usuario_id ");
         sql.append("  LEFT JOIN caleta cal ON cal.id = a.caleta_id ");
-        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
         sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
         sql.append("  UNION ALL ");
         // 3. Area (AMERB)
@@ -3666,17 +3658,13 @@ public class ReportRepository {
         sql.append("         ar.fecha_declaracion, ar.hora, ar.usuario_id, u.rut as usuario_rut, ");
         sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
         sql.append("         ar.latitud, ar.longitud, ar.precision_gps_m, ar.gps_capturado_en, ar.envio_offline, ");
-        sql.append("         ar.caleta_id, ar.amerb_id, ");
-        sql.append("         CASE WHEN am.latitud IS NOT NULL THEN 'AMERB' WHEN cal.latitud IS NOT NULL THEN 'CALETA' WHEN v.latitud IS NOT NULL THEN 'VARADERO' ELSE NULL END as ref_tipo, ");
-        sql.append("         CASE WHEN am.latitud IS NOT NULL THEN am.nombre WHEN cal.latitud IS NOT NULL THEN cal.nombre WHEN v.latitud IS NOT NULL THEN v.nombre ELSE NULL END as ref_nombre, ");
-        sql.append("         COALESCE(am.latitud, cal.latitud, v.latitud) as ref_lat, ");
-        sql.append("         COALESCE(am.longitud, cal.longitud, v.longitud) as ref_lon, ");
+        sql.append("         ar.caleta_id, ar.amerb_id, NULL as varadero_id, NULL as varadero_texto, ");
+        sql.append("         COALESCE(am.comuna_id, cal.comuna_id, u.comuna_id) as comuna_id, ");
         sql.append("         COALESCE(amc.region_id, cal.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_area ar ");
         sql.append("  JOIN usuario u ON u.id = ar.usuario_id ");
         sql.append("  LEFT JOIN amerb am ON am.id = ar.amerb_id ");
         sql.append("  LEFT JOIN caleta cal ON cal.id = ar.caleta_id ");
-        sql.append("  LEFT JOIN varadero v ON v.id = cal.varadero_id ");
         sql.append("  LEFT JOIN comuna amc ON amc.id = am.comuna_id ");
         sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
         sql.append(") AS todas WHERE 1=1 ");
@@ -3711,11 +3699,10 @@ public class ReportRepository {
             map.put("envioOffline", r[12] != null ? (Boolean.TRUE.equals(r[12]) || "1".equals(r[12].toString()) || "true".equalsIgnoreCase(r[12].toString())) : false);
             map.put("caletaId", r[13] != null ? ((Number) r[13]).longValue() : null);
             map.put("amerbId", r[14] != null ? ((Number) r[14]).longValue() : null);
-            map.put("refTipo", r[15] != null ? r[15].toString() : null);
-            map.put("refNombre", r[16] != null ? r[16].toString() : null);
-            map.put("refLat", r[17] != null ? ((Number) r[17]).doubleValue() : null);
-            map.put("refLon", r[18] != null ? ((Number) r[18]).doubleValue() : null);
-            map.put("regionId", r[19] != null ? ((Number) r[19]).longValue() : null);
+            map.put("varaderoId", r[15] != null ? ((Number) r[15]).longValue() : null);
+            map.put("varadero", r[16] != null ? r[16].toString() : null);
+            map.put("comunaId", r[17] != null ? ((Number) r[17]).longValue() : null);
+            map.put("regionId", r[18] != null ? ((Number) r[18]).longValue() : null);
             filas.add(map);
         }
         return filas;

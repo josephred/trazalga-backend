@@ -59,6 +59,13 @@ public record CriterioHallazgo(
             return String.format("z = %s supera el umbral de %s desviaciones estándar", valorObservado, umbral);
         }
 
+        // Formato para kilómetros (TG.5)
+        if ("km".equals(u)) {
+            String valFormateado = formatearDecimal(valorObservado, 1);
+            String umbralFormateado = formatearKilos(umbral);
+            return String.format("%s km supera el umbral de %s km", valFormateado, umbralFormateado);
+        }
+
         // Formato genérico
         if (!u.isEmpty()) {
             return String.format("%s %s supera el umbral de %s %s", valorObservado, u, umbral, u);
@@ -80,6 +87,12 @@ public record CriterioHallazgo(
 
     public static CriterioHallazgo deFecha(String parametro, String umbralFecha, String valorFecha) {
         return new CriterioHallazgo(parametro, umbralFecha, valorFecha, "fecha");
+    }
+
+    public static CriterioHallazgo deKilometros(String parametro, double umbral, double valor) {
+        String umbralStr = (umbral == (long) umbral) ? String.valueOf((long) umbral) : String.valueOf(umbral);
+        String valorStr = String.format(Locale.US, "%.1f", valor);
+        return new CriterioHallazgo(parametro, umbralStr, valorStr, "km");
     }
 
     private static String formatearKilos(String str) {

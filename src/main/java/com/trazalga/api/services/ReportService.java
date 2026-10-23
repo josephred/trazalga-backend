@@ -60,6 +60,13 @@ public class ReportService {
     private final VariacionPesoService variacionPesoService;
 
     @Autowired(required = false)
+    private com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService;
+
+    public void setReferenciaOrigenService(com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService) {
+        this.referenciaOrigenService = referenciaOrigenService;
+    }
+
+    @Autowired(required = false)
     private com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService;
 
     @Autowired(required = false)
@@ -392,6 +399,30 @@ public class ReportService {
             Double lon = fila.get("longitud") != null ? ((Number) fila.get("longitud")).doubleValue() : null;
             Double refLat = fila.get("refLat") != null ? ((Number) fila.get("refLat")).doubleValue() : null;
             Double refLon = fila.get("refLon") != null ? ((Number) fila.get("refLon")).doubleValue() : null;
+            String refTipo = fila.get("refTipo") != null ? fila.get("refTipo").toString() : null;
+            String refNombre = fila.get("refNombre") != null ? fila.get("refNombre").toString() : null;
+            String refFuente = fila.get("refFuente") != null ? fila.get("refFuente").toString() : null;
+
+            // TG.2: Resolución de referencia en Java mediante caché de ReferenciaOrigenService
+            if (referenciaOrigenService != null) {
+                String tipoDecl = fila.get("tipo") != null ? fila.get("tipo").toString() : "";
+                Long caletaId = fila.get("caletaId") != null ? ((Number) fila.get("caletaId")).longValue() : null;
+                Long amerbId = fila.get("amerbId") != null ? ((Number) fila.get("amerbId")).longValue() : null;
+                Long varaderoId = fila.get("varaderoId") != null ? ((Number) fila.get("varaderoId")).longValue() : null;
+                String varaderoTexto = fila.get("varadero") != null ? fila.get("varadero").toString() : null;
+                Long comunaId = fila.get("comunaId") != null ? ((Number) fila.get("comunaId")).longValue() : null;
+
+                com.trazalga.api.dto.geo.PuntoReferencia puntoRef =
+                        referenciaOrigenService.resolverPorIds(tipoDecl, caletaId, amerbId, varaderoId, varaderoTexto, comunaId);
+                if (puntoRef != null) {
+                    refLat = puntoRef.getLat();
+                    refLon = puntoRef.getLon();
+                    refTipo = puntoRef.getTipo();
+                    refNombre = puntoRef.getNombre();
+                    refFuente = puntoRef.getFuente();
+                }
+            }
+
             Double precision = fila.get("precisionGpsM") != null ? ((Number) fila.get("precisionGpsM")).doubleValue() : null;
             Boolean offline = Boolean.TRUE.equals(fila.get("envioOffline"));
 
@@ -436,8 +467,11 @@ public class ReportService {
                     h.put("precisionGpsM", precision != null ? Math.round(precision * 10.0) / 10.0 : null);
                     h.put("envioOffline", offline);
                     h.put("precisionAceptable", precisionAceptable);
-                    h.put("refTipo", fila.get("refTipo"));
-                    h.put("refNombre", fila.get("refNombre"));
+                    h.put("refTipo", refTipo);
+                    h.put("refNombre", refNombre);
+                    if (refFuente != null) {
+                        h.put("refFuente", refFuente);
+                    }
                     h.put("gpsLatitud", lat);
                     h.put("gpsLongitud", lon);
                     h.put("refLatitud", refLat);
