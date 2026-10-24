@@ -69,4 +69,13 @@ public interface IDeclaracionComercializadorRepository extends JpaRepository<Dec
             + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
     List<DeclaracionComercializadorModel> findConsumidasPorDestinos(
             @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
+
+    @EntityGraph(attributePaths = {"usuario", "especie", "composicion", "humedadEstado", "usuarioDestinatario", "usuarioDestinatario.comuna"})
+    @Query("SELECT d FROM DeclaracionComercializadorModel d "
+            + "WHERE (UPPER(REPLACE(REPLACE(COALESCE(d.placaPatente, ''), ' ', ''), '-', '')) = :patente "
+            + "   OR UPPER(REPLACE(REPLACE(COALESCE(d.placaPatenteCarro, ''), ' ', ''), '-', '')) = :patente "
+            + "   OR UPPER(REPLACE(REPLACE(COALESCE(d.patente, ''), ' ', ''), '-', '')) = :patente) "
+            + "AND (d.estado IS NULL OR (UPPER(d.estado) <> 'RECHAZADA' AND UPPER(d.estado) <> 'ANULADA')) "
+            + "ORDER BY d.fechaDeclaracion DESC, d.hora DESC, d.id DESC")
+    List<DeclaracionComercializadorModel> findCandidatosPorPatente(@Param("patente") String patente);
 }

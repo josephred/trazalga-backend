@@ -54,24 +54,25 @@ public class ConsultaPatentePublicaSecurityTest {
     }
 
     @Test
-    @DisplayName("TU.1: GET /api/public/patentes/{patente} no contiene datos personales ni operacionales restringidos")
+    @DisplayName("TU.1 & TN.2: GET /api/public/patentes/{patente} no contiene datos personales ni operacionales restringidos")
     void testConsultaPatente_NoExponeDatosPersonales() throws Exception {
         Map<String, Object> mockRespuesta = new LinkedHashMap<>();
         mockRespuesta.put("patente", "ABCD12");
-        mockRespuesta.put("vigente", true);
-        mockRespuesta.put("horasTranscurridas", 12.5);
-        mockRespuesta.put("fechaHoraMovimiento", "2026-10-22T08:00:00");
-        mockRespuesta.put("tipoMovimiento", "COMERCIALIZADOR_A_PLANTA");
-        mockRespuesta.put("especie", "Huiro Negro");
-        mockRespuesta.put("horaInformada", true);
+        mockRespuesta.put("resultado", "AUTORIZADO");
+        mockRespuesta.put("fechaHoraAutorizacion", "2026-10-22T08:00:00");
+        mockRespuesta.put("comunaDestino", "Coquimbo");
+        mockRespuesta.put("tipoAlga", "Huiro Negro");
+        mockRespuesta.put("texto", "");
+        mockRespuesta.put("consultadoEn", "2026-10-22T18:00:00");
 
         when(patenteService.consultar(eq("ABCD12"), any())).thenReturn(mockRespuesta);
 
         String jsonResponse = mockMvc.perform(get("/api/public/patentes/ABCD12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.patente").value("ABCD12"))
-                .andExpect(jsonPath("$.vigente").value(true))
-                .andExpect(jsonPath("$.especie").value("Huiro Negro"))
+                .andExpect(jsonPath("$.resultado").value("AUTORIZADO"))
+                .andExpect(jsonPath("$.tipoAlga").value("Huiro Negro"))
+                .andExpect(jsonPath("$.comunaDestino").value("Coquimbo"))
                 .andExpect(jsonPath("$.folio").doesNotExist())
                 .andExpect(jsonPath("$.kg").doesNotExist())
                 .andExpect(jsonPath("$.destino").doesNotExist())

@@ -7,30 +7,30 @@ import static org.mockito.Mockito.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.trazalga.api.dto.ConsultaPatentePublicaDTO;
 import com.trazalga.api.repositories.IConsultaPatenteLogRepository;
 import com.trazalga.api.security.RateLimitFilter;
+import com.trazalga.api.services.EstadoTrasladoPatente.EvaluacionPatente;
 
 @ExtendWith(MockitoExtension.class)
 public class ConsultaPatentePublicaTest {
 
     @Mock
-    private EntityManager entityManager;
+    private EstadoTrasladoPatente estadoTrasladoPatente;
 
     @Mock
     private ConfiguracionGeneralService configService;
@@ -39,154 +39,175 @@ public class ConsultaPatentePublicaTest {
     private IConsultaPatenteLogRepository logRepository;
 
     @Mock
-    private Query nativeQuery;
-
-    @Mock
     private HttpServletRequest request;
 
     @InjectMocks
     private ConsultaPatenteService patenteService;
 
+    private static final LocalDateTime AHORA_REFERENCIA = LocalDateTime.of(2026, 10, 22, 18, 0, 0);
+
     @BeforeEach
     void setUp() {
         lenient().when(configService.getInt(eq("patente_vigencia_horas"), anyInt())).thenReturn(48);
         lenient().when(configService.getInt(eq("patente_consulta_max_por_minuto"), anyInt())).thenReturn(20);
+        lenient().when(configService.getValor(eq("consulta_publica_texto_proteccion"), anyString())).thenReturn("Texto legal");
         lenient().when(request.getRemoteAddr()).thenReturn("192.168.1.50");
     }
 
-    /**
-     * Caso 1: Patente con movimiento hace 17 horas -> vigente = true
-     */
+    private static final Set<String> WHITELIST_AUTORIZADO = Set.of(
+            "patente", "resultado", "fechaHoraAutorizacion", "comunaDestino", "tipoAlga", "texto", "consultadoEn"
+    );
+
+    private static final Set<String> WHITELIST_SIN_AUTORIZACION = Set.of(
+            "patente", "resultado", "texto", "consultadoEn"
+    );
+
     @Test
-    void testCaso1_Movimiento17Horas_RetornaVigenteTrue() {
-        LocalDateTime mov17h = LocalDateTime.now().minusHours(17);
-        Date fechaMov = Date.from(mov17h.atZone(ZoneId.systemDefault()).toInstant());
-        String horaMov = String.format("%02d:%02d:00", mov17h.getHour(), mov17h.getMinute());
+    @DisplayName("TN.6 Caso 1: Autorizado -> respuesta pública contiene exactamente la lista blanca de AUTORIZADO")
+    void testCaso1_Autorizado() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_AUTORIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 10, 22, 8, 0, 0))
+                .comunaDestino("Coquimbo")
+                .tipoAlga("Huiro negro")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
 
-        Object[] row = new Object[]{
-                fechaMov,
-                horaMov,
-                "COMERCIALIZADOR_A_PLANTA",
-                "DC-1234",
-                "Huiro Negro",
-                5200.0,
-                "Caldera",
-                "Planta Pacific Algas"
-        };
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
 
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row));
+        ConsultaPatentePublicaDTO dto = patenteService.consultarPublica("ABCD12", request, AHORA_REFERENCIA);
+        Map<String, Object> map = dto.toMap();
 
-        Map<String, Object> result = patenteService.consultar("AB-CD-12", request);
+        assertEquals("ABCD12", map.get("patente"));
+        assertEquals("AUTORIZADO", map.get("resultado"));
+        assertEquals("2026-10-22T08:00:00", map.get("fechaHoraAutorizacion"));
+        assertEquals("Coquimbo", map.get("comunaDestino"));
+        assertEquals("Huiro negro", map.get("tipoAlga"));
+        assertEquals("Texto legal", map.get("texto"));
+        assertEquals("2026-10-22T18:00:00", map.get("consultadoEn"));
 
-        assertNotNull(result);
-        assertEquals("ABCD12", result.get("patente"));
-        assertEquals(true, result.get("vigente"));
-        assertFalse((Boolean) result.getOrDefault("sinRegistros", false));
-        assertEquals("Huiro Negro", result.get("especie"));
-        assertFalse(result.containsKey("comunaOrigen"), "No debe exponer comunaOrigen");
-        assertFalse(result.containsKey("destino"), "No debe exponer destino");
-        assertFalse(result.containsKey("kg"), "No debe exponer kg");
-        assertFalse(result.containsKey("folio"), "No debe exponer folio");
-
-        Double horas = (Double) result.get("horasTranscurridas");
-        assertTrue(horas >= 16.5 && horas <= 17.5, "Debería calcular aprox 17 horas");
+        assertEquals(WHITELIST_AUTORIZADO, map.keySet(), "Las claves deben coincidir estrictamente con la lista blanca");
+        verificarAusenciaDatosPersonales(map);
     }
 
-    /**
-     * Caso 2: Patente con movimiento hace 60 horas -> vigente = false con fecha de movimiento
-     */
     @Test
-    void testCaso2_Movimiento60Horas_RetornaVigenteFalse() {
-        LocalDateTime mov60h = LocalDateTime.now().minusHours(60);
-        Date fechaMov = Date.from(mov60h.atZone(ZoneId.systemDefault()).toInstant());
-        String horaMov = String.format("%02d:%02d:00", mov60h.getHour(), mov60h.getMinute());
+    @DisplayName("TN.6 Caso 2: Finalizado -> resultado público es SIN_AUTORIZACION_VIGENTE y no expone destino ni fechas")
+    void testCaso2_Finalizado() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_FINALIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 10, 22, 8, 0, 0))
+                .comunaDestino("Coquimbo")
+                .tipoAlga("Huiro negro")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
 
-        Object[] row = new Object[]{
-                fechaMov,
-                horaMov,
-                "RECEPCION_EN_PLANTA",
-                "DPA-99",
-                "Parda",
-                8000.0,
-                "Coquimbo",
-                "Planta Norte"
-        };
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
 
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row));
+        Map<String, Object> map = patenteService.consultar("ABCD12", request, AHORA_REFERENCIA);
 
-        Map<String, Object> result = patenteService.consultar("gh-jk-34", request);
+        assertEquals("ABCD12", map.get("patente"));
+        assertEquals("SIN_AUTORIZACION_VIGENTE", map.get("resultado"));
+        assertNull(map.get("fechaHoraAutorizacion"));
+        assertNull(map.get("comunaDestino"));
+        assertNull(map.get("tipoAlga"));
 
-        assertNotNull(result);
-        assertEquals("GHJK34", result.get("patente"));
-        assertEquals(false, result.get("vigente"));
-        assertNotNull(result.get("fechaHoraMovimiento"));
-
-        Double horas = (Double) result.get("horasTranscurridas");
-        assertTrue(horas >= 59.5 && horas <= 60.5, "Debería calcular aprox 60 horas");
+        assertEquals(WHITELIST_SIN_AUTORIZACION, map.keySet());
+        verificarAusenciaDatosPersonales(map);
     }
 
-    /**
-     * Caso 3: Patente no registrada en el sistema -> sinRegistros = true, vigente = false
-     */
     @Test
-    void testCaso3_PatenteNoRegistrada_RetornaSinRegistros() {
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.emptyList());
+    @DisplayName("TN.6 Caso 3: Vencido -> resultado público es SIN_AUTORIZACION_VIGENTE")
+    void testCaso3_Vencido() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_VENCIDO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
 
-        Map<String, Object> result = patenteService.consultar("XX-99-99", request);
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
 
-        assertNotNull(result);
-        assertEquals("XX9999", result.get("patente"));
-        assertEquals(false, result.get("vigente"));
-        assertEquals(true, result.get("sinRegistros"));
+        Map<String, Object> map = patenteService.consultar("ABCD12", request, AHORA_REFERENCIA);
+
+        assertEquals("SIN_AUTORIZACION_VIGENTE", map.get("resultado"));
+        assertEquals(WHITELIST_SIN_AUTORIZACION, map.keySet());
+        verificarAusenciaDatosPersonales(map);
     }
 
-    /**
-     * Caso 4: Privacidad estricta -> verificar que NO contenga campos como rut, rutChofer, choferTransporte, nombreComercializador
-     */
     @Test
-    void testCaso4_PrivacidadEstricta_NoContieneDatosPersonales() {
-        LocalDateTime mov10h = LocalDateTime.now().minusHours(10);
-        Date fechaMov = Date.from(mov10h.atZone(ZoneId.systemDefault()).toInstant());
+    @DisplayName("TN.6 Caso 4: Retenido -> resultado público es SIN_AUTORIZACION_VIGENTE")
+    void testCaso4_Retenido() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_RETENIDO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                .motivoRetencion("Retenido por RETENCION_EXCEDIDA")
+                .hallazgoMarca("RETENCION_EXCEDIDA")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
 
-        // Simulamos un destino que pudiera contener RUT por error humano en texto libre
-        Object[] row = new Object[]{
-                fechaMov,
-                "10:00:00",
-                "COMERCIALIZADOR_A_PLANTA",
-                "DC-555",
-                "Luga Negra",
-                3000.0,
-                "Los Vilos",
-                "Sociedad Algas Ltda 76.123.456-7"
-        };
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
 
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row));
+        Map<String, Object> map = patenteService.consultar("ABCD12", request, AHORA_REFERENCIA);
 
-        Map<String, Object> result = patenteService.consultar("KJ-88-22", request);
-
-        assertNotNull(result);
-        assertFalse(result.containsKey("rut"), "No debe exponer 'rut'");
-        assertFalse(result.containsKey("rutChofer"), "No debe exponer 'rutChofer'");
-        assertFalse(result.containsKey("choferTransporte"), "No debe exponer 'choferTransporte'");
-        assertFalse(result.containsKey("nombreComercializador"), "No debe exponer 'nombreComercializador'");
-        assertFalse(result.containsKey("usuarioId"), "No debe exponer 'usuarioId'");
-        assertFalse(result.containsKey("folio"), "No debe exponer 'folio'");
-        assertFalse(result.containsKey("kg"), "No debe exponer 'kg'");
-        assertFalse(result.containsKey("destino"), "No debe exponer 'destino'");
-        assertFalse(result.containsKey("comunaOrigen"), "No debe exponer 'comunaOrigen'");
+        assertEquals("SIN_AUTORIZACION_VIGENTE", map.get("resultado"));
+        assertFalse(map.containsKey("motivoRetencion"), "No debe exponer motivoRetencion al público");
+        assertFalse(map.containsKey("hallazgoMarca"), "No debe exponer marcas al público");
+        assertEquals(WHITELIST_SIN_AUTORIZACION, map.keySet());
+        verificarAusenciaDatosPersonales(map);
     }
 
-    /**
-     * Caso 5: Rate Limiting -> 21 consultas desde la misma IP en menos de 1 minuto retornan HTTP 429
-     */
     @Test
-    void testCaso5_RateLimiting_21ConsultasRetornan429() throws Exception {
+    @DisplayName("TN.6 Caso 5: Anulado / Inexistente -> resultado público es SIN_AUTORIZACION_VIGENTE")
+    void testCaso5_Inexistente() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ZZ9999")
+                .estado(EstadoTrasladoPatente.ESTADO_SIN_REGISTROS)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("ZZ9999"), any())).thenReturn(ev);
+
+        Map<String, Object> map = patenteService.consultar("ZZ-99-99", request, AHORA_REFERENCIA);
+
+        assertEquals("ZZ9999", map.get("patente"));
+        assertEquals("SIN_AUTORIZACION_VIGENTE", map.get("resultado"));
+        assertEquals(WHITELIST_SIN_AUTORIZACION, map.keySet());
+        verificarAusenciaDatosPersonales(map);
+    }
+
+    @Test
+    @DisplayName("TN.6 Caso 6: Rampla -> consulta con JK1234 retorna AUTORIZADO con lista blanca")
+    void testCaso6_Rampla() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("JK1234")
+                .estado(EstadoTrasladoPatente.ESTADO_AUTORIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 10, 22, 8, 0, 0))
+                .comunaDestino("Coquimbo")
+                .tipoAlga("Huiro negro")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("JK1234"), any())).thenReturn(ev);
+
+        Map<String, Object> map = patenteService.consultar("JK1234", request, AHORA_REFERENCIA);
+
+        assertEquals("JK1234", map.get("patente"));
+        assertEquals("AUTORIZADO", map.get("resultado"));
+        assertEquals(WHITELIST_AUTORIZADO, map.keySet());
+        verificarAusenciaDatosPersonales(map);
+    }
+
+    @Test
+    @DisplayName("TN.6: Rate Limiting -> consulta número 21 en un minuto desde la misma IP responde 429")
+    void testCasoRateLimiting_21ConsultasRetornan429() throws Exception {
         RateLimitFilter rateLimiter = new RateLimitFilter();
-        // Inyectamos configService simulado
         org.springframework.test.util.ReflectionTestUtils.setField(rateLimiter, "configService", configService);
 
         HttpServletRequest mockReq = mock(HttpServletRequest.class);
@@ -201,52 +222,25 @@ public class ConsultaPatentePublicaTest {
         PrintWriter pw = new PrintWriter(sw);
         lenient().when(mockRes.getWriter()).thenReturn(pw);
 
-        // Primeras 20 consultas deben pasar
         for (int i = 1; i <= 20; i++) {
             rateLimiter.doFilter(mockReq, mockRes, mockChain);
         }
         verify(mockChain, times(20)).doFilter(mockReq, mockRes);
         verify(mockRes, never()).setStatus(429);
 
-        // La consulta 21 debe ser bloqueada con 429
+        // Intento 21
         rateLimiter.doFilter(mockReq, mockRes, mockChain);
         verify(mockRes).setStatus(429);
-        verify(mockChain, times(20)).doFilter(mockReq, mockRes); // No se incrementa
+        verify(mockChain, times(20)).doFilter(mockReq, mockRes);
     }
 
-    /**
-     * Caso 6: Cambio dinámico de parámetro -> cambiar patente_vigencia_horas de 48 a 72
-     * hace que la patente con movimiento hace 60 horas pase a vigente = true
-     */
-    @Test
-    void testCaso6_CambioDinamicoVigenciaHoras_De48a72_PasaAVigenteTrue() {
-        LocalDateTime mov60h = LocalDateTime.now().minusHours(60);
-        Date fechaMov = Date.from(mov60h.atZone(ZoneId.systemDefault()).toInstant());
-        String horaMov = String.format("%02d:%02d:00", mov60h.getHour(), mov60h.getMinute());
-
-        Object[] row = new Object[]{
-                fechaMov,
-                horaMov,
-                "RECEPCION_EN_PLANTA",
-                "DPA-888",
-                "Huiro Flotador",
-                4500.0,
-                "Mejillones",
-                "Planta Puerto Angamos"
-        };
-
-        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-        when(nativeQuery.getResultList()).thenReturn(Collections.singletonList(row));
-
-        // Con 48 horas (default) -> vigente = false
-        when(configService.getInt(eq("patente_vigencia_horas"), anyInt())).thenReturn(48);
-        Map<String, Object> result48 = patenteService.consultar("LP-12-34", request);
-        assertEquals(false, result48.get("vigente"));
-
-        // Se reconfigura dinámicamente a 72 horas -> vigente = true
-        when(configService.getInt(eq("patente_vigencia_horas"), anyInt())).thenReturn(72);
-        Map<String, Object> result72 = patenteService.consultar("LP-12-34", request);
-        assertEquals(true, result72.get("vigente"));
+    private void verificarAusenciaDatosPersonales(Map<String, Object> map) {
+        List<String> camposProhibidos = List.of(
+                "rut", "rutChofer", "chofer", "choferTransporte", "nombreComercializador",
+                "usuarioId", "folio", "kg", "kilos", "destino", "comunaOrigen", "planta", "valor"
+        );
+        for (String campo : camposProhibidos) {
+            assertFalse(map.containsKey(campo), "La respuesta pública NO debe contener '" + campo + "'");
+        }
     }
-
 }
