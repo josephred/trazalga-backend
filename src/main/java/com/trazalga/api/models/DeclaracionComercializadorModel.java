@@ -112,6 +112,18 @@ public class DeclaracionComercializadorModel {
     @Column(name = "placa_patente_carro")
     private String placaPatenteCarro;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transportista_id")
+    private TransportistaModel transportista;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehiculo_id")
+    private VehiculoModel vehiculo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehiculo_carro_id")
+    private VehiculoModel vehiculoCarro;
+
     // CAMPO FALTANTE AÑADIDO (RUT del destinatario)
     @Column(nullable = false, length = 20)
     private String codigoDestinatario;

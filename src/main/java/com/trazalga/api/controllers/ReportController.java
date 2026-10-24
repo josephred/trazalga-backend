@@ -32,6 +32,8 @@ public class ReportController {
     private final PerfiladorRiesgoService perfiladorRiesgoService;
     private final com.trazalga.api.services.indicadores.DesembarqueAtipicoService desembarqueAtipicoService;
     private final com.trazalga.api.services.cuotas.CuotaSobrepasoService cuotaSobrepasoService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.trazalga.api.services.ReporteTransporteService reporteTransporteService;
 
     @GetMapping
     public ResponseEntity<?> generateReport(
@@ -1158,5 +1160,18 @@ public class ReportController {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/transporte/relaciones")
+    public ResponseEntity<com.trazalga.api.dto.ReporteRelacionesTransporteDTO> getRelacionesTransporte(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate hasta,
+            @RequestParam(required = false) Long comercializadorId,
+            @RequestParam(required = false) Long transportistaId,
+            @RequestParam(required = false) String patente) {
+        if (reporteTransporteService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(reporteTransporteService.generarReporteRelaciones(desde, hasta, comercializadorId, transportistaId, patente));
     }
 }

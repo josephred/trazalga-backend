@@ -1,6 +1,7 @@
 package com.trazalga.api.services;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,9 @@ public class DeclaracionComercializadorService {
 
     @Autowired(required = false)
     private ValidacionDeclaracionService validacionDeclaracionService;
+
+    @Autowired(required = false)
+    private TransporteResolverService transporteResolverService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -148,6 +152,7 @@ public class DeclaracionComercializadorService {
         validarCargasNoBloqueadas(declaracionComercializadorModel.getDeclaracionesSeleccionadas());
         sanearComposicion(declaracionComercializadorModel);
         normalizarPatentes(declaracionComercializadorModel);
+        resolverTransporte(declaracionComercializadorModel);
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
@@ -391,6 +396,33 @@ public class DeclaracionComercializadorService {
         }
         if (model.getPatente() != null) {
             model.setPatente(ConsultaPatenteService.normalizarPatente(model.getPatente()));
+        }
+    }
+
+    private void resolverTransporte(DeclaracionComercializadorModel dc) {
+        if (transporteResolverService == null || dc == null) return;
+        try {
+            Long comId = dc.getUsuario() != null ? dc.getUsuario().getId() : null;
+            Date fMomento = dc.getFechaTraslado() != null ? dc.getFechaTraslado() : dc.getFechaDeclaracion();
+            String patCamion = dc.getPlacaPatente() != null && !dc.getPlacaPatente().isBlank()
+                    ? dc.getPlacaPatente()
+                    : dc.getPatente();
+            TransporteResolverService.TransporteResolucionResult res = transporteResolverService.resolver(
+                    comId,
+                    dc.getChoferTransporte(),
+                    dc.getRutChofer(),
+                    patCamion,
+                    dc.getPlacaPatenteCarro(),
+                    dc.getVehiculoTransporte(),
+                    fMomento
+            );
+            if (res != null) {
+                dc.setTransportista(res.getTransportista());
+                dc.setVehiculo(res.getVehiculo());
+                dc.setVehiculoCarro(res.getVehiculoCarro());
+            }
+        } catch (Exception e) {
+            System.err.println("Advertencia al resolver transporte comercializador: " + e.getMessage());
         }
     }
 }

@@ -63,6 +63,9 @@ public class DeclaracionPlantaAbastecimientoService {
     @Autowired(required = false)
     private com.trazalga.api.repositories.IHumedadEstadoRepository humedadEstadoRepository;
 
+    @Autowired(required = false)
+    private TransporteResolverService transporteResolverService;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -155,6 +158,7 @@ public class DeclaracionPlantaAbastecimientoService {
         }
         sanearComposicion(declaracion);
         normalizarPatentes(declaracion);
+        resolverTransporte(declaracion);
         DeclaracionPlantaAbastecimientoModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -604,5 +608,32 @@ public class DeclaracionPlantaAbastecimientoService {
             }
         }
         return maxFecha;
+    }
+
+    private void resolverTransporte(DeclaracionPlantaAbastecimientoModel dpa) {
+        if (transporteResolverService == null || dpa == null) return;
+        try {
+            Long comId = dpa.getUsuario() != null ? dpa.getUsuario().getId() : null;
+            Date fMomento = dpa.getFechaIngresoPlanta() != null ? dpa.getFechaIngresoPlanta() : dpa.getFechaTraslado();
+            String patCamion = dpa.getPlacaPatente() != null && !dpa.getPlacaPatente().isBlank()
+                    ? dpa.getPlacaPatente()
+                    : dpa.getPatente();
+            TransporteResolverService.TransporteResolucionResult res = transporteResolverService.resolver(
+                    comId,
+                    dpa.getChoferTransporte(),
+                    dpa.getRutChofer(),
+                    patCamion,
+                    dpa.getPlacaPatenteCarro(),
+                    dpa.getVehiculoTransporte(),
+                    fMomento
+            );
+            if (res != null) {
+                dpa.setTransportista(res.getTransportista());
+                dpa.setVehiculo(res.getVehiculo());
+                dpa.setVehiculoCarro(res.getVehiculoCarro());
+            }
+        } catch (Exception e) {
+            System.err.println("Advertencia al resolver transporte planta: " + e.getMessage());
+        }
     }
 }

@@ -135,6 +135,12 @@ public class SecurityConfig {
                         // 11. Consultas de trazabilidad y búsqueda por folio: ADMINISTRADOR, FISCALIZADOR o AUDITOR (T2.2)
                         .requestMatchers("/api/consultas/**", "/consultas/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
 
+                        // 12. Transporte: mis-frecuentes para usuario autenticado (app movil)
+                        .requestMatchers("/api/transporte/mis-frecuentes", "/transporte/mis-frecuentes").authenticated()
+
+                        // 13. Transporte: nomina, vehiculos y candidatos para ADMIN, FISCALIZADOR o AUDITOR
+                        .requestMatchers("/api/transporte/**", "/transporte/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+
                         // 12. Todo lo demás permitido para compatibilidad operativa de la app móvil
                         .anyRequest().permitAll()
                 )

@@ -116,6 +116,18 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "placa_patente_carro")
     private String placaPatenteCarro;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transportista_id")
+    private TransportistaModel transportista;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehiculo_id")
+    private VehiculoModel vehiculo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehiculo_carro_id")
+    private VehiculoModel vehiculoCarro;
+
     // Relación con el usuario destinatario (Comercializador, Planta, etc.)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_destinatario_id", nullable = true)
