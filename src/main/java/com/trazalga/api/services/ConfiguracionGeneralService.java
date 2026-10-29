@@ -51,6 +51,10 @@ public class ConfiguracionGeneralService {
         createIfNotExist("cuota_accion_extemporanea", "ALERTA_CRITICA", "Acción ante declaración extemporánea: ALERTA_CRITICA o BLOQUEO_TOTAL (TC.4)", "CUOTA");
         createIfNotExist("cuota_imputacion_armador", "INSCRIPCION", "Criterio de imputación territorial para armadores: INSCRIPCION o CALETA_DESEMBARQUE (D1 / TC.8)", "CUOTA");
         updateDescripcionIfExists("cuota_imputacion_armador", "Criterio de imputación territorial para armadores: INSCRIPCION o CALETA_DESEMBARQUE (D1 / TC.8)");
+        // Refinamiento 23-10 · punto 1: barreteado en veda sin cuota propia -> cuota de varado
+        createIfNotExist("cuota_imputacion_veda_activo", "true", "Método en veda sin cuota propia (barreteado): se mantiene la alerta de veda y la captura se imputa a la cuota del método de destino (varado) de la misma especie, comuna y período (refinamiento 23-10)", "CUOTA");
+        createIfNotExist("cuota_imputacion_veda_metodo_origen", "BARRETEADO", "Método declarado que, en veda y sin cuota propia, se imputa a la cuota del método de destino (nombre en el maestro de métodos)", "CUOTA");
+        createIfNotExist("cuota_imputacion_veda_metodo_destino", "VARADO", "Método cuya cuota recibe la imputación cruzada por veda (nombre en el maestro de métodos)", "CUOTA");
 
         // 4. Vedas
         createIfNotExist("veda_modo_operacion", "BLOQUEO_ESTRICTO", "Modo de operación ante veda (BLOQUEO_ESTRICTO o ALERTA_FISCALIZACION)", "VEDA");

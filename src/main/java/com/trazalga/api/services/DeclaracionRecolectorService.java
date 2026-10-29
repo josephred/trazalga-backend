@@ -221,6 +221,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
         declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
         declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        declaracionRecolectorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
 
@@ -305,6 +307,12 @@ public class DeclaracionRecolectorService {
         if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        // findById deja el usuario como proxy LAZY; fuera de transacción (open-in-view=false) leer su comuna
+        // más abajo lanzaba LazyInitializationException. Se carga igual que en resolveDependencies.
+        if (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getId() != null) {
+            declaracionRecolectorModel.setUsuario(entityManager.find(com.trazalga.api.models.UsuarioModel.class,
+                    declaracionRecolectorModel.getUsuario().getId()));
+        }
         resolveDependencies(request);
         validarYResolverCaletaComuna(request);
         declaracionRecolectorModel.setFolioOrigen(request.getFolioOrigen());
@@ -364,6 +372,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
         declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
         declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        declaracionRecolectorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());

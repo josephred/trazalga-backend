@@ -193,6 +193,28 @@ public class CuotaExtraccionController {
         return cuotaService.recalcularHallazgos(id, desde, hasta);
     }
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.cuotas.ImputacionCruzadaVedaService imputacionCruzadaVedaService;
+
+    /**
+     * Recalcula la imputación cruzada por veda (refinamiento 23-10, punto 1) de las declaraciones de origen
+     * cuya fecha de imputación de cuota cae en el rango: un método en veda sin cuota propia (barreteado) se
+     * imputa a la cuota del método de destino (varado) de la misma especie, comuna y período.
+     * Con {@code aplicar=false} (por defecto) sólo informa lo que cambiaría. Sólo ADMIN.
+     * Sólo escribe extraccion_tipo_imputacion_id: no cambia lo declarado ni crea marcas.
+     */
+    @PostMapping(path = "/imputacion-cruzada/recalcular")
+    @PreAuthorize("hasRole('ADMIN')")
+    public com.trazalga.api.dto.ResumenImputacionCruzadaDTO recalcularImputacionCruzada(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate desde,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate hasta,
+            @RequestParam(required = false, defaultValue = "false") boolean aplicar) {
+        if (imputacionCruzadaVedaService == null) {
+            throw new IllegalStateException("Servicio de imputación cruzada por veda no disponible");
+        }
+        return imputacionCruzadaVedaService.recalcularImputaciones(desde, hasta, aplicar);
+    }
+
     // DTO simple para validación de declaración
     public static class ValidateDeclarationRequest {
         public Long usuarioId;
@@ -224,4 +246,4 @@ public class CuotaExtraccionController {
         return out;
     }
 
-}
+}

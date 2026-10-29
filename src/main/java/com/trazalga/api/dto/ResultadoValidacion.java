@@ -45,6 +45,16 @@ public class ResultadoValidacion {
     private BigDecimal factorAplicado;
     private Long factorConversionId;
 
+    /**
+     * Método cuya cuota recibe la captura por imputación cruzada por veda (refinamiento 23-10).
+     * Nulo cuando la declaración consume con su método declarado. Se persiste en
+     * {@code extraccion_tipo_imputacion_id}.
+     */
+    private Long extraccionTipoImputacionId;
+
+    /** Texto es-CL que explica la imputación cruzada, o su ausencia, cuando la declaración está en veda. */
+    private String imputacionDetalle;
+
     public boolean esRechazado() {
         return decision == DecisionValidacion.RECHAZAR;
     }

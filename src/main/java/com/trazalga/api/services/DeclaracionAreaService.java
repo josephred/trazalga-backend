@@ -281,6 +281,8 @@ public class DeclaracionAreaService {
         }
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionAreaModel savedDeclaracion = declaracionAreaRepository.save(declaracion);
 
@@ -433,6 +435,8 @@ public class DeclaracionAreaService {
         }
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionAreaModel updatedDeclaracion = declaracionAreaRepository.save(declaracion);
 

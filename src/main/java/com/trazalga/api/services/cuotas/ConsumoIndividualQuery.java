@@ -118,7 +118,8 @@ public class ConsumoIndividualQuery {
             params.put("especieId", especieId);
         }
         if (extraccionTipoId != null) {
-            sql.append("    AND dr.extraccion_tipo_id = :extraccionTipoId ");
+            // Refinamiento 23-10: método con que la declaración consume cuota (imputación cruzada por veda)
+            sql.append("    AND ").append(MetodoImputacion.sqlMetodoEfectivo("dr")).append(" = :extraccionTipoId ");
             params.put("extraccionTipoId", extraccionTipoId);
         }
 
@@ -134,7 +135,7 @@ public class ConsumoIndividualQuery {
             sql.append("    AND da.especie_id = :especieId ");
         }
         if (extraccionTipoId != null) {
-            sql.append("    AND da.extraccion_tipo_id = :extraccionTipoId ");
+            sql.append("    AND ").append(MetodoImputacion.sqlMetodoEfectivo("da")).append(" = :extraccionTipoId ");
         }
 
         sql.append(") t ")

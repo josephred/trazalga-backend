@@ -96,6 +96,15 @@ public class DeclaracionRecolectorModel {
     @JoinColumn(name = "extraccion_tipo_id", nullable = false)
     private ExtraccionTipoModel extraccionTipo;
 
+    /**
+     * Método cuya cuota recibe la captura cuando hay imputación cruzada por veda (refinamiento 23-10):
+     * p. ej. varado para un barreteado declarado en veda sin cuota de barreteado. Nulo = consume con el
+     * método declarado. Lo calcula el servidor; el método declarado (extraccionTipo) no se modifica.
+     */
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @Column(name = "extraccion_tipo_imputacion_id", nullable = true)
+    private Long extraccionTipoImputacionId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "composicion_id", nullable = true)
     private ComposicionModel composicion;
@@ -163,4 +172,4 @@ public class DeclaracionRecolectorModel {
 
     @Transient
     private String motivoBloqueo;
-}
+}

@@ -77,6 +77,14 @@ public class ValidacionDeclaracionService {
 
     @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.cuotas.ImputacionCruzadaVedaService imputacionCruzadaVedaService;
+
+    public void setImputacionCruzadaVedaService(com.trazalga.api.services.cuotas.ImputacionCruzadaVedaService imputacionCruzadaVedaService) {
+        this.imputacionCruzadaVedaService = imputacionCruzadaVedaService;
+    }
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.indicadores.DesembarqueAtipicoService desembarqueAtipicoService;
 
     @Autowired(required = false)
@@ -166,29 +174,8 @@ public class ValidacionDeclaracionService {
                 regionId,
                 ctx.getFechaExtraccion());
 
-        if (vedaRes.isEnVeda()) {
-            marcas.add(MarcaItem.builder()
-                    .marca("EN_VEDA")
-                    .detalle(vedaRes.getMensaje())
-                    .reglaId(vedaRes.getVedaAplicada() != null ? vedaRes.getVedaAplicada().getId() : null)
-                    .build());
-            if (vedaRes.isBloquear()) {
-                return ResultadoValidacion.builder()
-                        .decision(DecisionValidacion.RECHAZAR)
-                        .motivoRechazo(vedaRes.getMensaje())
-                        .marcas(marcas)
-                        .capturaCalculada(capturaCalculada)
-                        .factorAplicado(factorAplicado)
-                        .factorConversionId(factorConversionId)
-                        .build();
-            } else {
-                advertencias.add(vedaRes.getMensaje());
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 3. Evaluación de Cuotas de Extracción (TC.8)
-        // ---------------------------------------------------------------------
+        // Comuna de imputación de cuota (TC.8). Se resuelve antes de la veda porque la imputación
+        // cruzada por veda (refinamiento 23-10) depende de las cuotas de esa comuna.
         Long comunaImputacion;
         if (resolutorImputacion != null) {
             comunaImputacion = resolutorImputacion.resolver(ctx.getTipoDeclaracion()).comunaImputacion(ctx);
@@ -198,6 +185,67 @@ public class ValidacionDeclaracionService {
                     : (ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId());
         }
 
+        // Método con que la declaración consume cuota: el declarado, salvo imputación cruzada por veda.
+        Long metodoCuotaId = ctx.getExtraccionTipoId();
+        Long extraccionTipoImputacionId = null;
+        String imputacionDetalle = null;
+
+        if (vedaRes.isEnVeda()) {
+            if (vedaRes.isBloquear()) {
+                marcas.add(MarcaItem.builder()
+                        .marca("EN_VEDA")
+                        .detalle(vedaRes.getMensaje())
+                        .reglaId(vedaRes.getVedaAplicada() != null ? vedaRes.getVedaAplicada().getId() : null)
+                        .build());
+                return ResultadoValidacion.builder()
+                        .decision(DecisionValidacion.RECHAZAR)
+                        .motivoRechazo(vedaRes.getMensaje())
+                        .marcas(marcas)
+                        .capturaCalculada(capturaCalculada)
+                        .factorAplicado(factorAplicado)
+                        .factorConversionId(factorConversionId)
+                        .build();
+            }
+
+            // Refinamiento 23-10 · punto 1: un método en veda sin cuota propia (barreteado) se imputa a la
+            // cuota del método de destino (varado) de la misma especie, comuna y período. La alerta se mantiene.
+            String detalleVeda = vedaRes.getMensaje();
+            if (imputacionCruzadaVedaService != null) {
+                com.trazalga.api.services.cuotas.ImputacionCruzadaVedaService.Resultado imp =
+                        imputacionCruzadaVedaService.resolver(
+                                com.trazalga.api.services.cuotas.ImputacionCruzadaVedaService.ContextoImputacion.builder()
+                                        .perfil(ctx.getTipoDeclaracion())
+                                        .usuarioId(ctx.getUsuarioId())
+                                        .amerbId(ctx.getAmerbId())
+                                        .especieId(ctx.getEspecieId())
+                                        .extraccionTipoId(ctx.getExtraccionTipoId())
+                                        .comunaImputacionId(comunaImputacion)
+                                        .fechaExtraccion(ctx.getFechaExtraccion())
+                                        .fechaDeclaracion(ctx.getFechaDeclaracion())
+                                        .enVeda(true)
+                                        .build());
+                if (imp != null) {
+                    if (imp.isCruzada()) {
+                        metodoCuotaId = imp.getMetodoImputacionId();
+                        extraccionTipoImputacionId = imp.getMetodoImputacionId();
+                    }
+                    imputacionDetalle = imp.texto(capturaCalculada);
+                    if (imputacionDetalle != null) {
+                        detalleVeda = (detalleVeda != null ? detalleVeda + ". " : "") + imputacionDetalle;
+                    }
+                }
+            }
+            marcas.add(MarcaItem.builder()
+                    .marca("EN_VEDA")
+                    .detalle(detalleVeda)
+                    .reglaId(vedaRes.getVedaAplicada() != null ? vedaRes.getVedaAplicada().getId() : null)
+                    .build());
+            advertencias.add(detalleVeda);
+        }
+
+        // ---------------------------------------------------------------------
+        // 3. Evaluación de Cuotas de Extracción (TC.8)
+        // ---------------------------------------------------------------------
         CuotaExtraccionService.EvaluacionCuotaResult cuotaRes;
         if (Boolean.TRUE.equals(ctx.getEsEdicion())) {
             cuotaRes = cuotaExtraccionService.evaluarCuotaDeclaracion(
@@ -205,7 +253,7 @@ public class ValidacionDeclaracionService {
                     ctx.getUsuarioId(),
                     ctx.getAmerbId(),
                     ctx.getEspecieId(),
-                    ctx.getExtraccionTipoId(),
+                    metodoCuotaId,
                     comunaImputacion,
                     ctx.getFechaExtraccion(),
                     ctx.getFechaDeclaracion(),
@@ -219,7 +267,7 @@ public class ValidacionDeclaracionService {
                     ctx.getUsuarioId(),
                     ctx.getAmerbId(),
                     ctx.getEspecieId(),
-                    ctx.getExtraccionTipoId(),
+                    metodoCuotaId,
                     comunaImputacion,
                     ctx.getFechaExtraccion(),
                     ctx.getFechaDeclaracion(),
@@ -245,6 +293,8 @@ public class ValidacionDeclaracionService {
                     .capturaCalculada(capturaCalculada)
                     .factorAplicado(factorAplicado)
                     .factorConversionId(factorConversionId)
+                    .extraccionTipoImputacionId(extraccionTipoImputacionId)
+                    .imputacionDetalle(imputacionDetalle)
                     .build();
         }
 
@@ -281,6 +331,8 @@ public class ValidacionDeclaracionService {
                         .capturaCalculada(capturaCalculada)
                         .factorAplicado(factorAplicado)
                         .factorConversionId(factorConversionId)
+                        .extraccionTipoImputacionId(extraccionTipoImputacionId)
+                        .imputacionDetalle(imputacionDetalle)
                         .build();
             } else {
                 advertencias.add(ledRes.getMensaje());
@@ -408,6 +460,8 @@ public class ValidacionDeclaracionService {
                 .capturaCalculada(capturaCalculada)
                 .factorAplicado(factorAplicado)
                 .factorConversionId(factorConversionId)
+                .extraccionTipoImputacionId(extraccionTipoImputacionId)
+                .imputacionDetalle(imputacionDetalle)
                 .build();
     }
 

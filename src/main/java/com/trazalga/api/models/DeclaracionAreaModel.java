@@ -102,6 +102,14 @@ public class DeclaracionAreaModel {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ExtraccionTipoModel extraccionTipo;
 
+    /**
+     * Método cuya cuota recibe la captura cuando hay imputación cruzada por veda (refinamiento 23-10).
+     * Nulo = consume con el método declarado. Lo calcula el servidor; extraccionTipo no se modifica.
+     */
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @Column(name = "extraccion_tipo_imputacion_id", nullable = true)
+    private Long extraccionTipoImputacionId;
+
     @Column(name = "factor_aplicado", precision = 8, scale = 4)
     private BigDecimal factorAplicado;
 
@@ -166,4 +174,4 @@ public class DeclaracionAreaModel {
 
     @Transient
     private String motivoBloqueo;
-}
+}

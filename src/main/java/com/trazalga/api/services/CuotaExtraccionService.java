@@ -616,7 +616,9 @@ public class CuotaExtraccionService {
                 sql.append("AND d.especie_id = :especieId ");
             }
             if (cuota.getExtraccionTipo() != null) {
-                sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
+                // Refinamiento 23-10: método con que la declaración consume cuota (imputación cruzada por veda)
+                sql.append("AND ").append(com.trazalga.api.services.cuotas.MetodoImputacion.sqlMetodoEfectivo("d"))
+                   .append(" = :extraccionTipoId ");
             }
             sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate");
 
@@ -904,26 +906,8 @@ public class CuotaExtraccionService {
         java.time.LocalDate hoyParaVencimiento = f_ing != null ? f_ing : java.time.LocalDate.now();
 
         // 3. Filtrar cuotas aplicables mediante especificaciones combinables
-        List<CuotaExtraccionModel> aplicables = new ArrayList<>();
-        for (CuotaExtraccionModel c : todasCuotas) {
-            if (!ambitoAplica(c, perfil)) continue;
-            if (!especieAplica(c, especieId)) continue;
-            if (!metodoAplica(c, extraccionTipoId)) continue;
-            java.time.LocalDate cierre = c.fechaCierreEfectiva(hoyParaVencimiento, cierrePorVencimientoActivo);
-            if (!vigenciaContiene(c, f_imp, cierre)) continue;
-            if (!amerbAplica(c, amerbId)) continue;
-            if (!usuarioAplica(c, usuarioId)) continue;
-            if (comunaImputacionId != null && !contieneComuna(c, comunaImputacionId)) continue;
-
-            aplicables.add(c);
-        }
-
-        // D6: Persona específica sobre plantilla (la cuota individual específica reemplaza a la general)
-        boolean tieneCuotaIndividualEspecifica = aplicables.stream()
-                .anyMatch(c -> c.getUsuario() != null && usuarioId != null && c.getUsuario().getId().equals(usuarioId));
-        if (tieneCuotaIndividualEspecifica) {
-            aplicables.removeIf(c -> Boolean.TRUE.equals(c.getEsPlantilla()));
-        }
+        List<CuotaExtraccionModel> aplicables = filtrarCuotasAplicables(todasCuotas, perfil, usuarioId, amerbId,
+                especieId, extraccionTipoId, comunaImputacionId, f_imp, hoyParaVencimiento, cierrePorVencimientoActivo);
 
         if (aplicables.isEmpty()) {
             return new EvaluacionCuotaResult(true, false, false, false, false, null, java.util.Collections.emptyList(),
@@ -1078,6 +1062,78 @@ public class CuotaExtraccionService {
 
         return new EvaluacionCuotaResult(true, false, false, false, false, null, java.util.Collections.emptyList(),
                 totalCuello, limiteCuello, "Declaración dentro de la cuota.", cuotaCuelloBotella);
+    }
+
+    /**
+     * Cuotas activas que aplican a una declaración: ámbito, especie, método, vigencia, AMERB, persona y
+     * comuna de imputación, más la regla D6 (la cuota individual específica reemplaza a la plantilla).
+     *
+     * <p>Es la misma selección que hace {@link #evaluarCuotaDeclaracion}, sin calcular consumo ni
+     * registrar avisos, de modo que no tiene efectos laterales. La usa la imputación cruzada por veda
+     * (refinamiento 23-10) para saber si un método tiene cuota en la comuna y el período.</p>
+     */
+    public List<CuotaExtraccionModel> cuotasAplicables(
+            String perfil,
+            Long usuarioId,
+            Long amerbId,
+            Long especieId,
+            Long extraccionTipoId,
+            Long comunaImputacionId,
+            Date fechaExtraccion,
+            Date fechaDeclaracion) {
+        String modo = getModoImputacion();
+        Date fechaEval;
+        if ("DECLARACION".equalsIgnoreCase(modo)) {
+            fechaEval = (fechaDeclaracion != null) ? fechaDeclaracion : (fechaExtraccion != null ? fechaExtraccion : new Date());
+        } else {
+            fechaEval = (fechaExtraccion != null) ? fechaExtraccion : (fechaDeclaracion != null ? fechaDeclaracion : new Date());
+        }
+        java.time.LocalDate f_imp = toLocalDateSafe(fechaEval);
+        java.time.LocalDate f_ing = toLocalDateSafe(fechaDeclaracion != null ? fechaDeclaracion : (fechaExtraccion != null ? fechaExtraccion : new Date()));
+
+        boolean cierrePorVencimientoActivo = (configuracionGeneralService != null)
+                && configuracionGeneralService.getBoolean("cuota_cierre_automatico_vencimiento", false);
+        java.time.LocalDate hoyParaVencimiento = f_ing != null ? f_ing : java.time.LocalDate.now();
+
+        return filtrarCuotasAplicables(cuotaRepository.findByActivoTrue(), perfil, usuarioId, amerbId,
+                especieId, extraccionTipoId, comunaImputacionId, f_imp, hoyParaVencimiento, cierrePorVencimientoActivo);
+    }
+
+    private List<CuotaExtraccionModel> filtrarCuotasAplicables(
+            List<CuotaExtraccionModel> todasCuotas,
+            String perfil,
+            Long usuarioId,
+            Long amerbId,
+            Long especieId,
+            Long extraccionTipoId,
+            Long comunaImputacionId,
+            java.time.LocalDate f_imp,
+            java.time.LocalDate hoyParaVencimiento,
+            boolean cierrePorVencimientoActivo) {
+        List<CuotaExtraccionModel> aplicables = new ArrayList<>();
+        if (todasCuotas == null) {
+            return aplicables;
+        }
+        for (CuotaExtraccionModel c : todasCuotas) {
+            if (!ambitoAplica(c, perfil)) continue;
+            if (!especieAplica(c, especieId)) continue;
+            if (!metodoAplica(c, extraccionTipoId)) continue;
+            java.time.LocalDate cierre = c.fechaCierreEfectiva(hoyParaVencimiento, cierrePorVencimientoActivo);
+            if (!vigenciaContiene(c, f_imp, cierre)) continue;
+            if (!amerbAplica(c, amerbId)) continue;
+            if (!usuarioAplica(c, usuarioId)) continue;
+            if (comunaImputacionId != null && !contieneComuna(c, comunaImputacionId)) continue;
+
+            aplicables.add(c);
+        }
+
+        // D6: Persona específica sobre plantilla (la cuota individual específica reemplaza a la general)
+        boolean tieneCuotaIndividualEspecifica = aplicables.stream()
+                .anyMatch(c -> c.getUsuario() != null && usuarioId != null && c.getUsuario().getId().equals(usuarioId));
+        if (tieneCuotaIndividualEspecifica) {
+            aplicables.removeIf(c -> Boolean.TRUE.equals(c.getEsPlantilla()));
+        }
+        return aplicables;
     }
 
     public int calcularEspecificidadCuota(CuotaExtraccionModel c) {
@@ -1958,7 +2014,9 @@ public class CuotaExtraccionService {
             sql.append("AND d.especie_id = :especieId ");
         }
         if (cuota.getExtraccionTipo() != null) {
-            sql.append("AND d.extraccion_tipo_id = :extraccionTipoId ");
+            // Refinamiento 23-10: método con que la declaración consume cuota (imputación cruzada por veda)
+            sql.append("AND ").append(com.trazalga.api.services.cuotas.MetodoImputacion.sqlMetodoEfectivo("d"))
+               .append(" = :extraccionTipoId ");
         }
         sql.append("AND d.").append(colFecha).append(" BETWEEN :startDate AND :endDate ");
         if (declaracionExcluidaId != null) {
@@ -2386,4 +2444,4 @@ public class CuotaExtraccionService {
         public boolean isAllowed() { return allowed; }
         public String getMessage() { return message; }
     }
-}
+}

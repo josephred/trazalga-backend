@@ -58,6 +58,11 @@ public class ParametrosService {
     public static final String PARAM_BIO_HUMEDO_MERMA_MINIMA_PCT = "bio_humedo_merma_minima_pct";
     public static final String PARAM_BIO_SECO_MERMA_MAXIMA_PCT = "bio_seco_merma_maxima_pct";
 
+    // Refinamiento 23-10 · punto 1: imputación cruzada por veda (barreteado en veda -> cuota de varado)
+    public static final String PARAM_CUOTA_IMPUTACION_VEDA_ACTIVO = "cuota_imputacion_veda_activo";
+    public static final String PARAM_CUOTA_IMPUTACION_VEDA_METODO_ORIGEN = "cuota_imputacion_veda_metodo_origen";
+    public static final String PARAM_CUOTA_IMPUTACION_VEDA_METODO_DESTINO = "cuota_imputacion_veda_metodo_destino";
+
     @Autowired
     @Lazy
     private ConfiguracionGeneralService configService;
@@ -73,6 +78,24 @@ public class ParametrosService {
     private final AtomicReference<ParametrosVariacion> variacionCache = new AtomicReference<>();
     private final AtomicReference<ParametrosDesembarque> desembarqueCache = new AtomicReference<>();
     private final AtomicReference<CoherenciaHumedad.ParametrosCoherencia> coherenciaHumedadCache = new AtomicReference<>();
+    private final AtomicReference<ParametrosImputacionVeda> imputacionVedaCache = new AtomicReference<>();
+
+    /**
+     * Imputación cruzada por veda (refinamiento 23-10, punto 1): un método declarado en veda y sin
+     * cuota propia se imputa a la cuota del método de destino de la misma especie, comuna y período.
+     */
+    public ParametrosImputacionVeda imputacionVeda() {
+        ParametrosImputacionVeda cached = imputacionVedaCache.get();
+        if (cached == null) {
+            cached = new ParametrosImputacionVeda(
+                    getBoolean(PARAM_CUOTA_IMPUTACION_VEDA_ACTIVO, true),
+                    getString(PARAM_CUOTA_IMPUTACION_VEDA_METODO_ORIGEN, "BARRETEADO"),
+                    getString(PARAM_CUOTA_IMPUTACION_VEDA_METODO_DESTINO, "VARADO")
+            );
+            imputacionVedaCache.compareAndSet(null, cached);
+        }
+        return cached;
+    }
 
     public ParametrosCuota cuotas() {
         ParametrosCuota cached = cuotaCache.get();
@@ -167,6 +190,7 @@ public class ParametrosService {
         variacionCache.set(null);
         desembarqueCache.set(null);
         coherenciaHumedadCache.set(null);
+        imputacionVedaCache.set(null);
         log.debug("Caché de parámetros tipados invalidado exitosamente.");
     }
 

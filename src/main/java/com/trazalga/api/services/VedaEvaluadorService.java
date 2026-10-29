@@ -43,7 +43,12 @@ public class VedaEvaluadorService {
 
     /**
      * Evalúa si una extracción se encuentra en periodo de veda, contrastando la fecha de extracción.
+     *
+     * <p>Transaccional de sólo lectura: el mensaje lee relaciones LAZY de la veda (especie, método y
+     * región). Sin transacción, con {@code open-in-view=false}, una declaración en veda terminaba en
+     * LazyInitializationException al guardar.</p>
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public EvaluacionVedaResult evaluar(Long especieId, Long extraccionTipoId, Long regionId, Date fechaExtraccion) {
         if (especieId == null) {
             return new EvaluacionVedaResult(false, false, "Especie no especificada", null);

@@ -50,6 +50,19 @@ public class FichaTrazabilidadService {
     @Autowired(required = false)
     private ConfiguracionGeneralService configService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IExtraccionTipoRepository extraccionTipoRepository;
+
+    /** Refinamiento 23-10: nombre del método de imputación cruzada por veda (nulo si no hay). */
+    private String nombreMetodoImputacion(Long extraccionTipoImputacionId) {
+        if (extraccionTipoImputacionId == null || extraccionTipoRepository == null) {
+            return null;
+        }
+        return extraccionTipoRepository.findById(extraccionTipoImputacionId)
+                .map(com.trazalga.api.models.ExtraccionTipoModel::getNombre)
+                .orElse(null);
+    }
+
     public void setReferenciaOrigenService(ReferenciaOrigenService referenciaOrigenService) {
         this.referenciaOrigenService = referenciaOrigenService;
     }
@@ -256,6 +269,7 @@ public class FichaTrazabilidadService {
                  .nombre(r.getUsuario() != null ? formatNombre(r.getUsuario()) : r.getNombre())
                  .perfil(r.getUsuario() != null && r.getUsuario().getPerfil() != null ? r.getUsuario().getPerfil().getNombre() : "Recolector de orilla")
                  .metodoExtraccion(r.getExtraccionTipo() != null ? r.getExtraccionTipo().getNombre() : null)
+                 .metodoImputacionCuota(nombreMetodoImputacion(r.getExtraccionTipoImputacionId()))
                  .especie(r.getEspecie() != null ? r.getEspecie().getNombre() : ref.getEspecieNombre())
                  .estadoHumedad(r.getHumedadEstado() != null ? r.getHumedadEstado().getNombre() : ref.getHumedadNombre())
                  .humedadHigrometro(r.getHumedad())
@@ -316,6 +330,7 @@ public class FichaTrazabilidadService {
                  .buzoNombre(buzoNom)
                  .buzoCodigo(buzoCod)
                  .metodoExtraccion(a.getExtraccionTipo() != null ? a.getExtraccionTipo().getNombre() : null)
+                 .metodoImputacionCuota(nombreMetodoImputacion(a.getExtraccionTipoImputacionId()))
                  .especie(a.getEspecie() != null ? a.getEspecie().getNombre() : ref.getEspecieNombre())
                  .estadoHumedad(a.getHumedadEstado() != null ? a.getHumedadEstado().getNombre() : ref.getHumedadNombre())
                  .caleta(a.getCaleta() != null ? a.getCaleta().getNombre() : null)
@@ -358,6 +373,8 @@ public class FichaTrazabilidadService {
                 b.rut(ar.getUsuario() != null ? ar.getUsuario().getRut() : null)
                  .nombre(ar.getUsuario() != null ? formatNombre(ar.getUsuario()) : null)
                  .perfil(ar.getUsuario() != null && ar.getUsuario().getPerfil() != null ? ar.getUsuario().getPerfil().getNombre() : "Organización AMERB")
+                 .metodoExtraccion(ar.getExtraccionTipo() != null ? ar.getExtraccionTipo().getNombre() : null)
+                 .metodoImputacionCuota(nombreMetodoImputacion(ar.getExtraccionTipoImputacionId()))
                  .especie(ar.getEspecie() != null ? ar.getEspecie().getNombre() : ref.getEspecieNombre())
                  .estadoHumedad(ar.getHumedadEstado() != null ? ar.getHumedadEstado().getNombre() : ref.getHumedadNombre())
                  .caleta(ar.getCaleta() != null ? ar.getCaleta().getNombre() : null)

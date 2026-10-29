@@ -285,6 +285,8 @@ public class DeclaracionArmadorService {
         declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
         
         DeclaracionArmadorModel savedDeclaracion = declaracionArmadorRepository.save(declaracion);
 
@@ -546,6 +548,7 @@ public class DeclaracionArmadorService {
         declaracionArmadorModel.setCaptura(resVal.getCapturaCalculada().doubleValue());
         declaracionArmadorModel.setFactorAplicado(resVal.getFactorAplicado());
         declaracionArmadorModel.setFactorConversionId(resVal.getFactorConversionId());
+        declaracionArmadorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionArmadorModel updatedDeclaracion = declaracionArmadorRepository.save(declaracionArmadorModel);
 

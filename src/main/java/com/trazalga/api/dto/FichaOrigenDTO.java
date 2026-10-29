@@ -32,6 +32,8 @@ public class FichaOrigenDTO {
 
     // Método y especie
     private String metodoExtraccion;
+    /** Refinamiento 23-10: método cuya cuota recibe la captura por imputación cruzada por veda (nulo = el declarado). */
+    private String metodoImputacionCuota;
     private String especie;
     private String estadoHumedad;
     private String humedadHigrometro;
