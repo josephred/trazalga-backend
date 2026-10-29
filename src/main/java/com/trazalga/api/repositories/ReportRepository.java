@@ -367,9 +367,9 @@ public class ReportRepository {
             "LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
             "LEFT JOIN amerb am ON decl.amerb_id = am.id " +
             "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id, am.region_id) " +
-            "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "LEFT JOIN especie e ON decl.especie_id = e.id " +
             "LEFT JOIN extraccion_tipo ext ON decl.extraccion_tipo_id = ext.id " +
-            "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+            "LEFT JOIN usuario u ON decl.usuario_id = u.id " +
             "LEFT JOIN declaracion_marca dm ON dm.declaracion_tipo = decl.tipo_perfil AND dm.declaracion_id = decl.id AND dm.marca = 'EN_VEDA' " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
             "    AND (v.activo = true OR v.activo = 1) " +
@@ -390,7 +390,7 @@ public class ReportRepository {
             "    ) " +
             "WHERE 1=1" + filterBuilder.toString() + " " +
             "GROUP BY decl.id, decl.tipo_perfil, decl.folio, decl.fecha_extraccion, decl.fecha_declaracion, decl.desembarque, " +
-            "e.nombre, ext.nombre, u.rut, u.nombres, u.apellidop, cal.nombre, c.nombre, reg.nombre " +
+            "e.nombre, ext.nombre, u.rut, u.nombres, u.apellidop, cal.nombre, c_cal.nombre, c.nombre, reg.nombre " +
             "ORDER BY COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) DESC, decl.id DESC";
 
         Query query = entityManager.createNativeQuery(sql);
