@@ -38,6 +38,13 @@ public class ConfiguracionGeneralService {
         // 2. Captura
         createIfNotExist("captura_politica_sin_factor", "USAR_DEFAULT", "USAR_DEFAULT o RECHAZAR_DECLARACION cuando no hay factor vigente", "CAPTURA");
         createIfNotExist("captura_factor_default", "1.0000", "Factor de respaldo cuando la política es USAR_DEFAULT", "CAPTURA");
+        // Refinamiento 23-10 · punto 3: Subreporte Huiro Palo (IFOP: la fronda es el 22 % de la captura biológica)
+        createIfNotExist("subreporte_huiro_palo_activo", "true", "Muestra la tarjeta Subreporte Huiro Palo: kilos de fronda no declarados en el barreteado sin fronda (refinamiento 23-10)", "CAPTURA");
+        createIfNotExist("subreporte_huiro_palo_especie", "HUIRO PALO", "Especie del Subreporte Huiro Palo (nombre en el maestro de especies)", "CAPTURA");
+        createIfNotExist("subreporte_huiro_palo_metodo", "BARRETEADO", "Método de extracción declarado del Subreporte Huiro Palo (nombre en el maestro de métodos)", "CAPTURA");
+        createIfNotExist("subreporte_huiro_palo_composicion", "SIN FRONDA", "Composición de fronda del Subreporte Huiro Palo (nombre en el maestro de composiciones)", "CAPTURA");
+        createIfNotExist("subreporte_huiro_palo_factor_pct", "22", "Porcentaje de fronda en la captura biológica de huiro palo (IFOP)", "CAPTURA");
+        createIfNotExist("subreporte_huiro_palo_formula", "SOBRE_SIN_FRONDA", "SOBRE_SIN_FRONDA: captura sin fronda x %; SOBRE_TOTAL: el % es de la biomasa total (x % / (100 - %))", "CAPTURA");
 
         // 3. Cuotas
         createIfNotExist("cuota_fecha_imputacion", "EXTRACCION", "Fecha utilizada para imputar el consumo de cuota mensual: EXTRACCION o DECLARACION", "CUOTA");

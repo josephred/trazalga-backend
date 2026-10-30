@@ -63,6 +63,14 @@ public class ParametrosService {
     public static final String PARAM_CUOTA_IMPUTACION_VEDA_METODO_ORIGEN = "cuota_imputacion_veda_metodo_origen";
     public static final String PARAM_CUOTA_IMPUTACION_VEDA_METODO_DESTINO = "cuota_imputacion_veda_metodo_destino";
 
+    // Refinamiento 23-10 · punto 3: Subreporte Huiro Palo (barreteado sin fronda × % de fronda IFOP)
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_ACTIVO = "subreporte_huiro_palo_activo";
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_ESPECIE = "subreporte_huiro_palo_especie";
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_METODO = "subreporte_huiro_palo_metodo";
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_COMPOSICION = "subreporte_huiro_palo_composicion";
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_FACTOR_PCT = "subreporte_huiro_palo_factor_pct";
+    public static final String PARAM_SUBREPORTE_HUIRO_PALO_FORMULA = "subreporte_huiro_palo_formula";
+
     @Autowired
     @Lazy
     private ConfiguracionGeneralService configService;
@@ -79,6 +87,28 @@ public class ParametrosService {
     private final AtomicReference<ParametrosDesembarque> desembarqueCache = new AtomicReference<>();
     private final AtomicReference<CoherenciaHumedad.ParametrosCoherencia> coherenciaHumedadCache = new AtomicReference<>();
     private final AtomicReference<ParametrosImputacionVeda> imputacionVedaCache = new AtomicReference<>();
+    private final AtomicReference<ParametrosSubreporteHuiroPalo> subreporteHuiroPaloCache = new AtomicReference<>();
+
+    /**
+     * Subreporte Huiro Palo (refinamiento 23-10, punto 3): estima los kilos de fronda que no quedan
+     * declarados cuando el huiro palo barreteado se declara "sin fronda".
+     */
+    public ParametrosSubreporteHuiroPalo subreporteHuiroPalo() {
+        ParametrosSubreporteHuiroPalo cached = subreporteHuiroPaloCache.get();
+        if (cached == null) {
+            ParametrosSubreporteHuiroPalo def = ParametrosSubreporteHuiroPalo.porDefecto();
+            cached = new ParametrosSubreporteHuiroPalo(
+                    getBoolean(PARAM_SUBREPORTE_HUIRO_PALO_ACTIVO, def.activo()),
+                    getString(PARAM_SUBREPORTE_HUIRO_PALO_ESPECIE, def.especie()),
+                    getString(PARAM_SUBREPORTE_HUIRO_PALO_METODO, def.metodo()),
+                    getString(PARAM_SUBREPORTE_HUIRO_PALO_COMPOSICION, def.composicion()),
+                    getDouble(PARAM_SUBREPORTE_HUIRO_PALO_FACTOR_PCT, def.factorPct()),
+                    getString(PARAM_SUBREPORTE_HUIRO_PALO_FORMULA, def.formula())
+            );
+            subreporteHuiroPaloCache.compareAndSet(null, cached);
+        }
+        return cached;
+    }
 
     /**
      * Imputación cruzada por veda (refinamiento 23-10, punto 1): un método declarado en veda y sin
@@ -191,6 +221,7 @@ public class ParametrosService {
         desembarqueCache.set(null);
         coherenciaHumedadCache.set(null);
         imputacionVedaCache.set(null);
+        subreporteHuiroPaloCache.set(null);
         log.debug("Caché de parámetros tipados invalidado exitosamente.");
     }
 
