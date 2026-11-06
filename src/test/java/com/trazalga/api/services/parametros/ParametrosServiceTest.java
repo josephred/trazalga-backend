@@ -42,7 +42,6 @@ public class ParametrosServiceTest {
         assertFalse(cuotas.cierreAutomaticoVencimiento());
         assertEquals(0, cuotas.diasGraciaDeclaracion());
         assertEquals("ALERTA_CRITICA", cuotas.accionExtemporanea());
-        assertEquals("INSCRIPCION", cuotas.imputacionArmador());
         assertEquals(10.0, cuotas.umbralRestantePct());
 
         ParametrosRetencion retencion = parametrosService.retencion();

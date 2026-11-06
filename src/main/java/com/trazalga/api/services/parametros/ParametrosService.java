@@ -134,7 +134,6 @@ public class ParametrosService {
                     getBoolean("cuota_cierre_automatico_vencimiento", false),
                     getInt("cuota_dias_gracia_declaracion", 0),
                     getString("cuota_accion_extemporanea", "ALERTA_CRITICA"),
-                    getString("cuota_imputacion_armador", "INSCRIPCION"),
                     getDouble("cuota_umbral_restante_pct", 10.0)
             );
             cuotaCache.compareAndSet(null, cached);

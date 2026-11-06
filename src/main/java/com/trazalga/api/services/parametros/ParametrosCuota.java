@@ -7,6 +7,5 @@ public record ParametrosCuota(
         boolean cierreAutomaticoVencimiento,
         int diasGraciaDeclaracion,
         String accionExtemporanea,
-        String imputacionArmador,
         double umbralRestantePct
 ) {}

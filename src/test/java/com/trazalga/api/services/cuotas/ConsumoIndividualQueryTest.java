@@ -64,7 +64,7 @@ public class ConsumoIndividualQueryTest {
         cuotaPlantilla.setProvincia(new ProvinciaModel());
 
         when(resolutorImputacion.resolver("RECOLECTOR")).thenReturn(new ReglaImputacionInscripcion());
-        when(resolutorImputacion.resolver("ARMADOR")).thenReturn(new ReglaImputacionCaletaDesembarque());
+        when(resolutorImputacion.resolver("ARMADOR")).thenReturn(new ReglaImputacionInscripcion());
     }
 
     @Test

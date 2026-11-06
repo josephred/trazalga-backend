@@ -180,9 +180,8 @@ public class ValidacionDeclaracionService {
         if (resolutorImputacion != null) {
             comunaImputacion = resolutorImputacion.resolver(ctx.getTipoDeclaracion()).comunaImputacion(ctx);
         } else {
-            comunaImputacion = "RECOLECTOR".equalsIgnoreCase(ctx.getTipoDeclaracion())
-                    ? (ctx.getComunaInscripcionId() != null ? ctx.getComunaInscripcionId() : ctx.getComunaDesembarqueId())
-                    : (ctx.getComunaDesembarqueId() != null ? ctx.getComunaDesembarqueId() : ctx.getComunaInscripcionId());
+            // Comuna del usuario que declara; si no tiene, la de desembarque (06-11-2026)
+            comunaImputacion = ctx.getComunaInscripcionId() != null ? ctx.getComunaInscripcionId() : ctx.getComunaDesembarqueId();
         }
 
         // Método con que la declaración consume cuota: el declarado, salvo imputación cruzada por veda.

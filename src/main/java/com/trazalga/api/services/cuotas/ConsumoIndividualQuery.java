@@ -89,8 +89,8 @@ public class ConsumoIndividualQuery {
         // Expresión de imputación para recolector y armador (TC.8)
         ReglaImputacionTerritorial reglaRecolector = resolutorImputacion.resolver("RECOLECTOR");
         ReglaImputacionTerritorial reglaArmador = resolutorImputacion.resolver("ARMADOR");
-        String sqlComunaRec = reglaRecolector.sqlComuna("dr", "u_rec");
-        String sqlComunaArm = reglaArmador.sqlComuna("da", "u_arm");
+        String sqlComunaRec = reglaRecolector.sqlComuna(ReglaImputacionInscripcion.TABLA_RECOLECTOR, "dr", "u_rec");
+        String sqlComunaArm = reglaArmador.sqlComuna(ReglaImputacionInscripcion.TABLA_ARMADOR, "da", "u_arm");
 
         // Construir consulta nativa unificada
         StringBuilder sql = new StringBuilder();

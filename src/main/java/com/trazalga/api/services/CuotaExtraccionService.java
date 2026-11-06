@@ -166,9 +166,7 @@ public class CuotaExtraccionService {
             return resolutorImputacion;
         }
         return new com.trazalga.api.services.cuotas.ResolutorImputacionTerritorial(
-                new com.trazalga.api.services.cuotas.ReglaImputacionInscripcion(),
-                new com.trazalga.api.services.cuotas.ReglaImputacionCaletaDesembarque(),
-                null);
+                new com.trazalga.api.services.cuotas.ReglaImputacionInscripcion());
     }
 
     public List<CuotaExtraccionModel> getAll() {
@@ -1904,11 +1902,12 @@ public class CuotaExtraccionService {
         } else {
             String actor = "declaracion_recolector".equals(tableName) ? "RECOLECTOR" : ("declaracion_armador".equals(tableName) ? "ARMADOR" : "AREA");
             ReglaImputacionTerritorial regla = getResolutorImputacion().resolver(actor);
-            String sqlComuna = (regla != null) ? regla.sqlComuna("d", "u") : ("declaracion_recolector".equals(tableName) ? "COALESCE(u.comuna_id, d.comuna_id)" : "d.comuna_id");
+            // Comuna del usuario que declara (usuario.comuna_id); si no tiene, la de desembarque (06-11-2026)
+            String sqlComuna = (regla != null) ? regla.sqlComuna(tableName, "d", "u")
+                    : com.trazalga.api.services.cuotas.ReglaImputacionInscripcion.sql(tableName, "d", "u");
 
-            if (sqlComuna.contains("u.")) {
-                sql.append("JOIN usuario u ON d.usuario_id = u.id ");
-            }
+            // LEFT JOIN: una declaración sin usuario igual cae a la comuna de desembarque
+            sql.append("LEFT JOIN usuario u ON d.usuario_id = u.id ");
 
             if ("COMUNA".equals(nivelAgregacion)) {
                 Set<Long> cIds = idsComunas(cuota);
@@ -2055,12 +2054,14 @@ public class CuotaExtraccionService {
         Long idExcluirRecolector = excluirEnRecolector ? declaracionExcluidaId : null;
         Long idExcluirArmador = excluirEnArmador ? declaracionExcluidaId : null;
 
-        // 1. Consumo de recolectores — imputación por comuna de inscripción del usuario (u.comuna_id)
+        // Recolectores y armadores se imputan por la comuna del usuario que declara (u.comuna_id),
+        // con respaldo a la comuna de desembarque si el usuario no tiene comuna (06-11-2026).
+        // 1. Consumo de recolectores
         FiltroTerritorialCuota filtroRecolector = construirFiltroTerritorial(cuota, "declaracion_recolector", targetUsuarioId);
         BigDecimal consumoRecolector = ejecutarQueryConsumo(
                 "declaracion_recolector", colMetrica, filtroRecolector, cuota, rango, idExcluirRecolector);
 
-        // 2. Consumo de armadores — imputación por caleta de desembarque (d.comuna_id)
+        // 2. Consumo de armadores
         FiltroTerritorialCuota filtroArmador = construirFiltroTerritorial(cuota, "declaracion_armador", targetUsuarioId);
         BigDecimal consumoArmador = ejecutarQueryConsumo(
                 "declaracion_armador", colMetrica, filtroArmador, cuota, rango, idExcluirArmador);

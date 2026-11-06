@@ -439,10 +439,12 @@ public class RecalculoCuotaService {
         java.sql.Date sqlInicio = java.sql.Date.valueOf(fInicio);
         java.sql.Date sqlFin = java.sql.Date.valueOf(fFin);
 
+        // La columna 3 es la comuna de imputación: la del usuario que declara y, si no tiene, la de
+        // desembarque (06-11-2026), la misma expresión que usa la evaluación en línea.
         // La columna 5 es el método con que la declaración consume cuota: el declarado o,
         // si hubo imputación cruzada por veda (refinamiento 23-10), el de imputación.
         // 1. Recolectores
-        String sqlRec = "SELECT d.id, d.usuario_id, u.comuna_id, d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
+        String sqlRec = "SELECT d.id, d.usuario_id, " + ReglaImputacionInscripcion.sql(ReglaImputacionInscripcion.TABLA_RECOLECTOR, "d", "u") + ", d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
                 + "d.fecha_extraccion, d.fecha_declaracion, d.hora, d.desembarque, d.captura, d.fecha_declaracion AS f_creacion "
                 + "FROM declaracion_recolector d "
                 + "LEFT JOIN usuario u ON u.id = d.usuario_id "
@@ -457,9 +459,10 @@ public class RecalculoCuotaService {
         }
 
         // 2. Armadores
-        String sqlArm = "SELECT d.id, d.usuario_id, d.comuna_id, d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
+        String sqlArm = "SELECT d.id, d.usuario_id, " + ReglaImputacionInscripcion.sql(ReglaImputacionInscripcion.TABLA_ARMADOR, "d", "u") + ", d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
                 + "d.fecha_extraccion, d.fecha_declaracion, d.hora, d.desembarque, d.captura, d.fecha_declaracion AS f_creacion "
                 + "FROM declaracion_armador d "
+                + "LEFT JOIN usuario u ON u.id = d.usuario_id "
                 + "WHERE d." + colFecha + " BETWEEN :desde AND :hasta";
         Query qArm = em.createNativeQuery(sqlArm);
         qArm.setParameter("desde", sqlInicio);
@@ -471,11 +474,11 @@ public class RecalculoCuotaService {
         }
 
         // 3. Áreas de Manejo
-        // declaracion_area no tiene comuna_id (ver ReportRepository, "NULL as comuna_id"): se usa la comuna de la caleta.
-        String sqlArea = "SELECT d.id, d.usuario_id, ca.comuna_id, d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
+        // declaracion_area no tiene comuna_id: sin comuna del usuario se usa la del AMERB o la de la caleta.
+        String sqlArea = "SELECT d.id, d.usuario_id, " + ReglaImputacionInscripcion.sql(ReglaImputacionInscripcion.TABLA_AREA, "d", "u") + ", d.especie_id, " + MetodoImputacion.sqlMetodoEfectivo("d") + " AS extraccion_tipo_id, "
                 + "d.fecha_extraccion, d.fecha_declaracion, d.hora, d.desembarque, d.captura, d.fecha_declaracion AS f_creacion "
                 + "FROM declaracion_area d "
-                + "LEFT JOIN caleta ca ON ca.id = d.caleta_id "
+                + "LEFT JOIN usuario u ON u.id = d.usuario_id "
                 + "WHERE d." + colFecha + " BETWEEN :desde AND :hasta";
         Query qArea = em.createNativeQuery(sqlArea);
         qArea.setParameter("desde", sqlInicio);

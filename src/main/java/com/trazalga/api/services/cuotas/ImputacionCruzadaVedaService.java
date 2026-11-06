@@ -316,11 +316,13 @@ public class ImputacionCruzadaVedaService {
         int cruzadas = 0;
         int sinCuotaDestino = 0;
 
-        // tipo, tabla, folio, AMERB y comuna de desembarque (declaracion_area no tiene comuna_id: se usa la de la caleta)
+        // tipo, tabla, folio, AMERB y comuna de desembarque (declaracion_area no tiene comuna_id: se usa la del AMERB
+        // o la de la caleta). La comuna de imputación es la del usuario y, si no tiene, la de desembarque.
+        String desembarqueArea = ReglaImputacionInscripcion.sqlComunaDesembarque(ReglaImputacionInscripcion.TABLA_AREA, "d");
         String[][] tablas = {
                 {"RECOLECTOR", "declaracion_recolector", "COALESCE(d.folio_origen, d.folio_desembarque_ro, CONCAT('DR-', d.id))", "NULL", "COALESCE(d.comuna_id, ca.comuna_id)"},
                 {"ARMADOR", "declaracion_armador", "COALESCE(d.folio_origen, d.folio_desembarque_da, CONCAT('DA-', d.id))", "NULL", "COALESCE(d.comuna_id, ca.comuna_id)"},
-                {"AREA", "declaracion_area", "COALESCE(d.folio_origen, d.folio_desembarque_amerb, CONCAT('DAM-', d.id))", "d.amerb_id", "ca.comuna_id"}
+                {"AREA", "declaracion_area", "COALESCE(d.folio_origen, d.folio_desembarque_amerb, CONCAT('DAM-', d.id))", "d.amerb_id", desembarqueArea}
         };
 
         for (String[] t : tablas) {
@@ -466,10 +468,8 @@ public class ImputacionCruzadaVedaService {
         if (resolutorImputacion != null) {
             return resolutorImputacion.resolver(tipo).comunaImputacion(ctx);
         }
-        // Mismo respaldo que ValidacionDeclaracionService cuando no hay resolutor
-        return "RECOLECTOR".equalsIgnoreCase(tipo)
-                ? (comunaInscripcionId != null ? comunaInscripcionId : comunaDesembarqueId)
-                : (comunaDesembarqueId != null ? comunaDesembarqueId : comunaInscripcionId);
+        // Mismo respaldo que ValidacionDeclaracionService cuando no hay resolutor: comuna del usuario
+        return comunaInscripcionId != null ? comunaInscripcionId : comunaDesembarqueId;
     }
 
     private static Long toLong(Object o) {
