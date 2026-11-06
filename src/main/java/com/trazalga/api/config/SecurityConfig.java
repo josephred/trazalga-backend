@@ -93,6 +93,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**", "/usuario/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**", "/admin/**").hasRole("ADMIN")
 
+                        // 4b. Declaraciones congeladas por alerta (refinamiento 30-10, punto 3)
+                        .requestMatchers(HttpMethod.GET, "/api/declaraciones/*/*/edicion").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+                        .requestMatchers("/api/declaraciones/**").hasAnyRole("ADMIN", "FISCALIZADOR")
+
                         // 5. Hallazgos e indicadores normativos (TA.3 / TX.1): ADMIN, FISCALIZADOR o AUDITOR
                         .requestMatchers("/api/hallazgos/**", "/hallazgos/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
 

@@ -21,6 +21,10 @@ import com.trazalga.api.repositories.*;
 
 @Service
 public class DeclaracionArmadorService {
+
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
     
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
     
@@ -376,6 +380,9 @@ public class DeclaracionArmadorService {
         if (declaracionArmadorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
+                ? politicaEdicion.verificarEdicion("ARMADOR", id) : java.util.Optional.empty();
 
         if (request.getUsuario() == null || request.getUsuario().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario es obligatorio.");
@@ -606,6 +613,9 @@ public class DeclaracionArmadorService {
             );
         }
 
+        if (politicaEdicion != null) {
+            politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
         return updatedDeclaracion;
     }
 
@@ -613,6 +623,10 @@ public class DeclaracionArmadorService {
         DeclaracionArmadorModel model = declaracionArmadorRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        if (model != null && politicaEdicion != null) {
+            politicaEdicion.verificarEliminacion("ARMADOR", id);
         }
         try {
             // Eliminar buzos asociados primero

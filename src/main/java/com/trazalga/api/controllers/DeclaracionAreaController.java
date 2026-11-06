@@ -25,6 +25,10 @@ public class DeclaracionAreaController {
     @Autowired
     private IDeclaracionAreaRepository declaracionAreaRepository;
 
+    // Refinamiento 30-10 · punto 3: alertas en las respuestas, congelamiento, sesión y dueño
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
     @GetMapping
     public ResponseEntity<?> getAllDeclaraciones(
             @RequestParam(required = false) Integer page,
@@ -56,12 +60,15 @@ public class DeclaracionAreaController {
 
     @GetMapping("/usuario/{usuarioId}")
     public List<DeclaracionAreaModel> getDeclaracionesByUsuario(@PathVariable Long usuarioId) {
-        return declaracionAreaService.getDeclaracionesByUsuario(usuarioId);
+        return politicaEdicion.anotarLote("AREA", declaracionAreaService.getDeclaracionesByUsuario(usuarioId));
     }
 
     @PostMapping
     public DeclaracionAreaModel saveDeclaracion(@RequestBody DeclaracionAreaModel declaracion) {
-        return declaracionAreaService.saveDeclaracion(declaracion);
+        if (declaracion != null && declaracion.getId() != null) {
+            politicaEdicion.verificarSesionYDueno("AREA", declaracion.getId());
+        }
+        return politicaEdicion.anotar(declaracionAreaService.saveDeclaracion(declaracion));
     }
 
     @GetMapping("/{id}")
@@ -83,11 +90,13 @@ public class DeclaracionAreaController {
 
     @PutMapping("/{id}")
     public DeclaracionAreaModel updateDeclaracion(@PathVariable Long id, @RequestBody DeclaracionAreaModel request) {
-        return declaracionAreaService.updateDeclaracion(id, request);
+        politicaEdicion.verificarSesionYDueno("AREA", id);
+        return politicaEdicion.anotar(declaracionAreaService.updateDeclaracion(id, request));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteById(@PathVariable Long id) {
+        politicaEdicion.verificarSesionYDueno("AREA", id);
         boolean ok = declaracionAreaService.deleteDeclaracion(id);
         return ok ? ResponseEntity.ok("Declaración eliminada") : ResponseEntity.badRequest().body("Error al eliminar");
     }

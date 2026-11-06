@@ -31,6 +31,10 @@ public class DeclaracionArmadorController {
     @Autowired
     private IDeclaracionArmadorRepository declaracionArmadorRepository;
 
+    // Refinamiento 30-10 · punto 3: alertas en las respuestas, congelamiento, sesión y dueño
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
     /**
      * Obtener todas las declaraciones de armador
      */
@@ -68,7 +72,7 @@ public class DeclaracionArmadorController {
      */
     @GetMapping(path = "/usuario/{idUsuario}")
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(@PathVariable("idUsuario") Long idUsuario){
-        return this.declaracionArmadorService.getDeclaracionesArmadorIdUsuario(idUsuario);
+        return politicaEdicion.anotarLote("ARMADOR", this.declaracionArmadorService.getDeclaracionesArmadorIdUsuario(idUsuario));
     }
 
     /**
@@ -77,7 +81,7 @@ public class DeclaracionArmadorController {
     @PostMapping
     public DeclaracionArmadorModel saveDeclaracionArmador(@RequestBody DeclaracionArmadorModel declaracionArmador) {
     // public String saveDeclaracionArmador(@RequestBody DeclaracionArmadorModel declaracionArmador) {
-        return this.declaracionArmadorService.saveDeclaracionArmador(declaracionArmador);
+        return politicaEdicion.anotar(this.declaracionArmadorService.saveDeclaracionArmador(declaracionArmador));
         // return "OOKK";
         // return new DeclaracionArmadorModel();
     }
@@ -110,7 +114,8 @@ public class DeclaracionArmadorController {
      */
     @PutMapping(path = "{id}")
     public DeclaracionArmadorModel updateDeclaracionArmadorById(@RequestBody DeclaracionArmadorModel request, @PathVariable("id") Long id) {
-        return this.declaracionArmadorService.updateById(request, id);
+        politicaEdicion.verificarSesionYDueno("ARMADOR", id);
+        return politicaEdicion.anotar(this.declaracionArmadorService.updateById(request, id));
     }
 
     /**
@@ -118,6 +123,7 @@ public class DeclaracionArmadorController {
      */
     @DeleteMapping(path = "/{id}")
     public String deleteById(@PathVariable("id") Long id ){
+        politicaEdicion.verificarSesionYDueno("ARMADOR", id);
         boolean ok = this.declaracionArmadorService.deleteDeclaracionArmador(id);
         if(ok){
             return "Declaración " + id + " eliminada correctamente.";

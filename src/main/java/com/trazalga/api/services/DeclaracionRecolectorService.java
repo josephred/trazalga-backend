@@ -26,6 +26,10 @@ import com.trazalga.api.repositories.IBuzoRepository;
 
 @Service
 public class DeclaracionRecolectorService {
+
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
     
     @Autowired
     IDeclaracionRecolectorRepository declaracionRecolectorRepository;
@@ -169,6 +173,20 @@ public class DeclaracionRecolectorService {
     }
 
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+        // La app 2.4.0 edita recolectores con POST y el id existente (el repositorio lo actualiza):
+        // se aplican las mismas reglas que en updateById (recibida por un destinatario y congelamiento).
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
+        if (declaracionRecolectorModel.getId() != null) {
+            DeclaracionRecolectorModel existente = declaracionRecolectorRepository.findById(declaracionRecolectorModel.getId()).orElse(null);
+            if (existente != null) {
+                if (existente.getDeclaracionDestinatario() != null) {
+                    throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+                }
+                if (politicaEdicion != null) {
+                    autorizacionEdicion = politicaEdicion.verificarEdicion("RECOLECTOR", existente.getId());
+                }
+            }
+        }
         if (declaracionRecolectorModel.getFechaDeclaracion() != null) {
             if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel.getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
@@ -282,6 +300,9 @@ public class DeclaracionRecolectorService {
                 comunaIdGeo
         );
 
+        if (politicaEdicion != null) {
+            politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
         return saved;
     }
 
@@ -307,6 +328,9 @@ public class DeclaracionRecolectorService {
         if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
+                ? politicaEdicion.verificarEdicion("RECOLECTOR", id) : java.util.Optional.empty();
         // findById deja el usuario como proxy LAZY; fuera de transacción (open-in-view=false) leer su comuna
         // más abajo lanzaba LazyInitializationException. Se carga igual que en resolveDependencies.
         if (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getId() != null) {
@@ -417,6 +441,9 @@ public class DeclaracionRecolectorService {
             );
         }
 
+        if (politicaEdicion != null) {
+            politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
         return updated;
     }
 
@@ -424,6 +451,10 @@ public class DeclaracionRecolectorService {
         DeclaracionRecolectorModel model = declaracionRecolectorRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        if (model != null && politicaEdicion != null) {
+            politicaEdicion.verificarEliminacion("RECOLECTOR", id);
         }
         try{
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionRecolectorId(id);

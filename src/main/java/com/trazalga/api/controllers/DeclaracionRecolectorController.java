@@ -33,6 +33,10 @@ public class DeclaracionRecolectorController {
     @Autowired
     private DeclaracionRecolectorService declaracionRecolectorService;
 
+    // Refinamiento 30-10 · punto 3: alertas en las respuestas, congelamiento, sesión y dueño
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
     @Autowired
     private IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
@@ -67,12 +71,16 @@ public class DeclaracionRecolectorController {
     
     @GetMapping(path = "/usuario/{idUsuario}")
     public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolectorIdUsuario(@PathVariable("idUsuario") Long idUsuario){
-        return this.declaracionRecolectorService.getDeclaracionesRecolectorIdUsuario(idUsuario);
+        return politicaEdicion.anotarLote("RECOLECTOR", this.declaracionRecolectorService.getDeclaracionesRecolectorIdUsuario(idUsuario));
     }
 
     @PostMapping
     public DeclaracionRecolectorModel saveDeclaracionRecoleccion(@RequestBody DeclaracionRecolectorModel declaracionRecolector) {
-        return this.declaracionRecolectorService.saveDeclaracionRecolector(declaracionRecolector);
+        if (declaracionRecolector != null && declaracionRecolector.getId() != null) {
+            // La app 2.4.0 edita con POST y el id existente
+            politicaEdicion.verificarSesionYDueno("RECOLECTOR", declaracionRecolector.getId());
+        }
+        return politicaEdicion.anotar(this.declaracionRecolectorService.saveDeclaracionRecolector(declaracionRecolector));
     }
     
     @GetMapping(path = "/{id}")
@@ -93,11 +101,13 @@ public class DeclaracionRecolectorController {
     
     @PutMapping(path = "{id}")
     public DeclaracionRecolectorModel updateDeclaracionRecolectorById(@RequestBody DeclaracionRecolectorModel request, @PathVariable("id") Long id) {
-        return this.declaracionRecolectorService.updateById(request, id);
+        politicaEdicion.verificarSesionYDueno("RECOLECTOR", id);
+        return politicaEdicion.anotar(this.declaracionRecolectorService.updateById(request, id));
     }
 
     @DeleteMapping(path = "/{id}")
     public String deleteById(@PathVariable("id") Long id ){
+        politicaEdicion.verificarSesionYDueno("RECOLECTOR", id);
         boolean ok = this.declaracionRecolectorService.deleteDeclaracionRecolector(id);
         if(ok){
             return " Declaracion " + id + " eliminada ";

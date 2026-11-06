@@ -65,6 +65,8 @@ class ImputacionCruzadaVedaIT extends IntegracionBase {
     @Autowired private DeclaracionRecolectorService declaracionRecolectorService;
     @Autowired private CuotaExtraccionService cuotaExtraccionService;
     @Autowired private ImputacionCruzadaVedaService imputacionCruzadaVedaService;
+    @Autowired private com.trazalga.api.services.declaraciones.AutorizacionDeclaracionService autorizacionDeclaracionService;
+    @Autowired private com.trazalga.api.repositories.IDeclaracionAutorizacionRepository declaracionAutorizacionRepository;
     @Autowired private ConfiguracionGeneralService configuracionGeneralService;
     @Autowired private FichaTrazabilidadService fichaTrazabilidadService;
     @Autowired private CadenaCustodiaService cadenaCustodiaService;
@@ -154,6 +156,7 @@ class ImputacionCruzadaVedaIT extends IntegracionBase {
 
     @AfterEach
     void tearDown() {
+        declaracionAutorizacionRepository.deleteAll();
         declaracionMarcaRepository.deleteAll();
         avisoEnviadoRepository.deleteAll();
         declaracionRecolectorRepository.deleteAll();
@@ -244,10 +247,16 @@ class ImputacionCruzadaVedaIT extends IntegracionBase {
     }
 
     @Test
-    @DisplayName("Editar la declaración mantiene la imputación y no cuenta dos veces la captura")
+    @DisplayName("Editar la declaración (con autorización del fiscalizador, porque EN_VEDA la congela) mantiene la imputación y no cuenta dos veces la captura")
     void edicion_mantieneImputacion_sinDobleConteo() {
         CuotaExtraccionModel cuotaVarado = cuotaMensual(varado, 1000.0);
         DeclaracionRecolectorModel d = declarar(barreteado, "500.00");
+
+        // Refinamiento 30-10, punto 3: sin autorización, la edición se rechaza
+        DeclaracionRecolectorModel sinAutorizacion = solicitud(barreteado, "600.00");
+        assertThrows(com.trazalga.api.exceptions.DeclaracionCongeladaException.class,
+                () -> declaracionRecolectorService.updateById(sinAutorizacion, d.getId()));
+        autorizacionDeclaracionService.autorizarEdicion("RECOLECTOR", d.getId(), "Corrección de kilos verificada", "ACTA-IT-1", 24);
 
         DeclaracionRecolectorModel cambio = solicitud(barreteado, "600.00");
         DeclaracionRecolectorModel editada = declaracionRecolectorService.updateById(cambio, d.getId());

@@ -172,4 +172,15 @@ public class DeclaracionRecolectorModel {
 
     @Transient
     private String motivoBloqueo;
+
+    // Refinamiento 30-10, punto 3. Campos no persistentes con el modificador Java «transient» y no con
+    // @Transient de JPA: el módulo Hibernate de Jackson omite los campos @Transient al serializar, y la app
+    // necesita recibir estos tres.
+    /** Alertas de fiscalización de la declaración, para la app. */
+    private transient List<com.trazalga.api.dto.AlertaDeclaracionDTO> alertas;
+
+    /** Tiene una alerta que la congela: su dueño no puede modificarla ni eliminarla. */
+    private transient Boolean edicionBloqueada;
+
+    private transient String motivoEdicionBloqueada;
 }

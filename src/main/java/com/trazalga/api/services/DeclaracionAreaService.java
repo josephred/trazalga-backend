@@ -30,6 +30,10 @@ import org.springframework.http.HttpStatus;
 @Service
 public class DeclaracionAreaService {
 
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
     @Autowired
     private IDeclaracionAreaRepository declaracionAreaRepository;
 
@@ -100,6 +104,20 @@ public class DeclaracionAreaService {
     private GestionMensajeService gestionMensajeService;
 
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
+        // Un POST con el id de una declaración existente la actualiza en el repositorio:
+        // se aplican las mismas reglas que en updateDeclaracion (recibida por un destinatario y congelamiento).
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
+        if (declaracion.getId() != null) {
+            DeclaracionAreaModel existente = declaracionAreaRepository.findById(declaracion.getId()).orElse(null);
+            if (existente != null) {
+                if (existente.getDeclaracionDestinatario() != null) {
+                    throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+                }
+                if (politicaEdicion != null) {
+                    autorizacionEdicion = politicaEdicion.verificarEdicion("AREA", existente.getId());
+                }
+            }
+        }
         if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null) {
             if (declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
@@ -339,6 +357,9 @@ public class DeclaracionAreaService {
                 amerbId
         );
 
+        if (politicaEdicion != null) {
+            politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
         return savedDeclaracion;
     }
 
@@ -358,6 +379,9 @@ public class DeclaracionAreaService {
         if (declaracion.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
+                ? politicaEdicion.verificarEdicion("AREA", id) : java.util.Optional.empty();
         
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueAmerb(request.getFolioDesembarqueAmerb());
@@ -477,6 +501,9 @@ public class DeclaracionAreaService {
             );
         }
 
+        if (politicaEdicion != null) {
+            politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
         return updatedDeclaracion;
     }
 
@@ -484,6 +511,10 @@ public class DeclaracionAreaService {
         DeclaracionAreaModel model = declaracionAreaRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        if (model != null && politicaEdicion != null) {
+            politicaEdicion.verificarEliminacion("AREA", id);
         }
         try {
             // Eliminar buzos asociados primero

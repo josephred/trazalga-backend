@@ -19,6 +19,9 @@ public interface IDeclaracionMarcaRepository extends JpaRepository<DeclaracionMa
 
     List<DeclaracionMarcaModel> findByDeclaracionTipoAndDeclaracionIdAndMarca(String declaracionTipo, Long declaracionId, String marca);
 
+    /** Marcas de un lote de declaraciones del mismo tipo (congelamiento, refinamiento 30-10). */
+    List<DeclaracionMarcaModel> findByDeclaracionTipoAndDeclaracionIdIn(String declaracionTipo, java.util.Collection<Long> declaracionIds);
+
     List<DeclaracionMarcaModel> findByResueltaFalse();
 
     @Query("SELECT m FROM DeclaracionMarcaModel m WHERE " +
