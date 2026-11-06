@@ -35,6 +35,19 @@ public class BloqueoCargaService {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.parametros.ParametrosService parametrosService;
 
+    /**
+     * Refinamiento 30-10 · punto 3: una declaración de origen congelada por una alerta de veda o de cuota
+     * tampoco puede entrar a la cadena (comercializador o planta) hasta que un fiscalizador resuelva su
+     * hallazgo como LIBERADA o DESCARTADA en la Consola de Hallazgos.
+     */
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
+    public void setPoliticaEdicion(com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion) {
+        this.politicaEdicion = politicaEdicion;
+    }
+
     public void setParametrosService(com.trazalga.api.services.parametros.ParametrosService parametrosService) {
         this.parametrosService = parametrosService;
     }
@@ -72,19 +85,50 @@ public class BloqueoCargaService {
     }
 
     /**
+     * Marcas de una declaración de origen (recolector, armador, área) que la congelan y, por lo tanto,
+     * también la retienen para el comercializador o la planta. Vacío si el congelamiento está apagado.
+     */
+    public Set<String> getMarcasCongelantes(String tipo) {
+        if (politicaEdicion == null || tipo == null) return Collections.emptySet();
+        String t = tipo.toUpperCase().trim();
+        if (!com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion.TIPOS.contains(t)) {
+            return Collections.emptySet();
+        }
+        try {
+            return politicaEdicion.activo() ? politicaEdicion.marcasCongelantes() : Collections.emptySet();
+        } catch (RuntimeException e) {
+            log.warn("No se pudieron leer las marcas de congelamiento: {}", e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * Marcas que retienen una carga del tipo dado: las de bodega virtual (si el bloqueo de carga está
+     * activo) más las que congelan una declaración de origen.
+     */
+    public Set<String> getMarcasBloqueantes(String tipo) {
+        Set<String> set = new HashSet<>();
+        if (isBloqueoActivo()) {
+            set.addAll(getMarcasBloqueantes());
+        }
+        set.addAll(getMarcasCongelantes(tipo));
+        return set;
+    }
+
+    /**
      * Verifica si una carga específica está actualmente bloqueada en bodega.
      */
     public boolean estaBloqueada(String tipo, Long id) {
-        if (!isBloqueoActivo() || tipo == null || id == null) {
+        if (tipo == null || id == null) {
             return false;
         }
 
         // Just-in-time: evaluar retención si el bloqueo de retención está habilitado
-        if (isRetencionBloqueoActivo() && retencionCustodiaService != null) {
+        if (isBloqueoActivo() && isRetencionBloqueoActivo() && retencionCustodiaService != null) {
             retencionCustodiaService.evaluarYBloquearJustInTime(tipo, id);
         }
 
-        Set<String> marcas = getMarcasBloqueantes();
+        Set<String> marcas = getMarcasBloqueantes(tipo);
         if (marcas.isEmpty()) {
             return false;
         }
@@ -96,14 +140,14 @@ public class BloqueoCargaService {
      * y retorna el mapa de aquellas que se encuentran bloqueadas con su motivo.
      */
     public Map<String, MotivoBloqueoDTO> bloqueosPara(String csvTokens) {
-        if (!isBloqueoActivo() || csvTokens == null || csvTokens.isBlank()) {
+        if (csvTokens == null || csvTokens.isBlank()) {
             return Collections.emptyMap();
         }
 
         Map<String, List<Long>> parsed = SeleccionTokens.parse(csvTokens);
 
         // Just-in-time: evaluar si alguna de las cargas ha superado el tiempo máximo de retención
-        if (isRetencionBloqueoActivo() && retencionCustodiaService != null) {
+        if (isBloqueoActivo() && isRetencionBloqueoActivo() && retencionCustodiaService != null) {
             for (Map.Entry<String, List<Long>> entry : parsed.entrySet()) {
                 String tipo = entry.getKey();
                 List<Long> ids = entry.getValue();
@@ -120,11 +164,6 @@ public class BloqueoCargaService {
             }
         }
 
-        Set<String> marcasBloqueantes = getMarcasBloqueantes();
-        if (marcasBloqueantes.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
         Map<String, MotivoBloqueoDTO> bloqueadas = new HashMap<>();
 
         for (Map.Entry<String, List<Long>> entry : parsed.entrySet()) {
@@ -138,6 +177,8 @@ public class BloqueoCargaService {
                     : List.of(tipo.toUpperCase());
 
             for (String t : tiposAEvaluar) {
+                Set<String> marcasBloqueantes = getMarcasBloqueantes(t);
+                if (marcasBloqueantes.isEmpty()) continue;
                 List<DeclaracionMarcaModel> marcas = marcaRepository.findMarcasBloqueantesPorTipoEIds(t, ids, marcasBloqueantes);
                 for (DeclaracionMarcaModel m : marcas) {
                     String key = SeleccionTokens.LEGACY.equals(tipo) ? String.valueOf(m.getDeclaracionId()) : (t + ":" + m.getDeclaracionId());
@@ -153,10 +194,10 @@ public class BloqueoCargaService {
      * Consulta las marcas bloqueantes para un conjunto de IDs de un tipo específico.
      */
     public Map<Long, MotivoBloqueoDTO> bloqueosPorTipoEIds(String tipo, Collection<Long> ids) {
-        if (!isBloqueoActivo() || tipo == null || ids == null || ids.isEmpty()) {
+        if (tipo == null || ids == null || ids.isEmpty()) {
             return Collections.emptyMap();
         }
-        Set<String> marcasBloqueantes = getMarcasBloqueantes();
+        Set<String> marcasBloqueantes = getMarcasBloqueantes(tipo);
         if (marcasBloqueantes.isEmpty()) {
             return Collections.emptyMap();
         }

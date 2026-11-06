@@ -165,9 +165,10 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "resumen_documento", columnDefinition = "TEXT")
     private String resumenDocumento;
 
-    @Transient
-    private Boolean bloqueada;
+    // Retenida por un hallazgo (bodega virtual o declaración de origen congelada). Modificador Java
+    // `transient` y no @Transient: Hibernate6Module omite en el JSON los campos con @Transient y la app
+    // nunca recibía estos datos para deshabilitar la carga en su selector.
+    private transient Boolean bloqueada;
 
-    @Transient
-    private String motivoBloqueo;
+    private transient String motivoBloqueo;
 }

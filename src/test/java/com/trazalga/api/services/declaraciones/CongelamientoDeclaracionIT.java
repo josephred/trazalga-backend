@@ -73,6 +73,7 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
     @Autowired private AutorizacionDeclaracionService autorizacionService;
     @Autowired private DeclaracionRecolectorService declaracionRecolectorService;
     @Autowired private ConfiguracionGeneralService configuracionGeneralService;
+    @Autowired private com.trazalga.api.services.BloqueoCargaService bloqueoCargaService;
 
     @Autowired private IDeclaracionRecolectorRepository recolectorRepository;
     @Autowired private IDeclaracionMarcaRepository marcaRepository;
@@ -285,6 +286,49 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
     }
 
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------ comercializador
+
+    @Test
+    @DisplayName("Congelada: el comercializador la ve retenida (bloqueada en el JSON) y no puede incluirla (409)")
+    void congelada_retenidaParaComercializador() throws Exception {
+        DeclaracionRecolectorModel d = declarar();
+        DeclaracionMarcaModel marca = marcar(d, "EN_VEDA");
+
+        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].bloqueada", hasItem(true)))
+                .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].motivoBloqueo",
+                        hasItem(org.hamcrest.Matchers.containsString("EN_VEDA"))));
+
+        mockMvc.perform(post("/declaracioncomercializador").with(anonymous())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"declaracionesSeleccionadas\":\"RECOLECTOR:" + d.getId() + "\"}"))
+                .andExpect(status().isConflict());
+
+        // Con la carga retenida, la consulta directa también la informa
+        assertTrue(bloqueoCargaService.estaBloqueada("RECOLECTOR", d.getId()));
+
+        // Un fiscalizador libera el hallazgo: la carga puede seguir en la cadena, pero su dueño
+        // sigue sin poder modificarla (el congelamiento no depende de la resolución).
+        marca.setResuelta(true);
+        marca.setResolucionTipo("LIBERADA");
+        marcaRepository.saveAndFlush(marca);
+        assertTrue(bloqueoCargaService.bloqueosPara("RECOLECTOR:" + d.getId()).isEmpty());
+        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(anonymous()))
+                .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].bloqueada", hasItem(false)));
+        assertThrows(DeclaracionCongeladaException.class, () -> politica.verificarEdicion("RECOLECTOR", d.getId()));
+    }
+
+    @Test
+    @DisplayName("Con el congelamiento apagado, la alerta de veda no retiene la carga para el comercializador")
+    void congelamientoApagado_noRetiene() {
+        configuracionGeneralService.updateConfig("declaracion_congelar_activo", "false");
+        DeclaracionRecolectorModel d = declarar();
+        marcar(d, "EN_VEDA");
+        assertTrue(bloqueoCargaService.bloqueosPara("RECOLECTOR:" + d.getId()).isEmpty());
+        assertFalse(bloqueoCargaService.estaBloqueada("RECOLECTOR", d.getId()));
+    }
 
     private void comoFiscalizador() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(

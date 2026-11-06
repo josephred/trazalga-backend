@@ -169,11 +169,12 @@ public class DeclaracionAreaModel {
     @Transient
     private List<BuzoModel> buzos;
 
-    @Transient
-    private Boolean bloqueada;
+    // Retenida por un hallazgo (bodega virtual o declaración de origen congelada). Modificador Java
+    // `transient` y no @Transient: Hibernate6Module omite en el JSON los campos con @Transient y la app
+    // nunca recibía estos datos para deshabilitar la carga en su selector.
+    private transient Boolean bloqueada;
 
-    @Transient
-    private String motivoBloqueo;
+    private transient String motivoBloqueo;
 
     // Refinamiento 30-10, punto 3. Campos no persistentes con el modificador Java «transient» y no con
     // @Transient de JPA: el módulo Hibernate de Jackson omite los campos @Transient al serializar, y la app
