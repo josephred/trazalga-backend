@@ -83,6 +83,26 @@ public class DeclaracionPlantaProduccionModel {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal cantidadProducto;
 
+    // --- Rendimiento en Planta (NP.3 / NP.4) ---
+    @Column(name = "masa_entrada_equivalente_kg", precision = 14, scale = 2)
+    private BigDecimal masaEntradaEquivalenteKg;
+
+    @Column(name = "masa_producto_equivalente_kg", precision = 14, scale = 2)
+    private BigDecimal masaProductoEquivalenteKg;
+
+    @Column(name = "rendimiento_pct", precision = 7, scale = 2)
+    private BigDecimal rendimientoPct;
+
+    @Column(name = "rendimiento_max_teorico_pct", precision = 7, scale = 2)
+    private BigDecimal rendimientoMaxTeoricoPct;
+
+    @Column(name = "rendimiento_fuente", length = 20)
+    private String rendimientoFuente;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "rendimiento_evaluado_en")
+    private Date rendimientoEvaluadoEn;
+
     // --- Documentos Tributarios (Origen y Destino) ---
     private String documentoTributarioOrigenTipo;
     private String documentoTributarioOrigenNumero;
@@ -127,4 +147,16 @@ public class DeclaracionPlantaProduccionModel {
 
     @Column(name = "resumen_documento", columnDefinition = "TEXT")
     private String resumenDocumento;
+
+    // Retenida / congelada por hallazgo (NP.6 / D32). Modificador Java `transient` (no @Transient):
+    // Hibernate6Module omite @Transient al serializar JSON hacia la app móvil.
+    private transient Boolean bloqueada;
+
+    private transient String motivoBloqueo;
+
+    private transient java.util.List<com.trazalga.api.dto.AlertaDeclaracionDTO> alertas;
+
+    private transient Boolean edicionBloqueada;
+
+    private transient String motivoEdicionBloqueada;
 }

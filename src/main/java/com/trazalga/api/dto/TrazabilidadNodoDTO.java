@@ -64,4 +64,11 @@ public class TrazabilidadNodoDTO {
     private String resultadoCoherenciaHumedad;
     private String lugarAcopio;
     private String loteInterno;
+
+    // NP.7: Datos de producción y rendimiento en planta
+    private BigDecimal masaEntradaKg;
+    private String productoCodigo;
+    private BigDecimal rendimientoPct;
+    private BigDecimal rendimientoMaxTeoricoPct;
+    private String rendimientoFuente;
 }

@@ -824,4 +824,11 @@ public class ReportService {
     public java.util.Map<String, Object> getStockEnPlanta(Long plantaId) {
         return reportRepository.getStockEnPlanta(plantaId);
     }
+
+    /**
+     * Rendimiento de producción en planta de proceso (NP.7).
+     */
+    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
+        return reportRepository.getRendimientoPlanta(startDate, endDate, plantaId, especieId);
+    }
 }

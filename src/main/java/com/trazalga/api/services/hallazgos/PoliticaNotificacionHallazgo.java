@@ -56,6 +56,16 @@ public class PoliticaNotificacionHallazgo {
                     false, true, true, true,
                     "Carga Retenida en Bodega Virtual",
                     "/alertas?marca=RETENCION_EXCEDIDA"
+            ),
+            "RENDIMIENTO_ANOMALO", new DestinatariosNotificacion(
+                    true, false, true, true,
+                    "Alerta de Rendimiento Anómalo en Planta",
+                    "/alertas?marca=RENDIMIENTO_ANOMALO"
+            ),
+            "PRODUCCION_SIN_LOTES", new DestinatariosNotificacion(
+                    true, false, true, true,
+                    "Producción Declarada sin Lotes de Abastecimiento",
+                    "/alertas?marca=PRODUCCION_SIN_LOTES"
             )
     );
 

@@ -380,7 +380,8 @@ public class CadenaCustodiaService {
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "d.caleta_id, NULL as amerb_id, d.varadero_id, COALESCE(d.comuna_id, cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
-                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "NULL as masa_entrada_kg, NULL as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             case "ARMADOR":
                 tableName = "declaracion_armador";
@@ -402,7 +403,8 @@ public class CadenaCustodiaService {
                             "COALESCE(emb.nombre, d.embarcacion_nombre) as emb_nom, COALESCE(buz.nombre, d.buzo_nombre) as buzo_nom, " +
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "d.caleta_id, NULL as amerb_id, NULL as varadero_id, COALESCE(cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
-                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "NULL as masa_entrada_kg, NULL as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             case "AREA":
                 tableName = "declaracion_area";
@@ -421,7 +423,8 @@ public class CadenaCustodiaService {
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "d.caleta_id, d.amerb_id, NULL as varadero_id, COALESCE(am.comuna_id, cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
-                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "NULL as masa_entrada_kg, NULL as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             case "COMERCIALIZADOR":
                 tableName = "declaracion_comercializador";
@@ -439,7 +442,8 @@ public class CadenaCustodiaService {
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_traslado as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_traslado as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "NULL as masa_entrada_kg, NULL as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             case "PLANTA_ABASTECIMIENTO":
                 tableName = "declaracion_planta_abastecimiento";
@@ -460,7 +464,8 @@ public class CadenaCustodiaService {
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "d.documento_tributario_origen_tipo as dt_tipo, d.documento_tributario_origen_numero as dt_num, d.documento_tributario_origen_fecha as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, d.fecha_traslado as fecha_extraccion, NULL as ext_imp_nom, d.lugar_acopio as lugar_acopio, d.lote_interno as lote_interno ";
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, d.fecha_traslado as fecha_extraccion, NULL as ext_imp_nom, d.lugar_acopio as lugar_acopio, d.lote_interno as lote_interno, " +
+                               "NULL as masa_entrada_kg, NULL as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             case "PLANTA_PRODUCCION":
                 tableName = "declaracion_planta_produccion";
@@ -475,12 +480,13 @@ public class CadenaCustodiaService {
                 extraCols = "d.materia_prima_especie_id as esp_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
                             "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
                             "prod.nombre as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
-                            "'PRODUCIDA' as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, NULL as n_dest_dir, " +
+                            "COALESCE(d.estado, 'PRODUCIDA') as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, NULL as n_dest_dir, " +
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "d.cantidad_materia_prima as masa_entrada_kg, prod.codigo as prod_cod, d.rendimiento_pct as rend_pct, d.rendimiento_max_teorico_pct as rend_max, d.rendimiento_fuente as rend_fuente ";
                 break;
             case "PLANTA_DESTINO":
                 tableName = "declaracion_planta_destino";
@@ -502,7 +508,8 @@ public class CadenaCustodiaService {
                             "COALESCE(d.documento_tributario_origen_numero, d.documento_tributario_numero) as dt_num, " +
                             "COALESCE(d.documento_tributario_origen_fecha, d.documento_tributario_fecha) as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
-                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno ";
+                               "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
+                               "NULL as masa_entrada_kg, prod.codigo as prod_cod, NULL as rend_pct, NULL as rend_max, NULL as rend_fuente ";
                 break;
             default:
                 return map;
@@ -586,6 +593,11 @@ public class CadenaCustodiaService {
                 String extImpNom = getCol(r, 47) != null ? getCol(r, 47).toString() : null;
                 String lugarAcopio = getCol(r, 48) != null ? getCol(r, 48).toString() : null;
                 String loteInterno = getCol(r, 49) != null ? getCol(r, 49).toString() : null;
+                BigDecimal masaEntradaKg = getCol(r, 50) != null ? new BigDecimal(getCol(r, 50).toString()) : null;
+                String prodCod = getCol(r, 51) != null ? getCol(r, 51).toString() : null;
+                BigDecimal rendPct = getCol(r, 52) != null ? new BigDecimal(getCol(r, 52).toString()) : null;
+                BigDecimal rendMax = getCol(r, 53) != null ? new BigDecimal(getCol(r, 53).toString()) : null;
+                String rendFuente = getCol(r, 54) != null ? getCol(r, 54).toString() : null;
 
                 PuntoReferencia puntoRef = null;
                 if (referenciaOrigenService != null && ReferenciaOrigenService.esEslabonOrigen(tipoStr)) {
@@ -636,6 +648,11 @@ public class CadenaCustodiaService {
                         .declaracionesSeleccionadas(decSel)
                         .lugarAcopio(lugarAcopio)
                         .loteInterno(loteInterno)
+                        .masaEntradaKg(masaEntradaKg)
+                        .productoCodigo(prodCod)
+                        .rendimientoPct(rendPct)
+                        .rendimientoMaxTeoricoPct(rendMax)
+                        .rendimientoFuente(rendFuente)
                         .geo(geoDto)
                         .build();
 

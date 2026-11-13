@@ -28,12 +28,14 @@ import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAutorizacionModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
+import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionAutorizacionRepository;
 import com.trazalga.api.repositories.IDeclaracionMarcaRepository;
+import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.services.ConfiguracionGeneralService;
 
@@ -60,8 +62,10 @@ public class PoliticaEdicionDeclaracion {
     public static final String PARAM_EXIGE_SESION = "declaracion_escritura_exige_sesion";
 
     public static final String MARCAS_POR_DEFECTO = "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE";
+    public static final String PARAM_MARCAS_PRODUCCION = "marcas_bloqueantes_produccion";
+    public static final String MARCAS_PRODUCCION_POR_DEFECTO = "RENDIMIENTO_ANOMALO";
 
-    public static final Set<String> TIPOS = Set.of("RECOLECTOR", "ARMADOR", "AREA");
+    public static final Set<String> TIPOS = Set.of("RECOLECTOR", "ARMADOR", "AREA", "PLANTA_PRODUCCION");
 
     @Autowired private IDeclaracionMarcaRepository marcaRepository;
     @Autowired private IDeclaracionAutorizacionRepository autorizacionRepository;
@@ -69,6 +73,7 @@ public class PoliticaEdicionDeclaracion {
     @Autowired private IDeclaracionRecolectorRepository recolectorRepository;
     @Autowired private IDeclaracionArmadorRepository armadorRepository;
     @Autowired private IDeclaracionAreaRepository areaRepository;
+    @Autowired(required = false) private IDeclaracionPlantaProduccionRepository produccionRepository;
 
     /**
      * Estado de edición de una declaración.
@@ -93,7 +98,17 @@ public class PoliticaEdicionDeclaracion {
     }
 
     public Set<String> marcasCongelantes() {
-        String valor = configuracionGeneralService.getValor(PARAM_MARCAS, MARCAS_POR_DEFECTO);
+        return parseMarcasCsv(configuracionGeneralService.getValor(PARAM_MARCAS, MARCAS_POR_DEFECTO));
+    }
+
+    public Set<String> marcasCongelantes(String tipo) {
+        if ("PLANTA_PRODUCCION".equals(tipo)) {
+            return parseMarcasCsv(configuracionGeneralService.getValor(PARAM_MARCAS_PRODUCCION, MARCAS_PRODUCCION_POR_DEFECTO));
+        }
+        return marcasCongelantes();
+    }
+
+    private static Set<String> parseMarcasCsv(String valor) {
         Set<String> out = new LinkedHashSet<>();
         for (String s : (valor != null ? valor : "").split(",")) {
             String m = s.trim().toUpperCase(Locale.ROOT);
@@ -129,7 +144,7 @@ public class PoliticaEdicionDeclaracion {
         }
         String t = normalizarTipo(tipo);
         boolean activo = activo();
-        Set<String> congelantes = marcasCongelantes();
+        Set<String> congelantes = marcasCongelantes(t);
 
         Map<Long, List<DeclaracionMarcaModel>> marcasPorId = new HashMap<>();
         for (DeclaracionMarcaModel m : marcaRepository.findByDeclaracionTipoAndDeclaracionIdIn(t, ids)) {
@@ -217,11 +232,13 @@ public class PoliticaEdicionDeclaracion {
         UsuarioModel duenio = switch (t) {
             case "RECOLECTOR" -> recolectorRepository.findById(declaracionId).map(DeclaracionRecolectorModel::getUsuario).orElse(null);
             case "ARMADOR" -> armadorRepository.findById(declaracionId).map(DeclaracionArmadorModel::getUsuario).orElse(null);
+            case "PLANTA_PRODUCCION" -> produccionRepository != null ? produccionRepository.findById(declaracionId).map(DeclaracionPlantaProduccionModel::getUsuario).orElse(null) : null;
             default -> areaRepository.findById(declaracionId).map(DeclaracionAreaModel::getUsuario).orElse(null);
         };
         boolean existe = switch (t) {
             case "RECOLECTOR" -> recolectorRepository.existsById(declaracionId);
             case "ARMADOR" -> armadorRepository.existsById(declaracionId);
+            case "PLANTA_PRODUCCION" -> produccionRepository != null && produccionRepository.existsById(declaracionId);
             default -> areaRepository.existsById(declaracionId);
         };
         if (!existe) {
@@ -268,6 +285,11 @@ public class PoliticaEdicionDeclaracion {
         return d;
     }
 
+    public DeclaracionPlantaProduccionModel anotar(DeclaracionPlantaProduccionModel d) {
+        if (d != null) anotarLote("PLANTA_PRODUCCION", List.of(d));
+        return d;
+    }
+
     /** Llena alertas y estado de edición en un listado, con una sola consulta de marcas. */
     @Transactional(readOnly = true)
     public <T, L extends List<T>> L anotarLote(String tipo, L lista) {
@@ -277,7 +299,8 @@ public class PoliticaEdicionDeclaracion {
         String t = normalizarTipo(tipo);
         Function<Object, Long> id = o -> o instanceof DeclaracionRecolectorModel r ? r.getId()
                 : o instanceof DeclaracionArmadorModel a ? a.getId()
-                : o instanceof DeclaracionAreaModel m ? m.getId() : null;
+                : o instanceof DeclaracionAreaModel m ? m.getId()
+                : o instanceof DeclaracionPlantaProduccionModel p ? p.getId() : null;
         List<Long> ids = new ArrayList<>();
         for (T o : lista) {
             Long i = id.apply(o);
@@ -293,6 +316,8 @@ public class PoliticaEdicionDeclaracion {
                 aplicar(e, a::setAlertas, a::setEdicionBloqueada, a::setMotivoEdicionBloqueada);
             } else if (o instanceof DeclaracionAreaModel m) {
                 aplicar(e, m::setAlertas, m::setEdicionBloqueada, m::setMotivoEdicionBloqueada);
+            } else if (o instanceof DeclaracionPlantaProduccionModel p) {
+                aplicar(e, p::setAlertas, p::setEdicionBloqueada, p::setMotivoEdicionBloqueada);
             }
         }
         return lista;
@@ -319,6 +344,8 @@ public class PoliticaEdicionDeclaracion {
         String t = tipo != null ? tipo.trim().toUpperCase(Locale.ROOT) : "";
         if (t.equals("ÁREA") || t.equals("AMERB")) {
             t = "AREA";
+        } else if (t.equals("PPLA") || t.equals("P-PLA") || t.equals("PRODUCCION")) {
+            t = "PLANTA_PRODUCCION";
         }
         if (!TIPOS.contains(t)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de declaración no válido: " + tipo);

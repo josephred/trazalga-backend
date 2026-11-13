@@ -1183,4 +1183,14 @@ public class ReportController {
     public ResponseEntity<?> getStockEnPlanta(@RequestParam(required = false) Long plantaId) {
         return ResponseEntity.ok(reportService.getStockEnPlanta(plantaId));
     }
+
+    @GetMapping("/rendimiento-planta")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getRendimientoPlanta(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) Long plantaId,
+            @RequestParam(required = false) Long especieId) {
+        return ResponseEntity.ok(reportService.getRendimientoPlanta(startDate, endDate, plantaId, especieId));
+    }
 }

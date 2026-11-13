@@ -34,17 +34,34 @@ public class DeclaracionPlantaProduccionService {
     @Autowired(required = false)
     private ProductoAdminService productoAdminService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.indicadores.RendimientoPlantaService rendimientoPlantaService;
+
+    @Autowired(required = false)
+    private BloqueoCargaService bloqueoCargaService;
+
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicionDeclaracion;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public List<DeclaracionPlantaProduccionModel> getAllByUsuarioId(Long usuarioId) {
-        return repository.findAllByUsuarioIdOrderByFechaProduccionDesc(usuarioId);
+        List<DeclaracionPlantaProduccionModel> list = repository.findAllByUsuarioIdOrderByFechaProduccionDesc(usuarioId);
+        if (bloqueoCargaService != null) bloqueoCargaService.enriquecerProducciones(list);
+        if (politicaEdicionDeclaracion != null) politicaEdicionDeclaracion.anotarLote("PLANTA_PRODUCCION", list);
+        return list;
     }
 
     public Optional<DeclaracionPlantaProduccionModel> getById(Long id) {
-        return repository.findById(id);
+        Optional<DeclaracionPlantaProduccionModel> opt = repository.findById(id);
+        opt.ifPresent(p -> {
+            if (bloqueoCargaService != null) bloqueoCargaService.enriquecerProducciones(List.of(p));
+            if (politicaEdicionDeclaracion != null) politicaEdicionDeclaracion.anotar(p);
+        });
+        return opt;
     }
 
     public List<Map<String, Object>> getDetalleConsolidado(Long declaracionId) {
@@ -127,6 +144,13 @@ public class DeclaracionPlantaProduccionService {
         if (declaracion.getUsuario() != null) {
             declaracion.setUsuarioDestinatario(declaracion.getUsuario());
         }
+
+        // NP.2 & NP.4: masa de entrada calculada en el servidor + evaluación de rendimiento
+        com.trazalga.api.services.indicadores.RendimientoPlantaService.ResultadoRendimiento resRendimiento = null;
+        if (rendimientoPlantaService != null) {
+            resRendimiento = rendimientoPlantaService.evaluarYActualizar(declaracion);
+        }
+
         DeclaracionPlantaProduccionModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -139,6 +163,16 @@ public class DeclaracionPlantaProduccionService {
             congelarResumenDocumento(saved.getId());
         }
 
+        if (rendimientoPlantaService != null && resRendimiento != null) {
+            rendimientoPlantaService.registrarHallazgosPostGuardado(saved, resRendimiento);
+        }
+        if (bloqueoCargaService != null) {
+            bloqueoCargaService.enriquecerProducciones(List.of(saved));
+        }
+        if (politicaEdicionDeclaracion != null) {
+            politicaEdicionDeclaracion.anotar(saved);
+        }
+
         return saved;
     }
 
@@ -149,6 +183,14 @@ public class DeclaracionPlantaProduccionService {
 
         if (model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+        }
+        // NP.6 (D32): congelamiento ante RENDIMIENTO_ANOMALO salvo autorización de edición vigente (423)
+        Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion =
+                politicaEdicionDeclaracion != null
+                        ? politicaEdicionDeclaracion.verificarEdicion("PLANTA_PRODUCCION", id)
+                        : Optional.empty();
+        if (productoAdminService != null) {
+            productoAdminService.validarFormatoParaDeclaracion(request.getProductoResultante());
         }
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
@@ -192,6 +234,12 @@ public class DeclaracionPlantaProduccionService {
         }
         model.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
+        // NP.2 & NP.4: recalcular masa de entrada y rendimiento al editar (no borra marcas anteriores)
+        com.trazalga.api.services.indicadores.RendimientoPlantaService.ResultadoRendimiento resRendimiento = null;
+        if (rendimientoPlantaService != null) {
+            resRendimiento = rendimientoPlantaService.evaluarYActualizar(model);
+        }
+
         repository.save(model);
 
         if (oldSeleccionadas != null && !oldSeleccionadas.isEmpty()) {
@@ -210,6 +258,19 @@ public class DeclaracionPlantaProduccionService {
             repository.save(model);
         }
 
+        if (rendimientoPlantaService != null && resRendimiento != null) {
+            rendimientoPlantaService.registrarHallazgosPostGuardado(model, resRendimiento);
+        }
+        if (politicaEdicionDeclaracion != null) {
+            politicaEdicionDeclaracion.registrarUsoAutorizacion(autorizacionEdicion);
+        }
+        if (bloqueoCargaService != null) {
+            bloqueoCargaService.enriquecerProducciones(List.of(model));
+        }
+        if (politicaEdicionDeclaracion != null) {
+            politicaEdicionDeclaracion.anotar(model);
+        }
+
         return model;
     }
 
@@ -218,6 +279,9 @@ public class DeclaracionPlantaProduccionService {
         DeclaracionPlantaProduccionModel model = repository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+        }
+        if (model != null && politicaEdicionDeclaracion != null) {
+            politicaEdicionDeclaracion.verificarEliminacion("PLANTA_PRODUCCION", id);
         }
         try {
             if (model != null && model.getDeclaracionesSeleccionadas() != null && !model.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -232,13 +296,20 @@ public class DeclaracionPlantaProduccionService {
 
     public List<DeclaracionPlantaProduccionModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
         List<DeclaracionPlantaProduccionModel> libres = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+        List<DeclaracionPlantaProduccionModel> resultado = libres;
         if (consumidasPorId != null) {
             List<DeclaracionPlantaProduccionModel> consumidasPorEsta = repository.findByUsuarioDestinatarioIdAndDeclaracionDestinatario(usuarioDestinatarioId, consumidasPorId);
             List<DeclaracionPlantaProduccionModel> combinadas = new ArrayList<>(libres);
             combinadas.addAll(consumidasPorEsta);
-            return combinadas;
+            resultado = combinadas;
         }
-        return libres;
+        if (bloqueoCargaService != null) {
+            bloqueoCargaService.enriquecerProducciones(resultado);
+        }
+        if (politicaEdicionDeclaracion != null) {
+            politicaEdicionDeclaracion.anotarLote("PLANTA_PRODUCCION", resultado);
+        }
+        return resultado;
     }
 
     private String generarFolioPpla() {

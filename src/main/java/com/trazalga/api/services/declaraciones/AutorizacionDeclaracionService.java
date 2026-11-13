@@ -20,6 +20,7 @@ import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAutorizacionModel;
 import com.trazalga.api.models.DeclaracionBuzosModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
+import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IDeclaracionAreaRepository;
@@ -27,6 +28,7 @@ import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionAutorizacionRepository;
 import com.trazalga.api.repositories.DeclaracionBuzosRepository;
 import com.trazalga.api.repositories.IDeclaracionMarcaRepository;
+import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.CuotaExtraccionService;
@@ -52,6 +54,7 @@ public class AutorizacionDeclaracionService {
     @Autowired private IDeclaracionRecolectorRepository recolectorRepository;
     @Autowired private IDeclaracionArmadorRepository armadorRepository;
     @Autowired private IDeclaracionAreaRepository areaRepository;
+    @Autowired(required = false) private IDeclaracionPlantaProduccionRepository produccionRepository;
     @Autowired private DeclaracionBuzosRepository buzosRepository;
     @Autowired private IUsuarioRepository usuarioRepository;
     @Autowired private ObjectMapper objectMapper;
@@ -172,6 +175,9 @@ public class AutorizacionDeclaracionService {
                 buzosRepository.deleteAll(b);
                 armadorRepository.deleteById(id);
             }
+            case "PLANTA_PRODUCCION" -> {
+                if (produccionRepository != null) produccionRepository.deleteById(id);
+            }
             default -> {
                 List<DeclaracionBuzosModel> b = buzosRepository.findByDeclaracionAreaId(id);
                 buzosRepository.deleteAll(b);
@@ -191,6 +197,7 @@ public class AutorizacionDeclaracionService {
         Object d = switch (tipo) {
             case "RECOLECTOR" -> recolectorRepository.findById(id).orElse(null);
             case "ARMADOR" -> armadorRepository.findById(id).orElse(null);
+            case "PLANTA_PRODUCCION" -> produccionRepository != null ? produccionRepository.findById(id).orElse(null) : null;
             default -> areaRepository.findById(id).orElse(null);
         };
         if (d == null) {
@@ -203,6 +210,7 @@ public class AutorizacionDeclaracionService {
         if (d instanceof DeclaracionRecolectorModel r) return r.getDeclaracionDestinatario() != null;
         if (d instanceof DeclaracionArmadorModel a) return a.getDeclaracionDestinatario() != null;
         if (d instanceof DeclaracionAreaModel a) return a.getDeclaracionDestinatario() != null;
+        if (d instanceof DeclaracionPlantaProduccionModel p) return p.getDeclaracionDestinatario() != null;
         return false;
     }
 

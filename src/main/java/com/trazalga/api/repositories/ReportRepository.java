@@ -4016,5 +4016,173 @@ public class ReportRepository {
         resp.put("resumenPorAcopio", resumenPorAcopio);
         return resp;
     }
+
+    /**
+     * Métricas y detalle de rendimiento en planta de proceso (NP.7).
+     */
+    @SuppressWarnings("unchecked")
+    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
+        boolean rendimientoActivo = configuracionGeneralService == null || configuracionGeneralService.getBoolean("rendimiento_activo", true);
+        double toleranciaPct = configuracionGeneralService != null ? configuracionGeneralService.getDouble("rendimiento_tolerancia_pct", 5.0) : 5.0;
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT d.id, d.usuario_id, ");
+        sql.append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))), u.rut, ");
+        sql.append("COALESCE(d.nombre_planta, ''), ");
+        sql.append("COALESCE(d.folio_declaracion_p_pla, d.folio_declaracion_ppla, ''), ");
+        sql.append("d.fecha_produccion, d.materia_prima_especie_id, COALESCE(e.nombre, ''), ");
+        sql.append("d.producto_resultante_id, COALESCE(prod.codigo, ''), COALESCE(prod.nombre, ''), ");
+        sql.append("d.cantidad_materia_prima, d.cantidad_producto, ");
+        sql.append("d.rendimiento_pct, d.rendimiento_max_teorico_pct, d.rendimiento_fuente, d.rendimiento_evaluado_en, ");
+        sql.append("COALESCE(d.estado, 'ENVIADA'), ");
+        sql.append("CASE WHEN EXISTS (SELECT 1 FROM declaracion_marca dm WHERE dm.declaracion_tipo = 'PLANTA_PRODUCCION' AND dm.declaracion_id = d.id AND dm.marca = 'RENDIMIENTO_ANOMALO' AND COALESCE(dm.resuelta, 0) = 0) THEN 1 ELSE 0 END AS tiene_marca_anomala ");
+        sql.append("FROM declaracion_planta_produccion d ");
+        sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
+        sql.append("LEFT JOIN especie e ON d.materia_prima_especie_id = e.id ");
+        sql.append("LEFT JOIN producto prod ON d.producto_resultante_id = prod.id ");
+        sql.append("WHERE COALESCE(UPPER(d.estado), '') <> 'ANULADA' ");
+        if (startDate != null) {
+            sql.append("AND d.fecha_produccion >= :startDate ");
+        }
+        if (endDate != null) {
+            sql.append("AND d.fecha_produccion <= :endDate ");
+        }
+        if (plantaId != null) {
+            sql.append("AND d.usuario_id = :plantaId ");
+        }
+        if (especieId != null) {
+            sql.append("AND d.materia_prima_especie_id = :especieId ");
+        }
+        sql.append("ORDER BY d.fecha_produccion DESC, d.id DESC");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        if (startDate != null) {
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        }
+        if (endDate != null) {
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        }
+        if (plantaId != null) {
+            query.setParameter("plantaId", plantaId);
+        }
+        if (especieId != null) {
+            query.setParameter("especieId", especieId);
+        }
+
+        List<Object[]> rows = query.getResultList();
+        List<java.util.Map<String, Object>> detalle = new java.util.ArrayList<>();
+        java.util.Map<String, java.util.Map<String, Object>> porGrupo = new java.util.LinkedHashMap<>();
+
+        long normales = 0;
+        long anomalas = 0;
+        long sinReferencia = 0;
+
+        for (Object[] r : rows) {
+            Long id = r[0] != null ? ((Number) r[0]).longValue() : null;
+            Long pUsuarioId = r[1] != null ? ((Number) r[1]).longValue() : null;
+            String plantaUsuario = r[2] != null ? r[2].toString().trim() : "";
+            String plantaRut = r[3] != null ? r[3].toString() : "";
+            String nombrePlantaCampo = r[4] != null ? r[4].toString().trim() : "";
+            String plantaNombre = !plantaUsuario.isEmpty() ? plantaUsuario : nombrePlantaCampo;
+            String folio = r[5] != null ? r[5].toString() : "";
+            Date fechaProduccion = toReportDate(r[6]);
+            Long espId = r[7] != null ? ((Number) r[7]).longValue() : null;
+            String especieNombre = r[8] != null ? r[8].toString() : "";
+            Long prodId = r[9] != null ? ((Number) r[9]).longValue() : null;
+            String prodCodigo = r[10] != null ? r[10].toString() : "";
+            String prodNombre = r[11] != null ? r[11].toString() : "";
+            Double masaEntrada = r[12] != null ? ((Number) r[12]).doubleValue() : null;
+            Double masaProducto = r[13] != null ? ((Number) r[13]).doubleValue() : null;
+            Double rendimientoPct = r[14] != null ? ((Number) r[14]).doubleValue() : null;
+            Double maxTeoricoPct = r[15] != null ? ((Number) r[15]).doubleValue() : null;
+            String fuente = r[16] != null ? r[16].toString() : null;
+            Date evaluadoEn = toReportDate(r[17]);
+            String estado = r[18] != null ? r[18].toString() : "ENVIADA";
+            boolean tieneMarca = r[19] != null && ((Number) r[19]).intValue() > 0;
+
+            boolean sinRef = fuente == null || "SIN_REFERENCIA".equalsIgnoreCase(fuente) || rendimientoPct == null;
+            boolean esAnomalo = tieneMarca || (!sinRef && maxTeoricoPct != null && maxTeoricoPct > 0.0
+                    && rendimientoPct > maxTeoricoPct * (1.0 + toleranciaPct / 100.0) + 1e-6);
+
+            if (esAnomalo) {
+                anomalas++;
+            } else if (sinRef) {
+                sinReferencia++;
+            } else {
+                normales++;
+            }
+
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", id);
+            item.put("folio", folio);
+            item.put("fechaProduccion", fechaProduccion);
+            item.put("plantaId", pUsuarioId);
+            item.put("plantaNombre", plantaNombre);
+            item.put("plantaRut", plantaRut);
+            item.put("especieId", espId);
+            item.put("especieNombre", especieNombre);
+            item.put("productoId", prodId);
+            item.put("productoCodigo", prodCodigo);
+            item.put("productoNombre", prodNombre);
+            item.put("masaEntradaKg", masaEntrada);
+            item.put("masaProductoKg", masaProducto);
+            item.put("rendimientoPct", rendimientoPct);
+            item.put("rendimientoMaxTeoricoPct", maxTeoricoPct);
+            item.put("rendimientoFuente", fuente);
+            item.put("rendimientoEvaluadoEn", evaluadoEn);
+            item.put("estado", estado);
+            item.put("marcaAbierta", tieneMarca);
+            item.put("anomalo", esAnomalo);
+            item.put("clasificacion", esAnomalo ? "ANOMALO" : (sinRef ? "SIN_REFERENCIA" : "NORMAL"));
+            detalle.add(item);
+
+            String key = (pUsuarioId != null ? pUsuarioId : 0L) + "|" + (prodId != null ? prodId : 0L) + "|" + (espId != null ? espId : 0L);
+            java.util.Map<String, Object> grp = porGrupo.computeIfAbsent(key, k -> {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("plantaId", pUsuarioId);
+                m.put("plantaNombre", plantaNombre.isEmpty() ? "Sin nombre" : plantaNombre);
+                m.put("productoId", prodId);
+                m.put("productoCodigo", prodCodigo);
+                m.put("productoNombre", prodNombre.isEmpty() ? "Sin formato" : prodNombre);
+                m.put("especieNombre", especieNombre);
+                m.put("producciones", 0L);
+                m.put("masaEntradaKg", 0.0);
+                m.put("masaProductoKg", 0.0);
+                m.put("anomalas", 0L);
+                return m;
+            });
+            grp.put("producciones", ((Number) grp.get("producciones")).longValue() + 1L);
+            grp.put("masaEntradaKg", ((Number) grp.get("masaEntradaKg")).doubleValue() + (masaEntrada != null ? masaEntrada : 0.0));
+            grp.put("masaProductoKg", ((Number) grp.get("masaProductoKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
+            if (esAnomalo) {
+                grp.put("anomalas", ((Number) grp.get("anomalas")).longValue() + 1L);
+            }
+        }
+
+        List<java.util.Map<String, Object>> porPlantaFormato = new java.util.ArrayList<>();
+        for (java.util.Map<String, Object> grp : porGrupo.values()) {
+            double ent = ((Number) grp.get("masaEntradaKg")).doubleValue();
+            double prod = ((Number) grp.get("masaProductoKg")).doubleValue();
+            Double rendProm = ent > 0.0 ? Math.round((prod / ent * 100.0) * 100.0) / 100.0 : null;
+            grp.put("masaEntradaKg", Math.round(ent * 100.0) / 100.0);
+            grp.put("masaProductoKg", Math.round(prod * 100.0) / 100.0);
+            grp.put("rendimientoPromedioPct", rendProm);
+            porPlantaFormato.add(grp);
+        }
+
+        java.util.Map<String, Object> resumen = new java.util.LinkedHashMap<>();
+        resumen.put("total", (long) detalle.size());
+        resumen.put("normales", normales);
+        resumen.put("anomalas", anomalas);
+        resumen.put("sinReferencia", sinReferencia);
+        resumen.put("rendimientoActivo", rendimientoActivo);
+        resumen.put("toleranciaPct", toleranciaPct);
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("resumen", resumen);
+        resp.put("porPlantaFormato", porPlantaFormato);
+        resp.put("detalle", detalle);
+        return resp;
+    }
 }
 

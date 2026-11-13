@@ -95,7 +95,7 @@ public class BloqueoCargaService {
             return Collections.emptySet();
         }
         try {
-            return politicaEdicion.activo() ? politicaEdicion.marcasCongelantes() : Collections.emptySet();
+            return politicaEdicion.activo() ? politicaEdicion.marcasCongelantes(t) : Collections.emptySet();
         } catch (RuntimeException e) {
             log.warn("No se pudieron leer las marcas de congelamiento: {}", e.getMessage());
             return Collections.emptySet();
@@ -110,6 +110,15 @@ public class BloqueoCargaService {
         Set<String> set = new HashSet<>();
         if (isBloqueoActivo()) {
             set.addAll(getMarcasBloqueantes());
+        }
+        if ("PLANTA_PRODUCCION".equalsIgnoreCase(tipo) && configService != null) {
+            String raw = configService.getValor("marcas_bloqueantes_produccion", "RENDIMIENTO_ANOMALO");
+            if (raw != null && !raw.isBlank()) {
+                for (String s : raw.split(",")) {
+                    String clean = s.trim().toUpperCase(Locale.ROOT);
+                    if (!clean.isEmpty()) set.add(clean);
+                }
+            }
         }
         set.addAll(getMarcasCongelantes(tipo));
         return set;
@@ -303,6 +312,24 @@ public class BloqueoCargaService {
         List<Long> ids = list.stream().map(DeclaracionPlantaAbastecimientoModel::getId).filter(Objects::nonNull).toList();
         Map<Long, MotivoBloqueoDTO> bloqueos = bloqueosPorTipoEIds("PLANTA_ABASTECIMIENTO", ids);
         for (DeclaracionPlantaAbastecimientoModel item : list) {
+            if (bloqueos.containsKey(item.getId())) {
+                item.setBloqueada(true);
+                item.setMotivoBloqueo(formatMotivo(bloqueos.get(item.getId())));
+            } else {
+                item.setBloqueada(false);
+                item.setMotivoBloqueo(null);
+            }
+        }
+    }
+
+    /**
+     * Enriquecimiento de declaraciones de producción de planta (NP.6 / D32) antes de entregarlas a Destino.
+     */
+    public void enriquecerProducciones(List<DeclaracionPlantaProduccionModel> list) {
+        if (list == null || list.isEmpty()) return;
+        List<Long> ids = list.stream().map(DeclaracionPlantaProduccionModel::getId).filter(Objects::nonNull).toList();
+        Map<Long, MotivoBloqueoDTO> bloqueos = bloqueosPorTipoEIds("PLANTA_PRODUCCION", ids);
+        for (DeclaracionPlantaProduccionModel item : list) {
             if (bloqueos.containsKey(item.getId())) {
                 item.setBloqueada(true);
                 item.setMotivoBloqueo(formatMotivo(bloqueos.get(item.getId())));

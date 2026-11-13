@@ -56,6 +56,8 @@ public class DeclaracionMarcaService {
         porMarca.put("DESEMBARQUE_ATIPICO", todas.stream().filter(m -> "DESEMBARQUE_ATIPICO".equals(m.getMarca())).count());
         porMarca.put("CUOTA_EXCEDIDA", todas.stream().filter(m -> "CUOTA_EXCEDIDA".equals(m.getMarca())).count());
         porMarca.put("POSTERIOR_CIERRE", todas.stream().filter(m -> "POSTERIOR_CIERRE".equals(m.getMarca())).count());
+        porMarca.put("RENDIMIENTO_ANOMALO", todas.stream().filter(m -> "RENDIMIENTO_ANOMALO".equals(m.getMarca())).count());
+        porMarca.put("PRODUCCION_SIN_LOTES", todas.stream().filter(m -> "PRODUCCION_SIN_LOTES".equals(m.getMarca())).count());
 
         Map<String, Object> resumen = new HashMap<>();
         resumen.put("total", total);
