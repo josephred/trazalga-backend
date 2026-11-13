@@ -19,6 +19,7 @@ import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -244,6 +245,7 @@ public class RendimientoPlantaService {
      * Registra las marcas post-guardado (`PRODUCCION_SIN_LOTES` / `RENDIMIENTO_ANOMALO`).
      * No elimina marcas previas al recalcular tras edición autorizada (NP.5).
      */
+    @Transactional(readOnly = false)
     public void registrarHallazgosPostGuardado(DeclaracionPlantaProduccionModel saved, ResultadoRendimiento res) {
         if (hallazgoService == null || saved == null || saved.getId() == null || res == null) {
             return;
