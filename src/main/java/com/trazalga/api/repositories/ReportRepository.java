@@ -83,7 +83,11 @@ public class ReportRepository {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT d.id, d.folio_origen, d.").append(dateColumn).append(", d.hora, ");
         sql.append("u.nombres, u.apellidop, u.apellidom, u.rut, ");
-        sql.append("ud.nombres as r_nombres, ud.apellidop as r_apellidop, ud.apellidom as r_apellidom, ud.rut as r_rut, ");
+        if (tipoReporte == 5 || tipoReporte == 6) {
+            sql.append("NULL as r_nombres, NULL as r_apellidop, NULL as r_apellidom, NULL as r_rut, ");
+        } else {
+            sql.append("ud.nombres as r_nombres, ud.apellidop as r_apellidop, ud.apellidom as r_apellidom, ud.rut as r_rut, ");
+        }
         sql.append("d.").append(amountColumn).append(", e.nombre as especie_nombre ");
         
         if (tipoReporte == 1) {
@@ -109,7 +113,8 @@ public class ReportRepository {
         sql.append("FROM ").append(tableName).append(" d ");
         sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
         sql.append("LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id ");
-        sql.append("INNER JOIN especie e ON d.especie_id = e.id ");
+        String especieCol = (tipoReporte == 6) ? "d.materia_prima_especie_id" : "d.especie_id";
+        sql.append("INNER JOIN especie e ON ").append(especieCol).append(" = e.id ");
 
         if (tipoReporte >= 1 && tipoReporte <= 5) {
             sql.append("LEFT JOIN composicion c ON d.composicion_id = c.id ");

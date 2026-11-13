@@ -114,9 +114,9 @@ public class PoliticaEscrituraPlanta {
                 throw conflicto("El lote de abastecimiento #" + id + " no existe.");
             }
             String folio = a.getFolioDeclaracionAPla() != null ? a.getFolioDeclaracionAPla() : "#" + id;
-            // Hasta que el servidor asigne el destinatario (NA.1), la app lista los lotes de la planta por
-            // destinatario: el lote es de la planta si ella lo recibió o si es su destinataria.
-            if (!esDe(plantaUsuarioId, a.getUsuario(), a.getUsuarioDestinatario())) {
+            // NA.1: el lote pertenece a la planta que lo recibió (dueña de la recepción).
+            // Destinatario se autoasigna en backend para el flujo interno de planta.
+            if (!esDe(plantaUsuarioId, a.getUsuario())) {
                 throw conflicto("El lote " + folio + " no pertenece a esta planta.");
             }
             if (a.getDeclaracionDestinatario() != null && !a.getDeclaracionDestinatario().equals(produccionId)) {
@@ -155,7 +155,7 @@ public class PoliticaEscrituraPlanta {
                 throw conflicto("La producción #" + id + " no existe.");
             }
             String folio = p.getFolioDeclaracionPpla() != null ? p.getFolioDeclaracionPpla() : "#" + id;
-            if (!esDe(plantaUsuarioId, p.getUsuario(), p.getUsuarioDestinatario())) {
+            if (!esDe(plantaUsuarioId, p.getUsuario())) {
                 throw conflicto("La producción " + folio + " no pertenece a esta planta.");
             }
             if (p.getDeclaracionDestinatario() != null && !p.getDeclaracionDestinatario().equals(destinoId)) {
@@ -182,12 +182,11 @@ public class PoliticaEscrituraPlanta {
                 .filter(Objects::nonNull).distinct().toList();
     }
 
-    private static boolean esDe(Long plantaUsuarioId, UsuarioModel duenio, UsuarioModel destinatario) {
+    private static boolean esDe(Long plantaUsuarioId, UsuarioModel duenio) {
         if (plantaUsuarioId == null) {
             return false;
         }
-        return (duenio != null && plantaUsuarioId.equals(duenio.getId()))
-                || (destinatario != null && plantaUsuarioId.equals(destinatario.getId()));
+        return duenio != null && plantaUsuarioId.equals(duenio.getId());
     }
 
     private static boolean anulado(String estado) {

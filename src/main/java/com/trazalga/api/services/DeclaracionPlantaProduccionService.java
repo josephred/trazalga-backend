@@ -117,6 +117,10 @@ public class DeclaracionPlantaProduccionService {
             declaracion.setFechaProduccion(new Date());
         }
 
+        // NA.1 (D24): en producción el destinatario interno es siempre la misma planta que produce
+        if (declaracion.getUsuario() != null) {
+            declaracion.setUsuarioDestinatario(declaracion.getUsuario());
+        }
         DeclaracionPlantaProduccionModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -177,7 +181,9 @@ public class DeclaracionPlantaProduccionService {
         model.setPlacaPatente(request.getPlacaPatente());
         model.setPlacaPatenteCarro(request.getPlacaPatenteCarro());
         model.setPatente(request.getPatente());
-        model.setUsuarioDestinatario(request.getUsuarioDestinatario());
+        if (model.getUsuario() != null) {
+            model.setUsuarioDestinatario(model.getUsuario());
+        }
         model.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
         repository.save(model);
@@ -232,7 +238,7 @@ public class DeclaracionPlantaProduccionService {
     private String generarFolioPpla() {
         String prefijo = "PPLA";
         String anio = new SimpleDateFormat("yyyy").format(Calendar.getInstance().getTime());
-        String ultimoFolio = repository.findLastFolioDeclaracionPpla().stream().findFirst().orElse(null);
+        String ultimoFolio = repository.findLastFolioDeclaracionPpla().stream().filter(s -> s != null && !s.isBlank()).findFirst().orElse(null);
 
         int correlativo = 1;
         if (ultimoFolio != null && ultimoFolio.startsWith(prefijo + "-" + anio)) {

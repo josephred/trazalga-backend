@@ -159,6 +159,10 @@ public class DeclaracionPlantaAbastecimientoService {
         sanearComposicion(declaracion);
         normalizarPatentes(declaracion);
         resolverTransporte(declaracion);
+        // NA.1: en recepción de planta el destinatario interno es siempre la misma planta que declara
+        if (declaracion.getUsuario() != null) {
+            declaracion.setUsuarioDestinatario(declaracion.getUsuario());
+        }
         DeclaracionPlantaAbastecimientoModel saved = repository.save(declaracion);
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
@@ -222,7 +226,9 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setPlacaPatente(request.getPlacaPatente());
         model.setPlacaPatenteCarro(request.getPlacaPatenteCarro());
         model.setPatente(request.getPatente());
-        model.setUsuarioDestinatario(request.getUsuarioDestinatario());
+        if (model.getUsuario() != null) {
+            model.setUsuarioDestinatario(model.getUsuario());
+        }
         model.setDeclaracionesSeleccionadas(request.getDeclaracionesSeleccionadas());
 
         sanearComposicion(model);
@@ -356,7 +362,7 @@ public class DeclaracionPlantaAbastecimientoService {
     private String generarFolio() {
         String prefijo = "DAPLA"; // Declaracion Abastecimiento Planta
         String anio = new SimpleDateFormat("yyyy").format(Calendar.getInstance().getTime());
-        String ultimoFolio = repository.findLastFolioDeclaracionAPla().stream().findFirst().orElse(null);
+        String ultimoFolio = repository.findLastFolioDeclaracionAPla().stream().filter(s -> s != null && !s.isBlank()).findFirst().orElse(null);
 
         int correlativo = 1;
         if (ultimoFolio != null && ultimoFolio.startsWith(prefijo + "-" + anio)) {

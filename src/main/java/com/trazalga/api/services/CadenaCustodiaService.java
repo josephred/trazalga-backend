@@ -570,9 +570,10 @@ public class CadenaCustodiaService {
                 String dtNum = getCol(r, 35) != null ? getCol(r, 35).toString() : null;
                 Date dtFecha = toDate(getCol(r, 36));
 
-                String rutDest = getCol(r, 37) != null ? getCol(r, 37).toString() : null;
-                String nomDest = getCol(r, 38) != null ? getCol(r, 38).toString() : null;
-                String finalDestNom = (nDestDir != null && !nDestDir.isBlank()) ? nDestDir : nomDest;
+                boolean ocultarDestinatarioPlanta = "PLANTA_ABASTECIMIENTO".equals(tipoStr) || "PLANTA_PRODUCCION".equals(tipoStr);
+                String rutDest = ocultarDestinatarioPlanta ? null : (getCol(r, 37) != null ? getCol(r, 37).toString() : null);
+                String nomDest = ocultarDestinatarioPlanta ? null : (getCol(r, 38) != null ? getCol(r, 38).toString() : null);
+                String finalDestNom = ocultarDestinatarioPlanta ? null : ((nDestDir != null && !nDestDir.isBlank()) ? nDestDir : nomDest);
 
                 Long caletaId = getCol(r, 39) != null ? ((Number) getCol(r, 39)).longValue() : null;
                 Long amerbId = getCol(r, 40) != null ? ((Number) getCol(r, 40)).longValue() : null;
