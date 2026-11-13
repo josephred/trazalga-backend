@@ -57,6 +57,9 @@ public class PlantaHumedadRecepcionTest {
         decl.setPesoRomanaKg(new java.math.BigDecimal("1500.00"));
 
         lenient().when(configuracionGeneralService.getBoolean(eq("planta_exige_peso_romana"), anyBoolean())).thenReturn(false);
+        lenient().when(configuracionGeneralService.getBoolean(eq("planta_exige_guia_adjunta"), anyBoolean())).thenReturn(false);
+        lenient().when(configuracionGeneralService.getBoolean(eq("planta_exige_lugar_acopio"), anyBoolean())).thenReturn(false);
+        lenient().when(configuracionGeneralService.getBoolean(eq("planta_exige_lote_interno"), anyBoolean())).thenReturn(false);
         lenient().when(configuracionGeneralService.getValor(eq("planta_version_minima"), anyString())).thenReturn("");
     }
 
