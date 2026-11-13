@@ -31,6 +31,9 @@ public class DeclaracionPlantaProduccionService {
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
 
+    @Autowired(required = false)
+    private ProductoAdminService productoAdminService;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -107,6 +110,9 @@ public class DeclaracionPlantaProduccionService {
             politicaEscrituraPlanta.verificarLotesDeProduccion(
                     declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null,
                     declaracion.getDeclaracionesSeleccionadas(), null);
+        }
+        if (productoAdminService != null) {
+            productoAdminService.validarFormatoParaDeclaracion(declaracion.getProductoResultante());
         }
 
         if (declaracion.getFolioDeclaracionPpla() == null || declaracion.getFolioDeclaracionPpla().isEmpty()) {

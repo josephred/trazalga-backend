@@ -20,4 +20,7 @@ public interface IDeclaracionPlantaDestinoRepository extends JpaRepository<Decla
     List<DeclaracionPlantaDestinoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(Long usuarioDestinatarioId);
 
     List<DeclaracionPlantaDestinoModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatario(Long usuarioDestinatarioId, Long declaracionDestinatario);
+
+    @Query("SELECT d.producto.id, COUNT(d) FROM DeclaracionPlantaDestinoModel d WHERE d.producto IS NOT NULL GROUP BY d.producto.id")
+    List<Object[]> countUsosPorProducto();
 }

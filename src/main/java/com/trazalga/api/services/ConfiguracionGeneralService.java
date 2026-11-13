@@ -148,6 +148,7 @@ public class ConfiguracionGeneralService {
         createIfNotExist("planta_exige_humedad_recepcion", "false", "Exige ingresar el estado de humedad al recibir el camión en planta (TP.3)", "CADENA");
         createIfNotExist("planta_exige_lugar_acopio", "true", "Exige ingresar el lugar de acopio o almacenamiento al recepcionar en planta (NA.2)", "CADENA");
         createIfNotExist("planta_exige_lote_interno", "true", "Exige ingresar el número de lote interno al recepcionar en planta (NA.3)", "CADENA");
+        createIfNotExist("produccion_exige_formato_oficial", "false", "Exige seleccionar un formato de producto activo con código oficial Sernapesca en Producción y Destino (NF.4)", "CADENA");
         createIfNotExist("variacion_peso_alerta_equivalente", "false", "Usa la variación equivalente en captura para disparar alertas de peso cuando cambia la humedad", "CADENA");
 
         // PRIORIDAD 4 — PATENTES REGISTRADAS DE PRUEBA (T4.1)

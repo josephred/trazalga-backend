@@ -22,4 +22,10 @@ public interface IDeclaracionPlantaProduccionRepository extends JpaRepository<De
 
     // Método para obtener declaraciones consumidas por una declaración específica
     List<DeclaracionPlantaProduccionModel> findByUsuarioDestinatarioIdAndDeclaracionDestinatario(Long usuarioDestinatarioId, Long declaracionDestinatario);
+
+    @Query("SELECT d.productoResultante.id, COUNT(d) FROM DeclaracionPlantaProduccionModel d WHERE d.productoResultante IS NOT NULL GROUP BY d.productoResultante.id")
+    List<Object[]> countUsosPorProductoResultante();
+
+    @Query("SELECT d.materiaPrimaProducto.id, COUNT(d) FROM DeclaracionPlantaProduccionModel d WHERE d.materiaPrimaProducto IS NOT NULL GROUP BY d.materiaPrimaProducto.id")
+    List<Object[]> countUsosPorMateriaPrimaProducto();
 }
