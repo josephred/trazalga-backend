@@ -3915,5 +3915,103 @@ public class ReportRepository {
         Object res = q.getSingleResult();
         return res != null ? ((Number) res).longValue() : 0L;
     }
+
+    /**
+     * Stock disponible en planta (NA.2): recepciones de abastecimiento no consumidas ni anuladas.
+     */
+    @SuppressWarnings("unchecked")
+    public java.util.Map<String, Object> getStockEnPlanta(Long plantaId) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT p.id, ");
+        sql.append("p.usuario_id, ");
+        sql.append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))), ");
+        sql.append("u.rut, ");
+        sql.append("COALESCE(p.nombre_planta, ''), ");
+        sql.append("p.lugar_acopio, ");
+        sql.append("COALESCE(p.folio_declaracionapla, ''), ");
+        sql.append("p.folio_origen, ");
+        sql.append("p.fecha_ingreso_planta, ");
+        sql.append("e.nombre, ");
+        sql.append("COALESCE(her.nombre, he.nombre), ");
+        sql.append("p.peso_romana_kg, ");
+        sql.append("p.cantidad ");
+        sql.append("FROM declaracion_planta_abastecimiento p ");
+        sql.append("INNER JOIN usuario u ON p.usuario_id = u.id ");
+        sql.append("LEFT JOIN especie e ON p.especie_id = e.id ");
+        sql.append("LEFT JOIN humedad_estado he ON p.humedad_estado_id = he.id ");
+        sql.append("LEFT JOIN humedad_estado her ON p.humedad_estado_recepcion_id = her.id ");
+        sql.append("WHERE p.declaracion_destinatario_id IS NULL ");
+        sql.append("AND COALESCE(UPPER(p.estado), '') <> 'ANULADA' ");
+        if (plantaId != null) {
+            sql.append("AND p.usuario_id = :plantaId ");
+        }
+        sql.append("ORDER BY COALESCE(p.lugar_acopio, 'ZZZ') ASC, p.fecha_ingreso_planta DESC, p.id DESC");
+
+        Query query = entityManager.createNativeQuery(sql.toString());
+        if (plantaId != null) {
+            query.setParameter("plantaId", plantaId);
+        }
+
+        List<Object[]> rows = query.getResultList();
+        List<java.util.Map<String, Object>> lotes = new java.util.ArrayList<>();
+        java.util.Map<String, double[]> acumPorAcopio = new java.util.LinkedHashMap<>();
+        double totalKg = 0.0;
+
+        for (Object[] r : rows) {
+            Long id = r[0] != null ? ((Number) r[0]).longValue() : null;
+            Long pUsuarioId = r[1] != null ? ((Number) r[1]).longValue() : null;
+            String plantaUsuario = r[2] != null ? r[2].toString().trim() : "";
+            String plantaRut = r[3] != null ? r[3].toString() : "";
+            String nombrePlantaCampo = r[4] != null ? r[4].toString().trim() : "";
+            String plantaNombre = !plantaUsuario.isEmpty() ? plantaUsuario : nombrePlantaCampo;
+            String lugarAcopio = r[5] != null && !r[5].toString().trim().isEmpty() ? r[5].toString().trim() : null;
+            String folioApla = r[6] != null ? r[6].toString() : "";
+            String folioOrigen = r[7] != null ? r[7].toString() : "";
+            Date fechaIngreso = toReportDate(r[8]);
+            String especieNombre = r[9] != null ? r[9].toString() : "";
+            String humedadNombre = r[10] != null ? r[10].toString() : "";
+            Double pesoRomanaKg = r[11] != null ? ((Number) r[11]).doubleValue() : null;
+            Double cantidad = r[12] != null ? ((Number) r[12]).doubleValue() : 0.0;
+            double kgDisponible = (pesoRomanaKg != null && pesoRomanaKg > 0.0) ? pesoRomanaKg : cantidad;
+
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", id);
+            item.put("plantaId", pUsuarioId);
+            item.put("plantaNombre", plantaNombre);
+            item.put("plantaRut", plantaRut);
+            item.put("lugarAcopio", lugarAcopio);
+            item.put("folioDeclaracionapla", folioApla);
+            item.put("folioOrigen", folioOrigen);
+            item.put("fechaIngresoPlanta", fechaIngreso);
+            item.put("especieNombre", especieNombre);
+            item.put("humedadNombre", humedadNombre);
+            item.put("pesoRomanaKg", pesoRomanaKg);
+            item.put("cantidad", cantidad);
+            item.put("kgDisponibles", Math.round(kgDisponible * 100.0) / 100.0);
+            lotes.add(item);
+
+            totalKg += kgDisponible;
+            String grupoAcopio = lugarAcopio != null ? lugarAcopio : "Sin especificar";
+            double[] acc = acumPorAcopio.computeIfAbsent(grupoAcopio, k -> new double[]{0.0, 0.0});
+            acc[0] += 1.0;
+            acc[1] += kgDisponible;
+        }
+
+        List<java.util.Map<String, Object>> resumenPorAcopio = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, double[]> entry : acumPorAcopio.entrySet()) {
+            java.util.Map<String, Object> g = new java.util.LinkedHashMap<>();
+            g.put("lugarAcopio", entry.getKey());
+            g.put("lotes", (long) entry.getValue()[0]);
+            g.put("totalKg", Math.round(entry.getValue()[1] * 100.0) / 100.0);
+            resumenPorAcopio.add(g);
+        }
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("lotes", lotes);
+        resp.put("totalLotes", lotes.size());
+        resp.put("totalKg", Math.round(totalKg * 100.0) / 100.0);
+        resp.put("resumenPorAcopio", resumenPorAcopio);
+        return resp;
+    }
 }
 

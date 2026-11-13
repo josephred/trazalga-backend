@@ -62,4 +62,5 @@ public class TrazabilidadNodoDTO {
     private Double edadExtraccionHoras;
     private String estadoEsperadoHumedad;
     private String resultadoCoherenciaHumedad;
+    private String lugarAcopio;
 }

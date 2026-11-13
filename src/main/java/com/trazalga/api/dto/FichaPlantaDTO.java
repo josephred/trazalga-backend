@@ -20,6 +20,7 @@ public class FichaPlantaDTO {
 
     // Planta y ubicación
     private String nombrePlanta;
+    private String lugarAcopio;
     private String codigoSernapesca;
     private String comuna;
     private String region;

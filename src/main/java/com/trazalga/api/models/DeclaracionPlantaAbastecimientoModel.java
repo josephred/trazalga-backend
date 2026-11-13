@@ -46,6 +46,9 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "nombre_planta", nullable = true)
     private String nombrePlanta;
 
+    @Column(name = "lugar_acopio", length = 120)
+    private String lugarAcopio;
+
     // Código de la planta
     @Column(name = "codigo_sernapesca", nullable = true, length = 50)
     private String codigoSernapesca;

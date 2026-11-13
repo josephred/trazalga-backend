@@ -204,4 +204,50 @@ public class DeclaracionPlantaAbastecimientoValidationTest {
             service.validarVersionMinima();
         });
     }
+
+    @Test
+    @DisplayName("NA.2: Exige lugar_acopio para app >= 2.6.0 cuando planta_exige_lugar_acopio=true")
+    void testValidarLugarAcopioExigeDesde260() {
+        when(configuracionGeneralService.getBoolean("planta_exige_lugar_acopio", true)).thenReturn(true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-App-Version", "2.6.0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            DeclaracionPlantaAbastecimientoModel model = new DeclaracionPlantaAbastecimientoModel();
+            model.setLugarAcopio("   ");
+            assertThrows(ValidacionPlantaException.class, () -> service.validarLugarAcopio(model));
+
+            model.setLugarAcopio("Galpón 2");
+            assertDoesNotThrow(() -> service.validarLugarAcopio(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    @DisplayName("NA.2: Permite lugar_acopio vacío en clientes legacy (< 2.6.0) y cuando el parámetro está apagado")
+    void testValidarLugarAcopioLegacyYDesactivado() {
+        DeclaracionPlantaAbastecimientoModel model = new DeclaracionPlantaAbastecimientoModel();
+        when(configuracionGeneralService.getBoolean("planta_exige_lugar_acopio", true)).thenReturn(true);
+
+        MockHttpServletRequest reqLegacy = new MockHttpServletRequest();
+        reqLegacy.addHeader("X-App-Version", "2.5.8");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(reqLegacy));
+        try {
+            assertDoesNotThrow(() -> service.validarLugarAcopio(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        when(configuracionGeneralService.getBoolean("planta_exige_lugar_acopio", true)).thenReturn(false);
+        MockHttpServletRequest req260 = new MockHttpServletRequest();
+        req260.addHeader("X-App-Version", "2.6.0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req260));
+        try {
+            assertDoesNotThrow(() -> service.validarLugarAcopio(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
 }

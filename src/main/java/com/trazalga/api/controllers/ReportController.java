@@ -1174,4 +1174,13 @@ public class ReportController {
         }
         return ResponseEntity.ok(reporteTransporteService.generarReporteRelaciones(desde, hasta, comercializadorId, transportistaId, patente));
     }
+
+    /**
+     * Reporte operativo de stock disponible en planta por lugar de acopio (NA.2).
+     */
+    @GetMapping("/stock-planta")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getStockEnPlanta(@RequestParam(required = false) Long plantaId) {
+        return ResponseEntity.ok(reportService.getStockEnPlanta(plantaId));
+    }
 }

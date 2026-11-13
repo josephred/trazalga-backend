@@ -27,11 +27,15 @@ import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.exceptions.CargaBloqueadaException;
 import com.trazalga.api.exceptions.ValidacionPlantaException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 public class DeclaracionPlantaAbastecimientoService {
+
+    private static final Logger log = LoggerFactory.getLogger(DeclaracionPlantaAbastecimientoService.class);
 
     @Autowired
     private IDeclaracionPlantaAbastecimientoRepository repository;
@@ -150,6 +154,8 @@ public class DeclaracionPlantaAbastecimientoService {
         validarPesoRomana(declaracion);
         validarVoucher(declaracion);
         validarHumedadRecepcion(declaracion);
+        declaracion.setLugarAcopio(normalizarTextoOpcional(declaracion.getLugarAcopio()));
+        validarLugarAcopio(declaracion);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
         }
@@ -193,6 +199,8 @@ public class DeclaracionPlantaAbastecimientoService {
         validarPesoRomana(request);
         validarVoucher(request);
         validarHumedadRecepcion(request);
+        request.setLugarAcopio(normalizarTextoOpcional(request.getLugarAcopio()));
+        validarLugarAcopio(request);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
         model.setFolioOrigen(request.getFolioOrigen());
@@ -201,6 +209,7 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setFechaTraslado(request.getFechaTraslado());
         model.setHora(request.getHora());
         model.setNombrePlanta(request.getNombrePlanta());
+        model.setLugarAcopio(request.getLugarAcopio());
         model.setCodigoSernapesca(request.getCodigoSernapesca());
         model.setLatitud(request.getLatitud());
         model.setLongitud(request.getLongitud());
@@ -299,6 +308,26 @@ public class DeclaracionPlantaAbastecimientoService {
         }
     }
 
+    public void validarLugarAcopio(DeclaracionPlantaAbastecimientoModel model) {
+        if (configuracionGeneralService == null || model == null) return;
+        boolean exige = configuracionGeneralService.getBoolean("planta_exige_lugar_acopio", true);
+        if (!exige) {
+            return;
+        }
+        String acopio = normalizarTextoOpcional(model.getLugarAcopio());
+        if (acopio != null) {
+            return;
+        }
+        String appVersion = obtenerHeaderAppVersion();
+        if (appVersion != null && !appVersion.isBlank()
+                && !UsuarioVersionService.esVersionMenorQue(appVersion, "2.6.0")) {
+            throw new ValidacionPlantaException(
+                "El registro de recepción en planta exige indicar el lugar de acopio o almacenamiento (planta_exige_lugar_acopio=true)."
+            );
+        }
+        log.warn("Recepción en planta sin lugar_acopio permitida por compatibilidad legacy (X-App-Version={})", appVersion);
+    }
+
     public void validarVersionMinima() {
         if (configuracionGeneralService == null) return;
         String versionMinima = configuracionGeneralService.getValor("planta_version_minima", "");
@@ -306,20 +335,32 @@ public class DeclaracionPlantaAbastecimientoService {
             return;
         }
 
-        String appVersion = null;
-        try {
-            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs != null && attrs.getRequest() != null) {
-                appVersion = attrs.getRequest().getHeader("X-App-Version");
-            }
-        } catch (Exception ignored) {
-        }
+        String appVersion = obtenerHeaderAppVersion();
 
         if (appVersion == null || appVersion.isBlank() || UsuarioVersionService.esVersionMenorQue(appVersion, versionMinima.trim())) {
             throw new ValidacionPlantaException(
                 "Actualice TrazAlga a la versión " + versionMinima.trim() + " o superior para registrar recepciones."
             );
         }
+    }
+
+    private String obtenerHeaderAppVersion() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null && attrs.getRequest() != null) {
+                return attrs.getRequest().getHeader("X-App-Version");
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private static String normalizarTextoOpcional(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String trimmed = valor.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Transactional

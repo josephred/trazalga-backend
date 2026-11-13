@@ -26,6 +26,7 @@ public class ResultadoVariacionPesoDTO {
     private String hora;
     private String plantaNombre;
     private String plantaRut;
+    private String lugarAcopio;
     private Long especieId;
     private String especieNombre;
 

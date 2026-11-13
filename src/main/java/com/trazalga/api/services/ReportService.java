@@ -817,4 +817,11 @@ public class ReportService {
     public long contarComercializadoresMultisalto() {
         return reportRepository.contarComercializadoresMultisalto();
     }
+
+    /**
+     * Stock disponible en planta: recepciones de abastecimiento aún no consumidas por producción ni destino (NA.2).
+     */
+    public java.util.Map<String, Object> getStockEnPlanta(Long plantaId) {
+        return reportRepository.getStockEnPlanta(plantaId);
+    }
 }

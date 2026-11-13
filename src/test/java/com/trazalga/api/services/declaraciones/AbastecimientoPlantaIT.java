@@ -3,6 +3,10 @@ package com.trazalga.api.services.declaraciones;
 import com.trazalga.api.IntegracionBase;
 import com.trazalga.api.dto.ReportDTO;
 import com.trazalga.api.dto.TrazabilidadNodoDTO;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
 import com.trazalga.api.models.EspecieModel;
@@ -148,6 +152,63 @@ class AbastecimientoPlantaIT extends IntegracionBase {
                 assertNull(n.getNombreDestinatario());
                 assertNull(n.getRutDestinatario());
             }
+        }
+    }
+
+    @Test
+    void na2_lugarAcopio_exigeDesde260YExcluyeConsumidosOAnuladosEnStock() {
+        try {
+            MockHttpServletRequest req260 = new MockHttpServletRequest();
+            req260.addHeader("X-App-Version", "2.6.0");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req260));
+
+            DeclaracionPlantaAbastecimientoModel sinAcopio = abastecimiento(plantaA, "FOLIO-NA2-ERR-" + seq);
+            sinAcopio.setLugarAcopio("   ");
+            assertThrows(ValidacionPlantaException.class, () -> abastecimientoService.save(sinAcopio));
+
+            DeclaracionPlantaAbastecimientoModel conAcopio = abastecimiento(plantaA, "FOLIO-NA2-OK-" + seq);
+            conAcopio.setLugarAcopio("  Galpón Norte 1  ");
+            DeclaracionPlantaAbastecimientoModel guardada = abastecimientoService.save(conAcopio);
+            assertEquals("Galpón Norte 1", guardada.getLugarAcopio());
+
+            // Legacy < 2.6.0 permite recepción sin lugar_acopio (compatibilidad hacia atrás)
+            MockHttpServletRequest reqLegacy = new MockHttpServletRequest();
+            reqLegacy.addHeader("X-App-Version", "2.5.9");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(reqLegacy));
+
+            DeclaracionPlantaAbastecimientoModel legacySinAcopio = abastecimiento(plantaA, "FOLIO-NA2-LEG-" + seq);
+            DeclaracionPlantaAbastecimientoModel guardadaLegacy = abastecimientoService.save(legacySinAcopio);
+            assertNull(guardadaLegacy.getLugarAcopio());
+
+            // Anulada excluida de stock
+            DeclaracionPlantaAbastecimientoModel anulada = abastecimiento(plantaA, "FOLIO-NA2-ANU-" + seq);
+            anulada.setEstado("ANULADA");
+            anulada.setLugarAcopio("Galpón Sur");
+            DeclaracionPlantaAbastecimientoModel guardadaAnulada = abastecimientoService.save(anulada);
+
+            // Cadena de custodia propaga lugarAcopio
+            var cadena = cadenaCustodiaService.getTrazabilidad("PLANTA_ABASTECIMIENTO", guardada.getId());
+            assertEquals("Galpón Norte 1", cadena.getNodos().get(0).getLugarAcopio());
+
+            // Stock en planta incluye solo disponibles no consumidos y no anulados
+            var stockInicial = reportService.getStockEnPlanta(plantaA.getId());
+            @SuppressWarnings("unchecked")
+            List<java.util.Map<String, Object>> lotesInicial =
+                    (List<java.util.Map<String, Object>>) stockInicial.get("lotes");
+            assertTrue(lotesInicial.stream().anyMatch(m ->
+                    guardada.getId().equals(m.get("id")) && "Galpón Norte 1".equals(m.get("lugarAcopio"))));
+            assertTrue(lotesInicial.stream().anyMatch(m -> guardadaLegacy.getId().equals(m.get("id"))));
+            assertFalse(lotesInicial.stream().anyMatch(m -> guardadaAnulada.getId().equals(m.get("id"))));
+
+            // Tras consumir con Producción, sale del stock disponible
+            produccionService.save(produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + guardada.getId()));
+            var stockTrasConsumo = reportService.getStockEnPlanta(plantaA.getId());
+            @SuppressWarnings("unchecked")
+            List<java.util.Map<String, Object>> lotesTras =
+                    (List<java.util.Map<String, Object>>) stockTrasConsumo.get("lotes");
+            assertFalse(lotesTras.stream().anyMatch(m -> guardada.getId().equals(m.get("id"))));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
         }
     }
 

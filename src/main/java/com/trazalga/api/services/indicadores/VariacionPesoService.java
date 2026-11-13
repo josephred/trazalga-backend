@@ -472,6 +472,7 @@ public class VariacionPesoService {
                 .hora(p.getHora())
                 .plantaNombre(plantaNombre)
                 .plantaRut(plantaRut)
+                .lugarAcopio(p.getLugarAcopio())
                 .especieId(espId)
                 .especieNombre(p.getEspecie() != null ? p.getEspecie().getNombre() : "")
                 .tramo(tramo)
