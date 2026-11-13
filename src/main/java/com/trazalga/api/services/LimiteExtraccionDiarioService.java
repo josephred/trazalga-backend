@@ -32,6 +32,18 @@ public class LimiteExtraccionDiarioService {
     private com.trazalga.api.repositories.IEmbarcacionRepository embarcacionRepository;
 
     @Autowired(required = false)
+    private com.trazalga.api.services.indicadores.AcumuladoDiarioLed acumuladoDiarioLed;
+
+    /** Fuera de Spring (pruebas unitarias con repositorios simulados) se arma con los repositorios propios. */
+    private com.trazalga.api.services.indicadores.AcumuladoDiarioLed acumuladoDiario() {
+        if (acumuladoDiarioLed == null) {
+            acumuladoDiarioLed = new com.trazalga.api.services.indicadores.AcumuladoDiarioLed(
+                    declaracionArmadorRepository, declaracionRecolectorRepository, null, null);
+        }
+        return acumuladoDiarioLed;
+    }
+
+    @Autowired(required = false)
     private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
 
     public static class EvaluacionLedResult {
@@ -107,39 +119,10 @@ public class LimiteExtraccionDiarioService {
         String unidad = regla.getUnidadAgregacion() != null ? regla.getUnidadAgregacion().toUpperCase() : "EMBARCACION";
         boolean esCaptura = "CAPTURA".equalsIgnoreCase(regla.getMetrica());
 
-        BigDecimal acumuladoPrevio = BigDecimal.ZERO;
+        // La suma del día sale de AcumuladoDiarioLed, la misma que usa el monitoreo del panel (NL.4)
         Long espId = regla.getEspecie() != null ? regla.getEspecie().getId() : especieId;
-
-        if ("EMBARCACION".equals(unidad) && embarcacionId != null) {
-            if (esCaptura) {
-                Double sumCap = declaracionArmadorRepository.sumCapturaByEmbarcacionAndFecha(embarcacionId, espId, fecha);
-                acumuladoPrevio = BigDecimal.valueOf(sumCap != null ? sumCap : 0.0);
-            } else {
-                acumuladoPrevio = declaracionArmadorRepository.sumDesembarqueByEmbarcacionAndFecha(embarcacionId, espId, fecha);
-            }
-        } else if ("BUZO".equals(unidad) && buzoId != null) {
-            if (esCaptura) {
-                Double sumCap = declaracionArmadorRepository.sumCapturaByBuzoAndFecha(buzoId, espId, fecha);
-                acumuladoPrevio = BigDecimal.valueOf(sumCap != null ? sumCap : 0.0);
-            } else {
-                acumuladoPrevio = declaracionArmadorRepository.sumDesembarqueByBuzoAndFecha(buzoId, espId, fecha);
-            }
-        } else if ("USUARIO".equals(unidad) && usuarioId != null) {
-            if ("ARMADOR".equalsIgnoreCase(perfil)) {
-                if (esCaptura) {
-                    Double sumCap = declaracionArmadorRepository.sumCapturaByUsuarioAndFecha(usuarioId, espId, fecha);
-                    acumuladoPrevio = BigDecimal.valueOf(sumCap != null ? sumCap : 0.0);
-                } else {
-                    acumuladoPrevio = declaracionArmadorRepository.sumDesembarqueByUsuarioAndFecha(usuarioId, espId, fecha);
-                }
-            } else if ("RECOLECTOR".equalsIgnoreCase(perfil)) {
-                if (esCaptura) {
-                    acumuladoPrevio = declaracionRecolectorRepository.sumCapturaByUsuarioAndFecha(usuarioId, espId, fecha);
-                } else {
-                    acumuladoPrevio = declaracionRecolectorRepository.sumDesembarqueByUsuarioAndFecha(usuarioId, espId, fecha);
-                }
-            }
-        }
+        BigDecimal acumuladoPrevio = acumuladoDiario().acumulado(
+                unidad, esCaptura, perfil, embarcacionId, buzoId, usuarioId, espId, fecha);
 
         if (acumuladoPrevio == null) {
             acumuladoPrevio = BigDecimal.ZERO;
@@ -173,9 +156,8 @@ public class LimiteExtraccionDiarioService {
                         .orElse("USR-" + usuarioId);
             }
 
-            java.time.LocalDate localFecha = fecha != null
-                    ? fecha.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                    : java.time.LocalDate.now();
+            // FechaSql admite java.sql.Date (la fecha de una declaración leída de la base), que no tiene toInstant()
+            java.time.LocalDate localFecha = com.trazalga.api.services.fechas.FechaSql.diaLocal(fecha);
 
             String msg = String.format("Embarcación %s — armador %s — %s: %.2f kg acumulados sobre límite de %.2f kg (exceso %.2f kg, %.1f%%)",
                     matricula, rutArmador, localFecha, total.doubleValue(), limiteConTolerancia.doubleValue(), excesoKg.doubleValue(), excesoPct);

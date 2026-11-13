@@ -50,6 +50,8 @@ public class ConfiguracionGeneralService {
         createIfNotExist("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE", "Marcas que congelan una declaración de recolector, armador o área (separadas por coma)", "CADENA");
         createIfNotExist("declaracion_autorizacion_horas", "48", "Horas que tiene el dueño para usar una autorización de edición dada por un fiscalizador", "CADENA");
         createIfNotExist("declaracion_escritura_exige_sesion", "false", "Exige sesión para modificar o eliminar declaraciones de origen y de planta. Encender cuando la app 2.5.0+ esté instalada", "CADENA");
+        // Refinamiento 06-11 · punto 1 (D20): el LED por embarcación o buzo cuenta también las declaraciones de área
+        createIfNotExist("led_suma_declaraciones_area", "true", "El acumulado diario del LED (evaluación en línea y monitoreo del panel) suma también las declaraciones de área de manejo de la misma embarcación, buzo o usuario (refinamiento 06-11)", "CADENA");
 
         // 3. Cuotas
         createIfNotExist("cuota_fecha_imputacion", "EXTRACCION", "Fecha utilizada para imputar el consumo de cuota mensual: EXTRACCION o DECLARACION", "CUOTA");

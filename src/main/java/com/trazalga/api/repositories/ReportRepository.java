@@ -26,6 +26,10 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.FactorConversionService factorConversionService;
 
+    /** Suma diaria del LED, compartida con la evaluación en línea (refinamiento 06-11, NL.4). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.trazalga.api.services.indicadores.AcumuladoDiarioLed acumuladoDiarioLed;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.ConfiguracionGeneralService configuracionGeneralService;
@@ -2809,23 +2813,141 @@ public class ReportRepository {
     // INDICADOR 4 — LÍMITE DE EXTRACCIÓN DIARIO (LED)
     // =========================================================================
 
+    /** Una faena del día para el LED: los kilos de un origen, agrupados por unidad, especie, método y región. */
+    private record FaenaLed(String origen, Long embarcacionId, String embarcacionNombre, String embarcacionCodigo,
+                            Long buzoId, String buzoNombre, Long usuarioId, String usuarioRut, String usuarioNombre,
+                            Long especieId, String especie, Long extraccionTipoId, String metodo, Long regionId,
+                            double desembarqueKg, double capturaKg) {
+    }
+
+    /** Las filas del monitoreo que comparten regla, unidad y especie: se comparan juntas contra el límite. */
+    private static final class GrupoLed {
+        FaenaLed primera;
+        Object[] regla;
+        String unidad;
+        boolean captura;
+        Long especieClave;
+        double kgFilas;
+        final java.util.Set<String> origenes = new java.util.LinkedHashSet<>();
+        final java.util.Set<String> metodos = new java.util.LinkedHashSet<>();
+        final java.util.Set<String> especies = new java.util.LinkedHashSet<>();
+    }
+
+    private static Long lng(Object o) {
+        return o != null ? ((Number) o).longValue() : null;
+    }
+
+    private static String str(Object o) {
+        return o != null ? o.toString() : null;
+    }
+
+    private static double dbl(Object o) {
+        return o != null ? ((Number) o).doubleValue() : 0.0;
+    }
+
+    /**
+     * Faenas de un día en una tabla de declaraciones de origen. {@code dia} viaja como {@code DATE}
+     * (ver {@link com.trazalga.api.services.fechas.FechaSql}).
+     */
+    @SuppressWarnings("unchecked")
+    private List<FaenaLed> faenasLed(String origen, java.sql.Date dia) {
+        boolean recolector = "RECOLECTOR".equals(origen);
+        String tabla = "ARMADOR".equals(origen) ? "declaracion_armador"
+                : recolector ? "declaracion_recolector" : "declaracion_area";
+        String comuna = "AREA".equals(origen) ? "cal.comuna_id" : "COALESCE(a.comuna_id, cal.comuna_id)";
+        String embBuzoCols = recolector ? "" : "emb.id, emb.nombre, emb.codigo, b.id, b.nombre, ";
+        String embBuzoJoins = recolector ? ""
+                : "LEFT JOIN embarcacion emb ON a.embarcacion_id = emb.id LEFT JOIN buzo b ON a.buzo_id = b.id ";
+        String sql = "SELECT " + embBuzoCols
+                + "u.id, u.rut, u.nombres, u.apellidop, e.id, e.nombre, ext.id, ext.nombre, "
+                + "COALESCE(c.region_id, cal.region_id), SUM(a.desembarque), SUM(a.captura) "
+                + "FROM " + tabla + " a "
+                + embBuzoJoins
+                + "LEFT JOIN usuario u ON a.usuario_id = u.id "
+                + "INNER JOIN especie e ON a.especie_id = e.id "
+                + "LEFT JOIN extraccion_tipo ext ON a.extraccion_tipo_id = ext.id "
+                + "LEFT JOIN caleta cal ON a.caleta_id = cal.id "
+                + "LEFT JOIN comuna c ON " + comuna + " = c.id "
+                + "WHERE a.fecha_declaracion = :fecha "
+                + "GROUP BY " + embBuzoCols
+                + "u.id, u.rut, u.nombres, u.apellidop, e.id, e.nombre, ext.id, ext.nombre, "
+                + "COALESCE(c.region_id, cal.region_id)";
+        Query q = entityManager.createNativeQuery(sql);
+        q.setParameter("fecha", dia);
+        List<Object[]> rows = q.getResultList();
+        List<FaenaLed> out = new java.util.ArrayList<>();
+        for (Object[] r : rows) {
+            int i = recolector ? 0 : 5;
+            String nombreUsuario = ((r[i + 2] != null ? r[i + 2] : "") + " " + (r[i + 3] != null ? r[i + 3] : "")).trim();
+            out.add(new FaenaLed(origen,
+                    recolector ? null : lng(r[0]), recolector ? null : str(r[1]), recolector ? null : str(r[2]),
+                    recolector ? null : lng(r[3]), recolector ? null : str(r[4]),
+                    lng(r[i]), str(r[i + 1]), nombreUsuario.isEmpty() ? null : nombreUsuario,
+                    lng(r[i + 4]), str(r[i + 5]), lng(r[i + 6]), str(r[i + 7]), lng(r[i + 8]),
+                    dbl(r[i + 9]), dbl(r[i + 10])));
+        }
+        return out;
+    }
+
+    /**
+     * La regla más específica para una faena. Mismo criterio que
+     * {@code LimiteExtraccionDiarioService.evaluar}: perfil, especie, método y región.
+     * Columnas de la regla: 0 id, 1 nombre, 2 límite, 3 tolerancia, 4 modo, 5 unidad, 6 especie, 7 método,
+     * 8 región, 9 perfil, 10 métrica.
+     */
+    private static Object[] reglaLed(List<Object[]> reglas, FaenaLed f) {
+        Object[] mejor = null;
+        int mejorScore = -1;
+        for (Object[] reg : reglas) {
+            Long rEsp = lng(reg[6]);
+            Long rExt = lng(reg[7]);
+            Long rReg = lng(reg[8]);
+            String rPerfil = str(reg[9]);
+            boolean perfilEspecifico = rPerfil != null && !"TODOS".equalsIgnoreCase(rPerfil);
+            if (perfilEspecifico && !f.origen().equalsIgnoreCase(rPerfil)) continue;
+            if (rEsp != null && !rEsp.equals(f.especieId())) continue;
+            if (rExt != null && !rExt.equals(f.extraccionTipoId())) continue;
+            if (rReg != null && !rReg.equals(f.regionId())) continue;
+            int score = (rEsp != null ? 4 : 0) + (rExt != null ? 2 : 0) + (rReg != null ? 1 : 0) + (perfilEspecifico ? 1 : 0);
+            if (score > mejorScore) {
+                mejorScore = score;
+                mejor = reg;
+            }
+        }
+        return mejor;
+    }
+
+    /**
+     * Monitoreo del LED de un día (refinamiento 06-11, NL.2 y NL.4).
+     * <ul>
+     *   <li>La fecha viaja como {@code DATE}: antes viajaba como {@code TIMESTAMP} y no calzaba con
+     *       {@code fecha_declaracion}.</li>
+     *   <li>Cada fila se agrupa por la unidad (embarcación, buzo o usuario) y la métrica (desembarque o
+     *       captura) de su regla, y su total es el de {@code AcumuladoDiarioLed}, el mismo de la evaluación
+     *       en línea. Con {@code led_suma_declaraciones_area} activo, incluye las declaraciones de área.</li>
+     * </ul>
+     */
+    @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> getLimiteExtraccionDiarioMetrics(Date fecha) {
         Date targetDate = fecha != null ? fecha : new Date();
+        java.sql.Date dia = com.trazalga.api.services.fechas.FechaSql.dia(targetDate);
+        boolean sumaArea = acumuladoDiarioLed != null && acumuladoDiarioLed.sumaArea();
 
         // 1. Obtener todas las reglas LED activas y vigentes
         String sqlReglas = "SELECT id, nombre_regla, limite_kg, margen_tolerancia_pct, modo_accion, unidad_agregacion, " +
-                           "especie_id, extraccion_tipo_id, region_id, perfil_aplicable " +
+                           "especie_id, extraccion_tipo_id, region_id, perfil_aplicable, metrica " +
                            "FROM limite_extraccion_diario_config WHERE activo = true " +
                            "AND (vigencia_inicio IS NULL OR vigencia_inicio <= :fecha) " +
                            "AND (vigencia_fin IS NULL OR vigencia_fin >= :fecha) " +
                            "ORDER BY id ASC";
         Query qReglas = entityManager.createNativeQuery(sqlReglas);
-        qReglas.setParameter("fecha", targetDate);
+        qReglas.setParameter("fecha", dia);
         List<Object[]> listaReglas = qReglas.getResultList();
 
         if (listaReglas.isEmpty()) {
             java.util.Map<String, Object> outVacio = new java.util.HashMap<>();
             outVacio.put("fecha", targetDate);
+            outVacio.put("dia", dia.toString());
             outVacio.put("sinReglaConfigurada", true);
             outVacio.put("nombreRegla", "Sin regla LED configurada");
             outVacio.put("limiteOficialKg", null);
@@ -2833,11 +2955,13 @@ public class ReportRepository {
             outVacio.put("limiteConToleranciaKg", null);
             outVacio.put("modoAccion", "INACTIVO");
             outVacio.put("unidadAgregacion", "EMBARCACION");
+            outVacio.put("sumaArea", sumaArea);
             outVacio.put("totalMonitoreados", 0);
             outVacio.put("dentroLimite", 0);
             outVacio.put("advertencia", 0);
             outVacio.put("enTolerancia", 0);
             outVacio.put("excedidos", 0);
+            outVacio.put("sinUnidad", 0);
             outVacio.put("detalle", java.util.Collections.emptyList());
             return outVacio;
         }
@@ -2851,22 +2975,56 @@ public class ReportRepository {
         String unidadAgregacionGlobal = reglaCabecera[5] != null ? reglaCabecera[5].toString() : "EMBARCACION";
         double limiteConToleranciaGlobal = limiteOficialGlobal * (1.0 + (toleranciaGlobal / 100.0));
 
-        // 2. Consultar faenas del día agrupadas por embarcación, especie, método y región
-        String sqlArmador = "SELECT emb.id, emb.nombre, emb.codigo, e.id as especie_id, e.nombre as especie, " +
-            "ext.id as extraccion_tipo_id, ext.nombre as metodo, " +
-            "COALESCE(c.region_id, cal.region_id) as region_id, SUM(a.desembarque) as kg_total " +
-            "FROM declaracion_armador a " +
-            "INNER JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
-            "INNER JOIN especie e ON a.especie_id = e.id " +
-            "LEFT JOIN extraccion_tipo ext ON a.extraccion_tipo_id = ext.id " +
-            "LEFT JOIN caleta cal ON a.caleta_id = cal.id " +
-            "LEFT JOIN comuna c ON COALESCE(a.comuna_id, cal.comuna_id) = c.id " +
-            "WHERE a.fecha_declaracion = :fecha " +
-            "GROUP BY emb.id, emb.nombre, emb.codigo, e.id, e.nombre, ext.id, ext.nombre, COALESCE(c.region_id, cal.region_id)";
+        // 2. Faenas del día: armador, recolector y, si el parámetro lo indica, área
+        List<FaenaLed> faenas = new java.util.ArrayList<>(faenasLed("ARMADOR", dia));
+        if (sumaArea) {
+            faenas.addAll(faenasLed("AREA", dia));
+        }
+        faenas.addAll(faenasLed("RECOLECTOR", dia));
 
-        Query qArm = entityManager.createNativeQuery(sqlArmador);
-        qArm.setParameter("fecha", targetDate);
-        List<Object[]> rows = qArm.getResultList();
+        // 3. Agrupar por regla, unidad y especie, como la evaluación en línea
+        java.util.Map<String, GrupoLed> grupos = new java.util.LinkedHashMap<>();
+        int sinUnidad = 0;
+        for (FaenaLed f : faenas) {
+            Object[] regla = reglaLed(listaReglas, f);
+            String clave;
+            String unidad = null;
+            boolean captura = false;
+            Long especieClave = f.especieId();
+            if (regla == null) {
+                clave = "SR|" + f.origen() + "|" + f.embarcacionId() + "|" + f.usuarioId() + "|" + f.especieId()
+                        + "|" + f.extraccionTipoId() + "|" + f.regionId();
+            } else {
+                unidad = regla[5] != null ? regla[5].toString().toUpperCase(java.util.Locale.ROOT) : "EMBARCACION";
+                captura = "CAPTURA".equalsIgnoreCase(str(regla[10]));
+                if (regla[6] != null) {
+                    especieClave = lng(regla[6]);
+                }
+                Long unidadId = "BUZO".equals(unidad) ? f.buzoId()
+                        : "USUARIO".equals(unidad) ? f.usuarioId() : f.embarcacionId();
+                if (unidadId == null || (!"EMBARCACION".equals(unidad) && !"BUZO".equals(unidad) && !"USUARIO".equals(unidad))) {
+                    // Por ejemplo, un recolector frente a una regla por embarcación: no hay unidad que acumular
+                    sinUnidad++;
+                    continue;
+                }
+                clave = regla[0] + "|" + unidad + "|" + unidadId + "|"
+                        + ("USUARIO".equals(unidad) ? f.origen() : "") + "|" + especieClave;
+            }
+            GrupoLed g = grupos.get(clave);
+            if (g == null) {
+                g = new GrupoLed();
+                g.primera = f;
+                g.regla = regla;
+                g.unidad = unidad;
+                g.captura = captura;
+                g.especieClave = especieClave;
+                grupos.put(clave, g);
+            }
+            g.kgFilas += captura ? f.capturaKg() : f.desembarqueKg();
+            g.origenes.add(f.origen());
+            if (f.metodo() != null) g.metodos.add(f.metodo());
+            if (f.especie() != null) g.especies.add(f.especie());
+        }
 
         List<java.util.Map<String, Object>> detalle = new java.util.ArrayList<>();
         int dentro = 0;
@@ -2874,58 +3032,25 @@ public class ReportRepository {
         int enTolerancia = 0;
         int excedidos = 0;
 
-        for (Object[] r : rows) {
-            String embNom = r[1] != null ? r[1].toString() : "Embarcación " + r[0];
-            String mat = r[2] != null ? r[2].toString() : "—";
-            Long espId = r[3] != null ? ((Number) r[3]).longValue() : null;
-            String esp = r[4] != null ? r[4].toString() : "—";
-            Long extId = r[5] != null ? ((Number) r[5]).longValue() : null;
-            String met = r[6] != null ? r[6].toString() : "No especificado";
-            Long regId = r[7] != null ? ((Number) r[7]).longValue() : null;
-            double kg = r[8] != null ? ((Number) r[8]).doubleValue() : 0.0;
+        for (GrupoLed g : grupos.values()) {
+            FaenaLed f = g.primera;
+            boolean sinRegla = g.regla == null;
 
-            // Buscar la regla más específica aplicable a esta faena
-            Object[] reglaEspecifica = null;
-            int mejorScore = -1;
-
-            for (Object[] reg : listaReglas) {
-                Long rEspId = reg[6] != null ? ((Number) reg[6]).longValue() : null;
-                Long rExtId = reg[7] != null ? ((Number) reg[7]).longValue() : null;
-                Long rRegId = reg[8] != null ? ((Number) reg[8]).longValue() : null;
-                String rPerfil = reg[9] != null ? reg[9].toString() : null;
-
-                if (rPerfil != null && !"TODOS".equalsIgnoreCase(rPerfil) && !"ARMADOR".equalsIgnoreCase(rPerfil)) {
-                    continue;
-                }
-                if (rEspId != null && (espId == null || !rEspId.equals(espId))) {
-                    continue;
-                }
-                if (rExtId != null && (extId == null || !rExtId.equals(extId))) {
-                    continue;
-                }
-                if (rRegId != null && (regId == null || !rRegId.equals(regId))) {
-                    continue;
-                }
-
-                int score = (rEspId != null ? 4 : 0) + (rExtId != null ? 2 : 0) + (rRegId != null ? 1 : 0);
-                if (score > mejorScore) {
-                    mejorScore = score;
-                    reglaEspecifica = reg;
-                }
+            double kg = g.kgFilas;
+            if (!sinRegla && acumuladoDiarioLed != null) {
+                kg = acumuladoDiarioLed.acumulado(g.unidad, g.captura, f.origen(), f.embarcacionId(), f.buzoId(),
+                        f.usuarioId(), g.especieClave, dia).doubleValue();
             }
 
             double limKg = 0.0;
             double tolPct = 0.0;
             String modo = "INACTIVO";
             String nomRegla = "Sin regla configurada";
-            boolean sinRegla = true;
-
-            if (reglaEspecifica != null) {
-                sinRegla = false;
-                nomRegla = reglaEspecifica[1] != null ? reglaEspecifica[1].toString() : nombreReglaGlobal;
-                limKg = reglaEspecifica[2] != null ? ((Number) reglaEspecifica[2]).doubleValue() : 0.0;
-                tolPct = reglaEspecifica[3] != null ? ((Number) reglaEspecifica[3]).doubleValue() : 0.0;
-                modo = reglaEspecifica[4] != null ? reglaEspecifica[4].toString() : "SOLO_ALERTA";
+            if (!sinRegla) {
+                nomRegla = g.regla[1] != null ? g.regla[1].toString() : nombreReglaGlobal;
+                limKg = dbl(g.regla[2]);
+                tolPct = dbl(g.regla[3]);
+                modo = g.regla[4] != null ? g.regla[4].toString() : "SOLO_ALERTA";
             }
 
             double limConTol = limKg * (1.0 + (tolPct / 100.0));
@@ -2948,12 +3073,34 @@ public class ReportRepository {
                 dentro++;
             }
 
+            // Qué se monitorea en la fila: la embarcación, el buzo o el usuario, según la unidad de la regla
+            String tipo = g.unidad != null ? g.unidad : (f.embarcacionId() != null ? "EMBARCACION" : "USUARIO");
+            Long id;
+            String nombre;
+            String matricula;
+            if ("BUZO".equals(tipo)) {
+                id = f.buzoId();
+                nombre = f.buzoNombre() != null ? f.buzoNombre() : "Buzo " + f.buzoId();
+                matricula = "—";
+            } else if ("USUARIO".equals(tipo)) {
+                id = f.usuarioId();
+                nombre = f.usuarioNombre() != null ? f.usuarioNombre() : "Usuario " + f.usuarioId();
+                matricula = f.usuarioRut() != null ? f.usuarioRut() : "—";
+            } else {
+                id = f.embarcacionId();
+                nombre = f.embarcacionNombre() != null ? f.embarcacionNombre() : "Embarcación " + f.embarcacionId();
+                matricula = f.embarcacionCodigo() != null ? f.embarcacionCodigo() : "—";
+            }
+
             java.util.Map<String, Object> item = new java.util.HashMap<>();
-            item.put("id", r[0]);
-            item.put("nombre", embNom);
-            item.put("matricula", mat);
-            item.put("especie", esp);
-            item.put("metodo", met);
+            item.put("id", id);
+            item.put("tipo", tipo);
+            item.put("nombre", nombre);
+            item.put("matricula", matricula);
+            item.put("especie", g.especies.isEmpty() ? "—" : String.join(", ", g.especies));
+            item.put("metodo", g.metodos.isEmpty() ? "No especificado" : String.join(", ", g.metodos));
+            item.put("origenes", new java.util.ArrayList<>(g.origenes));
+            item.put("metrica", g.captura ? "CAPTURA" : "DESEMBARQUE");
             item.put("kgDesembarcados", Math.round(kg * 100.0) / 100.0);
             item.put("limiteKg", sinRegla ? null : limKg);
             item.put("limiteConToleranciaKg", sinRegla ? null : Math.round(limConTol * 100.0) / 100.0);
@@ -2967,6 +3114,7 @@ public class ReportRepository {
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("fecha", targetDate);
+        out.put("dia", dia.toString());
         out.put("sinReglaConfigurada", false);
         out.put("nombreRegla", nombreReglaGlobal);
         out.put("limiteOficialKg", limiteOficialGlobal);
@@ -2974,24 +3122,36 @@ public class ReportRepository {
         out.put("limiteConToleranciaKg", Math.round(limiteConToleranciaGlobal * 100.0) / 100.0);
         out.put("modoAccion", modoAccionGlobal);
         out.put("unidadAgregacion", unidadAgregacionGlobal);
+        out.put("sumaArea", sumaArea);
         out.put("totalMonitoreados", detalle.size());
         out.put("dentroLimite", dentro);
         out.put("advertencia", advertencia);
         out.put("enTolerancia", enTolerancia);
         out.put("excedidos", excedidos);
+        out.put("sinUnidad", sinUnidad);
         out.put("detalle", detalle);
 
         return out;
     }
 
+    /**
+     * Hallazgos {@code LED_EXCEDIDO} del período (refinamiento 06-11, NL.2 y NL.3).
+     * <ul>
+     *   <li>Cruza la marca con la declaración de armador, de área o de recolector, según su tipo.</li>
+     *   <li>No rellena: si no hay declaración ni texto que calce, los kilos, el límite y el exceso van en
+     *       {@code null}. El límite sale de la regla de la marca y el folio, de la declaración.</li>
+     * </ul>
+     */
+    @SuppressWarnings("unchecked")
     public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId, Long embarcacionId) {
+        String fechaHallazgo = "COALESCE(da.fecha_declaracion, dar.fecha_declaracion, dr.fecha_declaracion, DATE(dm.created_at))";
         StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
-            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) BETWEEN :startDate AND :endDate");
+            filterBuilder.append(" AND ").append(fechaHallazgo).append(" BETWEEN :startDate AND :endDate");
         } else if (startDate != null) {
-            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) >= :startDate");
+            filterBuilder.append(" AND ").append(fechaHallazgo).append(" >= :startDate");
         } else if (endDate != null) {
-            filterBuilder.append(" AND COALESCE(da.fecha_declaracion, DATE(dm.created_at)) <= :endDate");
+            filterBuilder.append(" AND ").append(fechaHallazgo).append(" <= :endDate");
         }
 
         if (regionId != null) {
@@ -3010,10 +3170,10 @@ public class ReportRepository {
             "dm.regla_id, " +
             "dm.resuelta, " +
             "dm.created_at, " +
-            "da.folio_origen, " +
-            "da.folio_desembarque_da, " +
-            "da.fecha_declaracion, " +
-            "da.desembarque as kg_desembarque, " +
+            "COALESCE(da.folio_origen, dar.folio_origen, dr.folio_origen) as folio_origen, " +
+            "COALESCE(da.folio_desembarque_da, dar.folio_desembarque_amerb, dr.folio_desembarque_ro) as folio_desembarque, " +
+            "COALESCE(da.fecha_declaracion, dar.fecha_declaracion, dr.fecha_declaracion) as fecha_declaracion, " +
+            "COALESCE(da.desembarque, dar.desembarque, dr.desembarque) as kg_desembarque, " +
             "emb.id as emb_id, " +
             "emb.nombre as emb_nombre, " +
             "emb.codigo as emb_codigo, " +
@@ -3028,21 +3188,26 @@ public class ReportRepository {
             "reg.nombre as reg_nombre, " +
             "cfg.nombre_regla, " +
             "cfg.limite_kg as regla_limite_kg, " +
-            "cfg.margen_tolerancia_pct as regla_tolerancia_pct " +
+            "cfg.margen_tolerancia_pct as regla_tolerancia_pct, " +
+            "dr.nombre as recolector_nombre, " +
+            "COALESCE(da.id, dar.id, dr.id) as declaracion_encontrada " +
             "FROM declaracion_marca dm " +
             "LEFT JOIN declaracion_armador da ON dm.declaracion_tipo = 'ARMADOR' AND dm.declaracion_id = da.id " +
-            "LEFT JOIN embarcacion emb ON da.embarcacion_id = emb.id " +
-            "LEFT JOIN usuario u ON da.usuario_id = u.id " +
-            "LEFT JOIN caleta cal ON da.caleta_id = cal.id " +
-            "LEFT JOIN comuna c ON COALESCE(da.comuna_id, cal.comuna_id) = c.id " +
+            "LEFT JOIN declaracion_area dar ON dm.declaracion_tipo = 'AREA' AND dm.declaracion_id = dar.id " +
+            "LEFT JOIN declaracion_recolector dr ON dm.declaracion_tipo = 'RECOLECTOR' AND dm.declaracion_id = dr.id " +
+            "LEFT JOIN embarcacion emb ON emb.id = COALESCE(da.embarcacion_id, dar.embarcacion_id) " +
+            "LEFT JOIN usuario u ON u.id = COALESCE(da.usuario_id, dar.usuario_id, dr.usuario_id) " +
+            "LEFT JOIN caleta cal ON cal.id = COALESCE(da.caleta_id, dar.caleta_id, dr.caleta_id) " +
+            "LEFT JOIN comuna c ON c.id = COALESCE(da.comuna_id, dr.comuna_id, cal.comuna_id) " +
             "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id) " +
             "LEFT JOIN limite_extraccion_diario_config cfg ON dm.regla_id = cfg.id " +
             "WHERE dm.marca = 'LED_EXCEDIDO' " + filterBuilder.toString() + " " +
             "ORDER BY dm.id DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        // Como DATE: un java.util.Date viaja como TIMESTAMP y deja fuera el primer día del período (NL.2)
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (regionId != null) query.setParameter("regionId", regionId);
         if (embarcacionId != null) query.setParameter("embarcacionId", embarcacionId);
 
@@ -3057,22 +3222,24 @@ public class ReportRepository {
 
         for (Object[] r : rows) {
             Long marcaId = ((Number) r[0]).longValue();
-            String decTipo = r[1] != null ? r[1].toString() : "ARMADOR";
+            String decTipo = r[1] != null ? r[1].toString().toUpperCase(java.util.Locale.ROOT) : "ARMADOR";
             Long decId = r[2] != null ? ((Number) r[2]).longValue() : null;
             String detalleStr = r[3] != null ? r[3].toString() : "";
             Long reglaId = r[4] != null ? ((Number) r[4]).longValue() : null;
-            Boolean resuelta = r[5] != null && (((Number) r[5]).intValue() == 1 || Boolean.TRUE.equals(r[5]));
+            Boolean resuelta = r[5] != null && (Boolean.TRUE.equals(r[5]) || (r[5] instanceof Number n && n.intValue() == 1));
             Date createdAt = null;
             if (r[6] instanceof java.sql.Timestamp) createdAt = new Date(((java.sql.Timestamp) r[6]).getTime());
             else if (r[6] instanceof Date) createdAt = (Date) r[6];
+            else if (r[6] instanceof java.time.LocalDateTime ldt) createdAt = Date.from(ldt.atZone(java.time.ZoneId.systemDefault()).toInstant());
 
-            String daFolioOrig = r[7] != null ? r[7].toString() : null;
-            String daFolioDa = r[8] != null ? r[8].toString() : null;
-            Date daFecha = null;
-            if (r[9] instanceof java.sql.Timestamp) daFecha = new Date(((java.sql.Timestamp) r[9]).getTime());
-            else if (r[9] instanceof Date) daFecha = (Date) r[9];
+            String folioOrigen = r[7] != null ? r[7].toString() : null;
+            String folioDesembarque = r[8] != null ? r[8].toString() : null;
+            Date decFecha = null;
+            if (r[9] instanceof java.sql.Timestamp) decFecha = new Date(((java.sql.Timestamp) r[9]).getTime());
+            else if (r[9] instanceof Date) decFecha = (Date) r[9];
+            else if (r[9] instanceof java.time.LocalDate ld) decFecha = java.sql.Date.valueOf(ld);
 
-            Double daDesembarque = r[10] != null ? ((Number) r[10]).doubleValue() : null;
+            Double decDesembarque = r[10] != null ? ((Number) r[10]).doubleValue() : null;
             Long embId = r[11] != null ? ((Number) r[11]).longValue() : null;
             String embNom = r[12] != null ? r[12].toString() : null;
             String embCod = r[13] != null ? r[13].toString() : null;
@@ -3080,59 +3247,61 @@ public class ReportRepository {
             String usrRut = r[15] != null ? r[15].toString() : null;
             String usrNom = r[16] != null ? r[16].toString() : "";
             String usrApe = r[17] != null ? r[17].toString() : "";
-            String armadorNomCompleto = (usrNom + " " + usrApe).trim();
+            String usuarioNomCompleto = (usrNom + " " + usrApe).trim();
 
             String calNombre = r[19] != null ? r[19].toString() : null;
             String comNombre = r[20] != null ? r[20].toString() : null;
             String regNombre = r[22] != null ? r[22].toString() : null;
             String regNombreRegla = r[23] != null ? r[23].toString() : null;
             Double reglaLimiteKg = r[24] != null ? ((Number) r[24]).doubleValue() : null;
+            String recolectorNombre = r[26] != null ? r[26].toString() : null;
+            boolean declaracionEncontrada = r[27] != null;
 
-            // Variables a consolidar
-            String folio = decId != null ? (daFolioOrig != null ? daFolioOrig : (daFolioDa != null ? daFolioDa : "DA-" + decId)) : "BLOQUEADO (Intento)";
-            String embarcacion = embNom != null ? embNom : (embCod != null ? embCod : null);
-            String matricula = embCod != null ? embCod : null;
-            String armador = !armadorNomCompleto.isEmpty() ? (usrRut != null ? usrRut + " - " + armadorNomCompleto : armadorNomCompleto) : usrRut;
+            // Qué se fiscaliza en la fila
+            String tipo = "AREA".equals(decTipo) ? "AMERB" : "RECOLECTOR".equals(decTipo) ? "RECOLECTOR" : "EMBARCACION";
+
+            // Folio: el de la declaración. Sin declaración (intento bloqueado) o sin folio, no se inventa uno
+            String folio = decId == null ? "BLOQUEADO (Intento)"
+                    : folioOrigen != null ? folioOrigen : folioDesembarque;
+            String embarcacion = embNom != null ? embNom : embCod;
+            String matricula = embCod;
+            if (usuarioNomCompleto.isEmpty() && recolectorNombre != null) usuarioNomCompleto = recolectorNombre;
+            String armador = !usuarioNomCompleto.isEmpty() ? (usrRut != null ? usrRut + " - " + usuarioNomCompleto : usuarioNomCompleto) : usrRut;
             String rut = usrRut;
-            Date fecha = daFecha != null ? daFecha : createdAt;
-            Double kgDia = daDesembarque;
+            Date fecha = decFecha != null ? decFecha : createdAt;
+            Double kgDia = decDesembarque;
             Double limite = reglaLimiteKg;
             Double exceso = null;
             Double excesoPct = null;
-            String nombreRegla = regNombreRegla != null ? regNombreRegla : "Límite Oficial Diario";
 
-            // Si hay datos parseables en detalleStr (especialmente valioso para intentos bloqueados)
+            // El texto de la marca completa lo que la declaración no trae (sobre todo en intentos bloqueados)
             if (detalleStr != null && !detalleStr.isEmpty()) {
                 java.util.regex.Matcher m = regexDetalle.matcher(detalleStr);
                 if (m.find()) {
-                    if (matricula == null || matricula.equals("—")) matricula = m.group(1).trim();
-                    if (embarcacion == null || embarcacion.equals("N/A")) embarcacion = m.group(1).trim();
-                    if (rut == null) rut = m.group(2).trim();
-                    if (armador == null) armador = m.group(2).trim();
-                    if (kgDia == null) {
-                        try { kgDia = Double.parseDouble(m.group(4).replace(",", ".")); } catch (Exception ignored) {}
-                    }
-                    if (limite == null) {
-                        try { limite = Double.parseDouble(m.group(5).replace(",", ".")); } catch (Exception ignored) {}
-                    }
-                    if (m.group(6) != null) {
-                        try { exceso = Double.parseDouble(m.group(6).replace(",", ".")); } catch (Exception ignored) {}
-                    }
-                    if (m.group(7) != null) {
-                        try { excesoPct = Double.parseDouble(m.group(7).replace(",", ".")); } catch (Exception ignored) {}
-                    }
+                    String embTexto = m.group(1).trim();
+                    String rutTexto = m.group(2).trim();
+                    boolean hayEmbTexto = !embTexto.isEmpty() && !"N/A".equalsIgnoreCase(embTexto);
+                    boolean hayRutTexto = !rutTexto.isEmpty() && !"N/A".equalsIgnoreCase(rutTexto);
+                    if (matricula == null && hayEmbTexto) matricula = embTexto;
+                    if (embarcacion == null && hayEmbTexto) embarcacion = embTexto;
+                    if (rut == null && hayRutTexto) rut = rutTexto;
+                    if (armador == null && hayRutTexto) armador = rutTexto;
+                    if (kgDia == null) kgDia = numeroDetalleLed(m.group(4));
+                    if (limite == null) limite = numeroDetalleLed(m.group(5));
+                    exceso = numeroDetalleLed(m.group(6));
+                    excesoPct = numeroDetalleLed(m.group(7));
                 }
             }
 
-            if (kgDia == null) kgDia = 0.0;
-            if (limite == null) limite = 2000.0;
-            if (exceso == null) exceso = Math.max(0.0, kgDia - limite);
-            if (excesoPct == null) excesoPct = limite > 0 ? (exceso / limite) * 100.0 : 0.0;
+            if (exceso == null && kgDia != null && limite != null) exceso = Math.max(0.0, kgDia - limite);
+            if (excesoPct == null && exceso != null && limite != null && limite > 0) excesoPct = (exceso / limite) * 100.0;
 
             java.util.Map<String, Object> h = new java.util.HashMap<>();
             h.put("marcaId", marcaId);
             h.put("declaracionId", decId);
             h.put("declaracionTipo", decTipo);
+            h.put("declaracionEncontrada", declaracionEncontrada);
+            h.put("tipo", tipo);
             h.put("folio", folio);
             h.put("embarcacion", embarcacion != null ? embarcacion : "—");
             h.put("matricula", matricula != null ? matricula : "—");
@@ -3143,11 +3312,11 @@ public class ReportRepository {
             h.put("comuna", comNombre != null ? comNombre : "—");
             h.put("region", regNombre != null ? regNombre : "—");
             h.put("fecha", fecha);
-            h.put("kgDia", Math.round(kgDia * 100.0) / 100.0);
-            h.put("limiteKg", Math.round(limite * 100.0) / 100.0);
-            h.put("excesoKg", Math.round(exceso * 100.0) / 100.0);
-            h.put("excesoPct", Math.round(excesoPct * 10.0) / 10.0);
-            h.put("nombreRegla", nombreRegla);
+            h.put("kgDia", kgDia != null ? Math.round(kgDia * 100.0) / 100.0 : null);
+            h.put("limiteKg", limite != null ? Math.round(limite * 100.0) / 100.0 : null);
+            h.put("excesoKg", exceso != null ? Math.round(exceso * 100.0) / 100.0 : null);
+            h.put("excesoPct", excesoPct != null ? Math.round(excesoPct * 10.0) / 10.0 : null);
+            h.put("nombreRegla", regNombreRegla);
             h.put("reglaId", reglaId);
             h.put("resuelta", resuelta);
             h.put("detalle", detalleStr);
@@ -3155,13 +3324,36 @@ public class ReportRepository {
             hallazgos.add(h);
         }
 
-        // Ordenar por exceso descendente según criterio de aceptación de R4.2
+        // Ordenar por exceso descendente según criterio de aceptación de R4.2; los que no tienen dato, al final
         hallazgos.sort((a, b) -> Double.compare(
-            ((Number) b.getOrDefault("excesoKg", 0.0)).doubleValue(),
-            ((Number) a.getOrDefault("excesoKg", 0.0)).doubleValue()
+            b.get("excesoKg") != null ? ((Number) b.get("excesoKg")).doubleValue() : -1.0,
+            a.get("excesoKg") != null ? ((Number) a.get("excesoKg")).doubleValue() : -1.0
         ));
 
         return hallazgos;
+    }
+
+    /**
+     * Número del texto de una marca LED. El texto se escribe con el idioma del servidor: «2500,00» en es-CL
+     * y «2500.00» en otros. Si trae coma y punto, el último es el decimal.
+     */
+    static Double numeroDetalleLed(String s) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+        String t = s.trim();
+        int coma = t.lastIndexOf(',');
+        int punto = t.lastIndexOf('.');
+        if (coma >= 0 && punto >= 0) {
+            t = coma > punto ? t.replace(".", "").replace(',', '.') : t.replace(",", "");
+        } else if (coma >= 0) {
+            t = t.replace(',', '.');
+        }
+        try {
+            return Double.parseDouble(t);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // =========================================================================

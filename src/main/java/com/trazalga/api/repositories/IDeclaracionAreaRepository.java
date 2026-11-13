@@ -66,4 +66,42 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
             + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
     List<DeclaracionAreaModel> findConsumidasPorDestinos(
             @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
+
+    // --- Acumulado diario del LED (refinamiento 06-11, NL.4): las declaraciones de área también suman ---
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.embarcacion.id = :embarcacionId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumDesembarqueByEmbarcacionAndFecha(@Param("embarcacionId") Long embarcacionId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.embarcacion.id = :embarcacionId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByEmbarcacionAndFecha(@Param("embarcacionId") Long embarcacionId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.buzo.id = :buzoId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumDesembarqueByBuzoAndFecha(@Param("buzoId") Long buzoId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.buzo.id = :buzoId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByBuzoAndFecha(@Param("buzoId") Long buzoId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.desembarque), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumDesembarqueByUsuarioAndFecha(@Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @Query("SELECT COALESCE(SUM(d.captura), 0) FROM DeclaracionAreaModel d "
+            + "WHERE d.usuario.id = :usuarioId AND (:especieId IS NULL OR d.especie.id = :especieId) "
+            + "AND d.fechaDeclaracion = :fecha")
+    Double sumCapturaByUsuarioAndFecha(@Param("usuarioId") Long usuarioId,
+            @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
 }
