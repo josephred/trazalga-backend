@@ -63,4 +63,5 @@ public class TrazabilidadNodoDTO {
     private String estadoEsperadoHumedad;
     private String resultadoCoherenciaHumedad;
     private String lugarAcopio;
+    private String loteInterno;
 }

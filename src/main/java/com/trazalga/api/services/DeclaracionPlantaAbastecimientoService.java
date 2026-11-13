@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.exceptions.CargaBloqueadaException;
+import com.trazalga.api.exceptions.LoteInternoDuplicadoException;
 import com.trazalga.api.exceptions.ValidacionPlantaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,6 +158,8 @@ public class DeclaracionPlantaAbastecimientoService {
         validarHumedadRecepcion(declaracion);
         declaracion.setLugarAcopio(normalizarTextoOpcional(declaracion.getLugarAcopio()));
         validarLugarAcopio(declaracion);
+        declaracion.setLoteInterno(normalizarLoteInterno(declaracion.getLoteInterno()));
+        validarLoteInterno(declaracion, null, null);
         if (declaracion.getFolioDeclaracionAPla() == null || declaracion.getFolioDeclaracionAPla().isEmpty()) {
             declaracion.setFolioDeclaracionAPla(generarFolio());
         }
@@ -201,6 +205,11 @@ public class DeclaracionPlantaAbastecimientoService {
         validarHumedadRecepcion(request);
         request.setLugarAcopio(normalizarTextoOpcional(request.getLugarAcopio()));
         validarLugarAcopio(request);
+        Long plantaIdValidacion = model.getUsuario() != null
+                ? model.getUsuario().getId()
+                : (request.getUsuario() != null ? request.getUsuario().getId() : null);
+        request.setLoteInterno(normalizarLoteInterno(request.getLoteInterno()));
+        validarLoteInterno(request, plantaIdValidacion, id);
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
 
         model.setFolioOrigen(request.getFolioOrigen());
@@ -210,6 +219,7 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setHora(request.getHora());
         model.setNombrePlanta(request.getNombrePlanta());
         model.setLugarAcopio(request.getLugarAcopio());
+        model.setLoteInterno(request.getLoteInterno());
         model.setCodigoSernapesca(request.getCodigoSernapesca());
         model.setLatitud(request.getLatitud());
         model.setLongitud(request.getLongitud());
@@ -328,6 +338,38 @@ public class DeclaracionPlantaAbastecimientoService {
         log.warn("Recepción en planta sin lugar_acopio permitida por compatibilidad legacy (X-App-Version={})", appVersion);
     }
 
+    public void validarLoteInterno(DeclaracionPlantaAbastecimientoModel model) {
+        validarLoteInterno(model, null, model != null ? model.getId() : null);
+    }
+
+    public void validarLoteInterno(DeclaracionPlantaAbastecimientoModel model, Long plantaIdOverride, Long excludeId) {
+        if (configuracionGeneralService == null || model == null) return;
+        String lote = normalizarLoteInterno(model.getLoteInterno());
+        model.setLoteInterno(lote);
+        boolean exige = configuracionGeneralService.getBoolean("planta_exige_lote_interno", true);
+        if (lote == null) {
+            if (!exige) {
+                return;
+            }
+            String appVersion = obtenerHeaderAppVersion();
+            if (appVersion != null && !appVersion.isBlank()
+                    && !UsuarioVersionService.esVersionMenorQue(appVersion, "2.6.0")) {
+                throw new ValidacionPlantaException(
+                    "El registro de recepción en planta exige indicar el número de lote interno (planta_exige_lote_interno=true)."
+                );
+            }
+            log.warn("Recepción en planta sin lote_interno permitida por compatibilidad legacy (X-App-Version={})", appVersion);
+            return;
+        }
+        Long plantaId = plantaIdOverride != null ? plantaIdOverride : (model.getUsuario() != null ? model.getUsuario().getId() : null);
+        if (plantaId != null && repository != null
+                && repository.existsLoteInternoActivoEnPlanta(plantaId, lote, excludeId)) {
+            throw new LoteInternoDuplicadoException(
+                "Ya existe una recepción activa con el lote interno '" + lote + "' para esta planta."
+            );
+        }
+    }
+
     public void validarVersionMinima() {
         if (configuracionGeneralService == null) return;
         String versionMinima = configuracionGeneralService.getValor("planta_version_minima", "");
@@ -361,6 +403,11 @@ public class DeclaracionPlantaAbastecimientoService {
         }
         String trimmed = valor.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String normalizarLoteInterno(String valor) {
+        String norm = normalizarTextoOpcional(valor);
+        return norm != null ? norm.toUpperCase(Locale.ROOT) : null;
     }
 
     @Transactional

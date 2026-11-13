@@ -473,6 +473,7 @@ public class VariacionPesoService {
                 .plantaNombre(plantaNombre)
                 .plantaRut(plantaRut)
                 .lugarAcopio(p.getLugarAcopio())
+                .loteInterno(p.getLoteInterno())
                 .especieId(espId)
                 .especieNombre(p.getEspecie() != null ? p.getEspecie().getNombre() : "")
                 .tramo(tramo)

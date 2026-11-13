@@ -642,6 +642,7 @@ public class FichaTrazabilidadService {
                 .mensajeEstado("Recepcionada en planta")
                 .nombrePlanta(p.getNombrePlanta())
                 .lugarAcopio(p.getLugarAcopio())
+                .loteInterno(p.getLoteInterno())
                 .codigoSernapesca(p.getCodigoSernapesca())
                 .comuna(p.getUsuario() != null && p.getUsuario().getComuna() != null ? p.getUsuario().getComuna().getNombre() : null)
                 .region(p.getUsuario() != null && p.getUsuario().getComuna() != null && p.getUsuario().getComuna().getRegion() != null ? p.getUsuario().getComuna().getRegion().getNombre() : null)

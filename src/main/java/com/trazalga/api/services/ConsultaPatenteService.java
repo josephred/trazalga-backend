@@ -304,6 +304,8 @@ public class ConsultaPatenteService {
         String recPlantaNom = null;
         BigDecimal recRomanaKg = null;
         String recVoucher = null;
+        String recLoteInterno = null;
+        String recLugarAcopio = null;
 
         if (dc.getDeclaracionDestinatario() != null
                 && (dc.getConsumidaPorTipo() == null || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(dc.getConsumidaPorTipo()))
@@ -321,6 +323,8 @@ public class ConsultaPatenteService {
                         : (p.getUsuario() != null ? p.getUsuario().getNombres() : "Planta");
                 recRomanaKg = p.getPesoRomanaKg();
                 recVoucher = p.getVoucherRomanaNumero();
+                recLoteInterno = p.getLoteInterno();
+                recLugarAcopio = p.getLugarAcopio();
             }
         }
 
@@ -359,6 +363,8 @@ public class ConsultaPatenteService {
                 .recepcionPlantaNombre(recPlantaNom)
                 .recepcionPesoRomanaKg(recRomanaKg)
                 .recepcionVoucherRomana(recVoucher)
+                .recepcionLoteInterno(recLoteInterno)
+                .recepcionLugarAcopio(recLugarAcopio)
                 .marcas(marcasDto)
                 .enlaceFicha("/consultas/ficha/COMERCIALIZADOR/" + dc.getId())
                 .build();
@@ -413,6 +419,8 @@ public class ConsultaPatenteService {
                 .recepcionPlantaNombre(plantaNom)
                 .recepcionPesoRomanaKg(dpa.getPesoRomanaKg())
                 .recepcionVoucherRomana(dpa.getVoucherRomanaNumero())
+                .recepcionLoteInterno(dpa.getLoteInterno())
+                .recepcionLugarAcopio(dpa.getLugarAcopio())
                 .marcas(marcasDto)
                 .enlaceFicha("/consultas/ficha/PLANTA_ABASTECIMIENTO/" + dpa.getId())
                 .build();

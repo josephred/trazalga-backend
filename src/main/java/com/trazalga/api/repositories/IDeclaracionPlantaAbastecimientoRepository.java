@@ -30,4 +30,14 @@ public interface IDeclaracionPlantaAbastecimientoRepository extends JpaRepositor
             + "AND (d.declaracionDestinatario IS NULL OR d.declaracionDestinatario = :consumidaPorId) "
             + "AND (d.estado IS NULL OR d.estado <> 'RECHAZADA')")
     List<DeclaracionPlantaAbastecimientoModel> findAsignadasParaEditar(@Param("usuarioDestinatarioId") Long usuarioDestinatarioId, @Param("consumidaPorId") Long consumidaPorId);
+
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN TRUE ELSE FALSE END FROM DeclaracionPlantaAbastecimientoModel d "
+            + "WHERE d.usuario.id = :usuarioId "
+            + "AND d.loteInterno IS NOT NULL "
+            + "AND UPPER(TRIM(d.loteInterno)) = UPPER(TRIM(:loteInterno)) "
+            + "AND (:excludeId IS NULL OR d.id <> :excludeId) "
+            + "AND (d.estado IS NULL OR UPPER(d.estado) <> 'ANULADA')")
+    boolean existsLoteInternoActivoEnPlanta(@Param("usuarioId") Long usuarioId,
+            @Param("loteInterno") String loteInterno,
+            @Param("excludeId") Long excludeId);
 }

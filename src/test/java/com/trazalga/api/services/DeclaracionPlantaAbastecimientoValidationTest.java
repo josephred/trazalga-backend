@@ -18,7 +18,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.trazalga.api.exceptions.LoteInternoDuplicadoException;
 import com.trazalga.api.exceptions.ValidacionPlantaException;
+import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.HumedadEstadoModel;
 import com.trazalga.api.models.UsuarioModel;
@@ -246,6 +249,61 @@ public class DeclaracionPlantaAbastecimientoValidationTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req260));
         try {
             assertDoesNotThrow(() -> service.validarLugarAcopio(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    @DisplayName("NA.3: Exige lote_interno para app >= 2.6.0 y rechaza duplicado activo en la planta con 409")
+    void testValidarLoteInternoExigeYRechazaDuplicado() {
+        when(configuracionGeneralService.getBoolean("planta_exige_lote_interno", true)).thenReturn(true);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader("X-App-Version", "2.6.0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            UsuarioModel planta = new UsuarioModel();
+            planta.setId(55L);
+
+            DeclaracionPlantaAbastecimientoModel model = new DeclaracionPlantaAbastecimientoModel();
+            model.setUsuario(planta);
+            model.setLoteInterno("   ");
+            assertThrows(ValidacionPlantaException.class, () -> service.validarLoteInterno(model));
+
+            model.setLoteInterno(" lot-900 ");
+            when(repository.existsLoteInternoActivoEnPlanta(55L, "LOT-900", null)).thenReturn(false);
+            assertDoesNotThrow(() -> service.validarLoteInterno(model));
+            assertEquals("LOT-900", model.getLoteInterno());
+
+            when(repository.existsLoteInternoActivoEnPlanta(55L, "LOT-900", null)).thenReturn(true);
+            assertThrows(LoteInternoDuplicadoException.class, () -> service.validarLoteInterno(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    @DisplayName("NA.3: Permite lote_interno vacío en legacy (< 2.6.0) y cuando planta_exige_lote_interno=false")
+    void testValidarLoteInternoLegacyYDesactivado() {
+        DeclaracionPlantaAbastecimientoModel model = new DeclaracionPlantaAbastecimientoModel();
+        when(configuracionGeneralService.getBoolean("planta_exige_lote_interno", true)).thenReturn(true);
+
+        MockHttpServletRequest reqLegacy = new MockHttpServletRequest();
+        reqLegacy.addHeader("X-App-Version", "2.5.9");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(reqLegacy));
+        try {
+            assertDoesNotThrow(() -> service.validarLoteInterno(model));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        when(configuracionGeneralService.getBoolean("planta_exige_lote_interno", true)).thenReturn(false);
+        MockHttpServletRequest req260 = new MockHttpServletRequest();
+        req260.addHeader("X-App-Version", "2.6.0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req260));
+        try {
+            assertDoesNotThrow(() -> service.validarLoteInterno(model));
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }

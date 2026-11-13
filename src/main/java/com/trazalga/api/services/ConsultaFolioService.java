@@ -213,6 +213,9 @@ public class ConsultaFolioService {
         String condP_docNum = esExacta ? "p.documento_tributario_numero IN (:terms)" : "p.documento_tributario_numero LIKE :suffixPattern";
         String condP_patente = esExacta ? "p.placa_patente IN (:terms)" : "p.placa_patente LIKE :suffixPattern";
         String condP_carro = esExacta ? "p.placa_patente_carro IN (:terms)" : "p.placa_patente_carro LIKE :suffixPattern";
+        String condP_lote = esExacta
+                ? "p.lote_interno IS NOT NULL AND TRIM(p.lote_interno) <> '' AND REPLACE(REPLACE(UPPER(p.lote_interno), '-', ''), ' ', '') IN (:terms)"
+                : "p.lote_interno IS NOT NULL AND TRIM(p.lote_interno) <> '' AND REPLACE(REPLACE(UPPER(p.lote_interno), '-', ''), ' ', '') LIKE :suffixPattern";
 
         StringBuilder sb = new StringBuilder();
 
@@ -459,7 +462,19 @@ public class ConsultaFolioService {
                 .append("INNER JOIN usuario u ON p.usuario_id = u.id ")
                 .append("LEFT JOIN comuna com ON u.comuna_id = com.id ")
                 .append("LEFT JOIN especie e ON p.especie_id = e.id ")
-                .append("WHERE ").append(condP_carro);
+                .append("WHERE ").append(condP_carro).append(" ");
+
+        // 21. Planta Abastecimiento - Lote Interno (NA.3)
+        sb.append("UNION ALL ")
+                .append("SELECT 'PLANTA_ABASTECIMIENTO' as tipo, p.id, 'Lote Interno' as campo, p.lote_interno as valor, ")
+                .append("p.fecha_ingreso_planta as fecha, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, ")
+                .append("COALESCE(p.nombre_planta, com.nombre, 'Planta') as comuna_o_caleta, ")
+                .append("COALESCE(e.nombre, 'Sin especie') as especie, p.cantidad as kg, COALESCE(p.estado, 'ENVIADA') as estado ")
+                .append("FROM declaracion_planta_abastecimiento p ")
+                .append("INNER JOIN usuario u ON p.usuario_id = u.id ")
+                .append("LEFT JOIN comuna com ON u.comuna_id = com.id ")
+                .append("LEFT JOIN especie e ON p.especie_id = e.id ")
+                .append("WHERE ").append(condP_lote);
 
         return sb.toString();
     }

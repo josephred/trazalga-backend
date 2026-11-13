@@ -3928,6 +3928,7 @@ public class ReportRepository {
         sql.append("u.rut, ");
         sql.append("COALESCE(p.nombre_planta, ''), ");
         sql.append("p.lugar_acopio, ");
+        sql.append("p.lote_interno, ");
         sql.append("COALESCE(p.folio_declaracionapla, ''), ");
         sql.append("p.folio_origen, ");
         sql.append("p.fecha_ingreso_planta, ");
@@ -3965,13 +3966,14 @@ public class ReportRepository {
             String nombrePlantaCampo = r[4] != null ? r[4].toString().trim() : "";
             String plantaNombre = !plantaUsuario.isEmpty() ? plantaUsuario : nombrePlantaCampo;
             String lugarAcopio = r[5] != null && !r[5].toString().trim().isEmpty() ? r[5].toString().trim() : null;
-            String folioApla = r[6] != null ? r[6].toString() : "";
-            String folioOrigen = r[7] != null ? r[7].toString() : "";
-            Date fechaIngreso = toReportDate(r[8]);
-            String especieNombre = r[9] != null ? r[9].toString() : "";
-            String humedadNombre = r[10] != null ? r[10].toString() : "";
-            Double pesoRomanaKg = r[11] != null ? ((Number) r[11]).doubleValue() : null;
-            Double cantidad = r[12] != null ? ((Number) r[12]).doubleValue() : 0.0;
+            String loteInterno = r[6] != null && !r[6].toString().trim().isEmpty() ? r[6].toString().trim() : null;
+            String folioApla = r[7] != null ? r[7].toString() : "";
+            String folioOrigen = r[8] != null ? r[8].toString() : "";
+            Date fechaIngreso = toReportDate(r[9]);
+            String especieNombre = r[10] != null ? r[10].toString() : "";
+            String humedadNombre = r[11] != null ? r[11].toString() : "";
+            Double pesoRomanaKg = r[12] != null ? ((Number) r[12]).doubleValue() : null;
+            Double cantidad = r[13] != null ? ((Number) r[13]).doubleValue() : 0.0;
             double kgDisponible = (pesoRomanaKg != null && pesoRomanaKg > 0.0) ? pesoRomanaKg : cantidad;
 
             java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
@@ -3980,6 +3982,7 @@ public class ReportRepository {
             item.put("plantaNombre", plantaNombre);
             item.put("plantaRut", plantaRut);
             item.put("lugarAcopio", lugarAcopio);
+            item.put("loteInterno", loteInterno);
             item.put("folioDeclaracionapla", folioApla);
             item.put("folioOrigen", folioOrigen);
             item.put("fechaIngresoPlanta", fechaIngreso);

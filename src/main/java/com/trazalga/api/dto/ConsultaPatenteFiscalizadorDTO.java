@@ -117,6 +117,8 @@ public class ConsultaPatenteFiscalizadorDTO {
         private String recepcionPlantaNombre;
         private BigDecimal recepcionPesoRomanaKg;
         private String recepcionVoucherRomana;
+        private String recepcionLoteInterno;
+        private String recepcionLugarAcopio;
 
         // Marcas y enlace a ficha
         @Builder.Default

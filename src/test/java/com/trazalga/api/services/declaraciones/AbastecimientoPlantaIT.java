@@ -3,6 +3,7 @@ package com.trazalga.api.services.declaraciones;
 import com.trazalga.api.IntegracionBase;
 import com.trazalga.api.dto.ReportDTO;
 import com.trazalga.api.dto.TrazabilidadNodoDTO;
+import com.trazalga.api.exceptions.LoteInternoDuplicadoException;
 import com.trazalga.api.exceptions.ValidacionPlantaException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -20,6 +21,7 @@ import com.trazalga.api.repositories.IHumedadEstadoRepository;
 import com.trazalga.api.repositories.IProductoRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
 import com.trazalga.api.services.CadenaCustodiaService;
+import com.trazalga.api.services.ConsultaFolioService;
 import com.trazalga.api.services.DeclaracionPlantaAbastecimientoService;
 import com.trazalga.api.services.DeclaracionPlantaProduccionService;
 import com.trazalga.api.services.ReportService;
@@ -51,6 +53,7 @@ class AbastecimientoPlantaIT extends IntegracionBase {
     @Autowired private IProductoRepository productoRepository;
     @Autowired private ReportService reportService;
     @Autowired private CadenaCustodiaService cadenaCustodiaService;
+    @Autowired private ConsultaFolioService consultaFolioService;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private UsuarioModel plantaA;
@@ -168,6 +171,7 @@ class AbastecimientoPlantaIT extends IntegracionBase {
 
             DeclaracionPlantaAbastecimientoModel conAcopio = abastecimiento(plantaA, "FOLIO-NA2-OK-" + seq);
             conAcopio.setLugarAcopio("  Galpón Norte 1  ");
+            conAcopio.setLoteInterno("LOT-NA2-" + seq);
             DeclaracionPlantaAbastecimientoModel guardada = abastecimientoService.save(conAcopio);
             assertEquals("Galpón Norte 1", guardada.getLugarAcopio());
 
@@ -207,6 +211,82 @@ class AbastecimientoPlantaIT extends IntegracionBase {
             List<java.util.Map<String, Object>> lotesTras =
                     (List<java.util.Map<String, Object>>) stockTrasConsumo.get("lotes");
             assertFalse(lotesTras.stream().anyMatch(m -> guardada.getId().equals(m.get("id"))));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    void na3_loteInterno_exigeDesde260NormalizaYBloqueaDuplicadosEnMismaPlanta() {
+        try {
+            MockHttpServletRequest req260 = new MockHttpServletRequest();
+            req260.addHeader("X-App-Version", "2.6.0");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req260));
+
+            DeclaracionPlantaAbastecimientoModel sinLote = abastecimiento(plantaA, "FOLIO-NA3-ERR-" + seq);
+            sinLote.setLugarAcopio("Bodega Central");
+            sinLote.setLoteInterno("   ");
+            assertThrows(ValidacionPlantaException.class, () -> abastecimientoService.save(sinLote));
+
+            DeclaracionPlantaAbastecimientoModel lote1 = abastecimiento(plantaA, "FOLIO-NA3-1-" + seq);
+            lote1.setLugarAcopio("Bodega Central");
+            lote1.setLoteInterno("  lot-" + seq + "-a  ");
+            DeclaracionPlantaAbastecimientoModel guardada = abastecimientoService.save(lote1);
+            assertEquals("LOT-" + seq + "-A", guardada.getLoteInterno());
+
+            // Mismo lote (incluso minúsculas) en la misma planta => 409 Conflict
+            DeclaracionPlantaAbastecimientoModel duplicado = abastecimiento(plantaA, "FOLIO-NA3-DUP-" + seq);
+            duplicado.setLugarAcopio("Bodega Sur");
+            duplicado.setLoteInterno("lot-" + seq + "-a");
+            assertThrows(LoteInternoDuplicadoException.class, () -> abastecimientoService.save(duplicado));
+
+            // Mismo lote en distinta planta => permitido
+            DeclaracionPlantaAbastecimientoModel otraPlanta = abastecimiento(plantaB, "FOLIO-NA3-OTRA-" + seq);
+            otraPlanta.setLugarAcopio("Galpón B");
+            otraPlanta.setLoteInterno("lot-" + seq + "-a");
+            DeclaracionPlantaAbastecimientoModel guardadaB = abastecimientoService.save(otraPlanta);
+            assertEquals("LOT-" + seq + "-A", guardadaB.getLoteInterno());
+
+            // Edición de la propia declaración conserva su lote sin conflicto
+            DeclaracionPlantaAbastecimientoModel cambioMismo = abastecimiento(plantaA, "FOLIO-NA3-1-" + seq);
+            cambioMismo.setLugarAcopio("Bodega Norte");
+            cambioMismo.setLoteInterno("LOT-" + seq + "-A");
+            DeclaracionPlantaAbastecimientoModel actualizada = abastecimientoService.updateById(cambioMismo, guardada.getId());
+            assertEquals("LOT-" + seq + "-A", actualizada.getLoteInterno());
+
+            // Anulada libera el número de lote en la misma planta
+            guardada.setEstado("ANULADA");
+            abastecimientoRepository.saveAndFlush(guardada);
+            DeclaracionPlantaAbastecimientoModel reutilizada = abastecimiento(plantaA, "FOLIO-NA3-REU-" + seq);
+            reutilizada.setLugarAcopio("Bodega Central");
+            reutilizada.setLoteInterno("LOT-" + seq + "-A");
+            DeclaracionPlantaAbastecimientoModel guardadaReu = abastecimientoService.save(reutilizada);
+            assertEquals("LOT-" + seq + "-A", guardadaReu.getLoteInterno());
+
+            // Cadena de custodia, stock en planta y búsqueda por folio exponen el lote interno
+            var cadena = cadenaCustodiaService.getTrazabilidad("PLANTA_ABASTECIMIENTO", guardadaReu.getId());
+            assertEquals("LOT-" + seq + "-A", cadena.getNodos().get(0).getLoteInterno());
+
+            var stock = reportService.getStockEnPlanta(plantaA.getId());
+            @SuppressWarnings("unchecked")
+            List<java.util.Map<String, Object>> lotes = (List<java.util.Map<String, Object>>) stock.get("lotes");
+            assertTrue(lotes.stream().anyMatch(m ->
+                    guardadaReu.getId().equals(m.get("id")) && ("LOT-" + seq + "-A").equals(m.get("loteInterno"))));
+
+            var buscados = consultaFolioService.buscar("LOT-" + seq + "-A", "76001" + seq + "-K");
+            assertTrue(buscados.stream().anyMatch(r ->
+                    "PLANTA_ABASTECIMIENTO".equals(r.getTipo())
+                            && guardadaReu.getId().equals(r.getId())
+                            && "Lote Interno".equals(r.getCampo())));
+
+            // Legacy < 2.6.0 permite recepción sin lote_interno
+            MockHttpServletRequest reqLegacy = new MockHttpServletRequest();
+            reqLegacy.addHeader("X-App-Version", "2.5.9");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(reqLegacy));
+
+            DeclaracionPlantaAbastecimientoModel legacy = abastecimiento(plantaA, "FOLIO-NA3-LEG-" + seq);
+            DeclaracionPlantaAbastecimientoModel guardadaLeg = abastecimientoService.save(legacy);
+            assertNull(guardadaLeg.getLoteInterno());
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }
