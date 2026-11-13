@@ -27,6 +27,10 @@ public class DeclaracionPlantaDestinoService {
     @Autowired
     private IDeclaracionPlantaProduccionRepository produccionRepository;
 
+    /** Selección válida de lo que se consume (refinamiento 06-11, NP.0). Nulo en pruebas unitarias. */
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -96,6 +100,13 @@ public class DeclaracionPlantaDestinoService {
 
     @Transactional
     public DeclaracionPlantaDestinoModel save(DeclaracionPlantaDestinoModel declaracion) {
+        // NP.0: las producciones deben ser de la planta, estar libres, no anuladas y no retenidas (409)
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.verificarProduccionesDeDestino(
+                    declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null,
+                    declaracion.getDeclaracionesSeleccionadas(), null);
+        }
+
         if (declaracion.getFolioDeclaracionDestino() == null || declaracion.getFolioDeclaracionDestino().isEmpty()) {
             declaracion.setFolioDeclaracionDestino(generarFolioDestino());
         }
@@ -128,6 +139,13 @@ public class DeclaracionPlantaDestinoService {
             throw new IllegalArgumentException("Esta declaración ya ha sido consumida y no puede ser modificada.");
         }
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
+
+        // NP.0: misma verificación al modificar; las producciones que este destino ya consume siguen siendo válidas
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.verificarProduccionesDeDestino(
+                    model.getUsuario() != null ? model.getUsuario().getId() : null,
+                    request.getDeclaracionesSeleccionadas(), id);
+        }
 
         model.setFolioOrigen(request.getFolioOrigen());
         model.setFolioDeclaracionDestino(request.getFolioDeclaracionDestino());

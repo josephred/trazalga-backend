@@ -22,6 +22,10 @@ public class DeclaracionPlantaProduccionController {
     @Autowired
     private DeclaracionPlantaProduccionService service;
 
+    /** Sesión y dueño al modificar o eliminar (refinamiento 06-11, NP.0). */
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
+
     @PostMapping
     @Operation(summary = "Crear una nueva declaración de producción")
     @ApiResponse(responseCode = "201", description = "Declaración creada exitosamente")
@@ -33,6 +37,8 @@ public class DeclaracionPlantaProduccionController {
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar una declaración de producción existente")
     public ResponseEntity<DeclaracionPlantaProduccionModel> updateDeclaracion(@RequestBody DeclaracionPlantaProduccionModel request, @PathVariable("id") Long id) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.PRODUCCION, id);
         DeclaracionPlantaProduccionModel actualizada = service.updateById(request, id);
         return ResponseEntity.ok(actualizada);
     }
@@ -40,6 +46,8 @@ public class DeclaracionPlantaProduccionController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Eliminar una declaración de producción")
     public ResponseEntity<String> deleteDeclaracion(@PathVariable("id") Long id) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.PRODUCCION, id);
         boolean ok = service.deleteById(id);
         if (ok) {
             return ResponseEntity.ok("Declaracion " + id + " eliminada");

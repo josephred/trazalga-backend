@@ -49,7 +49,7 @@ public class ConfiguracionGeneralService {
         createIfNotExist("declaracion_congelar_activo", "true", "Una declaración de origen con alerta de la lista no puede ser modificada ni eliminada por su dueño (refinamiento 30-10)", "CADENA");
         createIfNotExist("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE", "Marcas que congelan una declaración de recolector, armador o área (separadas por coma)", "CADENA");
         createIfNotExist("declaracion_autorizacion_horas", "48", "Horas que tiene el dueño para usar una autorización de edición dada por un fiscalizador", "CADENA");
-        createIfNotExist("declaracion_escritura_exige_sesion", "false", "Exige sesión para modificar o eliminar declaraciones de origen. Encender cuando la app 2.5.0 esté instalada", "CADENA");
+        createIfNotExist("declaracion_escritura_exige_sesion", "false", "Exige sesión para modificar o eliminar declaraciones de origen y de planta. Encender cuando la app 2.5.0+ esté instalada", "CADENA");
 
         // 3. Cuotas
         createIfNotExist("cuota_fecha_imputacion", "EXTRACCION", "Fecha utilizada para imputar el consumo de cuota mensual: EXTRACCION o DECLARACION", "CUOTA");

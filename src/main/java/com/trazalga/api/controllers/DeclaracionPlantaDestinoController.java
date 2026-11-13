@@ -23,6 +23,10 @@ public class DeclaracionPlantaDestinoController {
     @Autowired
     private DeclaracionPlantaDestinoService service;
 
+    /** Sesión y dueño al modificar o eliminar (refinamiento 06-11, NP.0). */
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
+
     @PostMapping
     @Operation(summary = "Crear una nueva declaración de destino",
                description = "Registra una nueva declaración sobre el destino de un producto procesado por la planta.")
@@ -41,6 +45,8 @@ public class DeclaracionPlantaDestinoController {
     public ResponseEntity<DeclaracionPlantaDestinoModel> updateDeclaracion(
             @PathVariable Long id,
             @RequestBody DeclaracionPlantaDestinoModel declaracion) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.DESTINO, id);
         try {
             DeclaracionPlantaDestinoModel updated = service.updateById(declaracion, id);
             return ResponseEntity.ok(updated);
@@ -55,6 +61,8 @@ public class DeclaracionPlantaDestinoController {
     @ApiResponse(responseCode = "200", description = "Declaración eliminada exitosamente")
     @ApiResponse(responseCode = "404", description = "Declaración no encontrada o ya consumida", content = @Content)
     public ResponseEntity<Boolean> deleteDeclaracion(@PathVariable Long id) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.DESTINO, id);
         try {
             return ResponseEntity.ok(service.deleteById(id));
         } catch (IllegalArgumentException e) {

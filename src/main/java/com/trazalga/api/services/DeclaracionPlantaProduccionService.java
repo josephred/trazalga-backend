@@ -27,6 +27,10 @@ public class DeclaracionPlantaProduccionService {
     @Autowired
     private IDeclaracionPlantaAbastecimientoRepository abastecimientoRepository;
 
+    /** Selección válida de lo que se consume (refinamiento 06-11, NP.0). Nulo en pruebas unitarias. */
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -98,6 +102,13 @@ public class DeclaracionPlantaProduccionService {
 
     @Transactional
     public DeclaracionPlantaProduccionModel save(DeclaracionPlantaProduccionModel declaracion) {
+        // NP.0: los lotes deben ser de la planta, estar libres, no anulados y no retenidos (409)
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.verificarLotesDeProduccion(
+                    declaracion.getUsuario() != null ? declaracion.getUsuario().getId() : null,
+                    declaracion.getDeclaracionesSeleccionadas(), null);
+        }
+
         if (declaracion.getFolioDeclaracionPpla() == null || declaracion.getFolioDeclaracionPpla().isEmpty()) {
             declaracion.setFolioDeclaracionPpla(generarFolioPpla());
         }
@@ -130,6 +141,13 @@ public class DeclaracionPlantaProduccionService {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
         String oldSeleccionadas = model.getDeclaracionesSeleccionadas();
+
+        // NP.0: misma verificación al modificar; los lotes que esta producción ya consume siguen siendo válidos
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.verificarLotesDeProduccion(
+                    model.getUsuario() != null ? model.getUsuario().getId() : null,
+                    request.getDeclaracionesSeleccionadas(), id);
+        }
 
         model.setFolioOrigen(request.getFolioOrigen());
         model.setFolioDeclaracionPpla(request.getFolioDeclaracionPpla());

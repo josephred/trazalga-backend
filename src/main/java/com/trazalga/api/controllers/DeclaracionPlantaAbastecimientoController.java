@@ -22,6 +22,10 @@ public class DeclaracionPlantaAbastecimientoController {
     @Autowired
     private DeclaracionPlantaAbastecimientoService service;
 
+    /** Sesión y dueño al modificar o eliminar (refinamiento 06-11, NP.0). */
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
+
     @PostMapping
     @Operation(summary = "Crear una nueva declaración de abastecimiento")
     @ApiResponse(responseCode = "201", description = "Declaración creada exitosamente")
@@ -33,6 +37,8 @@ public class DeclaracionPlantaAbastecimientoController {
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar una declaración de abastecimiento existente")
     public ResponseEntity<DeclaracionPlantaAbastecimientoModel> updateDeclaracion(@RequestBody DeclaracionPlantaAbastecimientoModel request, @PathVariable("id") Long id) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.ABASTECIMIENTO, id);
         DeclaracionPlantaAbastecimientoModel actualizada = service.updateById(request, id);
         return ResponseEntity.ok(actualizada);
     }
@@ -40,6 +46,8 @@ public class DeclaracionPlantaAbastecimientoController {
     @DeleteMapping("/{id}")
     @Operation(summary = "Eliminar una declaración de abastecimiento")
     public ResponseEntity<String> deleteDeclaracion(@PathVariable("id") Long id) {
+        politicaEscrituraPlanta.verificarSesionYDueno(
+                com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.ABASTECIMIENTO, id);
         boolean ok = service.deleteById(id);
         if (ok) {
             return ResponseEntity.ok("Declaracion " + id + " eliminada");
