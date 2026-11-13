@@ -44,3 +44,4 @@ SET @q = (SELECT IF(
     'ALTER TABLE declaracion_planta_abastecimiento ADD COLUMN guia_despacho_adjunto_id BIGINT NULL'
 ));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+

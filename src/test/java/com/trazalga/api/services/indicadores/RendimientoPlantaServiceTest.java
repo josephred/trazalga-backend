@@ -266,3 +266,4 @@ class RendimientoPlantaServiceTest {
                 any(CriterioHallazgo.class), anyString(), eq("VALIDACION"), eq(99L), isNull());
     }
 }
+

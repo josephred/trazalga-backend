@@ -57,3 +57,4 @@ public class RendimientoRangoModel {
     @Builder.Default
     private Boolean activo = true;
 }
+

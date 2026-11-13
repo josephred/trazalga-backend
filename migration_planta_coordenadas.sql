@@ -45,3 +45,4 @@ SET @sql_act_por = IF(@col_act_por = 0,
   'ALTER TABLE planta ADD COLUMN coordenada_actualizada_por VARCHAR(100) NULL',
   'SELECT ''planta.coordenada_actualizada_por ya existe'' AS msg');
 PREPARE s FROM @sql_act_por; EXECUTE s; DEALLOCATE PREPARE s;
+

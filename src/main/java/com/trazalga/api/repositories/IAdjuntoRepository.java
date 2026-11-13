@@ -15,3 +15,4 @@ public interface IAdjuntoRepository extends JpaRepository<AdjuntoModel, Long> {
 
     long countByRutaRelativa(String rutaRelativa);
 }
+

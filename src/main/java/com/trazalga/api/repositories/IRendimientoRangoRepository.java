@@ -35,3 +35,4 @@ public interface IRendimientoRangoRepository extends JpaRepository<RendimientoRa
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 }
+

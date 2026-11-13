@@ -232,3 +232,4 @@ class AdjuntoIT extends IntegracionBase {
                 .andExpect(jsonPath("$.guiaDespachoAdjunto").value(gNode.get("url").asText()));
     }
 }
+

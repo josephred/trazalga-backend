@@ -53,3 +53,4 @@ CREATE TABLE IF NOT EXISTS `rendimiento_rango` (
   CONSTRAINT `fk_rr_humedad_entrada` FOREIGN KEY (`humedad_entrada_id`) REFERENCES `humedad_estado` (`id`),
   CONSTRAINT `fk_rr_producto` FOREIGN KEY (`producto_id`) REFERENCES `producto` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
