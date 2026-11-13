@@ -137,8 +137,8 @@ public class ReportRepository {
         }
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        query.setParameter("fechaInicio", fechaInicio);
-        query.setParameter("fechaFin", fechaFin);
+        query.setParameter("fechaInicio", com.trazalga.api.services.fechas.FechaSql.dia(fechaInicio));
+        query.setParameter("fechaFin", com.trazalga.api.services.fechas.FechaSql.dia(fechaFin));
         if (rut != null && !rut.isEmpty()) {
             query.setParameter("rut", rut);
         }
@@ -238,8 +238,8 @@ public class ReportRepository {
             "GROUP BY DATE(fecha_declaracion) ORDER BY DATE(fecha_declaracion) ASC";
         
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
         
@@ -311,8 +311,8 @@ public class ReportRepository {
             ") sub";
         
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (especieId != null) query.setParameter("especieId", especieId);
         if (regionId != null) query.setParameter("regionId", regionId);
 
@@ -403,8 +403,8 @@ public class ReportRepository {
             "ORDER BY COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) DESC, decl.id DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (especieId != null) query.setParameter("especieId", especieId);
         if (regionId != null) query.setParameter("regionId", regionId);
 
@@ -481,8 +481,8 @@ public class ReportRepository {
             "ORDER BY volumen_kg DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (perfilNormalizado != null) query.setParameter("perfil", perfilNormalizado);
 
         List<Object[]> results = query.getResultList();
@@ -522,8 +522,8 @@ public class ReportRepository {
             "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (amerbId != null) query.setParameter("amerbId", amerbId);
         if (especieId != null) query.setParameter("especieId", especieId);
 
@@ -635,8 +635,8 @@ public class ReportRepository {
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("tolerancia", tolerancia);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> rows = query.getResultList();
 
@@ -703,8 +703,8 @@ public class ReportRepository {
             ") as decl " + dateFilter;
             
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
@@ -779,8 +779,8 @@ public class ReportRepository {
             "WHERE 1=1" + dateFilter;
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
@@ -831,8 +831,8 @@ public class ReportRepository {
             ") as t ORDER BY estado DESC, horas DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
 
@@ -976,8 +976,8 @@ public class ReportRepository {
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("umbral", umbral);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
@@ -1102,8 +1102,8 @@ public class ReportRepository {
         sqlPlanta += "ORDER BY dpa.fecha_ingreso_planta DESC, dpa.id DESC";
 
         Query qPlanta = entityManager.createNativeQuery(sqlPlanta);
-        if (startDate != null) qPlanta.setParameter("startDate", startDate);
-        if (endDate != null) qPlanta.setParameter("endDate", endDate);
+        if (startDate != null) qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (especieId != null) qPlanta.setParameter("especieId", especieId);
 
         @SuppressWarnings("unchecked")
@@ -1647,8 +1647,8 @@ public class ReportRepository {
             "ORDER BY ABS(t.pct) DESC LIMIT 100";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
 
@@ -2061,8 +2061,8 @@ public class ReportRepository {
 
         String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC LIMIT 200";
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
         Date now = new Date();
@@ -2468,8 +2468,8 @@ public class ReportRepository {
     private void bindDesembarqueFisicoParams(Query query, Date startDate, Date endDate, Long especieId,
                                             Long comunaId, Long regionId, Long provinciaId, Long caletaId,
                                             Long usuarioId, Long macrozonaId) {
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (especieId != null) query.setParameter("especieId", especieId);
         if (comunaId != null) query.setParameter("comunaId", comunaId);
         if (regionId != null) query.setParameter("regionId", regionId);
@@ -2772,8 +2772,8 @@ public class ReportRepository {
             "GROUP BY e.nombre, h.nombre";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (especieId != null) query.setParameter("especieId", especieId);
 
         List<Object[]> rows = query.getResultList();
@@ -3377,8 +3377,8 @@ public class ReportRepository {
 
         String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC";
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
         Date now = new Date();
@@ -3698,8 +3698,8 @@ public class ReportRepository {
         sql.append("ORDER BY todas.usuario_id, todas.fecha_declaracion ASC, todas.hora ASC, todas.id ASC");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (regionId != null) query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
@@ -3761,8 +3761,8 @@ public class ReportRepository {
         if (regionId != null) sql.append("AND sin_geo.region_id = :regionId ");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (regionId != null) query.setParameter("regionId", regionId);
 
         Number count = (Number) query.getSingleResult();
@@ -3872,8 +3872,8 @@ public class ReportRepository {
         sql.append("ORDER BY todas.fecha_declaracion DESC, todas.hora DESC, todas.id DESC");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
         if (regionId != null) query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
