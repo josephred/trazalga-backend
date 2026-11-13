@@ -290,18 +290,18 @@ public class ReportRepository {
             "    LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
             "    LEFT JOIN amerb am ON decl.amerb_id = am.id " +
             "    INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "        AND (v.activo = true OR v.activo = 1) " +
+            "        AND v.activo = true " +
             "        AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
             "        AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
             "        AND ( " +
-            "            ((v.recurrencia_anual = true OR v.recurrencia_anual = 1) " +
+            "            (v.recurrencia_anual = true " +
             "             AND v.meses_veda IS NOT NULL " +
             "             AND ( " +
             "                 CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
             "                 OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
             "             )) " +
             "            OR " +
-            "            ((v.recurrencia_anual = false OR v.recurrencia_anual = 0 OR v.recurrencia_anual IS NULL) " +
+            "            ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
             "             AND v.fecha_inicio IS NOT NULL " +
             "             AND v.fecha_fin IS NOT NULL " +
             "             AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
@@ -381,18 +381,18 @@ public class ReportRepository {
             "LEFT JOIN usuario u ON decl.usuario_id = u.id " +
             "LEFT JOIN declaracion_marca dm ON dm.declaracion_tipo = decl.tipo_perfil AND dm.declaracion_id = decl.id AND dm.marca = 'EN_VEDA' " +
             "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "    AND (v.activo = true OR v.activo = 1) " +
+            "    AND v.activo = true " +
             "    AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
             "    AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
             "    AND ( " +
-            "        ((v.recurrencia_anual = true OR v.recurrencia_anual = 1) " +
+            "        (v.recurrencia_anual = true " +
             "         AND v.meses_veda IS NOT NULL " +
             "         AND ( " +
             "             CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
             "             OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
             "         )) " +
             "        OR " +
-            "        ((v.recurrencia_anual = false OR v.recurrencia_anual = 0 OR v.recurrencia_anual IS NULL) " +
+            "        ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
             "         AND v.fecha_inicio IS NOT NULL " +
             "         AND v.fecha_fin IS NOT NULL " +
             "         AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
@@ -1322,9 +1322,9 @@ public class ReportRepository {
 
         java.util.Map<Long, OrigenData> recMap = new java.util.HashMap<>();
         if (!allRecolectorIds.isEmpty()) {
-            String sqlR = "SELECT r.id, r.folio_origen, COALESCE(r.desembarque, r.cantidad), r.fecha_declaracion, " +
+            String sqlR = "SELECT r.id, r.folio_origen, r.desembarque, r.fecha_declaracion, " +
                     "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
-                    "COALESCE(r.captura, COALESCE(r.desembarque, r.cantidad)) as captura, h.nombre as humedad_nombre " +
+                    "COALESCE(r.captura, r.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_recolector r " +
                     "JOIN usuario u ON r.usuario_id = u.id " +
                     "LEFT JOIN especie e ON r.especie_id = e.id " +
@@ -1350,9 +1350,9 @@ public class ReportRepository {
 
         java.util.Map<Long, OrigenData> armMap = new java.util.HashMap<>();
         if (!allArmadorIds.isEmpty()) {
-            String sqlA = "SELECT a.id, a.folio_origen, COALESCE(a.desembarque, a.cantidad), a.fecha_declaracion, " +
+            String sqlA = "SELECT a.id, a.folio_origen, a.desembarque, a.fecha_declaracion, " +
                     "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
-                    "COALESCE(a.captura, COALESCE(a.desembarque, a.cantidad)) as captura, h.nombre as humedad_nombre " +
+                    "COALESCE(a.captura, a.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_armador a " +
                     "JOIN usuario u ON a.usuario_id = u.id " +
                     "LEFT JOIN especie e ON a.especie_id = e.id " +
@@ -1378,9 +1378,9 @@ public class ReportRepository {
 
         java.util.Map<Long, OrigenData> areaMap = new java.util.HashMap<>();
         if (!allAreaIds.isEmpty()) {
-            String sqlAr = "SELECT ar.id, ar.folio_origen, COALESCE(ar.desembarque, ar.cantidad), ar.fecha_declaracion, " +
+            String sqlAr = "SELECT ar.id, ar.folio_origen, ar.desembarque, ar.fecha_declaracion, " +
                     "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
-                    "COALESCE(ar.captura, COALESCE(ar.desembarque, ar.cantidad)) as captura, h.nombre as humedad_nombre " +
+                    "COALESCE(ar.captura, ar.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_area ar " +
                     "JOIN usuario u ON ar.usuario_id = u.id " +
                     "LEFT JOIN especie e ON ar.especie_id = e.id " +
