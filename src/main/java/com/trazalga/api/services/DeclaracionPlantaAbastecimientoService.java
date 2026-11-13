@@ -155,6 +155,7 @@ public class DeclaracionPlantaAbastecimientoService {
         validarCargasNoBloqueadas(declaracion.getDeclaracionesSeleccionadas());
         validarPesoRomana(declaracion);
         validarVoucher(declaracion);
+        validarGuiaAdjunta(declaracion);
         validarHumedadRecepcion(declaracion);
         declaracion.setLugarAcopio(normalizarTextoOpcional(declaracion.getLugarAcopio()));
         validarLugarAcopio(declaracion);
@@ -202,6 +203,7 @@ public class DeclaracionPlantaAbastecimientoService {
         validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
         validarPesoRomana(request);
         validarVoucher(request);
+        validarGuiaAdjunta(request);
         validarHumedadRecepcion(request);
         request.setLugarAcopio(normalizarTextoOpcional(request.getLugarAcopio()));
         validarLugarAcopio(request);
@@ -231,6 +233,9 @@ public class DeclaracionPlantaAbastecimientoService {
         model.setCantidad(request.getCantidad());
         model.setVoucherRomanaNumero(request.getVoucherRomanaNumero());
         model.setVoucherRomanaAdjunto(request.getVoucherRomanaAdjunto());
+        model.setVoucherRomanaAdjuntoId(request.getVoucherRomanaAdjuntoId());
+        model.setGuiaDespachoAdjunto(request.getGuiaDespachoAdjunto());
+        model.setGuiaDespachoAdjuntoId(request.getGuiaDespachoAdjuntoId());
         model.setPesoRomanaKg(request.getPesoRomanaKg());
         model.setFechaPesaje(request.getFechaPesaje());
         model.setDocumentoTributarioOrigenTipo(request.getDocumentoTributarioOrigenTipo());
@@ -292,10 +297,26 @@ public class DeclaracionPlantaAbastecimientoService {
         if (configuracionGeneralService == null || model == null) return;
         boolean exigeVoucher = configuracionGeneralService.getBoolean("variacion_peso_exige_voucher", true);
         if (exigeVoucher) {
-            boolean tieneVoucher = model.getVoucherRomanaNumero() != null && !model.getVoucherRomanaNumero().trim().isEmpty();
-            if (!tieneVoucher) {
+            boolean tieneNumero = model.getVoucherRomanaNumero() != null && !model.getVoucherRomanaNumero().trim().isEmpty();
+            boolean tieneAdjunto = (model.getVoucherRomanaAdjunto() != null && !model.getVoucherRomanaAdjunto().trim().isEmpty())
+                    || model.getVoucherRomanaAdjuntoId() != null;
+            if (!tieneNumero && !tieneAdjunto) {
                 throw new ValidacionPlantaException(
-                    "El número de voucher de romana es obligatorio según la configuración variacion_peso_exige_voucher=true."
+                    "El comprobante del voucher de romana (número o foto) es obligatorio según la configuración variacion_peso_exige_voucher=true."
+                );
+            }
+        }
+    }
+
+    public void validarGuiaAdjunta(DeclaracionPlantaAbastecimientoModel model) {
+        if (configuracionGeneralService == null || model == null) return;
+        boolean exigeGuia = configuracionGeneralService.getBoolean("planta_exige_guia_adjunta", false);
+        if (exigeGuia) {
+            boolean tieneGuia = (model.getGuiaDespachoAdjunto() != null && !model.getGuiaDespachoAdjunto().trim().isEmpty())
+                    || model.getGuiaDespachoAdjuntoId() != null;
+            if (!tieneGuia) {
+                throw new ValidacionPlantaException(
+                    "El respaldo fotográfico o PDF de la guía de despacho es obligatorio según planta_exige_guia_adjunta=true."
                 );
             }
         }

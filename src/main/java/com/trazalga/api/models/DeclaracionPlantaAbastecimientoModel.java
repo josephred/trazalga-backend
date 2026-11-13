@@ -155,6 +155,15 @@ public class DeclaracionPlantaAbastecimientoModel {
     @Column(name = "voucher_romana_adjunto", length = 255)
     private String voucherRomanaAdjunto;
 
+    @Column(name = "voucher_romana_adjunto_id")
+    private Long voucherRomanaAdjuntoId;
+
+    @Column(name = "guia_despacho_adjunto", length = 255)
+    private String guiaDespachoAdjunto;
+
+    @Column(name = "guia_despacho_adjunto_id")
+    private Long guiaDespachoAdjuntoId;
+
     @Column(name = "peso_romana_kg", precision = 12, scale = 2)
     private BigDecimal pesoRomanaKg;
 

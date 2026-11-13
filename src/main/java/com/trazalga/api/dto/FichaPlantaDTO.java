@@ -35,6 +35,8 @@ public class FichaPlantaDTO {
     private boolean conRomana;
     private BigDecimal pesoRomanaKg;
     private String numeroVoucherRomana;
+    private String voucherRomanaAdjunto;
+    private String guiaDespachoAdjunto;
     private Date fechaPesajeRomana;
     private BigDecimal cantidadDeclarada;
     private String rotuloPesaje; // "Pesaje en romana" o "Sin pesaje en romana"

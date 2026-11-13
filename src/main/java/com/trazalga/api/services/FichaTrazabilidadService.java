@@ -652,6 +652,8 @@ public class FichaTrazabilidadService {
                 .conRomana(conRomana)
                 .pesoRomanaKg(p.getPesoRomanaKg())
                 .numeroVoucherRomana(p.getVoucherRomanaNumero())
+                .voucherRomanaAdjunto(p.getVoucherRomanaAdjunto())
+                .guiaDespachoAdjunto(p.getGuiaDespachoAdjunto())
                 .fechaPesajeRomana(p.getFechaPesaje())
                 .cantidadDeclarada(p.getCantidad())
                 .rotuloPesaje(conRomana ? "Pesaje en romana" : "Sin pesaje en romana")
