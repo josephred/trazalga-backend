@@ -11,7 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FilaResultadoImportacionDto {
     private int numeroFila;
-    private String tipo;           // CALETA, VARADERO, AMERB
+    private String tipo;           // CALETA, VARADERO, AMERB, PLANTA
+    private String tipoPlanta;     // SECADO, PROCESO, OTRA (opcional para tipo=PLANTA)
     private String codigo;         // Código Sernapesca (AMERB)
     private String nombre;         // Nombre según planilla
     private String comuna;         // Comuna según planilla

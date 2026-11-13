@@ -27,6 +27,10 @@ public class CoberturaCoordenadasDto {
     private long amerbConGps;
     private double porcentajeAmerb;
 
+    private long totalPlantas;
+    private long plantasConGps;
+    private double porcentajePlantas;
+
     private long totalEntidades;
     private long totalConGps;
     private double porcentajeTotal;

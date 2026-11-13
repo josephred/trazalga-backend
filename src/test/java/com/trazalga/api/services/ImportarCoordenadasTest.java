@@ -30,6 +30,7 @@ class ImportarCoordenadasTest {
     @Mock private ICaletaRepository caletaRepository;
     @Mock private IVaraderoRepository varaderoRepository;
     @Mock private IAmerbRepository amerbRepository;
+    @Mock private IPlantaRepository plantaRepository;
     @Mock private IRegionRepository regionRepository;
     @Mock private ICoordenadaCambioLogRepository cambioLogRepository;
 
@@ -254,5 +255,60 @@ class ImportarCoordenadasTest {
 
         assertEquals(1, cob.getPorRegion().size());
         assertEquals("Coquimbo", cob.getPorRegion().get(0).getRegionNombre());
+    }
+
+    @Test
+    @DisplayName("NG.3 - Importación de coordenadas de planta con tipo SECADO")
+    void testImportarPlantaSecadoConCoordenadas() {
+        PlantaModel plantaSecado = PlantaModel.builder()
+                .id(30L)
+                .codigo(3001)
+                .rut("76.111.222-3")
+                .nombre("Planta Secado Norte")
+                .direccion("Km 5 Ruta 5 Norte")
+                .build();
+        PlantaModel plantaProceso = PlantaModel.builder()
+                .id(31L)
+                .codigo(3002)
+                .rut("76.333.444-5")
+                .nombre("Planta Proceso Sur")
+                .latitud(-29.9100)
+                .longitud(-71.2600)
+                .tipo("PROCESO")
+                .fuenteCoordenada("SERNAPESCA")
+                .build();
+
+        when(caletaRepository.findAll()).thenReturn(Collections.emptyList());
+        when(varaderoRepository.findAll()).thenReturn(Collections.emptyList());
+        when(amerbRepository.findAll()).thenReturn(Collections.emptyList());
+        when(plantaRepository.findAll()).thenReturn(new ArrayList<>(List.of(plantaSecado, plantaProceso)));
+
+        String csv = "tipo;codigo;nombre;comuna;region;latitud;longitud;datum;fuente;tipo_planta\n" +
+                "PLANTA;3001;Planta Secado Norte;Coquimbo;Coquimbo;-29.9610;-71.3350;WGS84;PLANILLA_SECADO;SECADO\n" +
+                "PLANTA;3002;Planta Proceso Sur;Coquimbo;Coquimbo;-29.9150;-71.2650;WGS84;PLANILLA_SECADO;TIPO_INVALIDO\n";
+
+        InputStream previewIs = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8));
+        ResumenImportacionDto preview = service.procesarPlanilla(previewIs, false, false, "ADMIN");
+        assertEquals(2, preview.getTotalFilas());
+        assertEquals(1, preview.getCalzadas());
+        assertEquals(1, preview.getSinCalce());
+        assertEquals("SECADO", preview.getFilas().get(0).getTipoPlanta());
+        assertNull(plantaSecado.getLatitud());
+
+        InputStream applyIs = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8));
+        ResumenImportacionDto aplicado = service.procesarPlanilla(applyIs, true, false, "ADMIN");
+        assertTrue(aplicado.isAplicado());
+        assertEquals(1, aplicado.getAplicadas());
+        assertEquals(-29.9610, plantaSecado.getLatitud());
+        assertEquals(-71.3350, plantaSecado.getLongitud());
+        assertEquals("SECADO", plantaSecado.getTipo());
+        assertEquals("PLANILLA_SECADO", plantaSecado.getFuenteCoordenada());
+        verify(plantaRepository, times(1)).saveAll(any());
+
+        when(regionRepository.findAll()).thenReturn(Collections.emptyList());
+        CoberturaCoordenadasDto cob = service.obtenerCobertura();
+        assertEquals(2, cob.getTotalPlantas());
+        assertEquals(2, cob.getPlantasConGps());
+        assertEquals(100.0, cob.getPorcentajePlantas());
     }
 }

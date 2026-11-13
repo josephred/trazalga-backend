@@ -26,11 +26,13 @@ public class ImportarCoordenadasService {
     private final ICaletaRepository caletaRepository;
     private final IVaraderoRepository varaderoRepository;
     private final IAmerbRepository amerbRepository;
+    private final IPlantaRepository plantaRepository;
     private final IRegionRepository regionRepository;
     private final ICoordenadaCambioLogRepository cambioLogRepository;
     private final ReferenciaOrigenService referenciaOrigenService;
 
     private static final double TOLERANCIA_DIFERENCIA_COORD = 0.0001; // ~11 metros
+    private static final Set<String> TIPOS_PLANTA_VALIDOS = Set.of("SECADO", "PROCESO", "OTRA");
 
     /**
      * Procesa la planilla CSV de coordenadas (vista previa o aplicación transaccional).
@@ -50,6 +52,7 @@ public class ImportarCoordenadasService {
         List<CaletaModel> todasCaletas = caletaRepository.findAll();
         List<VaraderoModel> todosVaraderos = varaderoRepository.findAll();
         List<AmerbModel> todasAmerb = amerbRepository.findAll();
+        List<PlantaModel> todasPlantas = plantaRepository != null ? plantaRepository.findAll() : Collections.emptyList();
 
         List<FilaResultadoImportacionDto> resultados = new ArrayList<>();
         List<CoordenadaCambioLogModel> logsToSave = new ArrayList<>();
@@ -73,6 +76,7 @@ public class ImportarCoordenadasService {
             Integer idxLon = null;
             Integer idxDatum = null;
             Integer idxFuente = null;
+            Integer idxTipoPlanta = null;
             String separador = ";";
 
             while ((line = reader.readLine()) != null) {
@@ -97,13 +101,14 @@ public class ImportarCoordenadasService {
                         String h = CoordenadaNormalizer.normalizarTexto(headers[i]);
                         if (h.equals("TIPO")) idxTipo = i;
                         else if (h.equals("CODIGO") || h.equals("COD")) idxCodigo = i;
-                        else if (h.equals("NOMBRE") || h.equals("CALETA") || h.equals("VARADERO") || h.equals("AMERB")) idxNombre = i;
+                        else if (h.equals("NOMBRE") || h.equals("CALETA") || h.equals("VARADERO") || h.equals("AMERB") || h.equals("PLANTA")) idxNombre = i;
                         else if (h.equals("COMUNA")) idxComuna = i;
                         else if (h.equals("REGION")) idxRegion = i;
                         else if (h.startsWith("LAT")) idxLat = i;
                         else if (h.startsWith("LON") || h.startsWith("LNG")) idxLon = i;
                         else if (h.equals("DATUM")) idxDatum = i;
                         else if (h.equals("FUENTE")) idxFuente = i;
+                        else if (h.equals("TIPO PLANTA") || h.equals("TIPOPLANTA")) idxTipoPlanta = i;
                     }
                     continue; // Fin de la línea de encabezado
                 }
@@ -119,6 +124,8 @@ public class ImportarCoordenadasService {
                 String lonRaw = getVal(tokens, idxLon, 6);
                 String datum = getVal(tokens, idxDatum, 7);
                 String fuenteFila = getVal(tokens, idxFuente, 8);
+                String tipoPlantaRaw = idxTipoPlanta != null ? getVal(tokens, idxTipoPlanta, -1) : getVal(tokens, null, 9);
+                String tipoPlantaNorm = tipoPlantaRaw != null ? CoordenadaNormalizer.normalizarTexto(tipoPlantaRaw) : null;
 
                 String tipoNorm = CoordenadaNormalizer.normalizarTexto(tipo);
                 String nombreNorm = CoordenadaNormalizer.normalizarTexto(nombre);
@@ -133,6 +140,7 @@ public class ImportarCoordenadasService {
                 FilaResultadoImportacionDto filaRes = FilaResultadoImportacionDto.builder()
                         .numeroFila(lineNumber)
                         .tipo(tipoNorm)
+                        .tipoPlanta(tipoPlantaNorm)
                         .codigo(codigo)
                         .nombre(nombre)
                         .comuna(comuna)
@@ -174,9 +182,11 @@ public class ImportarCoordenadasService {
                     evaluarCaleta(filaRes, todasCaletas, nombreNorm, comunaNorm);
                 } else if (tipoNorm.equals("VARADERO")) {
                     evaluarVaradero(filaRes, todosVaraderos, nombreNorm, comunaNorm);
+                } else if (tipoNorm.equals("PLANTA")) {
+                    evaluarPlanta(filaRes, todasPlantas, codigoNorm, nombreNorm, tipoPlantaNorm);
                 } else {
                     filaRes.setEstado(EstadoFilaCoordenada.SIN_CALCE);
-                    filaRes.setDetalleEstado("Tipo de entidad '" + tipo + "' desconocido (debe ser CALETA, VARADERO o AMERB).");
+                    filaRes.setDetalleEstado("Tipo de entidad '" + tipo + "' desconocido (debe ser CALETA, VARADERO, AMERB o PLANTA).");
                 }
 
                 // 4. Conteo de estados
@@ -198,7 +208,7 @@ public class ImportarCoordenadasService {
                                 ? filaRes.getFuente().trim()
                                 : fuenteDefault;
 
-                        aplicarCambio(filaRes, todasCaletas, todosVaraderos, todasAmerb, fuenteFinal, usuario, logsToSave);
+                        aplicarCambio(filaRes, todasCaletas, todosVaraderos, todasAmerb, todasPlantas, fuenteFinal, usuario, logsToSave);
                         filaRes.setAplicada(true);
                         contAplicadas++;
                     }
@@ -216,6 +226,9 @@ public class ImportarCoordenadasService {
             caletaRepository.saveAll(todasCaletas);
             varaderoRepository.saveAll(todosVaraderos);
             amerbRepository.saveAll(todasAmerb);
+            if (plantaRepository != null) {
+                plantaRepository.saveAll(todasPlantas);
+            }
             if (!logsToSave.isEmpty()) {
                 cambioLogRepository.saveAll(logsToSave);
             }
@@ -387,6 +400,66 @@ public class ImportarCoordenadasService {
         vincularRegistroAmerb(filaRes, match);
     }
 
+    private void evaluarPlanta(
+            FilaResultadoImportacionDto filaRes,
+            List<PlantaModel> todas,
+            String codigoNorm,
+            String nombreNorm,
+            String tipoPlantaNorm
+    ) {
+        if (tipoPlantaNorm != null && !tipoPlantaNorm.isEmpty() && !TIPOS_PLANTA_VALIDOS.contains(tipoPlantaNorm)) {
+            filaRes.setEstado(EstadoFilaCoordenada.SIN_CALCE);
+            filaRes.setDetalleEstado("Tipo de planta '" + tipoPlantaNorm + "' no reconocido (valores válidos: SECADO, PROCESO, OTRA).");
+            return;
+        }
+
+        PlantaModel match = null;
+        if (!codigoNorm.isEmpty()) {
+            List<PlantaModel> porCodigo = todas.stream()
+                    .filter(p -> (p.getCodigo() != null && String.valueOf(p.getCodigo()).equalsIgnoreCase(codigoNorm))
+                            || (p.getRut() != null && p.getRut().trim().equalsIgnoreCase(codigoNorm)))
+                    .collect(Collectors.toList());
+            if (porCodigo.size() == 1) {
+                match = porCodigo.get(0);
+            } else if (porCodigo.size() > 1) {
+                filaRes.setEstado(EstadoFilaCoordenada.AMBIGUA);
+                filaRes.setDetalleEstado("Múltiples plantas coinciden con el código/RUT '" + filaRes.getCodigo() + "'.");
+                return;
+            }
+        }
+
+        if (match == null && !nombreNorm.isEmpty()) {
+            List<PlantaModel> porNombre = todas.stream()
+                    .filter(p -> CoordenadaNormalizer.normalizarTexto(p.getNombre()).equals(nombreNorm))
+                    .collect(Collectors.toList());
+            if (porNombre.size() == 1) {
+                match = porNombre.get(0);
+            } else if (porNombre.size() > 1) {
+                filaRes.setEstado(EstadoFilaCoordenada.AMBIGUA);
+                filaRes.setDetalleEstado("Planta homónima encontrada (" + porNombre.size() + "). Especifique código o RUT.");
+                return;
+            }
+        }
+
+        if (match == null) {
+            filaRes.setEstado(EstadoFilaCoordenada.SIN_CALCE);
+            filaRes.setDetalleEstado("No se encontró planta para código '" + filaRes.getCodigo() + "' o nombre '" + filaRes.getNombre() + "'.");
+            return;
+        }
+
+        vincularRegistroPlanta(filaRes, match);
+    }
+
+    private void vincularRegistroPlanta(FilaResultadoImportacionDto filaRes, PlantaModel planta) {
+        filaRes.setEntidadId(planta.getId());
+        filaRes.setEntidadNombre(planta.getNombre());
+        filaRes.setLatitudActual(planta.getLatitud());
+        filaRes.setLongitudActual(planta.getLongitud());
+        filaRes.setFuenteActual(planta.getFuenteCoordenada());
+
+        verificarConflictoOExito(filaRes, planta.getLatitud(), planta.getLongitud(), planta.getFuenteCoordenada());
+    }
+
     private void vincularRegistroCaleta(FilaResultadoImportacionDto filaRes, CaletaModel caleta) {
         filaRes.setEntidadId(caleta.getId());
         filaRes.setEntidadNombre(caleta.getNombre());
@@ -446,6 +519,7 @@ public class ImportarCoordenadasService {
             List<CaletaModel> caletas,
             List<VaraderoModel> varaderos,
             List<AmerbModel> amerbs,
+            List<PlantaModel> plantas,
             String fuenteFinal,
             String usuario,
             List<CoordenadaCambioLogModel> logs
@@ -527,6 +601,34 @@ public class ImportarCoordenadasService {
                         a.setCoordenadaActualizadaEn(now);
                         a.setCoordenadaActualizadaPor(usuario);
                     });
+        } else if (filaRes.getTipo().equalsIgnoreCase("PLANTA")) {
+            plantas.stream()
+                    .filter(p -> p.getId().equals(filaRes.getEntidadId()))
+                    .findFirst()
+                    .ifPresent(p -> {
+                        logs.add(CoordenadaCambioLogModel.builder()
+                                .entidadTipo("PLANTA")
+                                .entidadId(p.getId())
+                                .entidadNombre(p.getNombre())
+                                .latitudAnterior(p.getLatitud())
+                                .longitudAnterior(p.getLongitud())
+                                .fuenteAnterior(p.getFuenteCoordenada())
+                                .latitudNueva(filaRes.getLatitudParsed())
+                                .longitudNueva(filaRes.getLongitudParsed())
+                                .fuenteNueva(fuenteFinal)
+                                .actualizadoEn(now)
+                                .actualizadoPor(usuario)
+                                .build());
+
+                        p.setLatitud(filaRes.getLatitudParsed());
+                        p.setLongitud(filaRes.getLongitudParsed());
+                        p.setFuenteCoordenada(fuenteFinal);
+                        p.setCoordenadaActualizadaEn(now);
+                        p.setCoordenadaActualizadaPor(usuario);
+                        if (filaRes.getTipoPlanta() != null && !filaRes.getTipoPlanta().isBlank()) {
+                            p.setTipo(filaRes.getTipoPlanta());
+                        }
+                    });
         }
     }
 
@@ -538,6 +640,7 @@ public class ImportarCoordenadasService {
         List<CaletaModel> caletas = caletaRepository.findAll();
         List<VaraderoModel> varaderos = varaderoRepository.findAll();
         List<AmerbModel> amerbs = amerbRepository.findAll();
+        List<PlantaModel> plantas = plantaRepository != null ? plantaRepository.findAll() : Collections.emptyList();
         List<RegionModel> regiones = regionRepository.findAll();
 
         long totCal = caletas.size();
@@ -549,8 +652,11 @@ public class ImportarCoordenadasService {
         long totAmerb = amerbs.size();
         long amerbConGps = amerbs.stream().filter(a -> a.getLatitud() != null && a.getLongitud() != null).count();
 
-        long totalEntidades = totCal + totVar + totAmerb;
-        long totalConGps = calConGps + varConGps + amerbConGps;
+        long totPlantas = plantas.size();
+        long plantasConGps = plantas.stream().filter(p -> p.getLatitud() != null && p.getLongitud() != null).count();
+
+        long totalEntidades = totCal + totVar + totAmerb + totPlantas;
+        long totalConGps = calConGps + varConGps + amerbConGps + plantasConGps;
 
         List<CoberturaCoordenadasDto.CoberturaRegionDto> porRegion = new ArrayList<>();
 
@@ -613,6 +719,9 @@ public class ImportarCoordenadasService {
                 .totalAmerb(totAmerb)
                 .amerbConGps(amerbConGps)
                 .porcentajeAmerb(calcPct(amerbConGps, totAmerb))
+                .totalPlantas(totPlantas)
+                .plantasConGps(plantasConGps)
+                .porcentajePlantas(calcPct(plantasConGps, totPlantas))
                 .totalEntidades(totalEntidades)
                 .totalConGps(totalConGps)
                 .porcentajeTotal(calcPct(totalConGps, totalEntidades))
