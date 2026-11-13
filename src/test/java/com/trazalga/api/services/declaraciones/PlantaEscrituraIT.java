@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -61,6 +64,7 @@ class PlantaEscrituraIT extends IntegracionBase {
     @Autowired private DeclaracionPlantaDestinoService destinoService;
     @Autowired private ConfiguracionGeneralService configuracionGeneralService;
     @Autowired private BloqueoCargaService bloqueoCargaService;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @Autowired private IDeclaracionPlantaAbastecimientoRepository abastecimientoRepository;
     @Autowired private IDeclaracionPlantaProduccionRepository produccionRepository;
@@ -80,6 +84,8 @@ class PlantaEscrituraIT extends IntegracionBase {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.execute("ALTER TABLE declaracion_planta_abastecimiento ADD COLUMN IF NOT EXISTS folio_declaracion_a_pla VARCHAR(50)");
+        jdbcTemplate.execute("ALTER TABLE declaracion_planta_produccion ADD COLUMN IF NOT EXISTS folio_declaracion_p_pla VARCHAR(50)");
         fecha = Date.valueOf("2026-11-06");
         configuracionGeneralService.updateConfig("declaracion_escritura_exige_sesion", "false");
         if (especie != null) {
@@ -228,6 +234,82 @@ class PlantaEscrituraIT extends IntegracionBase {
         mockMvc.perform(delete("/api/declaracion-planta-produccion/" + p.getId()).with(user(RUT_PLANTA_A).roles("USER")))
                 .andExpect(status().isOk());
         assertFalse(produccionRepository.existsById(p.getId()));
+    }
+
+    @Test
+    @DisplayName("NA.5/NA.7: POST /api/declaracion-planta-abastecimiento responde 422 por validación, 409 por lote duplicado y exige humedad recepción si parámetro=true")
+    void abastecimiento_postHttp_422_409_y_humedadRecepcion() throws Exception {
+        String baseFmt = """
+                {
+                  "usuario": {"id": %d},
+                  "folioOrigen": "%s",
+                  "codigoSernapesca": "SERN-TEST",
+                  "documentoTributarioTipo": "GUIA",
+                  "documentoTributarioNumero": "1001",
+                  "documentoTributarioFecha": "2026-11-06",
+                  "fechaIngresoPlanta": "2026-11-06",
+                  "fechaTraslado": "2026-11-06",
+                  "hora": "10:00:00",
+                  "nombrePlanta": "Planta NP0",
+                  "especie": {"id": %d},
+                  "humedadEstado": {"id": %d},
+                  %s
+                  "cantidad": 1000.00,
+                  "pesoRomanaKg": 1000.00,
+                  "voucherRomanaNumero": "VCH-IT-1",
+                  "lugarAcopio": "Galpón IT",
+                  %s
+                  "estado": "CONGELADA"
+                }
+                """;
+        String humField = String.format("\"humedadEstadoRecepcion\": {\"id\": %d},", humedad.getId());
+
+        // 1) Sin loteInterno con X-App-Version 2.6.0 -> 422 JSON legible
+        String jsonSinLote = String.format(baseFmt, plantaA.getId(), "IT-FOL-1", especie.getId(), humedad.getId(), humField, "");
+        mockMvc.perform(post("/api/declaracion-planta-abastecimiento")
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .header("X-App-Version", "2.6.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonSinLote))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"))
+                .andExpect(jsonPath("$.message").exists());
+
+        // 2) Alta válida -> 201 Created
+        String jsonOk = String.format(baseFmt, plantaA.getId(), "IT-FOL-2", especie.getId(), humedad.getId(), humField, "\"loteInterno\": \"LOT-HTTP-01\",");
+        mockMvc.perform(post("/api/declaracion-planta-abastecimiento")
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .header("X-App-Version", "2.6.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonOk))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loteInterno").value("LOT-HTTP-01"));
+
+        // 3) Reintento con mismo lote (minúsculas) -> 409 Conflict
+        String jsonDup = String.format(baseFmt, plantaA.getId(), "IT-FOL-3", especie.getId(), humedad.getId(), humField, "\"loteInterno\": \"lot-http-01\",");
+        mockMvc.perform(post("/api/declaracion-planta-abastecimiento")
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .header("X-App-Version", "2.6.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonDup))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("LOTE_INTERNO_DUPLICADO"))
+                .andExpect(jsonPath("$.message").exists());
+
+        // 4) Con planta_exige_humedad_recepcion=true y sin humedadEstadoRecepcion -> 422 (NA.5)
+        try {
+            configuracionGeneralService.updateConfig("planta_exige_humedad_recepcion", "true");
+            String jsonSinHum = String.format(baseFmt, plantaA.getId(), "IT-FOL-4", especie.getId(), humedad.getId(), "", "\"loteInterno\": \"LOT-HTTP-02\",");
+            mockMvc.perform(post("/api/declaracion-planta-abastecimiento")
+                            .with(user(RUT_PLANTA_A).roles("USER"))
+                            .header("X-App-Version", "2.6.0")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(jsonSinHum))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"));
+        } finally {
+            configuracionGeneralService.updateConfig("planta_exige_humedad_recepcion", "false");
+        }
     }
 
     // ------------------------------------------------------------------ utilidades
