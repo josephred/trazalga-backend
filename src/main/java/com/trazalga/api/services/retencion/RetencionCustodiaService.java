@@ -798,10 +798,10 @@ public class RetencionCustodiaService {
     private void bindSqlLotesBodegaParams(Query query, FiltroRetencionBodega filtro) {
         if (filtro != null && !Boolean.TRUE.equals(filtro.getSoloEnBodega())) {
             if (filtro.getStartDate() != null) {
-                query.setParameter("startDate", filtro.getStartDate());
+                query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(filtro.getStartDate()));
             }
             if (filtro.getEndDate() != null) {
-                query.setParameter("endDate", filtro.getEndDate());
+                query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(filtro.getEndDate()));
             }
         }
     }
