@@ -120,7 +120,7 @@ public class ReportService {
      * lo suficiente para que el caché aporte.
      */
     public List<ReportDTO> getReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
-        return reportRepository.generateReport(fechaInicio, fechaFin, tipoReporte, rut);
+        return reportRepository.generateReport(fechaInicio, fechaFin, tipoReporte, rut, referenciaOrigenService);
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)

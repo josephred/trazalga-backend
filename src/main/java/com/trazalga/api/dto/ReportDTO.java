@@ -37,4 +37,10 @@ public class ReportDTO {
     private String estadoHumedad;
     private Double latitud;
     private Double longitud;
+
+    // Coordenadas resueltas de origen y destino (QE.2)
+    private Double latitudOrigen;
+    private Double longitudOrigen;
+    private Double latitudDestino;
+    private Double longitudDestino;
 }

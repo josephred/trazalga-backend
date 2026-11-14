@@ -65,6 +65,15 @@ public class ReportRepository {
     }
 
     public List<ReportDTO> generateReport(Date fechaInicio, Date fechaFin, Integer tipoReporte, String rut) {
+        return generateReport(fechaInicio, fechaFin, tipoReporte, rut, null);
+    }
+
+    public List<ReportDTO> generateReport(
+            Date fechaInicio,
+            Date fechaFin,
+            Integer tipoReporte,
+            String rut,
+            com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService) {
         String tableName;
         String dateColumn = "fecha_declaracion";
         String amountColumn = "desembarque";
@@ -110,6 +119,37 @@ public class ReportRepository {
         
         sql.append(", d.latitud, d.longitud ");
 
+        // QE.2: Metadatos de origen y destino (indices 25..36) sin alterar indices 0..24
+        if (tipoReporte == 1) {
+            sql.append(", d.caleta_id, NULL as orig_amerb_id, d.varadero_id, d.varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
+        } else if (tipoReporte == 2) {
+            sql.append(", d.caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
+        } else if (tipoReporte == 3) {
+            sql.append(", d.caleta_id, d.amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, cal.comuna_id ");
+        } else {
+            sql.append(", NULL as orig_caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, NULL as orig_comuna_id ");
+        }
+
+        if (tipoReporte >= 1 && tipoReporte <= 3) {
+            sql.append(", COALESCE(dpa_dir.codigo_sernapesca, dpa.codigo_sernapesca), COALESCE(up_dir.rut, up_dpa.rut), COALESCE(dpa_dir.nombre_planta, dpa.nombre_planta) ");
+            sql.append(", COALESCE(dpa_dir.latitud, dpa.latitud, dc.latitud), COALESCE(dpa_dir.longitud, dpa.longitud, dc.longitud) ");
+            sql.append(", CASE WHEN dpa_dir.id IS NOT NULL OR dpa.id IS NOT NULL THEN 1 ELSE 0 END ");
+            sql.append(", NULL as src_cod_serna ");
+        } else if (tipoReporte == 4) {
+            sql.append(", dpa.codigo_sernapesca, udpa.rut, dpa.nombre_planta, dpa.latitud, dpa.longitud ");
+            sql.append(", CASE WHEN dpa.id IS NOT NULL THEN 1 ELSE 0 END ");
+            sql.append(", NULL as src_cod_serna ");
+        } else if (tipoReporte == 5) {
+            sql.append(", d.codigo_sernapesca, u.rut, d.nombre_planta, d.latitud, d.longitud, 1, NULL as src_cod_serna ");
+        } else if (tipoReporte == 6) {
+            sql.append(", NULL as dest_cod, NULL as dest_rut, NULL as dest_nombre, NULL as dest_lat, NULL as dest_lon, 0 ");
+            sql.append(", d.codigo_sernapesca ");
+        } else {
+            sql.append(", d.codigo_sernapesca_destino, d.rut_destino, d.nombre_destino, NULL as dest_lat, NULL as dest_lon ");
+            sql.append(", CASE WHEN d.codigo_sernapesca_destino IS NOT NULL OR d.rut_destino IS NOT NULL THEN 1 ELSE 0 END ");
+            sql.append(", d.codigo_sernapesca ");
+        }
+
         sql.append("FROM ").append(tableName).append(" d ");
         sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
         sql.append("LEFT JOIN usuario ud ON d.usuario_destinatario_id = ud.id ");
@@ -123,11 +163,22 @@ public class ReportRepository {
             sql.append("LEFT JOIN humedad_estado h ON d.humedad_estado_id = h.id ");
         }
 
-        if (tipoReporte == 1) {
-            sql.append("LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id ");
-            sql.append("LEFT JOIN usuario udc ON dc.usuario_destinatario_id = udc.id ");
+        if (tipoReporte >= 1 && tipoReporte <= 3) {
+            sql.append("LEFT JOIN caleta cal ON d.caleta_id = cal.id ");
+            sql.append("LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id AND (d.consumida_por_tipo IS NULL OR UPPER(d.consumida_por_tipo) = 'COMERCIALIZADOR') ");
+            if (tipoReporte == 1) {
+                sql.append("LEFT JOIN usuario udc ON dc.usuario_destinatario_id = udc.id ");
+            }
             sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa ON dc.declaracion_destinatario_id = dpa.id ");
-            sql.append("LEFT JOIN usuario udpa ON dpa.usuario_destinatario_id = udpa.id ");
+            if (tipoReporte == 1) {
+                sql.append("LEFT JOIN usuario udpa ON dpa.usuario_destinatario_id = udpa.id ");
+            }
+            sql.append("LEFT JOIN usuario up_dpa ON dpa.usuario_id = up_dpa.id ");
+            sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa_dir ON d.declaracion_destinatario_id = dpa_dir.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
+            sql.append("LEFT JOIN usuario up_dir ON dpa_dir.usuario_id = up_dir.id ");
+        } else if (tipoReporte == 4) {
+            sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa ON d.declaracion_destinatario_id = dpa.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
+            sql.append("LEFT JOIN usuario udpa ON dpa.usuario_id = udpa.id ");
         }
 
         sql.append("WHERE d.").append(dateColumn).append(" BETWEEN :fechaInicio AND :fechaFin ");
@@ -177,6 +228,10 @@ public class ReportRepository {
             if (row[20] instanceof java.sql.Timestamp) fechaPlantaAbast = new Date(((java.sql.Timestamp) row[20]).getTime());
             else if (row[20] instanceof Date) fechaPlantaAbast = (Date) row[20];
 
+            Double gpsLat = row.length > 23 && row[23] != null ? ((Number) row[23]).doubleValue() : null;
+            Double gpsLon = row.length > 24 && row[24] != null ? ((Number) row[24]).doubleValue() : null;
+            Double[][] coordsOD = resolverCoordsOrigenDestinoReport(tipoReporte, row, gpsLat, gpsLon, emisorNombre.trim(), row[7] != null ? row[7].toString() : null, referenciaOrigenService);
+
             return ReportDTO.builder()
                     .id(((Number) row[0]).longValue())
                     .folio(row[1] != null ? row[1].toString() : "")
@@ -196,10 +251,87 @@ public class ReportRepository {
                     .fechaPlantaAbastecimiento(fechaPlantaAbast)
                     .composicion(row.length > 21 && row[21] != null ? row[21].toString() : null)
                     .estadoHumedad(row.length > 22 && row[22] != null ? row[22].toString() : null)
-                    .latitud(row.length > 23 && row[23] != null ? ((Number) row[23]).doubleValue() : null)
-                    .longitud(row.length > 24 && row[24] != null ? ((Number) row[24]).doubleValue() : null)
+                    .latitud(gpsLat)
+                    .longitud(gpsLon)
+                    .latitudOrigen(coordsOD[0][0])
+                    .longitudOrigen(coordsOD[0][1])
+                    .latitudDestino(coordsOD[1][0])
+                    .longitudDestino(coordsOD[1][1])
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    private Double[][] resolverCoordsOrigenDestinoReport(
+            int tipoReporte,
+            Object[] row,
+            Double gpsLat,
+            Double gpsLon,
+            String emisorNombre,
+            String emisorRut,
+            com.trazalga.api.services.geo.ReferenciaOrigenService refSvc) {
+        Double origLat = null;
+        Double origLon = null;
+        Double destLat = null;
+        Double destLon = null;
+
+        if (tipoReporte >= 1 && tipoReporte <= 3) {
+            String tipoDecl = tipoReporte == 1 ? "RECOLECTOR" : tipoReporte == 2 ? "ARMADOR" : "AREA";
+            Long caletaId = row.length > 25 && row[25] instanceof Number ? ((Number) row[25]).longValue() : null;
+            Long amerbId = row.length > 26 && row[26] instanceof Number ? ((Number) row[26]).longValue() : null;
+            Long varaderoId = row.length > 27 && row[27] instanceof Number ? ((Number) row[27]).longValue() : null;
+            String varaderoTxt = row.length > 28 && row[28] != null ? row[28].toString() : null;
+            Long comunaId = row.length > 29 && row[29] instanceof Number ? ((Number) row[29]).longValue() : null;
+
+            com.trazalga.api.dto.geo.PuntoReferencia origRef = refSvc != null
+                    ? refSvc.resolverPorIds(tipoDecl, caletaId, amerbId, varaderoId, varaderoTxt, comunaId)
+                    : null;
+            if (origRef != null && origRef.getLat() != null && origRef.getLon() != null) {
+                origLat = origRef.getLat();
+                origLon = origRef.getLon();
+            } else if (gpsLat != null && gpsLon != null) {
+                origLat = gpsLat;
+                origLon = gpsLon;
+            }
+        } else if (tipoReporte == 4) {
+            origLat = gpsLat;
+            origLon = gpsLon;
+        } else if (tipoReporte == 6 || tipoReporte == 7) {
+            String srcCod = row.length > 36 && row[36] != null ? row[36].toString() : null;
+            com.trazalga.api.dto.geo.PuntoReferencia plOrigRef = refSvc != null
+                    ? refSvc.resolverPlantaOficial(srcCod, emisorRut, emisorNombre)
+                    : null;
+            if (plOrigRef != null && plOrigRef.getLat() != null && plOrigRef.getLon() != null) {
+                origLat = plOrigRef.getLat();
+                origLon = plOrigRef.getLon();
+            } else {
+                origLat = gpsLat;
+                origLon = gpsLon;
+            }
+        }
+
+        if (tipoReporte >= 1 && tipoReporte <= 5 || tipoReporte == 7) {
+            String destCod = row.length > 30 && row[30] != null ? row[30].toString() : null;
+            String destRut = row.length > 31 && row[31] != null ? row[31].toString() : null;
+            String destNombre = row.length > 32 && row[32] != null ? row[32].toString() : null;
+            Double destGpsLat = row.length > 33 && row[33] instanceof Number ? ((Number) row[33]).doubleValue() : null;
+            Double destGpsLon = row.length > 34 && row[34] instanceof Number ? ((Number) row[34]).doubleValue() : null;
+            boolean esPlanta = row.length > 35 && row[35] instanceof Number && ((Number) row[35]).intValue() == 1;
+
+            if (esPlanta && refSvc != null) {
+                com.trazalga.api.dto.geo.PuntoReferencia plDestRef =
+                        refSvc.resolverPlantaOficial(destCod, destRut, destNombre);
+                if (plDestRef != null && plDestRef.getLat() != null && plDestRef.getLon() != null) {
+                    destLat = plDestRef.getLat();
+                    destLon = plDestRef.getLon();
+                }
+            }
+            if ((destLat == null || destLon == null) && destGpsLat != null && destGpsLon != null) {
+                destLat = destGpsLat;
+                destLon = destGpsLon;
+            }
+        }
+
+        return new Double[][]{{origLat, origLon}, {destLat, destLon}};
     }
 
     private String getReportLabel(Integer tipo) {
