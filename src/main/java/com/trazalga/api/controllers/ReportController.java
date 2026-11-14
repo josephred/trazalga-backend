@@ -1201,4 +1201,14 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         return ResponseEntity.ok(reportService.getConsultasCiudadanas(startDate, endDate));
     }
+
+    @GetMapping("/flujos-origen-destino")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getFlujosOrigenDestino(
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long regionId) {
+        return ResponseEntity.ok(reportService.getFlujosOrigenDestino(startDate, endDate, especieId, regionId));
+    }
 }

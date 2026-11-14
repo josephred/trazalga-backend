@@ -4383,5 +4383,349 @@ public class ReportRepository {
         }
         return o.toString();
     }
+
+    /**
+     * QM.3 / QE.1 · Obtiene las filas crudas de cadena completa (origen -> [comercializador] -> planta)
+     * para declaraciones de planta con peso de romana > 0 en el período, filtrando opcionalmente
+     * por especie de la recepción y región de origen.
+     */
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlantaFlujosRaw(
+            Date startDate, Date endDate, Long especieId, Long regionId) {
+        StringBuilder sqlPlanta = new StringBuilder(
+                "SELECT dpa.id, " +
+                "COALESCE(NULLIF(TRIM(dpa.folio_declaracion_a_pla), ''), NULLIF(TRIM(dpa.folio_origen), ''), CONCAT('DPA-', dpa.id)), " +
+                "dpa.fecha_ingreso_planta, dpa.peso_romana_kg, dpa.especie_id, e.nombre, " +
+                "dpa.codigo_sernapesca, dpa.nombre_planta, dpa.latitud, dpa.longitud, dpa.declaraciones_seleccionadas, " +
+                "up.rut, up.nombres, up.apellidop, up.apellidom " +
+                "FROM declaracion_planta_abastecimiento dpa " +
+                "LEFT JOIN especie e ON dpa.especie_id = e.id " +
+                "LEFT JOIN usuario up ON dpa.usuario_id = up.id " +
+                "WHERE dpa.peso_romana_kg > 0");
+        if (startDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta >= :startDate");
+        if (endDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta <= :endDate");
+        if (especieId != null) sqlPlanta.append(" AND dpa.especie_id = :especieId");
+        sqlPlanta.append(" ORDER BY dpa.fecha_ingreso_planta DESC, dpa.id DESC");
+
+        Query qPlanta = entityManager.createNativeQuery(sqlPlanta.toString());
+        if (startDate != null) qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null) qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null) qPlanta.setParameter("especieId", especieId);
+
+        List<Object[]> pRows = qPlanta.getResultList();
+        if (pRows == null || pRows.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        class PlantaRow {
+            Long id;
+            String folio;
+            String fecha;
+            Double pesoRomanaKg;
+            Long especieId;
+            String especieNombre;
+            String codigoSernapesca;
+            String nombrePlanta;
+            Double lat;
+            Double lon;
+            String plantaUsuarioRut;
+            String plantaUsuarioNombre;
+            java.util.Map<String, List<Long>> tokens;
+        }
+        class ComRow {
+            Long id;
+            String folio;
+            java.util.Map<String, List<Long>> tokens;
+        }
+        class LinkRef {
+            String tipo;
+            Long id;
+            String comFolio;
+            LinkRef(String tipo, Long id, String comFolio) {
+                this.tipo = tipo;
+                this.id = id;
+                this.comFolio = comFolio;
+            }
+        }
+
+        List<PlantaRow> plantas = new java.util.ArrayList<>();
+        java.util.Set<Long> dpaIds = new java.util.LinkedHashSet<>();
+        java.util.Set<Long> allCIds = new java.util.LinkedHashSet<>();
+
+        for (Object[] r : pRows) {
+            PlantaRow p = new PlantaRow();
+            p.id = ((Number) r[0]).longValue();
+            p.folio = r[1] != null ? r[1].toString() : "DPA-" + p.id;
+            p.fecha = r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString() : null;
+            p.pesoRomanaKg = r[3] != null ? ((Number) r[3]).doubleValue() : 0.0;
+            p.especieId = r[4] != null ? ((Number) r[4]).longValue() : null;
+            p.especieNombre = r[5] != null ? r[5].toString() : null;
+            p.codigoSernapesca = r[6] != null ? r[6].toString() : null;
+            p.nombrePlanta = r[7] != null ? r[7].toString() : null;
+            p.lat = r[8] != null ? ((Number) r[8]).doubleValue() : null;
+            p.lon = r[9] != null ? ((Number) r[9]).doubleValue() : null;
+            p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[10] != null ? r[10].toString() : null);
+            p.plantaUsuarioRut = r[11] != null ? r[11].toString() : null;
+            p.plantaUsuarioNombre = unirNombreUsuario(r[12], r[13], r[14]);
+            plantas.add(p);
+            dpaIds.add(p.id);
+            allCIds.addAll(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
+        }
+
+        String filtroPlanta = "UPPER(COALESCE(consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO')";
+        java.util.Map<Long, List<Long>> fkP2C = cargarHijosPorFk("declaracion_comercializador", filtroPlanta, dpaIds);
+        java.util.Map<Long, List<Long>> fkP2R = cargarHijosPorFk("declaracion_recolector", filtroPlanta, dpaIds);
+        java.util.Map<Long, List<Long>> fkP2A = cargarHijosPorFk("declaracion_armador", filtroPlanta, dpaIds);
+        java.util.Map<Long, List<Long>> fkP2Ar = cargarHijosPorFk("declaracion_area", filtroPlanta, dpaIds);
+        fkP2C.values().forEach(allCIds::addAll);
+
+        java.util.Map<Long, ComRow> comById = new java.util.HashMap<>();
+        java.util.Set<Long> porExplorarC = new java.util.LinkedHashSet<>(allCIds);
+        java.util.Map<Long, List<Long>> fkC2C = new java.util.HashMap<>();
+        java.util.Map<Long, List<Long>> fkC2R = new java.util.HashMap<>();
+        java.util.Map<Long, List<Long>> fkC2A = new java.util.HashMap<>();
+        java.util.Map<Long, List<Long>> fkC2Ar = new java.util.HashMap<>();
+
+        String filtroCom = "UPPER(COALESCE(consumida_por_tipo, '')) = 'COMERCIALIZADOR'";
+        while (!porExplorarC.isEmpty() && comById.size() < 2000) {
+            List<Object[]> cRows = entityManager.createNativeQuery(
+                    "SELECT dc.id, COALESCE(NULLIF(TRIM(dc.folio_origen), ''), NULLIF(TRIM(dc.folio_desembarque_ac), ''), CONCAT('DC-', dc.id)), dc.declaraciones_seleccionadas " +
+                    "FROM declaracion_comercializador dc WHERE dc.id IN (:ids)")
+                    .setParameter("ids", porExplorarC)
+                    .getResultList();
+            java.util.Set<Long> encontradosLote = new java.util.LinkedHashSet<>();
+            java.util.Set<Long> siguientesC = new java.util.LinkedHashSet<>();
+            for (Object[] r : cRows) {
+                ComRow c = new ComRow();
+                c.id = ((Number) r[0]).longValue();
+                c.folio = r[1] != null ? r[1].toString() : "DC-" + c.id;
+                c.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[2] != null ? r[2].toString() : null);
+                comById.put(c.id, c);
+                encontradosLote.add(c.id);
+                for (Long subC : com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR")) {
+                    if (!comById.containsKey(subC)) siguientesC.add(subC);
+                }
+            }
+            if (!encontradosLote.isEmpty()) {
+                java.util.Map<Long, List<Long>> subFkC2C = cargarHijosPorFk("declaracion_comercializador", filtroCom, encontradosLote);
+                fkC2C.putAll(subFkC2C);
+                subFkC2C.values().forEach(l -> {
+                    for (Long subC : l) {
+                        if (!comById.containsKey(subC)) siguientesC.add(subC);
+                    }
+                });
+                fkC2R.putAll(cargarHijosPorFk("declaracion_recolector", filtroCom, encontradosLote));
+                fkC2A.putAll(cargarHijosPorFk("declaracion_armador", filtroCom, encontradosLote));
+                fkC2Ar.putAll(cargarHijosPorFk("declaracion_area", filtroCom, encontradosLote));
+            }
+            porExplorarC = siguientesC;
+        }
+
+        java.util.Map<Long, List<LinkRef>> linksPorPlanta = new java.util.LinkedHashMap<>();
+        java.util.Set<Long> allRIds = new java.util.LinkedHashSet<>();
+        java.util.Set<Long> allAIds = new java.util.LinkedHashSet<>();
+        java.util.Set<Long> allArIds = new java.util.LinkedHashSet<>();
+
+        for (PlantaRow p : plantas) {
+            List<LinkRef> refs = new java.util.ArrayList<>();
+            java.util.Set<String> vistoOrigenEnPlanta = new java.util.HashSet<>();
+
+            java.util.function.BiConsumer<String, Long> registrarDirecto = (tipo, oId) -> {
+                if (oId != null && vistoOrigenEnPlanta.add(tipo + ":" + oId)) {
+                    refs.add(new LinkRef(tipo, oId, null));
+                }
+            };
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR").forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
+            fkP2R.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR").forEach(id -> registrarDirecto.accept("ARMADOR", id));
+            fkP2A.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("ARMADOR", id));
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA").forEach(id -> registrarDirecto.accept("AREA", id));
+            fkP2Ar.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("AREA", id));
+
+            java.util.Deque<Long> colaC = new java.util.ArrayDeque<>();
+            java.util.Set<Long> visitadoC = new java.util.HashSet<>();
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR").forEach(colaC::add);
+            fkP2C.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(colaC::add);
+
+            while (!colaC.isEmpty() && visitadoC.size() < 500) {
+                Long cId = colaC.poll();
+                if (cId == null || !visitadoC.add(cId)) continue;
+                ComRow c = comById.get(cId);
+                if (c == null) continue;
+
+                java.util.function.BiConsumer<String, Long> registrarViaCom = (tipo, oId) -> {
+                    if (oId != null && vistoOrigenEnPlanta.add(tipo + ":" + oId)) {
+                        refs.add(new LinkRef(tipo, oId, c.folio));
+                    }
+                };
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "RECOLECTOR").forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
+                fkC2R.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "ARMADOR").forEach(id -> registrarViaCom.accept("ARMADOR", id));
+                fkC2A.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("ARMADOR", id));
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "AREA").forEach(id -> registrarViaCom.accept("AREA", id));
+                fkC2Ar.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("AREA", id));
+
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR").forEach(sub -> {
+                    if (!visitadoC.contains(sub)) colaC.add(sub);
+                });
+                fkC2C.getOrDefault(cId, java.util.Collections.emptyList()).forEach(sub -> {
+                    if (!visitadoC.contains(sub)) colaC.add(sub);
+                });
+            }
+
+            for (LinkRef lr : refs) {
+                if ("RECOLECTOR".equals(lr.tipo)) allRIds.add(lr.id);
+                else if ("ARMADOR".equals(lr.tipo)) allAIds.add(lr.id);
+                else if ("AREA".equals(lr.tipo)) allArIds.add(lr.id);
+            }
+            linksPorPlanta.put(p.id, refs);
+        }
+
+        java.util.Map<String, java.util.Map<String, Object>> origenesPorClave = new java.util.HashMap<>();
+        cargarOrigenesFlujo("RECOLECTOR", allRIds, regionId, origenesPorClave);
+        cargarOrigenesFlujo("ARMADOR", allAIds, regionId, origenesPorClave);
+        cargarOrigenesFlujo("AREA", allArIds, regionId, origenesPorClave);
+
+        List<java.util.Map<String, Object>> resultado = new java.util.ArrayList<>();
+        for (PlantaRow p : plantas) {
+            List<LinkRef> refs = linksPorPlanta.getOrDefault(p.id, java.util.Collections.emptyList());
+            for (LinkRef lr : refs) {
+                java.util.Map<String, Object> orig = origenesPorClave.get(lr.tipo + ":" + lr.id);
+                if (orig == null) continue; // filtrado por regionId o inexistente
+                java.util.Map<String, Object> row = new java.util.LinkedHashMap<>(orig);
+                row.put("comercializadorFolio", lr.comFolio);
+                row.put("recepcionId", p.id);
+                row.put("recepcionFolio", p.folio);
+                row.put("recepcionFecha", p.fecha);
+                row.put("pesoRomanaKg", p.pesoRomanaKg);
+                row.put("recepcionEspecieId", p.especieId);
+                row.put("recepcionEspecieNombre", p.especieNombre);
+                row.put("plantaCodigo", p.codigoSernapesca);
+                row.put("plantaNombreRaw", p.nombrePlanta);
+                row.put("plantaGpsLat", p.lat);
+                row.put("plantaGpsLon", p.lon);
+                row.put("plantaUsuarioRut", p.plantaUsuarioRut);
+                row.put("plantaUsuarioNombre", p.plantaUsuarioNombre);
+                resultado.add(row);
+            }
+        }
+        return resultado;
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<Long, List<Long>> cargarHijosPorFk(String table, String tipoFiltroSql, java.util.Collection<Long> parentIds) {
+        java.util.Map<Long, List<Long>> out = new java.util.HashMap<>();
+        if (parentIds == null || parentIds.isEmpty()) return out;
+        String sql = "SELECT declaracion_destinatario_id, id FROM " + table +
+                " WHERE " + tipoFiltroSql + " AND declaracion_destinatario_id IN (:ids)";
+        List<Object[]> rows = entityManager.createNativeQuery(sql)
+                .setParameter("ids", parentIds)
+                .getResultList();
+        for (Object[] r : rows) {
+            if (r[0] != null && r[1] != null) {
+                out.computeIfAbsent(((Number) r[0]).longValue(), k -> new java.util.ArrayList<>())
+                        .add(((Number) r[1]).longValue());
+            }
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void cargarOrigenesFlujo(
+            String tipo,
+            java.util.Collection<Long> ids,
+            Long regionId,
+            java.util.Map<String, java.util.Map<String, Object>> destino) {
+        if (ids == null || ids.isEmpty()) return;
+        String table;
+        String folioExpr;
+        String extraSelect;
+        String extraJoins;
+        String comunaIdExpr;
+        String regionIdExpr;
+        switch (tipo) {
+            case "RECOLECTOR":
+                table = "declaracion_recolector";
+                folioExpr = "COALESCE(NULLIF(TRIM(o.folio_origen), ''), NULLIF(TRIM(o.folio_desembarque_ro), ''), CONCAT('DR-', o.id))";
+                extraSelect = "o.varadero_id, o.varadero, var.nombre, NULL, NULL";
+                extraJoins = "LEFT JOIN varadero var ON o.varadero_id = var.id LEFT JOIN caleta cal ON o.caleta_id = cal.id LEFT JOIN comuna com ON o.comuna_id = com.id ";
+                comunaIdExpr = "COALESCE(o.comuna_id, cal.comuna_id)";
+                regionIdExpr = "COALESCE(cal.region_id, com.region_id)";
+                break;
+            case "ARMADOR":
+                table = "declaracion_armador";
+                folioExpr = "COALESCE(NULLIF(TRIM(o.folio_origen), ''), NULLIF(TRIM(o.folio_desembarque_da), ''), CONCAT('DA-', o.id))";
+                extraSelect = "NULL, NULL, NULL, NULL, NULL";
+                extraJoins = "LEFT JOIN caleta cal ON o.caleta_id = cal.id LEFT JOIN comuna com ON o.comuna_id = com.id ";
+                comunaIdExpr = "COALESCE(o.comuna_id, cal.comuna_id)";
+                regionIdExpr = "COALESCE(cal.region_id, com.region_id)";
+                break;
+            case "AREA":
+                table = "declaracion_area";
+                folioExpr = "COALESCE(NULLIF(TRIM(o.folio_origen), ''), NULLIF(TRIM(o.folio_desembarque_amerb), ''), CONCAT('DAM-', o.id))";
+                extraSelect = "NULL, NULL, NULL, o.amerb_id, am.nombre";
+                extraJoins = "LEFT JOIN amerb am ON o.amerb_id = am.id LEFT JOIN caleta cal ON o.caleta_id = cal.id LEFT JOIN comuna com ON cal.comuna_id = com.id ";
+                comunaIdExpr = "cal.comuna_id";
+                regionIdExpr = "COALESCE(am.region_id, cal.region_id, com.region_id)";
+                break;
+            default:
+                return;
+        }
+        StringBuilder sql = new StringBuilder(
+                "SELECT o.id, " + folioExpr + ", o.fecha_declaracion, o.desembarque, o.captura, " +
+                "o.latitud, o.longitud, o.caleta_id, cal.nombre, " + extraSelect + ", " +
+                comunaIdExpr + ", " + regionIdExpr + ", reg.nombre, e.nombre " +
+                "FROM " + table + " o " +
+                extraJoins +
+                "LEFT JOIN region reg ON reg.id = " + regionIdExpr + " " +
+                "LEFT JOIN especie e ON o.especie_id = e.id " +
+                "WHERE o.id IN (:ids)");
+        if (regionId != null) {
+            sql.append(" AND ").append(regionIdExpr).append(" = :regionId");
+        }
+        Query q = entityManager.createNativeQuery(sql.toString()).setParameter("ids", ids);
+        if (regionId != null) {
+            q.setParameter("regionId", regionId);
+        }
+        List<Object[]> rows = q.getResultList();
+        for (Object[] r : rows) {
+            Long id = ((Number) r[0]).longValue();
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("origenId", id);
+            m.put("origenTipo", tipo);
+            m.put("origenFolio", r[1] != null ? r[1].toString() : null);
+            m.put("origenFecha", r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString() : null);
+            m.put("desembarqueKg", r[3] != null ? ((Number) r[3]).doubleValue() : 0.0);
+            m.put("capturaKg", r[4] != null ? ((Number) r[4]).doubleValue() : 0.0);
+            m.put("origenGpsLat", r[5] != null ? ((Number) r[5]).doubleValue() : null);
+            m.put("origenGpsLon", r[6] != null ? ((Number) r[6]).doubleValue() : null);
+            m.put("caletaId", r[7] != null ? ((Number) r[7]).longValue() : null);
+            m.put("caletaNombre", r[8] != null ? r[8].toString() : null);
+            m.put("varaderoId", r[9] != null ? ((Number) r[9]).longValue() : null);
+            m.put("varaderoTexto", r[10] != null ? r[10].toString() : null);
+            m.put("varaderoNombre", r[11] != null ? r[11].toString() : null);
+            m.put("amerbId", r[12] != null ? ((Number) r[12]).longValue() : null);
+            m.put("amerbNombre", r[13] != null ? r[13].toString() : null);
+            m.put("comunaId", r[14] != null ? ((Number) r[14]).longValue() : null);
+            m.put("regionId", r[15] != null ? ((Number) r[15]).longValue() : null);
+            m.put("regionNombre", r[16] != null ? r[16].toString() : null);
+            m.put("origenEspecieNombre", r[17] != null ? r[17].toString() : null);
+            destino.put(tipo + ":" + id, m);
+        }
+    }
+
+    private static String unirNombreUsuario(Object nombres, Object apellidop, Object apellidom) {
+        StringBuilder sb = new StringBuilder();
+        for (Object part : new Object[]{nombres, apellidop, apellidom}) {
+            if (part != null) {
+                String s = part.toString().trim();
+                if (!s.isEmpty()) {
+                    if (sb.length() > 0) sb.append(' ');
+                    sb.append(s);
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
 }
 

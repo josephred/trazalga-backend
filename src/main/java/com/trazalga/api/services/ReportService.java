@@ -840,4 +840,361 @@ public class ReportService {
     public java.util.Map<String, Object> getConsultasCiudadanas(Date startDate, Date endDate) {
         return reportRepository.getConsultasCiudadanas(startDate, endDate);
     }
+
+    /**
+     * QM.3 / QE.1 · Mapa regional de flujos origen -> planta y detalle plano por declaración para exportación.
+     */
+    @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.Map<String, Object> getFlujosOrigenDestino(
+            Date startDate, Date endDate, Long especieId, Long regionId) {
+        List<java.util.Map<String, Object>> filas =
+                reportRepository.getCadenaOrigenPlantaFlujosRaw(startDate, endDate, especieId, regionId);
+
+        List<java.util.Map<String, Object>> declaraciones = new java.util.ArrayList<>();
+        java.util.Map<Long, Double> pesoRomanaPorRecepcion = new java.util.HashMap<>();
+
+        class PairAcc {
+            String key;
+            String origTipo;
+            String origTipoDeclaracion;
+            Long origRefId;
+            String origNombre;
+            Long regionId;
+            String regionNombre;
+            Double origLat;
+            Double origLon;
+            String origFuente = "SIN_COORDENADAS";
+            String origFuenteDetalle;
+
+            String plantaCodigo;
+            String plantaNombre;
+            String plantaRut;
+            Double plantaLat;
+            Double plantaLon;
+            String plantaFuente = "SIN_COORDENADAS";
+            String plantaFuenteDetalle;
+
+            double desembarqueKg = 0.0;
+            double capturaKg = 0.0;
+            int declaracionesCount = 0;
+            java.util.Map<Long, Double> recepciones = new java.util.LinkedHashMap<>();
+            java.util.Set<String> especies = new java.util.LinkedHashSet<>();
+        }
+
+        java.util.Map<String, PairAcc> pairsByKey = new java.util.LinkedHashMap<>();
+
+        for (java.util.Map<String, Object> fila : filas) {
+            String origenTipoDecl = strOrNull(fila.get("origenTipo"));
+            Long caletaId = longOrNull(fila.get("caletaId"));
+            Long amerbId = longOrNull(fila.get("amerbId"));
+            Long varaderoId = longOrNull(fila.get("varaderoId"));
+            String varaderoTexto = strOrNull(fila.get("varaderoTexto"));
+            Long comunaId = longOrNull(fila.get("comunaId"));
+            String catalogoNombre = resolverNombreCatalogoOrigen(
+                    origenTipoDecl,
+                    strOrNull(fila.get("caletaNombre")),
+                    strOrNull(fila.get("amerbNombre")),
+                    strOrNull(fila.get("varaderoNombre")),
+                    varaderoTexto);
+
+            com.trazalga.api.dto.geo.PuntoReferencia puntoRefOrigen = referenciaOrigenService != null
+                    ? referenciaOrigenService.resolverPorIds(
+                            origenTipoDecl, caletaId, amerbId, varaderoId, varaderoTexto, comunaId)
+                    : null;
+
+            Double origGpsLat = doubleOrNull(fila.get("origenGpsLat"));
+            Double origGpsLon = doubleOrNull(fila.get("origenGpsLon"));
+
+            Double origLat = null;
+            Double origLon = null;
+            String origFuente = "SIN_COORDENADAS";
+            String origFuenteDetalle = null;
+            String origTipoPunto = origenTipoDecl;
+            Long origPointId = null;
+            String origNombre;
+            String origGroupKey;
+
+            if (puntoRefOrigen != null && puntoRefOrigen.getLat() != null && puntoRefOrigen.getLon() != null) {
+                origLat = puntoRefOrigen.getLat();
+                origLon = puntoRefOrigen.getLon();
+                origFuente = "REFERENCIA";
+                origFuenteDetalle = puntoRefOrigen.getFuente();
+                origTipoPunto = firstNonBlank(puntoRefOrigen.getTipo(), origenTipoDecl);
+                origPointId = puntoRefOrigen.getId();
+                origNombre = firstNonBlank(puntoRefOrigen.getNombre(), catalogoNombre, origenTipoDecl);
+                origGroupKey = "REF|" + origTipoPunto + "|" +
+                        (origPointId != null ? origPointId : normalizarClave(origNombre));
+            } else if (origGpsLat != null && origGpsLon != null) {
+                origLat = origGpsLat;
+                origLon = origGpsLon;
+                origFuente = "GPS";
+                origFuenteDetalle = "GPS_DECLARACION";
+                origNombre = firstNonBlank(catalogoNombre, "Punto GPS (" + origenTipoDecl + ")");
+                String baseId = caletaId != null ? "C" + caletaId
+                        : amerbId != null ? "A" + amerbId
+                        : varaderoId != null ? "V" + varaderoId
+                        : normalizarClave(origNombre);
+                origGroupKey = "GPS|" + origenTipoDecl + "|" + baseId;
+            } else {
+                origNombre = firstNonBlank(catalogoNombre, "Sin ubicación (" + origenTipoDecl + ")");
+                String baseId = caletaId != null ? "C" + caletaId
+                        : amerbId != null ? "A" + amerbId
+                        : varaderoId != null ? "V" + varaderoId
+                        : normalizarClave(origNombre);
+                origGroupKey = "NONE|" + origenTipoDecl + "|" + baseId;
+            }
+
+            String plantaCodigo = strOrNull(fila.get("plantaCodigo"));
+            String plantaNombreRaw = strOrNull(fila.get("plantaNombreRaw"));
+            String plantaUsuarioNombre = strOrNull(fila.get("plantaUsuarioNombre"));
+            String plantaUsuarioRut = strOrNull(fila.get("plantaUsuarioRut"));
+            String plantaNombreDisplay = firstNonBlank(plantaNombreRaw, plantaUsuarioNombre, plantaCodigo, "Planta");
+
+            com.trazalga.api.dto.geo.PuntoReferencia puntoRefPlanta = referenciaOrigenService != null
+                    ? referenciaOrigenService.resolverPlantaOficial(plantaCodigo, plantaUsuarioRut, plantaNombreRaw)
+                    : null;
+
+            Double plantaGpsLat = doubleOrNull(fila.get("plantaGpsLat"));
+            Double plantaGpsLon = doubleOrNull(fila.get("plantaGpsLon"));
+
+            Double plLat = null;
+            Double plLon = null;
+            String plFuente = "SIN_COORDENADAS";
+            String plFuenteDetalle = null;
+            String plNombre = plantaNombreDisplay;
+
+            if (puntoRefPlanta != null && puntoRefPlanta.getLat() != null && puntoRefPlanta.getLon() != null) {
+                plLat = puntoRefPlanta.getLat();
+                plLon = puntoRefPlanta.getLon();
+                plFuente = "REFERENCIA";
+                plFuenteDetalle = puntoRefPlanta.getFuente();
+                plNombre = firstNonBlank(puntoRefPlanta.getNombre(), plantaNombreDisplay);
+            } else if (plantaGpsLat != null && plantaGpsLon != null) {
+                plLat = plantaGpsLat;
+                plLon = plantaGpsLon;
+                plFuente = "GPS";
+                plFuenteDetalle = "GPS_RECEPCION";
+            }
+
+            String especie = firstNonBlank(strOrNull(fila.get("origenEspecieNombre")), strOrNull(fila.get("recepcionEspecieNombre")));
+            double desembarqueKg = doubleOrZero(fila.get("desembarqueKg"));
+            double capturaKg = doubleOrZero(fila.get("capturaKg"));
+            double pesoRomanaKg = doubleOrZero(fila.get("pesoRomanaKg"));
+            Long recepcionId = longOrNull(fila.get("recepcionId"));
+            Long rowRegionId = longOrNull(fila.get("regionId"));
+            String rowRegionNombre = strOrNull(fila.get("regionNombre"));
+
+            if (recepcionId != null) {
+                pesoRomanaPorRecepcion.putIfAbsent(recepcionId, pesoRomanaKg);
+            }
+
+            java.util.Map<String, Object> declRow = new java.util.LinkedHashMap<>();
+            declRow.put("origenFolio", strOrNull(fila.get("origenFolio")));
+            declRow.put("origenTipo", origenTipoDecl);
+            declRow.put("origenFecha", strOrNull(fila.get("origenFecha")));
+            declRow.put("especie", especie);
+            declRow.put("desembarqueKg", redondearDosDec(desembarqueKg));
+            declRow.put("capturaKg", redondearDosDec(capturaKg));
+            declRow.put("origenNombre", origNombre);
+            declRow.put("origenLatitud", origLat);
+            declRow.put("origenLongitud", origLon);
+            declRow.put("origenFuente", origFuente);
+            declRow.put("origenFuenteDetalle", origFuenteDetalle);
+            declRow.put("regionId", rowRegionId);
+            declRow.put("regionNombre", rowRegionNombre);
+            declRow.put("comercializadorFolio", strOrNull(fila.get("comercializadorFolio")));
+            declRow.put("plantaNombre", plNombre);
+            declRow.put("plantaCodigo", plantaCodigo);
+            declRow.put("plantaLatitud", plLat);
+            declRow.put("plantaLongitud", plLon);
+            declRow.put("plantaFuente", plFuente);
+            declRow.put("plantaFuenteDetalle", plFuenteDetalle);
+            declRow.put("recepcionFolio", strOrNull(fila.get("recepcionFolio")));
+            declRow.put("recepcionFecha", strOrNull(fila.get("recepcionFecha")));
+            declRow.put("pesoRomanaKg", redondearDosDec(pesoRomanaKg));
+            declaraciones.add(declRow);
+
+            String plantaGroupKey = !esBlanco(plantaCodigo)
+                    ? "COD|" + plantaCodigo.trim().toUpperCase(java.util.Locale.ROOT)
+                    : "NOM|" + normalizarClave(plNombre);
+            String pairKey = origGroupKey + "||" + plantaGroupKey;
+
+            final String fOrigTipo = origTipoPunto;
+            final String fOrigTipoDecl = origenTipoDecl;
+            final Long fOrigId = origPointId;
+            final String fOrigNombre = origNombre;
+            final String fPlCodigo = plantaCodigo;
+            final String fPlNombre = plNombre;
+            final String fPlRut = plantaUsuarioRut;
+
+            PairAcc acc = pairsByKey.computeIfAbsent(pairKey, k -> {
+                PairAcc p = new PairAcc();
+                p.key = k;
+                p.origTipo = fOrigTipo;
+                p.origTipoDeclaracion = fOrigTipoDecl;
+                p.origRefId = fOrigId;
+                p.origNombre = fOrigNombre;
+                p.regionId = rowRegionId;
+                p.regionNombre = rowRegionNombre;
+                p.plantaCodigo = fPlCodigo;
+                p.plantaNombre = fPlNombre;
+                p.plantaRut = fPlRut;
+                return p;
+            });
+
+            if (acc.origLat == null && origLat != null && origLon != null) {
+                acc.origLat = origLat;
+                acc.origLon = origLon;
+                acc.origFuente = origFuente;
+                acc.origFuenteDetalle = origFuenteDetalle;
+            }
+            if ("SIN_COORDENADAS".equals(acc.plantaFuente) || ("GPS".equals(acc.plantaFuente) && "REFERENCIA".equals(plFuente))) {
+                if (plLat != null && plLon != null) {
+                    acc.plantaLat = plLat;
+                    acc.plantaLon = plLon;
+                    acc.plantaFuente = plFuente;
+                    acc.plantaFuenteDetalle = plFuenteDetalle;
+                    acc.plantaNombre = plNombre;
+                }
+            }
+            acc.desembarqueKg += desembarqueKg;
+            acc.capturaKg += capturaKg;
+            acc.declaracionesCount++;
+            if (recepcionId != null) {
+                acc.recepciones.putIfAbsent(recepcionId, pesoRomanaKg);
+            }
+            if (!esBlanco(especie)) {
+                acc.especies.add(especie);
+            }
+        }
+
+        List<PairAcc> sortedPairs = new java.util.ArrayList<>(pairsByKey.values());
+        sortedPairs.sort((a, b) -> Double.compare(b.desembarqueKg, a.desembarqueKg));
+
+        List<java.util.Map<String, Object>> flujosMapa = new java.util.ArrayList<>();
+        List<java.util.Map<String, Object>> flujosSinCoordenadas = new java.util.ArrayList<>();
+        double totalDesembarque = 0.0;
+        double totalCaptura = 0.0;
+
+        for (PairAcc acc : sortedPairs) {
+            totalDesembarque += acc.desembarqueKg;
+            totalCaptura += acc.capturaKg;
+            double pairRomanaKg = acc.recepciones.values().stream().mapToDouble(Double::doubleValue).sum();
+
+            boolean tieneOrig = acc.origLat != null && acc.origLon != null;
+            boolean tienePl = acc.plantaLat != null && acc.plantaLon != null;
+            String motivo = null;
+            if (!tieneOrig && !tienePl) {
+                motivo = "Origen sin referencia oficial ni GPS de declaración; planta sin coordenadas oficiales ni GPS de recepción";
+            } else if (!tieneOrig) {
+                motivo = "Origen sin referencia oficial (caleta/varadero/AMERB) ni GPS de declaración";
+            } else if (!tienePl) {
+                motivo = "Planta sin coordenadas en maestro oficial ni GPS de recepción";
+            }
+
+            java.util.Map<String, Object> origMap = new java.util.LinkedHashMap<>();
+            origMap.put("tipo", acc.origTipo);
+            origMap.put("tipoDeclaracion", acc.origTipoDeclaracion);
+            origMap.put("id", acc.origRefId);
+            origMap.put("nombre", acc.origNombre);
+            origMap.put("regionId", acc.regionId);
+            origMap.put("regionNombre", acc.regionNombre);
+            origMap.put("latitud", acc.origLat);
+            origMap.put("longitud", acc.origLon);
+            origMap.put("fuente", acc.origFuente);
+            origMap.put("fuenteDetalle", acc.origFuenteDetalle);
+
+            java.util.Map<String, Object> plantaMap = new java.util.LinkedHashMap<>();
+            plantaMap.put("codigo", acc.plantaCodigo);
+            plantaMap.put("nombre", acc.plantaNombre);
+            plantaMap.put("latitud", acc.plantaLat);
+            plantaMap.put("longitud", acc.plantaLon);
+            plantaMap.put("fuente", acc.plantaFuente);
+            plantaMap.put("fuenteDetalle", acc.plantaFuenteDetalle);
+
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", acc.key);
+            item.put("origen", origMap);
+            item.put("planta", plantaMap);
+            item.put("desembarqueKg", redondearDosDec(acc.desembarqueKg));
+            item.put("capturaKg", redondearDosDec(acc.capturaKg));
+            item.put("pesoRomanaKg", redondearDosDec(pairRomanaKg));
+            item.put("declaracionesCount", acc.declaracionesCount);
+            item.put("recepcionesCount", acc.recepciones.size());
+            item.put("especies", new java.util.ArrayList<>(acc.especies));
+            if (motivo != null) {
+                item.put("motivoSinCoordenadas", motivo);
+                flujosSinCoordenadas.add(item);
+            } else {
+                flujosMapa.add(item);
+            }
+        }
+
+        double pesoRomanaTotal = pesoRomanaPorRecepcion.values().stream().mapToDouble(Double::doubleValue).sum();
+        java.util.Map<String, Object> resumen = new java.util.LinkedHashMap<>();
+        resumen.put("totalPares", sortedPairs.size());
+        resumen.put("paresConCoordenadas", flujosMapa.size());
+        resumen.put("paresSinCoordenadas", flujosSinCoordenadas.size());
+        resumen.put("totalDeclaraciones", declaraciones.size());
+        resumen.put("desembarqueTotalKg", redondearDosDec(totalDesembarque));
+        resumen.put("capturaTotalKg", redondearDosDec(totalCaptura));
+        resumen.put("pesoRomanaTotalKg", redondearDosDec(pesoRomanaTotal));
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("resumen", resumen);
+        resp.put("flujosMapa", flujosMapa);
+        resp.put("flujosSinCoordenadas", flujosSinCoordenadas);
+        resp.put("declaraciones", declaraciones);
+        return resp;
+    }
+
+    private static String resolverNombreCatalogoOrigen(
+            String tipo, String caletaNombre, String amerbNombre, String varaderoNombre, String varaderoTexto) {
+        if ("AREA".equals(tipo) || "AMERB".equals(tipo)) {
+            return firstNonBlank(amerbNombre, caletaNombre);
+        }
+        if ("RECOLECTOR".equals(tipo)) {
+            return firstNonBlank(varaderoNombre, varaderoTexto, caletaNombre);
+        }
+        return firstNonBlank(caletaNombre, varaderoNombre, varaderoTexto);
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        if (candidates == null) return null;
+        for (String c : candidates) {
+            if (c != null && !c.trim().isEmpty()) {
+                return c.trim();
+            }
+        }
+        return null;
+    }
+
+    private static boolean esBlanco(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private static String normalizarClave(String s) {
+        return s == null ? "" : s.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static String strOrNull(Object o) {
+        return o != null ? o.toString() : null;
+    }
+
+    private static Long longOrNull(Object o) {
+        return o instanceof Number ? ((Number) o).longValue() : null;
+    }
+
+    private static Double doubleOrNull(Object o) {
+        return o instanceof Number ? ((Number) o).doubleValue() : null;
+    }
+
+    private static double doubleOrZero(Object o) {
+        return o instanceof Number ? ((Number) o).doubleValue() : 0.0;
+    }
+
+    private static double redondearDosDec(double v) {
+        return Math.round(v * 100.0) / 100.0;
+    }
 }
