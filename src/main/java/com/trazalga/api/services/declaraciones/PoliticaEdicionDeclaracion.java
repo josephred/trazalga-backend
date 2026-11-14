@@ -43,7 +43,7 @@ import com.trazalga.api.services.ConfiguracionGeneralService;
  * Congelamiento de declaraciones de origen con alerta de fiscalización (refinamiento 30-10, punto 3).
  * <p>
  * Si una declaración de recolector, armador o área tiene una marca de {@code declaracion_congelar_marcas}
- * (por defecto EN_VEDA, CUOTA_EXCEDIDA y POSTERIOR_CIERRE), su dueño no puede modificarla ni eliminarla:
+ * (por defecto EN_VEDA, CUOTA_EXCEDIDA, POSTERIOR_CIERRE y LED_EXCEDIDO), su dueño no puede modificarla ni eliminarla:
  * <ul>
  *   <li>modificarla requiere una autorización de edición vigente de un fiscalizador, que se usa una vez;</li>
  *   <li>eliminarla sólo lo hace un fiscalizador, con motivo y acta ({@link AutorizacionDeclaracionService}).</li>
@@ -61,7 +61,7 @@ public class PoliticaEdicionDeclaracion {
     public static final String PARAM_HORAS = "declaracion_autorizacion_horas";
     public static final String PARAM_EXIGE_SESION = "declaracion_escritura_exige_sesion";
 
-    public static final String MARCAS_POR_DEFECTO = "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE";
+    public static final String MARCAS_POR_DEFECTO = "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE,LED_EXCEDIDO";
     public static final String PARAM_MARCAS_PRODUCCION = "marcas_bloqueantes_produccion";
     public static final String MARCAS_PRODUCCION_POR_DEFECTO = "RENDIMIENTO_ANOMALO";
 

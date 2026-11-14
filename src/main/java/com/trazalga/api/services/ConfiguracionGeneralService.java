@@ -45,9 +45,9 @@ public class ConfiguracionGeneralService {
         createIfNotExist("subreporte_huiro_palo_composicion", "SIN FRONDA", "Composición de fronda del Subreporte Huiro Palo (nombre en el maestro de composiciones)", "CAPTURA");
         createIfNotExist("subreporte_huiro_palo_factor_pct", "22", "Porcentaje de fronda en la captura biológica de huiro palo (IFOP)", "CAPTURA");
         createIfNotExist("subreporte_huiro_palo_formula", "SOBRE_SIN_FRONDA", "SOBRE_SIN_FRONDA: captura sin fronda x %; SOBRE_TOTAL: el % es de la biomasa total (x % / (100 - %))", "CAPTURA");
-        // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+        // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización (QL.1 / D22: incluye LED_EXCEDIDO)
         createIfNotExist("declaracion_congelar_activo", "true", "Una declaración de origen con alerta de la lista no puede ser modificada ni eliminada por su dueño (refinamiento 30-10)", "CADENA");
-        createIfNotExist("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE", "Marcas que congelan una declaración de recolector, armador o área (separadas por coma)", "CADENA");
+        createIfNotExist("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE,LED_EXCEDIDO", "Marcas que congelan una declaración de recolector, armador o área (separadas por coma)", "CADENA");
         createIfNotExist("declaracion_autorizacion_horas", "48", "Horas que tiene el dueño para usar una autorización de edición dada por un fiscalizador", "CADENA");
         createIfNotExist("declaracion_escritura_exige_sesion", "false", "Exige sesión para modificar o eliminar declaraciones de origen y de planta. Encender cuando la app 2.5.0+ esté instalada", "CADENA");
         // Refinamiento 06-11 · punto 1 (D20): el LED por embarcación o buzo cuenta también las declaraciones de área

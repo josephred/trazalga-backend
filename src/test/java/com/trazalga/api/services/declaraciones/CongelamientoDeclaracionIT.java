@@ -31,22 +31,28 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.trazalga.api.IntegracionBase;
 import com.trazalga.api.exceptions.DeclaracionCongeladaException;
+import com.trazalga.api.models.BuzoModel;
 import com.trazalga.api.models.CaletaModel;
 import com.trazalga.api.models.ComunaModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAutorizacionModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
+import com.trazalga.api.models.EmbarcacionModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.ExtraccionTipoModel;
 import com.trazalga.api.models.HumedadEstadoModel;
 import com.trazalga.api.models.ProvinciaModel;
 import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IBuzoRepository;
 import com.trazalga.api.repositories.ICaletaRepository;
 import com.trazalga.api.repositories.IComunaRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionAutorizacionRepository;
 import com.trazalga.api.repositories.IDeclaracionMarcaRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
+import com.trazalga.api.repositories.IEmbarcacionRepository;
 import com.trazalga.api.repositories.IEspecieRepository;
 import com.trazalga.api.repositories.IExtraccionTipoRepository;
 import com.trazalga.api.repositories.IHumedadEstadoRepository;
@@ -76,12 +82,15 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
     @Autowired private com.trazalga.api.services.BloqueoCargaService bloqueoCargaService;
 
     @Autowired private IDeclaracionRecolectorRepository recolectorRepository;
+    @Autowired private IDeclaracionArmadorRepository armadorRepository;
     @Autowired private IDeclaracionMarcaRepository marcaRepository;
     @Autowired private IDeclaracionAutorizacionRepository autorizacionRepository;
     @Autowired private IRegionRepository regionRepository;
     @Autowired private IProvinciaRepository provinciaRepository;
     @Autowired private IComunaRepository comunaRepository;
     @Autowired private ICaletaRepository caletaRepository;
+    @Autowired private IEmbarcacionRepository embarcacionRepository;
+    @Autowired private IBuzoRepository buzoRepository;
     @Autowired private IEspecieRepository especieRepository;
     @Autowired private IExtraccionTipoRepository extraccionTipoRepository;
     @Autowired private IHumedadEstadoRepository humedadEstadoRepository;
@@ -89,6 +98,8 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
 
     private ComunaModel comuna;
     private CaletaModel caleta;
+    private EmbarcacionModel embarcacion;
+    private BuzoModel buzo;
     private EspecieModel especie;
     private ExtraccionTipoModel metodo;
     private HumedadEstadoModel humedad;
@@ -98,7 +109,7 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
     @BeforeEach
     void setUp() {
         configuracionGeneralService.updateConfig("declaracion_congelar_activo", "true");
-        configuracionGeneralService.updateConfig("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE");
+        configuracionGeneralService.updateConfig("declaracion_congelar_marcas", PoliticaEdicionDeclaracion.MARCAS_POR_DEFECTO);
         configuracionGeneralService.updateConfig("declaracion_escritura_exige_sesion", "false");
         if (comuna != null) {
             return;
@@ -107,6 +118,8 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
         ProvinciaModel prov = provinciaRepository.saveAndFlush(ProvinciaModel.builder().nombre("Elqui CG06").region(region).build());
         comuna = comunaRepository.saveAndFlush(ComunaModel.builder().nombre("La Higuera CG06").region(region).provincia(prov).build());
         caleta = caletaRepository.saveAndFlush(CaletaModel.builder().nombre("Punta Choros CG06").region(region).comuna(comuna).build());
+        embarcacion = embarcacionRepository.saveAndFlush(EmbarcacionModel.builder().nombre("Embarcacion CG06").codigo("RPA-EMB-CG06").build());
+        buzo = buzoRepository.saveAndFlush(BuzoModel.builder().nombre("Buzo CG06").codigo("RPA-BUZ-CG06").build());
         especie = especieRepository.saveAndFlush(EspecieModel.builder().nombre("Huiro negro CG06").build());
         metodo = extraccionTipoRepository.saveAndFlush(ExtraccionTipoModel.builder().nombre("Barreteado CG06").build());
         humedad = humedadEstadoRepository.saveAndFlush(HumedadEstadoModel.builder().nombre("Húmedo CG06").build());
@@ -123,6 +136,7 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
         SecurityContextHolder.clearContext();
         autorizacionRepository.deleteAll();
         marcaRepository.deleteAll();
+        armadorRepository.deleteAll();
         recolectorRepository.deleteAll();
         configuracionGeneralService.updateConfig("declaracion_escritura_exige_sesion", "false");
     }
@@ -330,6 +344,37 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
         assertFalse(bloqueoCargaService.estaBloqueada("RECOLECTOR", d.getId()));
     }
 
+    @Test
+    @DisplayName("QL.1 (D22): una declaración de armador con LED_EXCEDIDO responde 423 al editar o eliminar por su dueño")
+    void declaracionArmadorConMarcaLedExcedido_responde423AlEditarYEliminarPorSuDueno() throws Exception {
+        assertTrue(PoliticaEdicionDeclaracion.MARCAS_POR_DEFECTO.contains("LED_EXCEDIDO"));
+
+        DeclaracionArmadorModel armador = declararArmador();
+        marcar("ARMADOR", armador.getId(), "LED_EXCEDIDO");
+
+        PoliticaEdicionDeclaracion.EstadoEdicion estado = politica.evaluar("ARMADOR", armador.getId());
+        assertTrue(estado.congelada());
+        assertTrue(estado.marcasCongelantes().stream().anyMatch(m -> "LED_EXCEDIDO".equals(m.marca())));
+
+        mockMvc.perform(put("/declaracionarmador/" + armador.getId()).with(user(RUT_DUENO).roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usuario\":{\"id\":" + dueno.getId() + "},\"desembarque\":800}"))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.error").value("DECLARACION_CONGELADA"))
+                .andExpect(jsonPath("$.declaracionTipo").value("ARMADOR"))
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("LED_EXCEDIDO")))
+                .andExpect(jsonPath("$.marcas[*].marca", hasItem("LED_EXCEDIDO")));
+
+        mockMvc.perform(delete("/declaracionarmador/" + armador.getId()).with(user(RUT_DUENO).roles("USER")))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.error").value("DECLARACION_CONGELADA"))
+                .andExpect(jsonPath("$.declaracionTipo").value("ARMADOR"))
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("LED_EXCEDIDO")))
+                .andExpect(jsonPath("$.marcas[*].marca", hasItem("LED_EXCEDIDO")));
+
+        assertTrue(armadorRepository.existsById(armador.getId()));
+    }
+
     private void comoFiscalizador() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 RUT_FISCALIZADOR, null, List.of(new SimpleGrantedAuthority("ROLE_FISCALIZADOR"))));
@@ -348,10 +393,28 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
                 .build());
     }
 
+    private DeclaracionArmadorModel declararArmador() {
+        Date fecha = Date.valueOf("2026-10-10");
+        return armadorRepository.saveAndFlush(DeclaracionArmadorModel.builder()
+                .usuario(dueno).embarcacion(embarcacion).buzo(buzo)
+                .caleta(caleta).comuna(comuna).especie(especie).humedadEstado(humedad).extraccionTipo(metodo)
+                .fechaDeclaracion(fecha).fechaExtraccion(fecha).hora("09:30:00")
+                .folioOrigen("FOL-ARM-CG06-" + System.nanoTime())
+                .folioDesembarqueDa("DA-CG06-" + System.nanoTime())
+                .codigoDestinatario("DEST-CG06").usuarioDestinatario(planta)
+                .desembarque(new BigDecimal("1200.00")).captura(1200.0)
+                .estado("ENVIADA")
+                .build());
+    }
+
     private DeclaracionMarcaModel marcar(DeclaracionRecolectorModel d, String marca) {
+        return marcar("RECOLECTOR", d.getId(), marca);
+    }
+
+    private DeclaracionMarcaModel marcar(String tipo, Long id, String marca) {
         return marcaRepository.saveAndFlush(DeclaracionMarcaModel.builder()
-                .declaracionTipo("RECOLECTOR")
-                .declaracionId(d.getId())
+                .declaracionTipo(tipo)
+                .declaracionId(id)
                 .marca(marca)
                 .detalle("Detalle de prueba " + marca)
                 .build());
