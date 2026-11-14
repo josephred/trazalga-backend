@@ -29,6 +29,9 @@ public class AdminController {
     @Autowired
     private com.trazalga.api.services.UsuarioVersionService usuarioVersionService;
 
+    @Autowired
+    private com.trazalga.api.services.indicadores.RecalculoRendimientoFinalService recalculoRendimientoFinalService;
+
     @GetMapping("/tareas-programadas")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Obtiene el estado de la última ejecución de cada tarea programada (TA.6)")
@@ -49,5 +52,13 @@ public class AdminController {
     public ResponseEntity<com.trazalga.api.dto.ResumenVersionesAppDTO> getVersionesApp(
             @org.springframework.web.bind.annotation.RequestParam(value = "perfil", required = false) String perfil) {
         return ResponseEntity.ok(usuarioVersionService.listarUsuariosVersion(perfil));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/rendimiento/recalcular-final")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Recálculo histórico de captura_origen_kg, captura_origen_completa y rendimiento_final_pct sin crear marcas ni bloquear destinos (QR.4 / D36)")
+    public ResponseEntity<java.util.Map<String, Object>> recalcularRendimientoFinal(
+            @org.springframework.web.bind.annotation.RequestParam(value = "aplicar", defaultValue = "true") boolean aplicar) {
+        return ResponseEntity.ok(recalculoRendimientoFinalService.recalcularHistorico(aplicar));
     }
 }

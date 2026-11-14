@@ -94,6 +94,114 @@ public class RendimientoPlantaService {
         return FUENTE_TABLA_ORIGEN.equals(fuente) || FUENTE_FACTORES_ORIGEN.equals(fuente);
     }
 
+    public record EvaluacionOrigenPreview(
+            BigDecimal capturaOrigenKg,
+            boolean capturaOrigenCompleta,
+            BigDecimal rendimientoFinalPct,
+            BigDecimal rendimientoMaxTeoricoOrigenPct,
+            BigDecimal limiteSuperiorPct,
+            String fuenteOrigen,
+            boolean habriaSidoAnomala,
+            String tipoAnomalia,
+            String detalleAnomalia,
+            String motivoIncompleta
+    ) {
+    }
+
+    /**
+     * Evalúa sin efectos secundarios (sin mutar campos de proceso ni crear marcas) qué clasificación
+     * habría obtenido una producción bajo la base CAPTURA_ORIGEN (QR.4 / D36).
+     */
+    @Transactional(readOnly = true)
+    public EvaluacionOrigenPreview evaluarOrigenSinEfectos(
+            DeclaracionPlantaProduccionModel declaracion,
+            List<DeclaracionPlantaAbastecimientoModel> lotes,
+            CapturaOrigenProduccion.ResultadoCapturaOrigen capturaOrigen,
+            Date ahora) {
+        Date fechaRef = declaracion.getFechaProduccion() != null ? declaracion.getFechaProduccion() : (ahora != null ? ahora : new Date());
+        BigDecimal cantProd = declaracion.getCantidadProducto() != null ? declaracion.getCantidadProducto() : BigDecimal.ZERO;
+        BigDecimal capturaOrigenKg = (capturaOrigen != null && capturaOrigen.capturaOrigenKg() != null)
+                ? capturaOrigen.capturaOrigenKg().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        boolean completa = capturaOrigen != null && capturaOrigen.completa();
+        BigDecimal rendFinalExact = capturaOrigenKg.compareTo(BigDecimal.ZERO) > 0
+                ? cantProd.multiply(CIEN).divide(capturaOrigenKg, 6, RoundingMode.HALF_UP)
+                : null;
+        BigDecimal rendFinalPct = rendFinalExact != null ? rendFinalExact.setScale(2, RoundingMode.HALF_UP) : null;
+
+        if (!completa || rendFinalExact == null) {
+            return new EvaluacionOrigenPreview(
+                    capturaOrigenKg, completa, rendFinalPct, null, null,
+                    FUENTE_SIN_REFERENCIA, false, null, null,
+                    capturaOrigen != null ? capturaOrigen.motivoIncompleta() : CapturaOrigenProduccion.MOTIVO_SIN_LOTES
+            );
+        }
+
+        List<DeclaracionPlantaAbastecimientoModel> listaLotes = lotes != null ? lotes : Collections.emptyList();
+        ProductoModel producto = resolverProducto(declaracion.getProductoResultante());
+        Long productoId = producto != null ? producto.getId() : null;
+        HumedadEstadoModel humFormato = producto != null ? producto.getHumedadEstado() : null;
+        Long especieId = declaracion.getMateriaPrimaEspecie() != null
+                ? declaracion.getMateriaPrimaEspecie().getId()
+                : (!listaLotes.isEmpty() && listaLotes.get(0).getEspecie() != null ? listaLotes.get(0).getEspecie().getId() : null);
+        Long humedadPredId = resolverHumedadPredominanteId(declaracion, listaLotes);
+
+        double toleranciaPct = configService != null ? configService.getDouble("rendimiento_tolerancia_pct", 5.0) : 5.0;
+        BigDecimal globalMinPct = leerDecimalOpcional("rendimiento_min_pct");
+
+        String fuente = FUENTE_SIN_REFERENCIA;
+        BigDecimal maxTeoricoExact = null;
+        BigDecimal maxTeoricoPct = null;
+        BigDecimal minAplicadoPct = globalMinPct;
+
+        Optional<RendimientoRangoModel> rangoOpt = buscarRangoCapturaOrigen(especieId, humedadPredId, productoId, fechaRef);
+        if (rangoOpt.isPresent()) {
+            RendimientoRangoModel r = rangoOpt.get();
+            fuente = FUENTE_TABLA_ORIGEN;
+            maxTeoricoPct = r.getMaxPct();
+            maxTeoricoExact = r.getMaxPct();
+            if (r.getMinPct() != null) {
+                minAplicadoPct = r.getMinPct();
+            }
+        } else {
+            BalanceOrigen bo = calcularBalanceOrigenConFactores(especieId, humFormato, cantProd, capturaOrigenKg, fechaRef);
+            if (bo.completo) {
+                fuente = FUENTE_FACTORES_ORIGEN;
+                maxTeoricoExact = bo.maxTeoricoExact;
+                maxTeoricoPct = bo.maxTeoricoExact.setScale(2, RoundingMode.HALF_UP);
+            }
+        }
+
+        BigDecimal limiteSup = null;
+        boolean anomalo = false;
+        String tipoAnomalia = null;
+        String detalle = null;
+        if (!FUENTE_SIN_REFERENCIA.equals(fuente) && maxTeoricoExact != null) {
+            BigDecimal mult = BigDecimal.ONE.add(BigDecimal.valueOf(toleranciaPct).divide(CIEN, 6, RoundingMode.HALF_UP));
+            limiteSup = maxTeoricoExact.multiply(mult).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal limiteSupExact = maxTeoricoExact.multiply(mult);
+            String fuenteTexto = FUENTE_TABLA_ORIGEN.equals(fuente) ? "tabla" : "factores";
+            if (rendFinalExact.compareTo(limiteSupExact) > 0) {
+                anomalo = true;
+                tipoAnomalia = "EXCESO";
+                detalle = String.format(LOCALE_CL,
+                        "Rendimiento final sobre captura biológica de origen %.1f %% sobre un máximo teórico de %.1f %% (%s; tolerancia %s %%)",
+                        rendFinalPct, maxTeoricoPct, fuenteTexto, formatearTolerancia(toleranciaPct));
+            } else if (minAplicadoPct != null && rendFinalExact.compareTo(minAplicadoPct) < 0) {
+                anomalo = true;
+                tipoAnomalia = "BAJO_MINIMO";
+                detalle = String.format(LOCALE_CL,
+                        "Rendimiento final sobre captura biológica de origen %.1f %% bajo el mínimo esperado de %.1f %% (%s)",
+                        rendFinalPct, minAplicadoPct, fuenteTexto);
+            }
+        }
+
+        return new EvaluacionOrigenPreview(
+                capturaOrigenKg, true, rendFinalPct, maxTeoricoPct, limiteSup,
+                fuente, anomalo, tipoAnomalia, detalle, null
+        );
+    }
+
     public record ResultadoRendimiento(
             boolean sinLotes,
             BigDecimal masaEntradaKg,
