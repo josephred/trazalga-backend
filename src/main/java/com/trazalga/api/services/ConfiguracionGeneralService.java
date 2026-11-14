@@ -134,9 +134,15 @@ public class ConfiguracionGeneralService {
         createIfNotExist("origen_geo_patron_pct", "50", "% de declaraciones lejanas para detectar patrón", "INTEGRIDAD");
         createIfNotExist("origen_geo_patron_min_decl", "3", "Mínimo de declaraciones para evaluar patrón", "INTEGRIDAD");
 
-        // PUNTO 10 — CONSULTA CIUDADANA DE PATENTES (T10.2)
+        // PUNTO 10 — CONSULTA CIUDADANA DE PATENTES (T10.2 / QC.1)
         createIfNotExist("patente_vigencia_horas", "48", "Horas de vigencia del último movimiento para considerar traslado amparado", "CADENA");
         createIfNotExist("patente_consulta_max_por_minuto", "20", "Máximo de consultas públicas por IP por minuto", "CADENA");
+        createIfNotExist("consulta_publica_texto_proteccion", "Las algas pardas son un recurso con medidas de protección. Su extracción y traslado requieren autorización de Sernapesca.", "Leyenda pública sobre protección del recurso expuesta en consulta ciudadana de patentes (vacío = oculta, D42)", "CONSULTAS");
+        createIfNotExist("consulta_publica_grafica", "", "Ruta relativa o URL pública de la gráfica informativa en consulta ciudadana de patentes (vacío = oculta)", "CONSULTAS");
+        createIfNotExist("consulta_publica_fono_denuncia", "", "Teléfono de Fono Denuncia expuesto en consulta pública cuando no hay autorización vigente (vacío = oculto, D38)", "CONSULTAS");
+        createIfNotExist("consulta_publica_whatsapp", "", "Número de WhatsApp (código país + número) para denuncia ciudadana sin autorización vigente (vacío = oculto, D38)", "CONSULTAS");
+        createIfNotExist("consulta_publica_muestra_comuna", "true", "Si es true, incluye comunaDestino en respuestas públicas AUTORIZADO; false la omite (D37)", "CONSULTAS");
+        createIfNotExist("consulta_ciudadana_resultados_anomalos", "VENCIDO,SIN_REGISTROS,RETENIDO", "Resultados de consulta ciudadana considerados anómalos para la bandeja de fiscalización (D39)", "CONSULTAS");
 
         // PRIORIDAD 2 — CONSULTA POR FOLIO (T2.2)
         createIfNotExist("consulta_folio_dias_embarcacion", "30", "Días hacia atrás para buscar desembarques por código de embarcación", "CONSULTAS");
