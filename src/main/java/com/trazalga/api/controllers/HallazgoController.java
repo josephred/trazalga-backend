@@ -35,8 +35,8 @@ public class HallazgoController {
             @RequestParam(required = false) Boolean resuelta,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) Long reglaId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date desde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date hasta,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date desde,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date hasta,
             @RequestParam(required = false) String rpa,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size

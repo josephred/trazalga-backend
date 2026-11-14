@@ -37,8 +37,8 @@ public class ReportController {
 
     @GetMapping
     public ResponseEntity<?> generateReport(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fechaInicio,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fechaFin,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date fechaInicio,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date fechaFin,
             @RequestParam String tipoReporte,
             @RequestParam(required = false) String rut,
             @RequestParam(required = false) String format,
@@ -656,8 +656,8 @@ public class ReportController {
 
     @GetMapping("/indicadores-recolector")
     public ResponseEntity<?> getIndicadoresRecolector(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getIndicadoresRecolector(startDate, endDate));
         } catch (Exception e) {
@@ -668,8 +668,8 @@ public class ReportController {
     }
     @GetMapping("/extraccion-veda")
     public ResponseEntity<?> getExtraccionVedaMetrics(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long regionId) {
         try {
@@ -683,8 +683,8 @@ public class ReportController {
 
     @GetMapping("/extraccion-veda-detalle")
     public ResponseEntity<?> getExtraccionVedaDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long regionId) {
         try {
@@ -698,8 +698,8 @@ public class ReportController {
 
     @GetMapping("/resumen-global")
     public ResponseEntity<?> getResumenGlobal(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getResumenGlobal(startDate, endDate));
         } catch (Exception e) {
@@ -711,8 +711,8 @@ public class ReportController {
 
     @GetMapping("/casos-abiertos")
     public ResponseEntity<?> getCasosAbiertosDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getCasosAbiertosDetalle(startDate, endDate));
         } catch (Exception e) {
@@ -724,8 +724,8 @@ public class ReportController {
 
     @GetMapping("/variacion-peso")
     public ResponseEntity<?> getVariacionPeso(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Double umbral) {
         try {
             return ResponseEntity.ok(reportService.getVariacionPesoMetrics(startDate, endDate, umbral));
@@ -738,8 +738,8 @@ public class ReportController {
 
     @GetMapping("/variacion-peso-detalle")
     public ResponseEntity<?> getVariacionPesoDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getVariacionPesoDetalle(startDate, endDate));
         } catch (Exception e) {
@@ -756,8 +756,8 @@ public class ReportController {
     @GetMapping("/variacion-peso/recepciones")
     @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
     public ResponseEntity<?> getVariacionPesoRecepciones(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) String semaforo,
             @RequestParam(required = false) String tramo,
             @RequestParam(required = false) Long especieId,
@@ -796,8 +796,8 @@ public class ReportController {
 
     @GetMapping("/cadena-origen-planta")
     public ResponseEntity<?> getCadenaOrigenPlanta(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long regionId) {
         try {
@@ -811,8 +811,8 @@ public class ReportController {
 
     @GetMapping("/tiempo-validacion")
     public ResponseEntity<?> getTiempoValidacion(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getTiempoValidacionMetrics(startDate, endDate));
         } catch (Exception e) {
@@ -824,8 +824,8 @@ public class ReportController {
 
     @GetMapping("/tiempo-validacion-detalle")
     public ResponseEntity<?> getTiempoValidacionDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
             return ResponseEntity.ok(reportService.getTiempoValidacionDetalle(startDate, endDate));
         } catch (Exception e) {
@@ -837,8 +837,8 @@ public class ReportController {
 
     @GetMapping("/volumen-por-especie")
     public ResponseEntity<?> getVolumenPorEspecie(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false, defaultValue = "TODOS") String perfil) {
         try {
             return ResponseEntity.ok(reportService.getVolumenPorEspecie(startDate, endDate, perfil));
@@ -851,8 +851,8 @@ public class ReportController {
 
     @GetMapping("/doble-operacion")
     public ResponseEntity<?> getDobleOperacion(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false, defaultValue = "5") Double toleranciaPct) {
         try {
             return ResponseEntity.ok(reportService.getDobleOperacion(startDate, endDate, toleranciaPct));
@@ -865,8 +865,8 @@ public class ReportController {
 
     @GetMapping("/doble-operacion-geo")
     public ResponseEntity<?> getDobleOperacionGeo(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long regionId) {
         try {
             return ResponseEntity.ok(reportService.getDobleOperacionGeo(startDate, endDate, regionId));
@@ -879,8 +879,8 @@ public class ReportController {
 
     @GetMapping("/origen-geo")
     public ResponseEntity<?> getOrigenGeo(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long regionId) {
         try {
             return ResponseEntity.ok(reportService.getOrigenGeoPatrones(startDate, endDate, regionId));
@@ -893,8 +893,8 @@ public class ReportController {
 
     @GetMapping("/curva-snake")
     public ResponseEntity<?> getCurvaSnake(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long amerbId,
             @RequestParam(required = false) Long especieId) {
         try {
@@ -926,8 +926,8 @@ public class ReportController {
 
     @GetMapping("/trazabilidad-lote")
     public ResponseEntity<?> getTrazabilidadLote(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Double umbral) {
         try {
             return ResponseEntity.ok(reportService.getTrazabilidadLoteMetrics(startDate, endDate, umbral));
@@ -940,8 +940,8 @@ public class ReportController {
 
     @GetMapping("/trazabilidad-lote-detalle")
     public ResponseEntity<?> getTrazabilidadLoteDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) String semaforo) {
         try {
             return ResponseEntity.ok(reportService.getTrazabilidadLoteDetalle(startDate, endDate, semaforo));
@@ -954,8 +954,8 @@ public class ReportController {
 
     @GetMapping("/perfilador-riesgo")
     public ResponseEntity<?> getPerfiladorRiesgo(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long regionId,
             @RequestParam(required = false) Long actorId,
             @RequestParam(required = false) String nivel) {
@@ -970,8 +970,8 @@ public class ReportController {
 
     @GetMapping("/desembarque-fisico")
     public ResponseEntity<?> getDesembarqueFisico(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long regionId,
@@ -994,8 +994,8 @@ public class ReportController {
 
     @GetMapping("/desembarque-fisico-detalle")
     public ResponseEntity<?> getDesembarqueFisicoDetalle(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long regionId,
@@ -1017,8 +1017,8 @@ public class ReportController {
 
     @GetMapping("/captura-corregida")
     public ResponseEntity<?> getCapturaCorregida(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId) {
         try {
             return ResponseEntity.ok(reportService.getCapturaCorregidaMetrics(startDate, endDate, especieId));
@@ -1031,7 +1031,7 @@ public class ReportController {
 
     @GetMapping("/limite-extraccion-diario")
     public ResponseEntity<?> getLimiteExtraccionDiario(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date fecha) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date fecha) {
         try {
             return ResponseEntity.ok(reportService.getLimiteExtraccionDiarioMetrics(fecha));
         } catch (Exception e) {
@@ -1043,8 +1043,8 @@ public class ReportController {
 
     @GetMapping("/led-hallazgos")
     public ResponseEntity<?> getLedHallazgos(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long regionId,
             @RequestParam(required = false) Long embarcacionId) {
         try {
@@ -1073,8 +1073,8 @@ public class ReportController {
 
     @GetMapping("/desembarque-fisico/atipicos")
     public ResponseEntity<?> getDesembarquesAtipicos(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long provinciaId,
@@ -1117,8 +1117,8 @@ public class ReportController {
 
     @GetMapping("/cuotas/sobrepasos")
     public ResponseEntity<?> getCuotasSobrepasos(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long cuotaId,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long extraccionTipoId,
@@ -1187,8 +1187,8 @@ public class ReportController {
     @GetMapping("/rendimiento-planta")
     @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
     public ResponseEntity<?> getRendimientoPlanta(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long plantaId,
             @RequestParam(required = false) Long especieId) {
         return ResponseEntity.ok(reportService.getRendimientoPlanta(startDate, endDate, plantaId, especieId));

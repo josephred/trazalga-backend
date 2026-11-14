@@ -45,8 +45,8 @@ public class CuotaExtraccionController {
 
     @GetMapping("/dashboard-diario")
     public List<ControlCuotaDiariaDTO> getControlCuotasDiarioGlobal(
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) Date endDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) String periodo,
             @RequestParam(required = false) Long comunaId,
             @RequestParam(required = false) Long extraccionTipoId,

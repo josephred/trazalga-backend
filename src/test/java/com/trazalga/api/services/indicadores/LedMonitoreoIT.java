@@ -14,6 +14,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.trazalga.api.ApiApplication;
 import com.trazalga.api.IntegracionBase;
@@ -59,7 +66,10 @@ import com.trazalga.api.services.LimiteExtraccionDiarioService;
  * recibe un día y no un instante, y que el monitoreo y la evaluación en línea dan el mismo total.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@AutoConfigureMockMvc
 class LedMonitoreoIT extends IntegracionBase {
+
+    @Autowired private MockMvc mockMvc;
 
     /** Se calcula en setUp: el contexto de Spring fija la zona horaria de la JVM en America/Santiago. */
     private java.sql.Date dia;
@@ -278,6 +288,28 @@ class LedMonitoreoIT extends IntegracionBase {
         assertEquals(500.0, ((Number) intento.get("excesoKg")).doubleValue(), 0.001);
         // Con dato primero; sin dato al final
         assertSame(intento, hs.get(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("QL.2 · Parámetros ?fecha y ?startDate/?endDate YYYY-MM-DD se interpretan en hora de Chile y no retroceden un día")
+    void endpointLed_parametroFechaEnQueryNoCorreUnDiaEnChile() throws Exception {
+        DeclaracionArmadorModel da = armador(2300);
+        marca("ARMADOR", da.getId(), regla.getId(),
+                "Embarcación LED06-0001 — armador 31.111.111-1 — 2026-11-06: 2300,00 kg acumulados sobre límite de 2000,00 kg (exceso 300,00 kg, 15,0%)");
+
+        mockMvc.perform(get("/api/reportes/limite-extraccion-diario").param("fecha", "2026-11-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dia").value("2026-11-06"))
+                .andExpect(jsonPath("$.totalMonitoreados").value(1))
+                .andExpect(jsonPath("$.excedidos").value(1));
+
+        mockMvc.perform(get("/api/reportes/led-hallazgos")
+                        .param("startDate", "2026-11-06")
+                        .param("endDate", "2026-11-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].declaracionId").value(da.getId().intValue()))
+                .andExpect(jsonPath("$[0].fecha").value("2026-11-06"));
     }
 
     // ------------------------------------------------------------------ utilidades

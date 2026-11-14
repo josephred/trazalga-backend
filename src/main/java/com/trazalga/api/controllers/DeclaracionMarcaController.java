@@ -31,8 +31,8 @@ public class DeclaracionMarcaController {
             @RequestParam(required = false, defaultValue = "false") boolean soloPendientes,
             @RequestParam(required = false) String estadoGestion,
             @RequestParam(required = false) String tipo,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
 
         Boolean estadoResuelta = soloPendientes ? Boolean.FALSE : resuelta;
         Date endOfDay = ajustarFinDeDia(endDate);

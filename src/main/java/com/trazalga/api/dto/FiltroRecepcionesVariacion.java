@@ -16,10 +16,10 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FiltroRecepcionesVariacion {
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private Date startDate;
 
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private Date endDate;
 
     private String semaforo; // VERDE | AMARILLO | ROJO | TODOS
