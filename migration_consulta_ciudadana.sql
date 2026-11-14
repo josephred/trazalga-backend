@@ -5,6 +5,7 @@
 -- ya configurados por administración.
 -- ============================================================================
 
+SET NAMES utf8mb4;
 SET @db_name = DATABASE();
 
 -- 1. Asegurar existencia de tabla consulta_patente_log (T10.1 / QC.4)
