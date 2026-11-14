@@ -22,17 +22,14 @@ public class ProductoController {
     private IProductoRepository repository;
 
     @GetMapping
-    @Operation(summary = "Obtiene los formatos de producto registrados en el sistema (activos por defecto)")
+    @Operation(summary = "Obtiene los formatos de producto registrados en el sistema (activos por defecto; filtrable por especieId)")
     public List<ProductoModel> getProductos(
-            @RequestParam(required = false, defaultValue = "false") boolean incluirInactivos) {
-        if (repository.count() == 0) {
-            return List.of(
-                ProductoModel.builder().id(1L).nombre("Alga Seca").descripcion("Producto de alga deshidratada").activo(true).build(),
-                ProductoModel.builder().id(2L).nombre("Alga Picada / Picadillo").descripcion("Producto de alga troceada o picada").activo(true).build(),
-                ProductoModel.builder().id(3L).nombre("Harina de Alga").descripcion("Producto procesado de harina o polvo de alga").activo(true).build(),
-                ProductoModel.builder().id(4L).nombre("Alga Frecho / Molienda").descripcion("Molienda o subproducto procesado").activo(true).build(),
-                ProductoModel.builder().id(5L).nombre("Alga Fila / Tira").descripcion("Corte en tiras o filas").activo(true).build()
-            );
+            @RequestParam(required = false, defaultValue = "false") boolean incluirInactivos,
+            @RequestParam(required = false) Long especieId) {
+        if (especieId != null) {
+            return incluirInactivos
+                    ? repository.findByEspecieIdOrderByNombreAsc(especieId)
+                    : repository.findActivosByEspecieId(especieId);
         }
         return incluirInactivos
                 ? repository.findAllByOrderByNombreAsc()

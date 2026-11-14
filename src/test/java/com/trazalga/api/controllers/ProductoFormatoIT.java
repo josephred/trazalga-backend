@@ -127,6 +127,12 @@ class ProductoFormatoIT extends IntegracionBase {
         mockMvc.perform(get("/producto").param("incluirInactivos", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)));
+
+        // Con tabla vacía no hay lista de respaldo en memoria (QF.5 / F26)
+        productoRepo.deleteAll();
+        mockMvc.perform(get("/producto"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
