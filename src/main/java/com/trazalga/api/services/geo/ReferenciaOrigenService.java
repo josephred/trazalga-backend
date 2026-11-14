@@ -13,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Servicio centralizado de resolución de punto geográfico de referencia (TG.2 / TG.3).
@@ -30,13 +33,22 @@ public class ReferenciaOrigenService {
     private final IAmerbRepository amerbRepository;
     private final IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
+    @Autowired(required = false)
+    private IPlantaRepository plantaRepository;
+
     // Caché en memoria de maestros
     private final Map<Long, CaletaModel> cacheCaleta = new ConcurrentHashMap<>();
     private final Map<Long, VaraderoModel> cacheVaradero = new ConcurrentHashMap<>();
     private final Map<Long, AmerbModel> cacheAmerb = new ConcurrentHashMap<>();
+    private final List<PlantaModel> cachePlantas = new CopyOnWriteArrayList<>();
 
     // Índice auxiliar: comunaId -> lista de varaderos
     private final Map<Long, List<VaraderoModel>> varaderosPorComuna = new ConcurrentHashMap<>();
+
+    public void setPlantaRepository(IPlantaRepository plantaRepository) {
+        this.plantaRepository = plantaRepository;
+        recargarPlantas();
+    }
 
     @PostConstruct
     public void inicializarCache() {
@@ -75,10 +87,22 @@ public class ReferenciaOrigenService {
                 if (a.getId() != null) cacheAmerb.put(a.getId(), a);
             }
 
-            log.info("Caché ReferenciaOrigenService cargada: {} caletas, {} varaderos, {} AMERBs",
-                    cacheCaleta.size(), cacheVaradero.size(), cacheAmerb.size());
+            recargarPlantas();
+
+            log.info("Caché ReferenciaOrigenService cargada: {} caletas, {} varaderos, {} AMERBs, {} plantas",
+                    cacheCaleta.size(), cacheVaradero.size(), cacheAmerb.size(), cachePlantas.size());
         } catch (Exception e) {
             log.error("Error al inicializar/recargar caché de ReferenciaOrigenService", e);
+        }
+    }
+
+    private void recargarPlantas() {
+        cachePlantas.clear();
+        if (plantaRepository != null) {
+            List<PlantaModel> plantas = plantaRepository.findAll();
+            if (plantas != null) {
+                cachePlantas.addAll(plantas);
+            }
         }
     }
 
@@ -310,8 +334,111 @@ public class ReferenciaOrigenService {
         return null;
     }
 
+    /**
+     * Resuelve las coordenadas oficiales de una planta desde el maestro {@code planta}
+     * usando el calce de Q0.2.6: prioridad codigo_sernapesca = planta.codigo y
+     * respaldo por usuario.rut = planta.rut. Retorna null si no hay calce univoco o coordenadas.
+     */
+    public PuntoReferencia resolverPlantaOficial(String codigoSernapesca, String rutUsuario) {
+        return resolverPlantaOficial(codigoSernapesca, rutUsuario, null);
+    }
+
+    public PuntoReferencia resolverPlantaOficial(String codigoSernapesca, String rutUsuario, String nombrePlanta) {
+        if (cachePlantas.isEmpty() && plantaRepository != null) {
+            recargarPlantas();
+        }
+        if (cachePlantas.isEmpty()) {
+            return null;
+        }
+
+        String codTrim = codigoSernapesca != null ? codigoSernapesca.trim() : "";
+        if (!codTrim.isEmpty()) {
+            List<PlantaModel> porCodigo = cachePlantas.stream()
+                    .filter(p -> coincideCodigoPlanta(p, codTrim))
+                    .collect(Collectors.toList());
+            if (!porCodigo.isEmpty()) {
+                PlantaModel elegida = seleccionarPlantaUnica(porCodigo, nombrePlanta);
+                return elegida != null ? aPuntoReferenciaPlanta(elegida) : null;
+            }
+        }
+
+        String rutLimpio = limpiarRut(rutUsuario);
+        if (!rutLimpio.isEmpty()) {
+            List<PlantaModel> matchesRut = cachePlantas.stream()
+                    .filter(p -> p.getRut() != null && !p.getRut().isBlank()
+                            && limpiarRut(p.getRut()).equals(rutLimpio))
+                    .collect(Collectors.toList());
+            if (!matchesRut.isEmpty()) {
+                PlantaModel elegida = seleccionarPlantaUnica(matchesRut, nombrePlanta);
+                return elegida != null ? aPuntoReferenciaPlanta(elegida) : null;
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean coincideCodigoPlanta(PlantaModel planta, String codigoTrim) {
+        if (planta == null || planta.getCodigo() == null) return false;
+        if (String.valueOf(planta.getCodigo()).equalsIgnoreCase(codigoTrim)) {
+            return true;
+        }
+        try {
+            return Integer.parseInt(codigoTrim) == planta.getCodigo();
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
+    private static PlantaModel seleccionarPlantaUnica(List<PlantaModel> candidatas, String nombrePlanta) {
+        if (candidatas == null || candidatas.isEmpty()) return null;
+        if (candidatas.size() == 1) return candidatas.get(0);
+        if (nombrePlanta != null && !nombrePlanta.isBlank()) {
+            String norm = CoordenadaNormalizer.normalizarTexto(nombrePlanta);
+            if (!norm.isEmpty()) {
+                List<PlantaModel> porNombre = candidatas.stream()
+                        .filter(p -> p.getNombre() != null
+                                && CoordenadaNormalizer.normalizarTexto(p.getNombre()).equals(norm))
+                        .collect(Collectors.toList());
+                if (porNombre.size() == 1) {
+                    return porNombre.get(0);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String limpiarRut(String rut) {
+        if (rut == null) return "";
+        return rut.replace(".", "").replace("-", "").replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+    }
+
+    private static PuntoReferencia aPuntoReferenciaPlanta(PlantaModel p) {
+        if (p == null || p.getLatitud() == null || p.getLongitud() == null) {
+            return null;
+        }
+        String fuente = (p.getFuenteCoordenada() != null && !p.getFuenteCoordenada().isBlank())
+                ? p.getFuenteCoordenada().trim()
+                : "MAESTRO_PLANTA";
+        String nombre = (p.getNombre() != null && !p.getNombre().isBlank())
+                ? p.getNombre().trim()
+                : "Planta";
+        return PuntoReferencia.builder()
+                .tipo("PLANTA")
+                .id(p.getId())
+                .nombre(nombre)
+                .lat(p.getLatitud())
+                .lon(p.getLongitud())
+                .fuente(fuente)
+                .build();
+    }
+
     public PuntoReferencia resolverPlanta(DeclaracionPlantaAbastecimientoModel dp) {
         if (dp == null) return null;
+        String rutUsuario = dp.getUsuario() != null ? dp.getUsuario().getRut() : null;
+        PuntoReferencia oficial = resolverPlantaOficial(dp.getCodigoSernapesca(), rutUsuario, dp.getNombrePlanta());
+        if (oficial != null) {
+            return oficial;
+        }
         if (dp.getLatitud() != null && dp.getLongitud() != null) {
             return PuntoReferencia.builder()
                     .tipo("PLANTA_RECEPCION")
@@ -470,7 +597,7 @@ public class ReferenciaOrigenService {
                 : null;
 
         boolean esOrigen = esEslabonOrigen(tipoDeclaracion);
-        boolean tieneRef = esOrigen && puntoRef != null && puntoRef.getLat() != null && puntoRef.getLon() != null;
+        boolean tieneRef = puntoRef != null && puntoRef.getLat() != null && puntoRef.getLon() != null;
 
         GeoDeclaracionDTO.ReferenciaInfo refInfo = tieneRef
                 ? GeoDeclaracionDTO.ReferenciaInfo.builder()
@@ -490,7 +617,7 @@ public class ReferenciaOrigenService {
             evaluacion = "SIN_GPS";
         } else if (esOrigen && !tieneRef) {
             evaluacion = "SIN_REFERENCIA";
-        } else if (esOrigen) {
+        } else if (tieneRef) {
             double dist = ReportService.haversineKm(gpsLat, gpsLon, puntoRef.getLat(), puntoRef.getLon());
             distanciaKm = Math.round(dist * 10.0) / 10.0;
             boolean precisionBaja = precisionM != null && precisionM > precisionMaxM;
@@ -502,7 +629,7 @@ public class ReferenciaOrigenService {
                 evaluacion = "COHERENTE";
             }
         } else {
-            // Comercializador y Planta: sin origen propio; su GPS es el lugar de declaración/recepción
+            // Comercializador o Planta sin referencia en maestro: su GPS es el lugar de declaración/recepción
             boolean precisionBaja = precisionM != null && precisionM > precisionMaxM;
             evaluacion = precisionBaja ? "PRECISION_BAJA" : "COHERENTE";
         }
@@ -562,8 +689,10 @@ public class ReferenciaOrigenService {
             return construirGeoDeclaracion("COMERCIALIZADOR", dc.getLatitud(), dc.getLongitud(),
                     dc.getPrecisionGpsM(), capEn, dc.getEnvioOffline(), null, umbralKm, precisionMaxM);
         } else if (entidad instanceof DeclaracionPlantaAbastecimientoModel dp) {
+            String rutUsuario = dp.getUsuario() != null ? dp.getUsuario().getRut() : null;
+            PuntoReferencia ref = resolverPlantaOficial(dp.getCodigoSernapesca(), rutUsuario, dp.getNombrePlanta());
             return construirGeoDeclaracion("PLANTA_ABASTECIMIENTO", dp.getLatitud(), dp.getLongitud(),
-                    null, null, false, null, umbralKm, precisionMaxM);
+                    null, null, false, ref, umbralKm, precisionMaxM);
         }
         return construirGeoDeclaracion(tipoDeclaracion, null, null, null, null, false, null, umbralKm, precisionMaxM);
     }

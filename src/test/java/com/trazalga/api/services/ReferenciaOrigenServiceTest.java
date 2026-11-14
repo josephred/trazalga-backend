@@ -199,4 +199,79 @@ public class ReferenciaOrigenServiceTest {
         assertEquals(100L, drPendiente.getVaraderoRelacion().getId());
         verify(declaracionRecolectorRepository, times(1)).save(drPendiente);
     }
+
+    @Test
+    void testResolverPlantaOficial_PrioridadCodigoYReglasFallback() {
+        com.trazalga.api.repositories.IPlantaRepository plantaRepo =
+                org.mockito.Mockito.mock(com.trazalga.api.repositories.IPlantaRepository.class);
+
+        com.trazalga.api.models.PlantaModel pCodigo = new com.trazalga.api.models.PlantaModel();
+        pCodigo.setId(501L);
+        pCodigo.setCodigo(9901);
+        pCodigo.setRut("76.123.456-7");
+        pCodigo.setNombre("Planta Caldera Oficial");
+        pCodigo.setLatitud(-27.0667);
+        pCodigo.setLongitud(-70.8206);
+        pCodigo.setFuenteCoordenada("SERNAPESCA_2026_10");
+
+        com.trazalga.api.models.PlantaModel pSinCoords = new com.trazalga.api.models.PlantaModel();
+        pSinCoords.setId(502L);
+        pSinCoords.setCodigo(9902);
+        pSinCoords.setRut("76.123.456-7");
+        pSinCoords.setNombre("Planta Sin Coords");
+
+        com.trazalga.api.models.PlantaModel pUnicoRut = new com.trazalga.api.models.PlantaModel();
+        pUnicoRut.setId(503L);
+        pUnicoRut.setCodigo(9903);
+        pUnicoRut.setRut("76555444-3");
+        pUnicoRut.setNombre("Planta Unico Rut");
+        pUnicoRut.setLatitud(-29.9500);
+        pUnicoRut.setLongitud(-71.3400);
+
+        com.trazalga.api.models.PlantaModel pMultiA = new com.trazalga.api.models.PlantaModel();
+        pMultiA.setId(504L);
+        pMultiA.setCodigo(9904);
+        pMultiA.setRut("76.999.888-k");
+        pMultiA.setNombre("Planta Norte");
+        pMultiA.setLatitud(-25.4000);
+        pMultiA.setLongitud(-70.4800);
+        pMultiA.setFuenteCoordenada("MANUAL");
+
+        com.trazalga.api.models.PlantaModel pMultiB = new com.trazalga.api.models.PlantaModel();
+        pMultiB.setId(505L);
+        pMultiB.setCodigo(9905);
+        pMultiB.setRut("76999888-K");
+        pMultiB.setNombre("Planta Sur");
+        pMultiB.setLatitud(-30.1000);
+        pMultiB.setLongitud(-71.4000);
+        pMultiB.setFuenteCoordenada("SEMILLA");
+
+        when(plantaRepo.findAll()).thenReturn(List.of(pCodigo, pSinCoords, pUnicoRut, pMultiA, pMultiB));
+        referenciaOrigenService.setPlantaRepository(plantaRepo);
+        referenciaOrigenService.invalidarCache();
+
+        // 1. Prioridad codigo_sernapesca == planta.codigo
+        PuntoReferencia refCod = referenciaOrigenService.resolverPlantaOficial(" 9901 ", "76123456-7", null);
+        assertNotNull(refCod);
+        assertEquals("PLANTA", refCod.getTipo());
+        assertEquals(501L, refCod.getId());
+        assertEquals(-27.0667, refCod.getLat(), 0.0001);
+        assertEquals("SERNAPESCA_2026_10", refCod.getFuente());
+
+        // 2. Si el codigo matched corresponde a planta sin coords, no salta a otro registro del mismo RUT
+        assertNull(referenciaOrigenService.resolverPlantaOficial("9902", "76.123.456-7", null));
+
+        // 3. Fallback por RUT único normalizado y fuente por defecto MAESTRO_PLANTA
+        PuntoReferencia refRut = referenciaOrigenService.resolverPlantaOficial(null, "76.555.444-3", null);
+        assertNotNull(refRut);
+        assertEquals(503L, refRut.getId());
+        assertEquals("MAESTRO_PLANTA", refRut.getFuente());
+
+        // 4. RUT compartido entre plantas: nulo sin desambiguar, resuelto si coincide nombrePlanta normalizado
+        assertNull(referenciaOrigenService.resolverPlantaOficial(null, "76.999.888-k", null));
+        PuntoReferencia refDesamb = referenciaOrigenService.resolverPlantaOficial(null, "76.999.888-k", "  planta   sur ");
+        assertNotNull(refDesamb);
+        assertEquals(505L, refDesamb.getId());
+        assertEquals("SEMILLA", refDesamb.getFuente());
+    }
 }

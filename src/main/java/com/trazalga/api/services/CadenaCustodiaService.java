@@ -612,8 +612,12 @@ public class CadenaCustodiaService {
                 BigDecimal rendFinalPct = getCol(r, 57) != null ? new BigDecimal(getCol(r, 57).toString()) : null;
 
                 PuntoReferencia puntoRef = null;
-                if (referenciaOrigenService != null && ReferenciaOrigenService.esEslabonOrigen(tipoStr)) {
-                    puntoRef = referenciaOrigenService.resolverPorIds(tipoStr, caletaId, amerbId, varaderoId, varNom, comunaId);
+                if (referenciaOrigenService != null) {
+                    if (ReferenciaOrigenService.esEslabonOrigen(tipoStr)) {
+                        puntoRef = referenciaOrigenService.resolverPorIds(tipoStr, caletaId, amerbId, varaderoId, varNom, comunaId);
+                    } else if ("PLANTA_ABASTECIMIENTO".equals(tipoStr)) {
+                        puntoRef = referenciaOrigenService.resolverPlantaOficial(codSerna, rut, calNom);
+                    }
                 }
                 GeoDeclaracionDTO geoDto = ReferenciaOrigenService.construirGeoDeclaracion(
                         tipoStr, lat, lon, precisionGpsM, gpsCapturadoEn, envioOffline, puntoRef, umbralKm, precisionMaxM);

@@ -156,6 +156,14 @@ public class FichaTrazabilidadService {
         return null;
     }
 
+    private PuntoReferencia resolverRefPlanta(DeclaracionPlantaAbastecimientoModel p) {
+        if (p == null || referenciaOrigenService == null) {
+            return null;
+        }
+        String rut = p.getUsuario() != null ? p.getUsuario().getRut() : null;
+        return referenciaOrigenService.resolverPlantaOficial(p.getCodigoSernapesca(), rut, p.getNombrePlanta());
+    }
+
     /**
      * Construye la ficha completa de trazabilidad a partir del tipo e ID de cualquier eslabón.
      *
@@ -566,8 +574,9 @@ public class FichaTrazabilidadService {
         }
 
         DeclaracionPlantaAbastecimientoModel p = opt.get();
+        PuntoReferencia refPlanta = resolverRefPlanta(p);
         GeoDeclaracionDTO geo = ReferenciaOrigenService.construirGeoDeclaracion(
-                "PLANTA_ABASTECIMIENTO", p.getLatitud(), p.getLongitud(), null, null, false, null, umbralKm, precisionMaxM);
+                "PLANTA_ABASTECIMIENTO", p.getLatitud(), p.getLongitud(), null, null, false, refPlanta, umbralKm, precisionMaxM);
 
         boolean conRomana = p.getPesoRomanaKg() != null && p.getPesoRomanaKg().compareTo(BigDecimal.ZERO) > 0;
         double pesoPlanta = conRomana
