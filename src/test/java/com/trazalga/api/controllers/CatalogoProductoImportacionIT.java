@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -162,6 +163,21 @@ class CatalogoProductoImportacionIT extends IntegracionBase {
                 .andExpect(jsonPath("$.sinCambio").value(19))
                 .andExpect(jsonPath("$.recursos").value(3))
                 .andExpect(jsonPath("$.porRevisar").value(0));
+
+        // 4. QF.5 / QF.8: GET /producto?especieId= devuelve 9 (huiro palo), 6 (huiro negro) y 4 (huiro)
+        mockMvc.perform(get("/producto").param("especieId", huiroPalo.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(9)))
+                .andExpect(jsonPath("$[?(@.codigo=='47954')].presentacion", contains("PELLET")))
+                .andExpect(jsonPath("$[?(@.codigo=='47954')].calibre", contains(nullValue())));
+
+        mockMvc.perform(get("/producto").param("especieId", huiroNegro.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(6)));
+
+        mockMvc.perform(get("/producto").param("especieId", huiro.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)));
     }
 
     @Test
