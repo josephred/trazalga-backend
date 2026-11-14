@@ -218,4 +218,35 @@ public class SeguridadReportesHallazgosTest {
         mockMvc.perform(get("/usuario/all-usuarios"))
                 .andExpect(status().isOk());
     }
+
+    // 20. Derivar a citación por declaración con ROLE_USER -> 403 Forbidden (regresión PathPatternParser **/)
+    @Test
+    @WithMockUser(username = "pescador", roles = {"USER"})
+    @DisplayName("Seguridad: PUT /api/declaracion-marcas/declaracion/ARMADOR/1/derivar-citacion con ROLE_USER devuelve 403 Forbidden")
+    void testDerivarCitacionPorDeclaracion_ConRoleUser_Retorna403() throws Exception {
+        mockMvc.perform(put("/api/declaracion-marcas/declaracion/ARMADOR/1/derivar-citacion")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCitacion\":\"CIT-001\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    // 21. Derivar a citación por declaración con FISCALIZADOR -> 200 OK
+    @Test
+    @WithMockUser(username = "fiscalizador", roles = {"FISCALIZADOR"})
+    @DisplayName("Seguridad: PUT /api/declaracion-marcas/declaracion/ARMADOR/1/derivar-citacion con FISCALIZADOR devuelve 200 OK")
+    void testDerivarCitacionPorDeclaracion_ConFiscalizador_Retorna200() throws Exception {
+        DeclaracionMarcaModel marca = DeclaracionMarcaModel.builder()
+                .id(10L)
+                .declaracionTipo("ARMADOR")
+                .declaracionId(1L)
+                .marca("LED_EXCEDIDO")
+                .build();
+        when(declaracionMarcaService.derivarACitacionPorDeclaracion("ARMADOR", 1L, "CIT-001", null))
+                .thenReturn(marca);
+
+        mockMvc.perform(put("/api/declaracion-marcas/declaracion/ARMADOR/1/derivar-citacion")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCitacion\":\"CIT-001\"}"))
+                .andExpect(status().isOk());
+    }
 }

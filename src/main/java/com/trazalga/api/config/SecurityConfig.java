@@ -111,21 +111,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, 
                                 "/api/declaracion-marcas/*/resolver", 
                                 "/declaracion-marcas/*/resolver", 
-                                "/declaracionmarca/*/resolver",
-                                "/api/declaracion-marcas/**/resolver").hasAnyRole("ADMIN", "FISCALIZADOR")
+                                "/declaracionmarca/*/resolver").hasAnyRole("ADMIN", "FISCALIZADOR")
                         .requestMatchers(HttpMethod.PUT, 
                                 "/api/declaracion-marcas/*/derivar-citacion", 
                                 "/declaracion-marcas/*/derivar-citacion", 
                                 "/declaracionmarca/*/derivar-citacion",
-                                "/api/declaracion-marcas/**/derivar-citacion",
-                                "/api/declaracion-marcas/declaracion/**/derivar-citacion",
-                                "/declaracion-marcas/declaracion/**/derivar-citacion",
-                                "/declaracionmarca/declaracion/**/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
+                                "/api/declaracion-marcas/declaracion/*/*/derivar-citacion",
+                                "/declaracion-marcas/declaracion/*/*/derivar-citacion",
+                                "/declaracionmarca/declaracion/*/*/derivar-citacion").hasAnyRole("ADMIN", "FISCALIZADOR")
                         .requestMatchers(HttpMethod.PUT, 
                                 "/api/declaracion-marcas/*/reabrir", 
                                 "/declaracion-marcas/*/reabrir", 
-                                "/declaracionmarca/*/reabrir",
-                                "/api/declaracion-marcas/**/reabrir").hasAnyRole("ADMIN", "FISCALIZADOR")
+                                "/declaracionmarca/*/reabrir").hasAnyRole("ADMIN", "FISCALIZADOR")
 
                         // 9. Consulta de marcas: ADMINISTRADOR, FISCALIZADOR o AUDITOR (TX.1)
                         .requestMatchers(HttpMethod.GET, 
