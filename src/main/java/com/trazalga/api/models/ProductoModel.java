@@ -24,11 +24,17 @@ public class ProductoModel {
     @Column(unique = true, length = 30)
     private String codigo;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = 150)
     private String nombre;
 
     @Column(nullable = true)
     private String descripcion;
+
+    @Column(length = 60)
+    private String presentacion;
+
+    @Column(length = 40)
+    private String calibre;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "humedad_estado_id")

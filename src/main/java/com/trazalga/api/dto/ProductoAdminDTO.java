@@ -16,6 +16,8 @@ public class ProductoAdminDTO {
     private String codigo;
     private String nombre;
     private String descripcion;
+    private String presentacion;
+    private String calibre;
     private Long humedadEstadoId;
     private String humedadEstadoNombre;
     private Long especieId;
@@ -35,6 +37,8 @@ public class ProductoAdminDTO {
         private String codigo;
         private String nombre;
         private String descripcion;
+        private String presentacion;
+        private String calibre;
         private Long humedadEstadoId;
         private Long especieId;
         private Boolean activo;

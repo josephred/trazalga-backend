@@ -109,6 +109,9 @@ public class ProductoAdminService {
             throw new IllegalArgumentException("El nombre del formato es obligatorio.");
         }
         String nombre = req.getNombre().trim();
+        if (nombre.length() > 150) {
+            throw new IllegalArgumentException("El nombre del formato no puede superar 150 caracteres.");
+        }
         Optional<ProductoModel> porNombre = productoRepository.findByNombreIgnoreCase(nombre);
         if (porNombre.isPresent() && !porNombre.get().getId().equals(selfId)) {
             throw new IllegalStateException("Ya existe un formato de producto con el nombre '" + nombre + "'.");
@@ -137,15 +140,32 @@ public class ProductoAdminService {
                     .orElseThrow(() -> new IllegalArgumentException("Especie no encontrada: " + req.getEspecieId()));
         }
 
+        String presentacion = trimOrNull(req.getPresentacion(), 60);
+        String calibre = trimOrNull(req.getCalibre(), 40);
+
         model.setCodigo(codigo);
         model.setNombre(nombre);
         model.setDescripcion(req.getDescripcion() != null ? req.getDescripcion().trim() : null);
+        model.setPresentacion(presentacion);
+        model.setCalibre(calibre);
         model.setHumedadEstado(humedad);
         model.setEspecie(especie);
         model.setActivo(req.getActivo() != null ? req.getActivo() : true);
-        model.setFuente(req.getFuente() != null && !req.getFuente().isBlank() ? req.getFuente().trim() : "LOCAL");
+        model.setFuente(req.getFuente() != null && !req.getFuente().isBlank() ? trimMax(req.getFuente().trim(), 60) : "LOCAL");
         model.setActualizadoEn(LocalDateTime.now());
         model.setActualizadoPor(normalizarUsuario(usuario));
+    }
+
+    private static String trimOrNull(String val, int maxLen) {
+        if (val == null) return null;
+        String t = val.trim();
+        if (t.isEmpty()) return null;
+        return t.length() > maxLen ? t.substring(0, maxLen) : t;
+    }
+
+    private static String trimMax(String val, int maxLen) {
+        if (val == null) return null;
+        return val.length() > maxLen ? val.substring(0, maxLen) : val;
     }
 
     private static String normalizarUsuario(String usuario) {
@@ -170,6 +190,8 @@ public class ProductoAdminService {
                 .codigo(p.getCodigo())
                 .nombre(p.getNombre())
                 .descripcion(p.getDescripcion())
+                .presentacion(p.getPresentacion())
+                .calibre(p.getCalibre())
                 .humedadEstadoId(p.getHumedadEstado() != null ? p.getHumedadEstado().getId() : null)
                 .humedadEstadoNombre(p.getHumedadEstado() != null ? p.getHumedadEstado().getNombre() : null)
                 .especieId(p.getEspecie() != null ? p.getEspecie().getId() : null)

@@ -27,6 +27,9 @@ public class EspecieModel {
     @Column
     private String nombre;
 
+    @Column(name = "codigo_sernapesca", unique = true, length = 30)
+    private String codigoSernapesca;
+
     @Column
     private String descripcion;
 

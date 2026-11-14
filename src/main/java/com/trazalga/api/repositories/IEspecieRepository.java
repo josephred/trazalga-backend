@@ -14,5 +14,7 @@ public interface IEspecieRepository extends JpaRepository<EspecieModel, Long> {
 
     java.util.Optional<EspecieModel> findByNombreIgnoreCase(String nombre);
 
+    java.util.Optional<EspecieModel> findByCodigoSernapescaIgnoreCase(String codigoSernapesca);
+
     java.util.List<EspecieModel> findByNombreContainingIgnoreCase(String nombre);
 }
