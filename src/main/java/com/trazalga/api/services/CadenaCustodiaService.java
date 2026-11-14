@@ -396,11 +396,11 @@ public class CadenaCustodiaService {
                              "LEFT JOIN extraccion_tipo ext ON d.extraccion_tipo_id = ext.id " +
                              "LEFT JOIN extraccion_tipo exti ON d.extraccion_tipo_imputacion_id = exti.id ";
                 extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
-                            "d.codigo_sernapesca as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
+                            "COALESCE(d.codigo_sernapesca_embarcacion, d.codigo_sernapesca_buzo) as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
                             "NULL as var_nom, ext.nombre as ext_nom, d.latitud as lat, d.longitud as lon, " +
-                            "d.estado as est, CAST(d.humedad AS CHAR) as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "d.estado as est, NULL as hum_higro, NULL as n_dest_dir, " +
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
-                            "COALESCE(emb.nombre, d.embarcacion_nombre) as emb_nom, COALESCE(buz.nombre, d.buzo_nombre) as buzo_nom, " +
+                            "emb.nombre as emb_nom, buz.nombre as buzo_nom, " +
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "d.caleta_id, NULL as amerb_id, NULL as varadero_id, COALESCE(cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
                                "d.precision_gps_m, d.gps_capturado_en, d.envio_offline, d.fecha_extraccion, exti.nombre as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
@@ -417,9 +417,9 @@ public class CadenaCustodiaService {
                              "LEFT JOIN region reg ON com.region_id = reg.id " +
                              "LEFT JOIN extraccion_tipo exti ON d.extraccion_tipo_imputacion_id = exti.id ";
                 extraCols = "d.especie_id, e.nombre as esp_nom, d.humedad_estado_id, he.nombre as hum_nom, " +
-                            "d.codigo_sernapesca as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
+                            "d.codigo_sernapesca_amerb as cod_serna, cal.nombre as cal_nom, com.nombre as com_nom, reg.nombre as reg_nom, " +
                             "COALESCE(am.nombre, d.codigo_sernapesca_amerb) as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
-                            "'ENVIADA' as est, NULL as hum_higro, d.nombre_destinatario as n_dest_dir, " +
+                            "'ENVIADA' as est, NULL as hum_higro, NULL as n_dest_dir, " +
                             "NULL as vehiculo, NULL as pat, NULL as pat_carro, NULL as chofer_nom, NULL as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "d.caleta_id, d.amerb_id, NULL as varadero_id, COALESCE(am.comuna_id, cal.comuna_id, u.comuna_id) as geo_comuna_id, " +
@@ -472,7 +472,7 @@ public class CadenaCustodiaService {
                 roleName = "Planta Producción";
                 amountCol = "cantidad_producto";
                 dateCol = "fecha_produccion";
-                folioCol = "folio_declaracion_p_pla";
+                folioCol = "folio_declaracion_ppla";
                 hasSeleccionadas = true;
                 extraJoins = "LEFT JOIN especie e ON d.materia_prima_especie_id = e.id " +
                              "LEFT JOIN humedad_estado he ON d.humedad_estado_id = he.id " +
@@ -502,7 +502,7 @@ public class CadenaCustodiaService {
                             "d.codigo_sernapesca as cod_serna, d.nombre_planta as cal_nom, NULL as com_nom, NULL as reg_nom, " +
                             "prod.nombre as var_nom, NULL as ext_nom, d.latitud as lat, d.longitud as lon, " +
                             "d.estado as est, CAST(d.humedad_higrometro AS CHAR) as hum_higro, d.nombre_destino as n_dest_dir, " +
-                            "d.vehiculo_transporte as vehiculo, COALESCE(d.placa_patente, d.patente) as pat, d.placa_patente_carro as pat_carro, " +
+                            "d.vehiculo_transporte as vehiculo, d.placa_patente as pat, d.placa_patente_carro as pat_carro, " +
                             "d.chofer_transporte as chofer_nom, d.rut_chofer as chofer_rut, " +
                             "NULL as emb_nom, NULL as buzo_nom, " +
                             "COALESCE(d.documento_tributario_origen_tipo, d.documento_tributario_tipo) as dt_tipo, " +

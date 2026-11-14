@@ -3,15 +3,22 @@ package com.trazalga.api.services.indicadores;
 import com.trazalga.api.exceptions.ValidacionPlantaException;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.FactorConversionModel;
 import com.trazalga.api.models.HumedadEstadoModel;
 import com.trazalga.api.models.ProductoModel;
 import com.trazalga.api.models.RendimientoRangoModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IDeclaracionAreaRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
+import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
+import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.repositories.IProductoRepository;
 import com.trazalga.api.repositories.IRendimientoRangoRepository;
+import com.trazalga.api.services.CadenaCustodiaService;
 import com.trazalga.api.services.ConfiguracionGeneralService;
 import com.trazalga.api.services.FactorConversionService;
 import com.trazalga.api.services.hallazgos.CriterioHallazgo;
@@ -266,6 +273,216 @@ class RendimientoPlantaServiceTest {
         verify(hallazgoService).registrar(
                 eq("PLANTA_PRODUCCION"), eq(7L), eq("PRODUCCION_SIN_LOTES"), eq("SIN_LOTES"),
                 any(CriterioHallazgo.class), anyString(), eq("VALIDACION"), eq(99L), isNull());
+    }
+
+    @Test
+    @DisplayName("QR.6: bajo CAPTURA_ORIGEN dos lotes calculan rendimiento final sobre captura y preservan rendimiento de proceso")
+    void qr6_dosLotesSobreCapturaOrigen_calculaRendimientoFinalYPreservaProceso() {
+        when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("CAPTURA_ORIGEN");
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        DeclaracionPlantaAbastecimientoModel lote1 = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(11L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("4500")).build();
+        DeclaracionPlantaAbastecimientoModel lote2 = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(12L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("5500")).build();
+
+        DeclaracionPlantaProduccionModel decl = DeclaracionPlantaProduccionModel.builder()
+                .id(100L).folioDeclaracionPpla("PPLA-QR6-1").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-14"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("2500")).build();
+
+        CapturaOrigenProduccion.ResultadoCapturaOrigen cap = new CapturaOrigenProduccion.ResultadoCapturaOrigen(
+                new BigDecimal("10000.00"), true, 2, List.of("RECOLECTOR:1", "ARMADOR:2"), null);
+
+        RendimientoPlantaService.ResultadoRendimiento res = service.evaluarYActualizar(
+                decl, List.of(lote1, lote2), cap, new java.util.Date());
+
+        assertEquals(RendimientoPlantaService.BASE_CAPTURA_ORIGEN, res.baseAplicada());
+        assertEquals(RendimientoPlantaService.FUENTE_FACTORES_ORIGEN, res.fuente());
+        assertEquals(new BigDecimal("10000.00"), decl.getCapturaOrigenKg());
+        assertTrue(Boolean.TRUE.equals(decl.getCapturaOrigenCompleta()));
+        assertEquals(new BigDecimal("25.00"), decl.getRendimientoPct());
+        assertEquals(new BigDecimal("25.00"), decl.getRendimientoFinalPct());
+        assertEquals(new BigDecimal("27.93"), res.rendimientoMaxTeoricoPct());
+        assertFalse(res.anomalo());
+    }
+
+    @Test
+    @DisplayName("QR.6: CapturaOrigenProduccion real colaborando con RendimientoPlantaService deduplica origen compartido")
+    void qr6_origenCompartidoViaCapturaOrigenReal_seCuentaUnaSolaVez() {
+        when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("CAPTURA_ORIGEN");
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        CadenaCustodiaService cadenaMock = mock(CadenaCustodiaService.class);
+        IDeclaracionRecolectorRepository recRepo = mock(IDeclaracionRecolectorRepository.class);
+        IDeclaracionArmadorRepository armRepo = mock(IDeclaracionArmadorRepository.class);
+        IDeclaracionAreaRepository areaRepo = mock(IDeclaracionAreaRepository.class);
+        IDeclaracionComercializadorRepository comRepo = mock(IDeclaracionComercializadorRepository.class);
+
+        CapturaOrigenProduccion capturaOrigenReal = new CapturaOrigenProduccion(
+                cadenaMock, recRepo, armRepo, areaRepo, comRepo);
+        RendimientoPlantaService serviceConOrigen = new RendimientoPlantaService(
+                abastecimientoRepository, rendimientoRangoRepository, factorConversionService,
+                configService, productoRepository, hallazgoService, capturaOrigenReal);
+
+        DeclaracionPlantaAbastecimientoModel loteDirecto = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(201L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("5000"))
+                .declaracionesSeleccionadas("RECOLECTOR:501,ARMADOR:502").build();
+        DeclaracionPlantaAbastecimientoModel loteCom = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(202L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("5000"))
+                .declaracionesSeleccionadas("COMERCIALIZADOR:601").build();
+
+        when(cadenaMock.resolver("PLANTA_ABASTECIMIENTO", 201L)).thenReturn(
+                CadenaCustodiaService.Cadena.builder()
+                        .origenes(List.of(
+                                CadenaCustodiaService.OrigenRef.builder().tipo("RECOLECTOR").id(501L).build(),
+                                CadenaCustodiaService.OrigenRef.builder().tipo("ARMADOR").id(502L).build()))
+                        .build());
+        when(cadenaMock.resolver("PLANTA_ABASTECIMIENTO", 202L)).thenReturn(
+                CadenaCustodiaService.Cadena.builder()
+                        .origenes(List.of(
+                                CadenaCustodiaService.OrigenRef.builder().tipo("RECOLECTOR").id(501L).build()))
+                        .build());
+        when(recRepo.findAllById(java.util.Set.of(501L))).thenReturn(List.of(
+                DeclaracionRecolectorModel.builder().id(501L).captura(new BigDecimal("6000.00")).build()));
+        when(armRepo.findAllById(java.util.Set.of(502L))).thenReturn(List.of(
+                DeclaracionArmadorModel.builder().id(502L).captura(4000.0).build()));
+
+        DeclaracionPlantaProduccionModel decl = DeclaracionPlantaProduccionModel.builder()
+                .id(101L).folioDeclaracionPpla("PPLA-QR6-2").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-14"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("2500")).build();
+
+        RendimientoPlantaService.ResultadoRendimiento res = serviceConOrigen.evaluarYActualizar(
+                decl, List.of(loteDirecto, loteCom), new java.util.Date());
+
+        assertEquals(new BigDecimal("10000.00"), decl.getCapturaOrigenKg());
+        assertTrue(Boolean.TRUE.equals(decl.getCapturaOrigenCompleta()));
+        assertEquals(new BigDecimal("25.00"), decl.getRendimientoFinalPct());
+        assertFalse(res.anomalo());
+    }
+
+    @Test
+    @DisplayName("QR.6: factor Seco 3.58 (27.93% max, 29.33% tolerado) detecta anomalía sobre captura origen aunque proceso sea normal")
+    void qr6_secoFactor35800_anomaloSobreCapturaOrigenAunqueProcesoNormal() {
+        when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("CAPTURA_ORIGEN");
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        // Lote con masa en planta 12000 kg -> 3000/12000 = 25.00% en proceso, pero 3000/10000 = 30.00% sobre origen (> 29.33%)
+        DeclaracionPlantaAbastecimientoModel lote = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(13L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("12000")).build();
+        DeclaracionPlantaProduccionModel decl = DeclaracionPlantaProduccionModel.builder()
+                .id(102L).folioDeclaracionPpla("PPLA-QR6-3").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-14"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("3000")).build();
+
+        CapturaOrigenProduccion.ResultadoCapturaOrigen cap = new CapturaOrigenProduccion.ResultadoCapturaOrigen(
+                new BigDecimal("10000.00"), true, 1, List.of("RECOLECTOR:99"), null);
+
+        RendimientoPlantaService.ResultadoRendimiento res = service.evaluarYActualizar(
+                decl, List.of(lote), cap, new java.util.Date());
+
+        assertTrue(res.anomalo());
+        assertEquals("EXCESO", res.tipoAnomalia());
+        assertEquals(RendimientoPlantaService.BASE_CAPTURA_ORIGEN, res.baseAplicada());
+        assertEquals(RendimientoPlantaService.FUENTE_FACTORES_ORIGEN, res.fuente());
+        assertEquals(new BigDecimal("25.00"), res.rendimientoPct());
+        assertEquals(new BigDecimal("30.00"), res.rendimientoFinalPct());
+        assertEquals(new BigDecimal("27.93"), res.rendimientoMaxTeoricoPct());
+        assertEquals("29.33", res.umbralCriterio());
+        assertTrue(res.detalleAnomalia().contains("captura biológica de origen"));
+
+        service.registrarHallazgosPostGuardado(decl, res);
+        verify(hallazgoService).registrar(
+                eq("PLANTA_PRODUCCION"), eq(102L), eq("RENDIMIENTO_ANOMALO"), eq("EXCESO"),
+                any(CriterioHallazgo.class), contains("captura biológica de origen"),
+                eq("VALIDACION"), eq(99L), isNull());
+    }
+
+    @Test
+    @DisplayName("QR.6: aislamiento por base en rendimiento_rango ignora rango MASA_RECIBIDA bajo CAPTURA_ORIGEN y aplica rango CAPTURA_ORIGEN si existe")
+    void qr6_rendimientoRangoAisladoPorBase_ignoraMasaRecibidaEnCapturaOrigen() {
+        when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("CAPTURA_ORIGEN");
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        RendimientoRangoModel rangoMasa = RendimientoRangoModel.builder()
+                .id(70L).base("MASA_RECIBIDA").especie(pelillo).humedadEntrada(humHumedo).producto(prodSeco)
+                .maxPct(new BigDecimal("40.00")).activo(true).vigenciaInicio(Date.valueOf("2026-01-01")).build();
+        lenient().when(rendimientoRangoRepository.findVigentePorBase(eq(1L), eq(1L), eq(10L), eq("MASA_RECIBIDA"), any()))
+                .thenReturn(Optional.of(rangoMasa));
+
+        DeclaracionPlantaAbastecimientoModel lote = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(14L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("10000")).build();
+        DeclaracionPlantaProduccionModel decl = DeclaracionPlantaProduccionModel.builder()
+                .id(103L).folioDeclaracionPpla("PPLA-QR6-4").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-14"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("3000")).build();
+        CapturaOrigenProduccion.ResultadoCapturaOrigen cap = new CapturaOrigenProduccion.ResultadoCapturaOrigen(
+                new BigDecimal("10000.00"), true, 1, List.of("RECOLECTOR:1"), null);
+
+        // Sin rango CAPTURA_ORIGEN -> ignora el rango de MASA_RECIBIDA (40%) y cae a FACTORES_ORIGEN (27.93%) => anómalo
+        RendimientoPlantaService.ResultadoRendimiento sinRangoOrigen = service.evaluarYActualizar(
+                decl, List.of(lote), cap, new java.util.Date());
+        assertEquals(RendimientoPlantaService.FUENTE_FACTORES_ORIGEN, sinRangoOrigen.fuente());
+        assertTrue(sinRangoOrigen.anomalo());
+
+        // Con rango CAPTURA_ORIGEN (max 35%) -> usa TABLA_ORIGEN => 30.00% normal
+        RendimientoRangoModel rangoOrigen = RendimientoRangoModel.builder()
+                .id(71L).base("CAPTURA_ORIGEN").especie(pelillo).humedadEntrada(humHumedo).producto(prodSeco)
+                .minPct(new BigDecimal("20.00")).maxPct(new BigDecimal("35.00")).activo(true)
+                .vigenciaInicio(Date.valueOf("2026-01-01")).build();
+        when(rendimientoRangoRepository.findVigentePorBase(eq(1L), eq(1L), eq(10L), eq("CAPTURA_ORIGEN"), any()))
+                .thenReturn(Optional.of(rangoOrigen));
+
+        RendimientoPlantaService.ResultadoRendimiento conRangoOrigen = service.evaluarYActualizar(
+                decl, List.of(lote), cap, new java.util.Date());
+        assertEquals(RendimientoPlantaService.FUENTE_TABLA_ORIGEN, conRangoOrigen.fuente());
+        assertEquals(new BigDecimal("35.00"), conRangoOrigen.rendimientoMaxTeoricoPct());
+        assertFalse(conRangoOrigen.anomalo());
+    }
+
+    @Test
+    @DisplayName("QR.6: cadena incompleta respalda en MASA_RECIBIDA (RESPALDO_MASA_FACTORES) y no emite marca de cadena incompleta")
+    void qr6_cadenaIncompleta_respaldaEnMasaRecibidaYSinMarcaCadenaIncompleta() {
+        when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("CAPTURA_ORIGEN");
+        when(factorConversionService.findFactorVigente(eq(1L), eq(1L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("1.00"))));
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        DeclaracionPlantaAbastecimientoModel lote = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(15L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("10000")).build();
+        DeclaracionPlantaProduccionModel decl = DeclaracionPlantaProduccionModel.builder()
+                .id(104L).folioDeclaracionPpla("PPLA-QR6-5").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-14"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("2500")).build();
+
+        CapturaOrigenProduccion.ResultadoCapturaOrigen capIncompleta = new CapturaOrigenProduccion.ResultadoCapturaOrigen(
+                new BigDecimal("4000.00"), false, 1, List.of("RECOLECTOR:1"),
+                CapturaOrigenProduccion.MOTIVO_LOTE_SIN_ORIGENES);
+
+        RendimientoPlantaService.ResultadoRendimiento res = service.evaluarYActualizar(
+                decl, List.of(lote), capIncompleta, new java.util.Date());
+
+        assertFalse(Boolean.TRUE.equals(decl.getCapturaOrigenCompleta()));
+        assertEquals(new BigDecimal("4000.00"), decl.getCapturaOrigenKg());
+        assertEquals(new BigDecimal("62.50"), decl.getRendimientoFinalPct());
+        assertEquals(new BigDecimal("25.00"), decl.getRendimientoPct());
+        assertEquals(RendimientoPlantaService.BASE_MASA_RECIBIDA, res.baseAplicada());
+        assertEquals(RendimientoPlantaService.FUENTE_RESPALDO_FACTORES, res.fuente());
+        assertFalse(res.anomalo());
+
+        service.registrarHallazgosPostGuardado(decl, res);
+        verifyNoInteractions(hallazgoService);
     }
 }
 
