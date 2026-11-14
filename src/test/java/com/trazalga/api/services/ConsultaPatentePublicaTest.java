@@ -234,10 +234,94 @@ public class ConsultaPatentePublicaTest {
         verify(mockChain, times(20)).doFilter(mockReq, mockRes);
     }
 
+    @Test
+    @DisplayName("QC.2: consulta_publica_muestra_comuna=false omite comunaDestino incluso cuando está AUTORIZADO")
+    void testAutorizado_OcultaComunaSiParametroFalse() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_AUTORIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 9, 25, 14, 30, 0))
+                .comunaDestino("Coquimbo")
+                .tipoAlga("Lessonia trabeculata")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
+        when(configService.getValor(eq("consulta_publica_muestra_comuna"), anyString())).thenReturn("false");
+        when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
+
+        Map<String, Object> map = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 0, 0));
+
+        assertEquals("AUTORIZADO", map.get("resultado"));
+        assertFalse(map.containsKey("comunaDestino"), "comunaDestino debe omitirse si consulta_publica_muestra_comuna=false");
+        Set<String> esperadoSinComuna = new java.util.HashSet<>(WHITELIST_AUTORIZADO);
+        esperadoSinComuna.remove("comunaDestino");
+        assertEquals(esperadoSinComuna, map.keySet());
+        verificarAusenciaDatosPersonales(map);
+    }
+
+    @Test
+    @DisplayName("QC.2: AUTORIZADO nunca expone fonoDenuncia ni whatsappDenuncia aunque estén configurados")
+    void testAutorizado_NuncaExponeDenunciaAunqueConfigurados() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_AUTORIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 9, 25, 14, 30, 0))
+                .comunaDestino("Coquimbo")
+                .tipoAlga("Alga parda")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
+        lenient().when(configService.getValor(eq("consulta_publica_fono_denuncia"), anyString())).thenReturn("800123456");
+        lenient().when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("56911112222");
+        when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
+
+        Map<String, Object> map = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 0, 0));
+
+        assertFalse(map.containsKey("fonoDenuncia"));
+        assertFalse(map.containsKey("whatsappDenuncia"));
+        assertEquals(WHITELIST_AUTORIZADO, map.keySet());
+        verificarAusenciaDatosPersonales(map);
+    }
+
+    @Test
+    @DisplayName("QC.2: SIN_AUTORIZACION_VIGENTE agrega fonoDenuncia y whatsappDenuncia solo cuando no están vacíos manteniendo lista blanca")
+    void testSinAutorizacion_IncluyeDenunciaSoloSiNoVacios() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("ABCD12")
+                .estado(EstadoTrasladoPatente.ESTADO_VENCIDO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
+        when(configService.getValor(eq("consulta_publica_fono_denuncia"), anyString())).thenReturn(" +56 800 111 222 ");
+        when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("56911112222");
+        when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
+
+        Map<String, Object> mapAmbos = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 0, 0));
+        assertEquals("+56 800 111 222", mapAmbos.get("fonoDenuncia"));
+        assertEquals("56911112222", mapAmbos.get("whatsappDenuncia"));
+        Set<String> esperadoAmbos = new java.util.HashSet<>(WHITELIST_SIN_AUTORIZACION);
+        esperadoAmbos.add("fonoDenuncia");
+        esperadoAmbos.add("whatsappDenuncia");
+        assertEquals(esperadoAmbos, mapAmbos.keySet());
+        verificarAusenciaDatosPersonales(mapAmbos);
+
+        when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("   ");
+        Map<String, Object> mapSoloFono = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 1, 0));
+        assertTrue(mapSoloFono.containsKey("fonoDenuncia"));
+        assertFalse(mapSoloFono.containsKey("whatsappDenuncia"));
+    }
+
     private void verificarAusenciaDatosPersonales(Map<String, Object> map) {
         List<String> camposProhibidos = List.of(
                 "rut", "rutChofer", "chofer", "choferTransporte", "nombreComercializador",
-                "usuarioId", "folio", "kg", "kilos", "destino", "comunaOrigen", "planta", "valor"
+                "usuarioId", "folio", "kg", "kilos", "destino", "comunaOrigen", "planta", "valor",
+                "ipHash", "ip_hash"
         );
         for (String campo : camposProhibidos) {
             assertFalse(map.containsKey(campo), "La respuesta pública NO debe contener '" + campo + "'");
