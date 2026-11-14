@@ -72,7 +72,9 @@ class RendimientoPlantaServiceTest {
         lenient().when(configService.getBoolean("rendimiento_activo", true)).thenReturn(true);
         lenient().when(configService.getDouble("rendimiento_tolerancia_pct", 5.0)).thenReturn(5.0);
         lenient().when(configService.getValor("rendimiento_min_pct", "")).thenReturn("");
+        lenient().when(configService.getValor(eq("rendimiento_base"), anyString())).thenReturn("MASA_RECIBIDA");
         lenient().when(rendimientoRangoRepository.findVigente(anyLong(), anyLong(), anyLong(), any())).thenReturn(Optional.empty());
+        lenient().when(rendimientoRangoRepository.findVigentePorBase(anyLong(), anyLong(), anyLong(), anyString(), any())).thenReturn(Optional.empty());
     }
 
     private FactorConversionModel factor(BigDecimal f) {
@@ -172,7 +174,7 @@ class RendimientoPlantaServiceTest {
                 .minPct(new BigDecimal("20.00")).maxPct(new BigDecimal("28.00")).activo(true)
                 .vigenciaInicio(Date.valueOf("2026-01-01"))
                 .build();
-        when(rendimientoRangoRepository.findVigente(eq(1L), eq(1L), eq(10L), any())).thenReturn(Optional.of(rangoTabla));
+        when(rendimientoRangoRepository.findVigentePorBase(eq(1L), eq(1L), eq(10L), eq("MASA_RECIBIDA"), any())).thenReturn(Optional.of(rangoTabla));
         when(factorConversionService.findFactorVigente(eq(1L), eq(1L), any())).thenReturn(Optional.of(factor(new BigDecimal("1.00"))));
         when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any())).thenReturn(Optional.of(factor(new BigDecimal("2.50")))); // daría 40% en factores
 
@@ -224,7 +226,7 @@ class RendimientoPlantaServiceTest {
                 .id(60L).especie(pelillo).humedadEntrada(humHumedo).producto(prodSeco)
                 .maxPct(new BigDecimal("30.00")).activo(true).vigenciaInicio(Date.valueOf("2026-01-01"))
                 .build();
-        when(rendimientoRangoRepository.findVigente(eq(1L), eq(1L), eq(10L), any())).thenReturn(Optional.of(rango));
+        when(rendimientoRangoRepository.findVigentePorBase(eq(1L), eq(1L), eq(10L), eq("MASA_RECIBIDA"), any())).thenReturn(Optional.of(rango));
 
         DeclaracionPlantaAbastecimientoModel lote = DeclaracionPlantaAbastecimientoModel.builder()
                 .id(20L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("10000")).build();

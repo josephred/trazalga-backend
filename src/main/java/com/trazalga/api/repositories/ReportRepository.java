@@ -4018,12 +4018,18 @@ public class ReportRepository {
     }
 
     /**
-     * Métricas y detalle de rendimiento en planta de proceso (NP.7).
+     * Métricas y detalle de rendimiento en planta de proceso (NP.7 / QR.3 / QR.5).
      */
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
         boolean rendimientoActivo = configuracionGeneralService == null || configuracionGeneralService.getBoolean("rendimiento_activo", true);
         double toleranciaPct = configuracionGeneralService != null ? configuracionGeneralService.getDouble("rendimiento_tolerancia_pct", 5.0) : 5.0;
+        String rendimientoBaseRaw = configuracionGeneralService != null
+                ? configuracionGeneralService.getValor("rendimiento_base", com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN)
+                : com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN;
+        String rendimientoBase = com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA.equalsIgnoreCase(rendimientoBaseRaw)
+                ? com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA
+                : com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN;
 
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT d.id, d.usuario_id, ");
@@ -4034,6 +4040,7 @@ public class ReportRepository {
         sql.append("d.producto_resultante_id, COALESCE(prod.codigo, ''), COALESCE(prod.nombre, ''), ");
         sql.append("d.cantidad_materia_prima, d.cantidad_producto, ");
         sql.append("d.rendimiento_pct, d.rendimiento_max_teorico_pct, d.rendimiento_fuente, d.rendimiento_evaluado_en, ");
+        sql.append("d.captura_origen_kg, d.captura_origen_completa, d.rendimiento_final_pct, ");
         sql.append("COALESCE(d.estado, 'ENVIADA'), ");
         sql.append("CASE WHEN EXISTS (SELECT 1 FROM declaracion_marca dm WHERE dm.declaracion_tipo = 'PLANTA_PRODUCCION' AND dm.declaracion_id = d.id AND dm.marca = 'RENDIMIENTO_ANOMALO' AND COALESCE(dm.resuelta, 0) = 0) THEN 1 ELSE 0 END AS tiene_marca_anomala ");
         sql.append("FROM declaracion_planta_produccion d ");
@@ -4076,6 +4083,7 @@ public class ReportRepository {
         long normales = 0;
         long anomalas = 0;
         long sinReferencia = 0;
+        long cadenasIncompletas = 0;
 
         for (Object[] r : rows) {
             Long id = r[0] != null ? ((Number) r[0]).longValue() : null;
@@ -4097,12 +4105,28 @@ public class ReportRepository {
             Double maxTeoricoPct = r[15] != null ? ((Number) r[15]).doubleValue() : null;
             String fuente = r[16] != null ? r[16].toString() : null;
             Date evaluadoEn = toReportDate(r[17]);
-            String estado = r[18] != null ? r[18].toString() : "ENVIADA";
-            boolean tieneMarca = r[19] != null && ((Number) r[19]).intValue() > 0;
+            Double capturaOrigenKg = r[18] != null ? ((Number) r[18]).doubleValue() : null;
+            Boolean capturaOrigenCompleta = null;
+            if (r[19] instanceof Boolean b) {
+                capturaOrigenCompleta = b;
+            } else if (r[19] instanceof Number num) {
+                capturaOrigenCompleta = num.intValue() != 0;
+            } else if (r[19] != null) {
+                capturaOrigenCompleta = Boolean.parseBoolean(r[19].toString());
+            }
+            Double rendimientoFinalPct = r[20] != null ? ((Number) r[20]).doubleValue() : null;
+            String estado = r[21] != null ? r[21].toString() : "ENVIADA";
+            boolean tieneMarca = r[22] != null && ((Number) r[22]).intValue() > 0;
 
-            boolean sinRef = fuente == null || "SIN_REFERENCIA".equalsIgnoreCase(fuente) || rendimientoPct == null;
+            boolean evaluadaPorOrigen = com.trazalga.api.services.indicadores.RendimientoPlantaService.esFuenteCapturaOrigen(fuente);
+            Double rendimientoEvaluado = evaluadaPorOrigen ? rendimientoFinalPct : rendimientoPct;
+            if (Boolean.FALSE.equals(capturaOrigenCompleta)) {
+                cadenasIncompletas++;
+            }
+
+            boolean sinRef = fuente == null || "SIN_REFERENCIA".equalsIgnoreCase(fuente) || rendimientoEvaluado == null;
             boolean esAnomalo = tieneMarca || (!sinRef && maxTeoricoPct != null && maxTeoricoPct > 0.0
-                    && rendimientoPct > maxTeoricoPct * (1.0 + toleranciaPct / 100.0) + 1e-6);
+                    && rendimientoEvaluado > maxTeoricoPct * (1.0 + toleranciaPct / 100.0) + 1e-6);
 
             if (esAnomalo) {
                 anomalas++;
@@ -4126,7 +4150,11 @@ public class ReportRepository {
             item.put("productoNombre", prodNombre);
             item.put("masaEntradaKg", masaEntrada);
             item.put("masaProductoKg", masaProducto);
+            item.put("capturaOrigenKg", capturaOrigenKg);
+            item.put("capturaOrigenCompleta", capturaOrigenCompleta);
             item.put("rendimientoPct", rendimientoPct);
+            item.put("rendimientoFinalPct", rendimientoFinalPct);
+            item.put("evaluadoSobreOrigen", evaluadaPorOrigen);
             item.put("rendimientoMaxTeoricoPct", maxTeoricoPct);
             item.put("rendimientoFuente", fuente);
             item.put("rendimientoEvaluadoEn", evaluadoEn);
@@ -4148,12 +4176,23 @@ public class ReportRepository {
                 m.put("producciones", 0L);
                 m.put("masaEntradaKg", 0.0);
                 m.put("masaProductoKg", 0.0);
+                m.put("capturaOrigenKg", 0.0);
+                m.put("capturaCompletaProdKg", 0.0);
+                m.put("capturaCompletaCapKg", 0.0);
+                m.put("cadenasIncompletas", 0L);
                 m.put("anomalas", 0L);
                 return m;
             });
             grp.put("producciones", ((Number) grp.get("producciones")).longValue() + 1L);
             grp.put("masaEntradaKg", ((Number) grp.get("masaEntradaKg")).doubleValue() + (masaEntrada != null ? masaEntrada : 0.0));
             grp.put("masaProductoKg", ((Number) grp.get("masaProductoKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
+            if (Boolean.TRUE.equals(capturaOrigenCompleta) && capturaOrigenKg != null && capturaOrigenKg > 0.0) {
+                grp.put("capturaOrigenKg", ((Number) grp.get("capturaOrigenKg")).doubleValue() + capturaOrigenKg);
+                grp.put("capturaCompletaCapKg", ((Number) grp.get("capturaCompletaCapKg")).doubleValue() + capturaOrigenKg);
+                grp.put("capturaCompletaProdKg", ((Number) grp.get("capturaCompletaProdKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
+            } else {
+                grp.put("cadenasIncompletas", ((Number) grp.get("cadenasIncompletas")).longValue() + 1L);
+            }
             if (esAnomalo) {
                 grp.put("anomalas", ((Number) grp.get("anomalas")).longValue() + 1L);
             }
@@ -4163,10 +4202,16 @@ public class ReportRepository {
         for (java.util.Map<String, Object> grp : porGrupo.values()) {
             double ent = ((Number) grp.get("masaEntradaKg")).doubleValue();
             double prod = ((Number) grp.get("masaProductoKg")).doubleValue();
+            double capComp = ((Number) grp.remove("capturaCompletaCapKg")).doubleValue();
+            double prodComp = ((Number) grp.remove("capturaCompletaProdKg")).doubleValue();
+            double capSum = ((Number) grp.get("capturaOrigenKg")).doubleValue();
             Double rendProm = ent > 0.0 ? Math.round((prod / ent * 100.0) * 100.0) / 100.0 : null;
+            Double rendFinalProm = capComp > 0.0 ? Math.round((prodComp / capComp * 100.0) * 100.0) / 100.0 : null;
             grp.put("masaEntradaKg", Math.round(ent * 100.0) / 100.0);
             grp.put("masaProductoKg", Math.round(prod * 100.0) / 100.0);
+            grp.put("capturaOrigenKg", Math.round(capSum * 100.0) / 100.0);
             grp.put("rendimientoPromedioPct", rendProm);
+            grp.put("rendimientoFinalPromedioPct", rendFinalProm);
             porPlantaFormato.add(grp);
         }
 
@@ -4175,8 +4220,10 @@ public class ReportRepository {
         resumen.put("normales", normales);
         resumen.put("anomalas", anomalas);
         resumen.put("sinReferencia", sinReferencia);
+        resumen.put("cadenasIncompletas", cadenasIncompletas);
         resumen.put("rendimientoActivo", rendimientoActivo);
         resumen.put("toleranciaPct", toleranciaPct);
+        resumen.put("rendimientoBase", rendimientoBase);
 
         java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
         resp.put("resumen", resumen);

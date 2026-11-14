@@ -152,8 +152,9 @@ public class ConfiguracionGeneralService {
         createIfNotExist("produccion_exige_formato_oficial", "false", "Exige seleccionar un formato de producto activo con código oficial Sernapesca en Producción y Destino (NF.4)", "CADENA");
         createIfNotExist("variacion_peso_alerta_equivalente", "false", "Usa la variación equivalente en captura para disparar alertas de peso cuando cambia la humedad", "CADENA");
 
-        // PARTE P — RENDIMIENTO EN PLANTA (NP.4, NP.6)
+        // PARTE P — RENDIMIENTO EN PLANTA (NP.4, NP.6, QR.3)
         createIfNotExist("rendimiento_activo", "true", "Habilita el cálculo y detección de rendimiento anómalo en declaraciones de producción (NP.4)", "CADENA");
+        createIfNotExist("rendimiento_base", "CAPTURA_ORIGEN", "Base de evaluación del rendimiento en planta: CAPTURA_ORIGEN (recomendada, con respaldo a MASA_RECIBIDA si la cadena está incompleta) o MASA_RECIBIDA (QR.3 / D34)", "CADENA");
         createIfNotExist("rendimiento_tolerancia_pct", "5", "Tolerancia porcentual sobre el rendimiento máximo teórico en planta antes de alertar (NP.4)", "CADENA");
         createIfNotExist("rendimiento_min_pct", "", "Rendimiento mínimo esperado global en planta (%). Vacío = no evaluar piso global salvo tabla (NP.4)", "CADENA");
         createIfNotExist("marcas_bloqueantes_produccion", "RENDIMIENTO_ANOMALO", "Marcas que retienen e impiden despachar declaraciones de producción (NP.6 / D32)", "CADENA");

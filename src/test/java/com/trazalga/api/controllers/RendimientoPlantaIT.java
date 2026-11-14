@@ -174,7 +174,8 @@ class RendimientoPlantaIT extends IntegracionBase {
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.cantidadMateriaPrima").value(10000.0))
                 .andExpect(jsonPath("$.rendimientoPct").value(31.0))
-                .andExpect(jsonPath("$.rendimientoFuente").value("FACTORES"))
+                .andExpect(jsonPath("$.rendimientoFuente").value("RESPALDO_MASA_FACTORES"))
+                .andExpect(jsonPath("$.capturaOrigenCompleta").value(false))
                 .andExpect(jsonPath("$.bloqueada").value(false))
                 .andReturn();
 
