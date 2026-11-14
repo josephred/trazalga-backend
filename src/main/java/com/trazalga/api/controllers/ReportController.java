@@ -1193,4 +1193,12 @@ public class ReportController {
             @RequestParam(required = false) Long especieId) {
         return ResponseEntity.ok(reportService.getRendimientoPlanta(startDate, endDate, plantaId, especieId));
     }
+
+    @GetMapping("/consultas-ciudadanas")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getConsultasCiudadanas(
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
+        return ResponseEntity.ok(reportService.getConsultasCiudadanas(startDate, endDate));
+    }
 }

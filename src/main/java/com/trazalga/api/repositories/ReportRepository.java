@@ -4231,5 +4231,157 @@ public class ReportRepository {
         resp.put("detalle", detalle);
         return resp;
     }
+
+    // =========================================================================
+    // CONSULTAS CIUDADANAS DE PATENTES — BANDEJA DE FISCALIZACIÓN (QC.4 / D39)
+    // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    public java.util.Map<String, Object> getConsultasCiudadanas(Date startDate, Date endDate) {
+        String rawAnomalos = configuracionGeneralService != null
+                ? configuracionGeneralService.getValor("consulta_ciudadana_resultados_anomalos", "VENCIDO,SIN_REGISTROS,RETENIDO")
+                : "VENCIDO,SIN_REGISTROS,RETENIDO";
+        if (rawAnomalos == null || rawAnomalos.isBlank()) {
+            rawAnomalos = "VENCIDO,SIN_REGISTROS,RETENIDO";
+        }
+        List<String> resultadosAnomalos = java.util.Arrays.stream(rawAnomalos.split(","))
+                .map(s -> s != null ? s.trim().toUpperCase(java.util.Locale.ROOT) : "")
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+
+        java.sql.Timestamp inicioTs = startDate != null
+                ? java.sql.Timestamp.from(com.trazalga.api.services.fechas.FechaSql.diaLocal(startDate)
+                        .atStartOfDay(com.trazalga.api.ApiApplication.ZONA_CHILE)
+                        .toInstant())
+                : null;
+        java.sql.Timestamp finExclusivoTs = endDate != null
+                ? java.sql.Timestamp.from(com.trazalga.api.services.fechas.FechaSql.diaLocal(endDate)
+                        .plusDays(1)
+                        .atStartOfDay(com.trazalga.api.ApiApplication.ZONA_CHILE)
+                        .toInstant())
+                : null;
+
+        java.util.Map<String, Long> totalesPorResultado = new java.util.LinkedHashMap<>();
+        for (String rBase : List.of("AUTORIZADO", "RETENIDO", "FINALIZADO", "VENCIDO", "SIN_REGISTROS")) {
+            totalesPorResultado.put(rBase, 0L);
+        }
+
+        StringBuilder sqlTot = new StringBuilder();
+        sqlTot.append("SELECT l.resultado, COUNT(*) AS total ");
+        sqlTot.append("FROM consulta_patente_log l ");
+        sqlTot.append("WHERE 1=1 ");
+        if (inicioTs != null) {
+            sqlTot.append("AND l.fecha >= :inicioTs ");
+        }
+        if (finExclusivoTs != null) {
+            sqlTot.append("AND l.fecha < :finExclusivoTs ");
+        }
+        sqlTot.append("GROUP BY l.resultado ORDER BY l.resultado");
+
+        Query qTot = entityManager.createNativeQuery(sqlTot.toString());
+        if (inicioTs != null) qTot.setParameter("inicioTs", inicioTs);
+        if (finExclusivoTs != null) qTot.setParameter("finExclusivoTs", finExclusivoTs);
+
+        long totalConsultas = 0L;
+        for (Object[] row : (List<Object[]>) qTot.getResultList()) {
+            String res = row[0] != null ? row[0].toString().trim().toUpperCase(java.util.Locale.ROOT) : "OTRO";
+            long count = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+            totalesPorResultado.merge(res, count, Long::sum);
+            totalConsultas += count;
+        }
+
+        long totalAnomalas = 0L;
+        for (String anom : resultadosAnomalos) {
+            totalAnomalas += totalesPorResultado.getOrDefault(anom, 0L);
+        }
+
+        List<java.util.Map<String, Object>> patentesAnomalas = new java.util.ArrayList<>();
+        if (!resultadosAnomalos.isEmpty()) {
+            StringBuilder sqlPat = new StringBuilder();
+            sqlPat.append("SELECT l.patente, ");
+            sqlPat.append("       COUNT(*) AS consultas, ");
+            sqlPat.append("       MIN(l.fecha) AS primera_consulta, ");
+            sqlPat.append("       MAX(l.fecha) AS ultima_consulta, ");
+            sqlPat.append("       COUNT(DISTINCT l.ip_hash) AS origenes_distintos, ");
+            sqlPat.append("       (SELECT l2.resultado ");
+            sqlPat.append("        FROM consulta_patente_log l2 ");
+            sqlPat.append("        WHERE l2.patente = l.patente ");
+            sqlPat.append("          AND l2.resultado IN (:anomalos) ");
+            if (inicioTs != null) {
+                sqlPat.append("          AND l2.fecha >= :inicioTs ");
+            }
+            if (finExclusivoTs != null) {
+                sqlPat.append("          AND l2.fecha < :finExclusivoTs ");
+            }
+            sqlPat.append("        ORDER BY l2.fecha DESC, l2.id DESC ");
+            sqlPat.append("        LIMIT 1) AS ultimo_resultado ");
+            sqlPat.append("FROM consulta_patente_log l ");
+            sqlPat.append("WHERE l.resultado IN (:anomalos) ");
+            if (inicioTs != null) {
+                sqlPat.append("AND l.fecha >= :inicioTs ");
+            }
+            if (finExclusivoTs != null) {
+                sqlPat.append("AND l.fecha < :finExclusivoTs ");
+            }
+            sqlPat.append("GROUP BY l.patente ");
+            sqlPat.append("ORDER BY consultas DESC, ultima_consulta DESC");
+
+            Query qPat = entityManager.createNativeQuery(sqlPat.toString());
+            qPat.setParameter("anomalos", resultadosAnomalos);
+            if (inicioTs != null) qPat.setParameter("inicioTs", inicioTs);
+            if (finExclusivoTs != null) qPat.setParameter("finExclusivoTs", finExclusivoTs);
+
+            for (Object[] row : (List<Object[]>) qPat.getResultList()) {
+                java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("patente", row[0] != null ? row[0].toString() : "");
+                item.put("consultas", row[1] != null ? ((Number) row[1]).longValue() : 0L);
+                item.put("primeraConsulta", toIsoTimestamp(row[2]));
+                item.put("ultimaConsulta", toIsoTimestamp(row[3]));
+                item.put("origenesDistintos", row[4] != null ? ((Number) row[4]).longValue() : 0L);
+                item.put("ultimoResultado", row[5] != null ? row[5].toString() : "");
+                patentesAnomalas.add(item);
+            }
+        }
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("totalConsultas", totalConsultas);
+        resp.put("totalAnomalas", totalAnomalas);
+        resp.put("resultadosAnomalosConfigurados", resultadosAnomalos);
+        resp.put("totalesPorResultado", totalesPorResultado);
+        resp.put("patentesAnomalas", patentesAnomalas);
+        resp.put("startDate", startDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(startDate).toString() : null);
+        resp.put("endDate", endDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(endDate).toString() : null);
+        return resp;
+    }
+
+    private String toIsoTimestamp(Object o) {
+        if (o == null) return null;
+        java.time.Instant instant = null;
+        if (o instanceof java.sql.Timestamp ts) {
+            instant = ts.toInstant();
+        } else if (o instanceof java.time.Instant inst) {
+            instant = inst;
+        } else if (o instanceof java.time.LocalDateTime ldt) {
+            return ldt.atZone(com.trazalga.api.ApiApplication.ZONA_CHILE)
+                    .toOffsetDateTime()
+                    .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                    .format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } else if (o instanceof java.time.OffsetDateTime odt) {
+            return odt.atZoneSameInstant(com.trazalga.api.ApiApplication.ZONA_CHILE)
+                    .toOffsetDateTime()
+                    .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                    .format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } else if (o instanceof Date d) {
+            instant = d.toInstant();
+        }
+        if (instant != null) {
+            return instant.atZone(com.trazalga.api.ApiApplication.ZONA_CHILE)
+                    .toOffsetDateTime()
+                    .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                    .format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        }
+        return o.toString();
+    }
 }
 

@@ -30,5 +30,5 @@ public class ConsultaPatenteLogModel {
     private Date fecha;
 
     @Column(nullable = false, length = 20)
-    private String resultado; // VIGENTE | NO_VIGENTE | SIN_REGISTROS
+    private String resultado; // AUTORIZADO | RETENIDO | FINALIZADO | VENCIDO | SIN_REGISTROS
 }

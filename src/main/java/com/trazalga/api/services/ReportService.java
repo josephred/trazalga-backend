@@ -831,4 +831,13 @@ public class ReportService {
     public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
         return reportRepository.getRendimientoPlanta(startDate, endDate, plantaId, especieId);
     }
+
+    /**
+     * Resumen y bandeja de consultas ciudadanas de patentes (QC.4 / D39).
+     * Respeta exclusivamente los resultados anómalos configurados, nunca expone ip_hash y no crea marcas.
+     */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.Map<String, Object> getConsultasCiudadanas(Date startDate, Date endDate) {
+        return reportRepository.getConsultasCiudadanas(startDate, endDate);
+    }
 }
