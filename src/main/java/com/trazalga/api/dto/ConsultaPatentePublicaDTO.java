@@ -37,6 +37,8 @@ public class ConsultaPatentePublicaDTO {
     private String tipoAlga;
     private String texto;
     private String grafica;
+    private String fonoDenuncia;
+    private String whatsappDenuncia;
     private String consultadoEn;
 
     public Map<String, Object> toMap() {
@@ -52,6 +54,13 @@ public class ConsultaPatentePublicaDTO {
             }
             if (tipoAlga != null) {
                 map.put("tipoAlga", tipoAlga);
+            }
+        } else if ("SIN_AUTORIZACION_VIGENTE".equals(resultado)) {
+            if (fonoDenuncia != null && !fonoDenuncia.isBlank()) {
+                map.put("fonoDenuncia", fonoDenuncia.trim());
+            }
+            if (whatsappDenuncia != null && !whatsappDenuncia.isBlank()) {
+                map.put("whatsappDenuncia", whatsappDenuncia.trim());
             }
         }
         map.put("texto", texto != null ? texto : "");

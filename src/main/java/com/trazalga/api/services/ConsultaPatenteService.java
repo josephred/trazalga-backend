@@ -116,11 +116,33 @@ public class ConsultaPatenteService {
                 .consultadoEn(ahora.format(ISO_SEC));
 
         if (EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO.equals(resultadoPublico)) {
+            boolean muestraComuna = true;
+            if (configService != null) {
+                String valComuna = configService.getValor("consulta_publica_muestra_comuna", "true");
+                if (valComuna != null && !valComuna.isBlank()) {
+                    muestraComuna = Boolean.parseBoolean(valComuna.trim());
+                }
+            }
             builder.fechaHoraAutorizacion(ev.getFechaHoraAutorizacion() != null
                             ? ev.getFechaHoraAutorizacion().format(ISO_SEC)
                             : null)
-                    .comunaDestino(ev.getComunaDestino() != null ? ev.getComunaDestino() : "Comuna no informada")
                     .tipoAlga(ev.getTipoAlga() != null ? ev.getTipoAlga() : "Alga parda");
+            if (muestraComuna) {
+                builder.comunaDestino(ev.getComunaDestino() != null ? ev.getComunaDestino() : "Comuna no informada");
+            }
+        } else if (EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION.equals(resultadoPublico)) {
+            String fonoDenuncia = configService != null
+                    ? configService.getValor("consulta_publica_fono_denuncia", "")
+                    : "";
+            String whatsappDenuncia = configService != null
+                    ? configService.getValor("consulta_publica_whatsapp", "")
+                    : "";
+            if (fonoDenuncia != null && !fonoDenuncia.isBlank()) {
+                builder.fonoDenuncia(fonoDenuncia.trim());
+            }
+            if (whatsappDenuncia != null && !whatsappDenuncia.isBlank()) {
+                builder.whatsappDenuncia(whatsappDenuncia.trim());
+            }
         }
 
         registrarLog(patente, request, ev.getEstado() != null ? ev.getEstado() : resultadoPublico);
