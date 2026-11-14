@@ -7,11 +7,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -65,6 +70,35 @@ public class ProductoAdminController {
             return ResponseEntity.ok(service.cambiarActivo(id, activo, usuario));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", "VALIDACION_FORMATO", "message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/importar", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.TEXT_PLAIN_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE, "*/*"})
+    @Operation(summary = "Vista previa o carga masiva del catálogo oficial Sernapesca en CSV o XLSX (QF.3)")
+    public ResponseEntity<?> importar(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestBody(required = false) String csvBody,
+            @RequestParam(value = "aplicar", defaultValue = "false") boolean aplicar,
+            Authentication auth) {
+        try {
+            String usuario = auth != null ? auth.getName() : "ADMIN";
+            InputStream stream;
+            String nombreArchivo;
+            if (file != null && !file.isEmpty()) {
+                stream = file.getInputStream();
+                nombreArchivo = file.getOriginalFilename();
+            } else if (csvBody != null && !csvBody.isBlank()) {
+                stream = new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8));
+                nombreArchivo = "catalogo.csv";
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "IMPORTACION_CATALOGO", "message", "Debe adjuntar un archivo CSV o XLSX."));
+            }
+            return ResponseEntity.ok(service.importarCatalogo(stream, nombreArchivo, aplicar, usuario));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", "IMPORTACION_CATALOGO", "message", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "IMPORTACION_CATALOGO", "message", "Error al procesar el catálogo: " + ex.getMessage()));
         }
     }
 }
