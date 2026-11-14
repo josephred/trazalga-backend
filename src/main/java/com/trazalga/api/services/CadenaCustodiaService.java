@@ -486,7 +486,8 @@ public class CadenaCustodiaService {
                             "NULL as dt_tipo, NULL as dt_num, NULL as dt_fecha ";
                 geoExtraCols = "NULL as caleta_id, NULL as amerb_id, NULL as varadero_id, NULL as geo_comuna_id, " +
                                "NULL as precision_gps_m, NULL as gps_capturado_en, NULL as envio_offline, NULL as fecha_extraccion, NULL as ext_imp_nom, NULL as lugar_acopio, NULL as lote_interno, " +
-                               "d.cantidad_materia_prima as masa_entrada_kg, prod.codigo as prod_cod, d.rendimiento_pct as rend_pct, d.rendimiento_max_teorico_pct as rend_max, d.rendimiento_fuente as rend_fuente ";
+                               "d.cantidad_materia_prima as masa_entrada_kg, prod.codigo as prod_cod, d.rendimiento_pct as rend_pct, d.rendimiento_max_teorico_pct as rend_max, d.rendimiento_fuente as rend_fuente, " +
+                    "d.captura_origen_kg as cap_orig_kg, d.captura_origen_completa as cap_orig_comp, d.rendimiento_final_pct as rend_final_pct ";
                 break;
             case "PLANTA_DESTINO":
                 tableName = "declaracion_planta_destino";
@@ -598,6 +599,17 @@ public class CadenaCustodiaService {
                 BigDecimal rendPct = getCol(r, 52) != null ? new BigDecimal(getCol(r, 52).toString()) : null;
                 BigDecimal rendMax = getCol(r, 53) != null ? new BigDecimal(getCol(r, 53).toString()) : null;
                 String rendFuente = getCol(r, 54) != null ? getCol(r, 54).toString() : null;
+                BigDecimal capOrigKg = getCol(r, 55) != null ? new BigDecimal(getCol(r, 55).toString()) : null;
+                Boolean capOrigComp = null;
+                Object rawCapComp = getCol(r, 56);
+                if (rawCapComp instanceof Boolean b) {
+                    capOrigComp = b;
+                } else if (rawCapComp instanceof Number num) {
+                    capOrigComp = num.intValue() != 0;
+                } else if (rawCapComp != null) {
+                    capOrigComp = Boolean.parseBoolean(rawCapComp.toString());
+                }
+                BigDecimal rendFinalPct = getCol(r, 57) != null ? new BigDecimal(getCol(r, 57).toString()) : null;
 
                 PuntoReferencia puntoRef = null;
                 if (referenciaOrigenService != null && ReferenciaOrigenService.esEslabonOrigen(tipoStr)) {
@@ -653,6 +665,9 @@ public class CadenaCustodiaService {
                         .rendimientoPct(rendPct)
                         .rendimientoMaxTeoricoPct(rendMax)
                         .rendimientoFuente(rendFuente)
+                        .capturaOrigenKg(capOrigKg)
+                        .capturaOrigenCompleta(capOrigComp)
+                        .rendimientoFinalPct(rendFinalPct)
                         .geo(geoDto)
                         .build();
 

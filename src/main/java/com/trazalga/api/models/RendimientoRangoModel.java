@@ -53,6 +53,10 @@ public class RendimientoRangoModel {
     @Column(name = "vigencia_fin")
     private Date vigenciaFin;
 
+    @Column(name = "base", nullable = false, length = 20)
+    @Builder.Default
+    private String base = "MASA_RECIBIDA";
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;

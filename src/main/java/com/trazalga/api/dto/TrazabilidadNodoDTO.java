@@ -71,4 +71,9 @@ public class TrazabilidadNodoDTO {
     private BigDecimal rendimientoPct;
     private BigDecimal rendimientoMaxTeoricoPct;
     private String rendimientoFuente;
+
+    // QR.2: Captura biológica de origen y rendimiento final
+    private BigDecimal capturaOrigenKg;
+    private Boolean capturaOrigenCompleta;
+    private BigDecimal rendimientoFinalPct;
 }

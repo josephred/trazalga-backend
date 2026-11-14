@@ -30,9 +30,33 @@ public interface IRendimientoRangoRepository extends JpaRepository<RendimientoRa
             @Param("fecha") Date fecha
     );
 
+    @Query("""
+        SELECT r FROM RendimientoRangoModel r
+        WHERE r.especie.id = :especieId
+          AND r.humedadEntrada.id = :humedadEntradaId
+          AND r.producto.id = :productoId
+          AND r.base = :base
+          AND r.activo = true
+          AND r.vigenciaInicio <= :fecha
+          AND (r.vigenciaFin IS NULL OR r.vigenciaFin >= :fecha)
+        ORDER BY r.vigenciaInicio DESC, r.id DESC
+    """)
+    List<RendimientoRangoModel> findVigentesPorBase(
+            @Param("especieId") Long especieId,
+            @Param("humedadEntradaId") Long humedadEntradaId,
+            @Param("productoId") Long productoId,
+            @Param("base") String base,
+            @Param("fecha") Date fecha
+    );
+
+    default Optional<RendimientoRangoModel> findVigentePorBase(
+            Long especieId, Long humedadEntradaId, Long productoId, String base, Date fecha) {
+        List<RendimientoRangoModel> lista = findVigentesPorBase(especieId, humedadEntradaId, productoId, base, fecha);
+        return (lista != null && !lista.isEmpty()) ? Optional.of(lista.get(0)) : Optional.empty();
+    }
+
     default Optional<RendimientoRangoModel> findVigente(Long especieId, Long humedadEntradaId, Long productoId, Date fecha) {
-        List<RendimientoRangoModel> rows = findVigentes(especieId, humedadEntradaId, productoId, fecha);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+        return findVigentePorBase(especieId, humedadEntradaId, productoId, "MASA_RECIBIDA", fecha);
     }
 }
 

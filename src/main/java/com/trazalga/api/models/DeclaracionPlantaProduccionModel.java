@@ -96,12 +96,22 @@ public class DeclaracionPlantaProduccionModel {
     @Column(name = "rendimiento_max_teorico_pct", precision = 7, scale = 2)
     private BigDecimal rendimientoMaxTeoricoPct;
 
-    @Column(name = "rendimiento_fuente", length = 20)
+    @Column(name = "rendimiento_fuente", length = 40)
     private String rendimientoFuente;
 
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "rendimiento_evaluado_en")
     private Date rendimientoEvaluadoEn;
+
+    // --- Captura biológica de origen y rendimiento final (QR.2) ---
+    @Column(name = "captura_origen_kg", precision = 14, scale = 2)
+    private BigDecimal capturaOrigenKg;
+
+    @Column(name = "captura_origen_completa")
+    private Boolean capturaOrigenCompleta;
+
+    @Column(name = "rendimiento_final_pct", precision = 7, scale = 2)
+    private BigDecimal rendimientoFinalPct;
 
     // --- Documentos Tributarios (Origen y Destino) ---
     private String documentoTributarioOrigenTipo;
