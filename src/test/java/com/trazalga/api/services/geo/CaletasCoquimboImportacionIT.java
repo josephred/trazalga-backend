@@ -37,18 +37,24 @@ class CaletasCoquimboImportacionIT extends IntegracionBase {
     private static final String CSV_RESOURCE = "caletas_iv_region_importar.csv";
     private static final String FUENTE_ESPERADA = "Sernapesca - Trazalga_Caletas_IVRegion.xlt (13-11-2026)";
 
-    @Autowired private ImportarCoordenadasService importarCoordenadasService;
-    @Autowired private ICaletaRepository caletaRepository;
-    @Autowired private IComunaRepository comunaRepository;
-    @Autowired private IRegionRepository regionRepository;
-    @Autowired private ICoordenadaCambioLogRepository cambioLogRepository;
+    @Autowired
+    private ImportarCoordenadasService importarCoordenadasService;
+    @Autowired
+    private ICaletaRepository caletaRepository;
+    @Autowired
+    private IComunaRepository comunaRepository;
+    @Autowired
+    private IRegionRepository regionRepository;
+    @Autowired
+    private ICoordenadaCambioLogRepository cambioLogRepository;
 
     private final List<Long> caletasCreadasIds = new ArrayList<>();
     private final List<Long> comunasCreadasIds = new ArrayList<>();
     private RegionModel regionCoquimbo;
     private List<CsvRow> filasCsv;
 
-    private record CsvRow(String nombre, String comuna, double latitud, double longitud) {}
+    private record CsvRow(String nombre, String comuna, double latitud, double longitud) {
+    }
 
     @BeforeEach
     void setup() throws Exception {
@@ -206,14 +212,14 @@ class CaletasCoquimboImportacionIT extends IntegracionBase {
             assertNotNull(header);
             String line;
             while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
+                if (line.trim().isEmpty())
+                    continue;
                 String[] cols = line.split(";", -1);
                 rows.add(new CsvRow(
                         cols[2].trim(),
                         cols[3].trim(),
                         Double.parseDouble(cols[5].trim()),
-                        Double.parseDouble(cols[6].trim())
-                ));
+                        Double.parseDouble(cols[6].trim())));
             }
         }
         return rows;
