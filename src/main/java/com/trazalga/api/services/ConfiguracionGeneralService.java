@@ -159,6 +159,8 @@ public class ConfiguracionGeneralService {
         createIfNotExist("planta_exige_guia_adjunta", "false", "Exige adjuntar fotografía/PDF de la guía de despacho al recepcionar en planta (NA.4)", "CADENA");
         createIfNotExist("produccion_exige_formato_oficial", "false", "Exige seleccionar un formato de producto activo con código oficial Sernapesca en Producción y Destino (NF.4)", "CADENA");
         createIfNotExist("destino_exige_producciones", "true", "Exige seleccionar al menos una declaración de producción al crear o modificar un destino de planta (ZP.1)", "CADENA");
+        createIfNotExist("destino_tolerancia_pct", "1", "Tolerancia porcentual máxima permitida sobre la suma de kilos de las producciones seleccionadas en un destino de planta (ZP.2 / D56)", "CADENA");
+        createIfNotExist("destino_exige_mismo_formato", "true", "Exige que el formato del destino coincida con el formato de las producciones seleccionadas (ZP.2 / D56)", "CADENA");
         createIfNotExist("variacion_peso_alerta_equivalente", "false", "Usa la variación equivalente en captura para disparar alertas de peso cuando cambia la humedad", "CADENA");
 
         // PARTE P — RENDIMIENTO EN PLANTA (NP.4, NP.6, QR.3)

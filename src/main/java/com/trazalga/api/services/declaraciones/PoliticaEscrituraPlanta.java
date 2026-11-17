@@ -1,5 +1,7 @@
 package com.trazalga.api.services.declaraciones;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -17,6 +19,8 @@ import com.trazalga.api.exceptions.ValidacionPlantaException;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
+import com.trazalga.api.models.EspecieModel;
+import com.trazalga.api.models.ProductoModel;
 import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
@@ -175,6 +179,67 @@ public class PoliticaEscrituraPlanta {
                 throw conflicto("La producción " + folio + " está retenida por " + b.getMarca()
                         + " (hallazgo #" + b.getMarcaId() + ") hasta su fiscalización.");
             }
+        }
+    }
+
+    /**
+     * Valida cantidad, especie, formato y tolerancia de kilos de un destino frente a sus producciones (ZP.2 / D56).
+     */
+    @Transactional(readOnly = true)
+    public void validarContraProduccionesDeDestino(DeclaracionPlantaDestinoModel destino) {
+        if (destino == null || destino.getCantidad() == null
+                || destino.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidacionPlantaException("La cantidad declarada en el destino debe ser mayor a 0 kg.");
+        }
+        List<Long> ids = ids(destino.getDeclaracionesSeleccionadas(), PRODUCCION);
+        if (ids.isEmpty()) {
+            return;
+        }
+        Long especieDestinoId = destino.getEspecie() != null ? destino.getEspecie().getId() : null;
+        if (especieDestinoId == null) {
+            throw new ValidacionPlantaException("Debe seleccionar la especie del destino.");
+        }
+        boolean exigeMismoFormato = configService == null
+                || configService.getBoolean("destino_exige_mismo_formato", true);
+        Long productoDestinoId = destino.getProducto() != null ? destino.getProducto().getId() : null;
+        if (exigeMismoFormato && productoDestinoId == null) {
+            throw new ValidacionPlantaException("Debe seleccionar el formato de producto del destino.");
+        }
+
+        List<DeclaracionPlantaProduccionModel> producciones = produccionRepository.findAllById(ids);
+        BigDecimal sumaProducida = BigDecimal.ZERO;
+        for (DeclaracionPlantaProduccionModel p : producciones) {
+            String folio = p.getFolioDeclaracionPpla() != null ? p.getFolioDeclaracionPpla() : "#" + p.getId();
+            EspecieModel espProd = p.getMateriaPrimaEspecie();
+            if (espProd == null || !especieDestinoId.equals(espProd.getId())) {
+                String nombreEsp = espProd != null ? espProd.getNombre() : "sin especie";
+                throw new ValidacionPlantaException("La especie del destino no coincide con la de la producción "
+                        + folio + " (" + nombreEsp + ").");
+            }
+            if (exigeMismoFormato) {
+                ProductoModel fmtProd = p.getProductoResultante();
+                if (fmtProd == null || !productoDestinoId.equals(fmtProd.getId())) {
+                    String nombreFmt = fmtProd != null ? fmtProd.getNombre() : "sin formato";
+                    throw new ValidacionPlantaException("El formato del destino no coincide con el de la producción "
+                            + folio + " (" + nombreFmt + ").");
+                }
+            }
+            if (p.getCantidadProducto() != null) {
+                sumaProducida = sumaProducida.add(p.getCantidadProducto());
+            }
+        }
+
+        double toleranciaPct = configService != null
+                ? Math.max(0.0, configService.getDouble("destino_tolerancia_pct", 1.0))
+                : 1.0;
+        BigDecimal factor = BigDecimal.ONE.add(
+                BigDecimal.valueOf(toleranciaPct).divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP));
+        BigDecimal maxPermitido = sumaProducida.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+        if (destino.getCantidad().compareTo(maxPermitido) > 0) {
+            throw new ValidacionPlantaException("La cantidad del destino (" + destino.getCantidad().toPlainString()
+                    + " kg) supera el máximo permitido de " + maxPermitido.toPlainString()
+                    + " kg según las producciones seleccionadas (suma " + sumaProducida.toPlainString()
+                    + " kg, tolerancia " + BigDecimal.valueOf(toleranciaPct).stripTrailingZeros().toPlainString() + " %).");
         }
     }
 

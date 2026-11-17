@@ -116,6 +116,9 @@ public class DeclaracionPlantaDestinoService {
         if (productoAdminService != null) {
             productoAdminService.validarFormatoParaDeclaracion(declaracion.getProducto());
         }
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.validarContraProduccionesDeDestino(declaracion);
+        }
 
         if (declaracion.getFolioDeclaracionDestino() == null || declaracion.getFolioDeclaracionDestino().isEmpty()) {
             declaracion.setFolioDeclaracionDestino(generarFolioDestino());
@@ -173,6 +176,12 @@ public class DeclaracionPlantaDestinoService {
             politicaEscrituraPlanta.verificarProduccionesDeDestino(
                     model.getUsuario() != null ? model.getUsuario().getId() : null,
                     request.getDeclaracionesSeleccionadas(), id);
+        }
+        if (productoAdminService != null) {
+            productoAdminService.validarFormatoParaDeclaracion(request.getProducto());
+        }
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.validarContraProduccionesDeDestino(request);
         }
 
         model.setFolioOrigen(request.getFolioOrigen());
