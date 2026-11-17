@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.trazalga.api.dto.MotivoBloqueoDTO;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
@@ -21,6 +22,7 @@ import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
 import com.trazalga.api.services.BloqueoCargaService;
+import com.trazalga.api.services.ConfiguracionGeneralService;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
 
 /**
@@ -48,6 +50,7 @@ public class PoliticaEscrituraPlanta {
     @Autowired private IDeclaracionPlantaProduccionRepository produccionRepository;
     @Autowired private IDeclaracionPlantaDestinoRepository destinoRepository;
     @Autowired private BloqueoCargaService bloqueoCargaService;
+    @Autowired(required = false) private ConfiguracionGeneralService configService;
 
     // ------------------------------------------------------------------ sesión y dueño
 
@@ -142,6 +145,9 @@ public class PoliticaEscrituraPlanta {
     public void verificarProduccionesDeDestino(Long plantaUsuarioId, String seleccion, Long destinoId) {
         List<Long> ids = ids(seleccion, PRODUCCION);
         if (ids.isEmpty()) {
+            if (configService == null || configService.getBoolean("destino_exige_producciones", true)) {
+                throw new ValidacionPlantaException("Debe seleccionar al menos una producción.");
+            }
             return;
         }
         Map<Long, DeclaracionPlantaProduccionModel> porId = new java.util.HashMap<>();

@@ -228,18 +228,21 @@ class ProductoFormatoIT extends IntegracionBase {
                 .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"));
 
         // Formato activo con código -> 200/201 OK
-        mockMvc.perform(post("/declaracionplantaproduccion")
+        String resProdOk = mockMvc.perform(post("/declaracionplantaproduccion")
                         .with(user(planta.getRut()).roles("PLANTA"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(baseProd + "\"productoResultante\":{\"id\":" + activoConCodigo.getId() + "}}"))
-                .andExpect(status().is2xxSuccessful());
+                .andExpect(status().is2xxSuccessful())
+                .andReturn().getResponse().getContentAsString();
+        long prodOkId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(resProdOk).get("id").asLong();
 
-        // Destino con formato sin código -> 422
+        // Destino con formato sin código -> 422 (lleva producción seleccionada para llegar a validar formato)
         String destInvalido = "{\"folioOrigen\":\"P-PLA-1\",\"fechaDeclaracionDestino\":\"2026-11-12\",\"fechaTrasladoDestino\":\"2026-11-12\","
                 + "\"hora\":\"10:00\",\"nombrePlanta\":\"Planta Formatos\",\"codigoSernapesca\":\"PL-FMT\","
                 + "\"usuario\":{\"id\":" + planta.getId() + "},"
                 + "\"especie\":{\"id\":" + especiePelillo.getId() + "},"
                 + "\"producto\":{\"id\":" + activoSinCodigo.getId() + "},"
+                + "\"declaracionesSeleccionadas\":\"PLANTA_PRODUCCION:" + prodOkId + "\","
                 + "\"cantidad\":40,\"nombreDestino\":\"Cliente\",\"rutDestino\":\"88.888.888-8\","
                 + "\"documentoTributarioTipo\":\"GUIA\",\"documentoTributarioNumero\":\"G-2\"}";
         mockMvc.perform(post("/api/declaracion-planta-destino")

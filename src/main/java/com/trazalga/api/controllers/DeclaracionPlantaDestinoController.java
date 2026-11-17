@@ -1,9 +1,11 @@
 package com.trazalga.api.controllers;
 
+import com.trazalga.api.exceptions.ValidacionPlantaException;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
 import com.trazalga.api.services.DeclaracionPlantaDestinoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -50,6 +52,8 @@ public class DeclaracionPlantaDestinoController {
         try {
             DeclaracionPlantaDestinoModel updated = service.updateById(declaracion, id);
             return ResponseEntity.ok(updated);
+        } catch (ValidacionPlantaException | ResponseStatusException e) {
+            throw e;
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -65,6 +69,8 @@ public class DeclaracionPlantaDestinoController {
                 com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta.DESTINO, id);
         try {
             return ResponseEntity.ok(service.deleteById(id));
+        } catch (ValidacionPlantaException | ResponseStatusException e) {
+            throw e;
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(false);
         }

@@ -193,7 +193,11 @@ class PlantaEscrituraIT extends IntegracionBase {
     @DisplayName("Abastecimiento y destino: la sesión de otra planta tampoco los modifica ni elimina (403)")
     void abastecimientoYDestino_sesionDeOtraPlanta_403() throws Exception {
         DeclaracionPlantaAbastecimientoModel a = abastecimiento(plantaA, "DAPLA-NP0-403");
-        DeclaracionPlantaDestinoModel d = destinoService.save(destino(plantaA, null));
+        DeclaracionPlantaAbastecimientoModel loteProd = abastecimiento(plantaA, "DAPLA-NP0-403-P");
+        DeclaracionPlantaProduccionModel prodPropia = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + loteProd.getId()));
+        DeclaracionPlantaDestinoModel d = destinoService.save(
+                destino(plantaA, "PLANTA_PRODUCCION:" + prodPropia.getId()));
 
         mockMvc.perform(put("/api/declaracion-planta-abastecimiento/" + a.getId()).with(user(RUT_PLANTA_B).roles("USER"))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
