@@ -54,10 +54,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -617,5 +627,242 @@ class FlujosOrigenDestinoIT extends IntegracionBase {
                 .andReturn();
         JsonNode jsonDest1Post = objectMapper.readTree(resDest1PostImp.getResponse().getContentAsString());
         assertEquals(2, jsonDest1Post.path("declaraciones").size());
+    }
+
+    @Test
+    @DisplayName("ZE.4: Exportacion Excel SIG (4 hojas, campos <=10 chars, celdas numericas, seguridad 403) y ejemplo")
+    void exportarFlujosExcelSigYSeguridad() throws Exception {
+        mockMvc.perform(get("/api/reportes/flujos-origen-destino/exportar"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/reportes/flujos-origen-destino/exportar").with(user("pescador").roles("USER")))
+                .andExpect(status().isForbidden());
+
+        RegionModel regCoq = regionRepo.saveAndFlush(RegionModel.builder().nombre("Coquimbo ZE4").codigo("04E").build());
+        ProvinciaModel provCoq = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("Elqui ZE4").region(regCoq).build());
+        ComunaModel comCoq = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("Coquimbo Com ZE4").region(regCoq).provincia(provCoq).build());
+
+        CaletaModel calConCoords = caletaRepo.saveAndFlush(CaletaModel.builder()
+                .nombre("Caleta Chungungo ZE4").region(regCoq).comuna(comCoq)
+                .latitud(-29.4511).longitud(-71.3146).fuenteCoordenada("MAESTRO").build());
+        CaletaModel calSinCoords = caletaRepo.saveAndFlush(CaletaModel.builder()
+                .nombre("Caleta Sin Coord ZE4").region(regCoq).comuna(comCoq).build());
+
+        EspecieModel esp = especieRepo.saveAndFlush(EspecieModel.builder().nombre("Huiro Negro ZE4").activo(true).build());
+        HumedadEstadoModel hum = humedadRepo.saveAndFlush(HumedadEstadoModel.builder().nombre("Humedo ZE4").rangoInicio(60).rangoFin(85).build());
+        ExtraccionTipoModel metodo = extraccionTipoRepo.saveAndFlush(ExtraccionTipoModel.builder().nombre("Barreteado ZE4").build());
+
+        UsuarioModel uRec = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("81.111.111-1").nombres("Rec").apellidop("ZE4").comuna(comCoq).estado("ACTIVO").build());
+        UsuarioModel uCom = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("82.222.222-2").nombres("Com").apellidop("ZE4").comuna(comCoq).estado("ACTIVO").build());
+        UsuarioModel uPla = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("83.333.333-3").nombres("Planta").apellidop("ZE4").comuna(comCoq).estado("ACTIVO").build());
+
+        plantaRepo.saveAndFlush(PlantaModel.builder()
+                .id(9201L).codigo(9201).rut("83.333.333-3").nombre("Planta Proceso Coquimbo ZE4")
+                .comuna(comCoq).tipo("PROCESO").latitud(-29.9533).longitud(-71.3395)
+                .fuenteCoordenada("MAESTRO").build());
+
+        Date fOrig = Date.valueOf("2026-08-10");
+        Date fRec = Date.valueOf("2026-08-11");
+
+        // Caso 1: Origen con coords -> Comercializador con GPS -> Planta (genera ORI-COM y COM-PLA)
+        DeclaracionRecolectorModel ori1 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZE4-1").fechaExtraccion(fOrig).fechaDeclaracion(fOrig).hora("08:30:00")
+                .nombre("Rec 1 ZE4").codigoSernapesca("RPA-ZE4-1").caleta(calConCoords).comuna(comCoq)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("600.00")).captura(new BigDecimal("650.00"))
+                .codigoDestinatario(uCom.getRut()).nombreDestinatario("Com ZE4")
+                .usuarioDestinatario(uCom).build());
+        DeclaracionComercializadorModel com1 = comercializadorRepo.saveAndFlush(DeclaracionComercializadorModel.builder()
+                .usuario(uCom).folioOrigen("DC-ZE4-1").fechaDeclaracion(fOrig).hora("11:00:00")
+                .nombreComercializador("Com ZE4").codigoSernapesca("COM-ZE4-1")
+                .latitud(-29.6500).longitud(-71.2900)
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("590.00"))
+                .codigoDestinatario(uPla.getRut()).nombreDestinatario("Planta Proceso Coquimbo ZE4")
+                .usuarioDestinatario(uPla)
+                .declaracionesSeleccionadas("RECOLECTOR:" + ori1.getId())
+                .consumidaPorTipo("PLANTA_ABASTECIMIENTO").build());
+        ori1.setDeclaracionDestinatario(com1.getId());
+        ori1.setConsumidaPorTipo("COMERCIALIZADOR");
+        recolectorRepo.saveAndFlush(ori1);
+        DeclaracionPlantaAbastecimientoModel dpa1 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPla).folioDeclaracionAPla("APLA-ZE4-1").fechaIngresoPlanta(fRec).hora("09:00:00")
+                .nombrePlanta("Planta Proceso Coquimbo ZE4").codigoSernapesca("9201")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("585.00")).pesoRomanaKg(new BigDecimal("585.00"))
+                .declaracionesSeleccionadas("COMERCIALIZADOR:" + com1.getId()).build());
+        com1.setDeclaracionDestinatario(dpa1.getId());
+        comercializadorRepo.saveAndFlush(com1);
+
+        // Caso 2: Origen con coords -> Comercializador SIN GPS -> Planta (genera ORI-PLA directo + entrada en SIN_COORD)
+        DeclaracionRecolectorModel ori2 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZE4-2").fechaExtraccion(fOrig).fechaDeclaracion(fOrig).hora("09:15:00")
+                .nombre("Rec 2 ZE4").codigoSernapesca("RPA-ZE4-2").caleta(calConCoords).comuna(comCoq)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("350.00")).captura(new BigDecimal("360.00"))
+                .codigoDestinatario(uCom.getRut()).nombreDestinatario("Com ZE4")
+                .usuarioDestinatario(uCom).build());
+        DeclaracionComercializadorModel comSinGps = comercializadorRepo.saveAndFlush(DeclaracionComercializadorModel.builder()
+                .usuario(uCom).folioOrigen("DC-ZE4-SINGPS").fechaDeclaracion(fOrig).hora("13:00:00")
+                .nombreComercializador("Com ZE4").codigoSernapesca("COM-ZE4-2")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("345.00"))
+                .codigoDestinatario(uPla.getRut()).nombreDestinatario("Planta Proceso Coquimbo ZE4")
+                .usuarioDestinatario(uPla)
+                .declaracionesSeleccionadas("RECOLECTOR:" + ori2.getId())
+                .consumidaPorTipo("PLANTA_ABASTECIMIENTO").build());
+        ori2.setDeclaracionDestinatario(comSinGps.getId());
+        ori2.setConsumidaPorTipo("COMERCIALIZADOR");
+        recolectorRepo.saveAndFlush(ori2);
+        DeclaracionPlantaAbastecimientoModel dpa2 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPla).folioDeclaracionAPla("APLA-ZE4-2").fechaIngresoPlanta(fRec).hora("10:00:00")
+                .nombrePlanta("Planta Proceso Coquimbo ZE4").codigoSernapesca("9201")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("340.00")).pesoRomanaKg(new BigDecimal("340.00"))
+                .declaracionesSeleccionadas("COMERCIALIZADOR:" + comSinGps.getId()).build());
+        comSinGps.setDeclaracionDestinatario(dpa2.getId());
+        comercializadorRepo.saveAndFlush(comSinGps);
+
+        // Caso 3: Origen SIN coords ni GPS -> Planta (sin tramos, listado en DECLARACIONES y en SIN_COORD)
+        DeclaracionRecolectorModel ori3 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZE4-3").fechaExtraccion(fOrig).fechaDeclaracion(fOrig).hora("10:45:00")
+                .nombre("Rec 3 ZE4").codigoSernapesca("RPA-ZE4-3").caleta(calSinCoords).comuna(comCoq)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("220.00")).captura(new BigDecimal("230.00"))
+                .codigoDestinatario(uPla.getRut()).nombreDestinatario("Planta Proceso Coquimbo ZE4")
+                .usuarioDestinatario(uPla).build());
+        DeclaracionPlantaAbastecimientoModel dpa3 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPla).folioDeclaracionAPla("APLA-ZE4-3").fechaIngresoPlanta(fRec).hora("11:30:00")
+                .nombrePlanta("Planta Proceso Coquimbo ZE4").codigoSernapesca("9201")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("218.00")).pesoRomanaKg(new BigDecimal("218.00"))
+                .declaracionesSeleccionadas("RECOLECTOR:" + ori3.getId()).build());
+        ori3.setDeclaracionDestinatario(dpa3.getId());
+        ori3.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
+        recolectorRepo.saveAndFlush(ori3);
+        referenciaOrigenService.invalidarCache();
+
+        // Comparar cantidad contra JSON del endpoint de flujos
+        MvcResult resJson = mockMvc.perform(get("/api/reportes/flujos-origen-destino")
+                        .with(user("fisc").roles("FISCALIZADOR"))
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("regionDestinoId", String.valueOf(regCoq.getId())))
+                .andExpect(status().isOk())
+                .andReturn();
+        int totalDeclEndpoint = objectMapper.readTree(resJson.getResponse().getContentAsString())
+                .path("declaraciones").size();
+        assertEquals(3, totalDeclEndpoint);
+
+        // Descargar Excel (.xlsx)
+        MvcResult resXlsx = mockMvc.perform(get("/api/reportes/flujos-origen-destino/exportar")
+                        .with(user("fisc").roles("FISCALIZADOR"))
+                        .param("formato", "xlsx")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("regionDestinoId", String.valueOf(regCoq.getId())))
+                .andExpect(status().isOk())
+                .andReturn();
+        byte[] xlsxBytes = resXlsx.getResponse().getContentAsByteArray();
+        assertTrue(xlsxBytes.length > 0);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsxBytes))) {
+            assertEquals(4, wb.getNumberOfSheets());
+            assertEquals("DECLARACIONES", wb.getSheetName(0));
+            assertEquals("TRAMOS", wb.getSheetName(1));
+            assertEquals("SIN_COORD", wb.getSheetName(2));
+            assertEquals("LEEME", wb.getSheetName(3));
+
+            for (String sheetName : new String[]{"DECLARACIONES", "TRAMOS", "SIN_COORD"}) {
+                Sheet sh = wb.getSheet(sheetName);
+                Row hdr = sh.getRow(0);
+                assertNotNull(hdr);
+                Set<String> seen = new HashSet<>();
+                for (int c = 0; c < hdr.getLastCellNum(); c++) {
+                    String name = hdr.getCell(c).getStringCellValue();
+                    assertTrue(name.matches("^[A-Z0-9_]{1,10}$"),
+                            "Encabezado SIG invalido en " + sheetName + ": " + name);
+                    assertTrue(seen.add(name), "Encabezado duplicado en " + sheetName + ": " + name);
+                }
+            }
+
+            Sheet shDecl = wb.getSheet("DECLARACIONES");
+            assertEquals(totalDeclEndpoint, shDecl.getLastRowNum());
+            boolean verificoOri1Numerico = false;
+            boolean verificoOri3SinCoords = false;
+            for (int r = 1; r <= shDecl.getLastRowNum(); r++) {
+                Row row = shDecl.getRow(r);
+                String folioOri = row.getCell(0).getStringCellValue();
+                assertEquals(CellType.STRING, row.getCell(2).getCellType()); // FECHA_ORI
+                assertTrue(row.getCell(2).getStringCellValue().matches("\\d{4}-\\d{2}-\\d{2}"));
+                assertEquals(CellType.NUMERIC, row.getCell(4).getCellType()); // DESEMB_KG
+                assertEquals(CellType.NUMERIC, row.getCell(22).getCellType()); // ROMANA_KG
+                if ("RO-ZE4-1".equals(folioOri)) {
+                    assertEquals(CellType.NUMERIC, row.getCell(7).getCellType()); // LAT_ORI
+                    assertEquals(CellType.NUMERIC, row.getCell(8).getCellType()); // LON_ORI
+                    assertEquals(CellType.NUMERIC, row.getCell(11).getCellType()); // LAT_COM
+                    assertEquals(CellType.NUMERIC, row.getCell(12).getCellType()); // LON_COM
+                    assertEquals(CellType.NUMERIC, row.getCell(17).getCellType()); // LAT_PLA
+                    assertEquals(CellType.NUMERIC, row.getCell(18).getCellType()); // LON_PLA
+                    verificoOri1Numerico = true;
+                } else if ("RO-ZE4-3".equals(folioOri)) {
+                    assertNull(row.getCell(7)); // LAT_ORI sin coordenadas -> celda vacia
+                    assertNull(row.getCell(8)); // LON_ORI sin coordenadas -> celda vacia
+                    verificoOri3SinCoords = true;
+                }
+            }
+            assertTrue(verificoOri1Numerico, "Debe verificar celdas numericas de RO-ZE4-1");
+            assertTrue(verificoOri3SinCoords, "Debe verificar ausencia de coordenadas en RO-ZE4-3");
+
+            Sheet shTramos = wb.getSheet("TRAMOS");
+            // 2 tramos para Caso 1 (ORI-COM + COM-PLA) + 1 tramo para Caso 2 (ORI-PLA) = 3 tramos
+            assertEquals(3, shTramos.getLastRowNum());
+            Set<String> tiposTramo = new HashSet<>();
+            for (int r = 1; r <= shTramos.getLastRowNum(); r++) {
+                Row row = shTramos.getRow(r);
+                tiposTramo.add(row.getCell(3).getStringCellValue());
+                assertEquals(CellType.NUMERIC, row.getCell(0).getCellType()); // ID_TRAMO
+                assertEquals(CellType.NUMERIC, row.getCell(6).getCellType()); // X_INI
+                assertEquals(CellType.NUMERIC, row.getCell(7).getCellType()); // Y_INI
+                assertEquals(CellType.NUMERIC, row.getCell(8).getCellType()); // X_FIN
+                assertEquals(CellType.NUMERIC, row.getCell(9).getCellType()); // Y_FIN
+                assertEquals(CellType.NUMERIC, row.getCell(11).getCellType()); // KG
+            }
+            assertTrue(tiposTramo.contains("ORI-COM"));
+            assertTrue(tiposTramo.contains("COM-PLA"));
+            assertTrue(tiposTramo.contains("ORI-PLA"));
+
+            Sheet shSin = wb.getSheet("SIN_COORD");
+            assertEquals(2, shSin.getLastRowNum()); // comSinGps y ori3
+
+            Sheet shLeeme = wb.getSheet("LEEME");
+            boolean encontroEpsg = false;
+            for (int r = 0; r <= shLeeme.getLastRowNum(); r++) {
+                Row row = shLeeme.getRow(r);
+                if (row != null) {
+                    for (Cell cell : row) {
+                        if (cell.getCellType() == CellType.STRING && cell.getStringCellValue().contains("EPSG:4326")) {
+                            encontroEpsg = true;
+                        }
+                    }
+                }
+            }
+            assertTrue(encontroEpsg, "LEEME debe documentar EPSG:4326");
+        }
+
+        // Guardar archivo de ejemplo para validacion externa en ArcGIS (ZE.2 / ZE.4)
+        Path ejemploDestino = Path.of("..", "Planes", "REF20261116", "ejemplo_flujos_origen_destino.xlsx");
+        if (Files.isDirectory(ejemploDestino.getParent())) {
+            Files.write(ejemploDestino, xlsxBytes);
+        }
+
+        // Tambien verificar formato=csv
+        MvcResult resCsv = mockMvc.perform(get("/api/reportes/flujos-origen-destino/exportar")
+                        .with(user("aud").roles("AUDITOR"))
+                        .param("formato", "csv")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String csvTxt = resCsv.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(csvTxt.contains("FOLIO_ORI"));
+        assertTrue(csvTxt.contains("ROMANA_KG"));
     }
 }
