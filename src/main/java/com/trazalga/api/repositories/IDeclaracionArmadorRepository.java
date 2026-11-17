@@ -125,4 +125,12 @@ public interface IDeclaracionArmadorRepository extends JpaRepository<Declaracion
             + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
     List<DeclaracionArmadorModel> findConsumidasPorDestinos(
             @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
+
+    @EntityGraph(attributePaths = {"usuario", "especie", "humedadEstado", "usuarioDestinatario", "usuarioDestinatario.perfil", "usuarioDestinatario.comuna"})
+    @Query("SELECT d FROM DeclaracionArmadorModel d "
+            + "WHERE (UPPER(REPLACE(REPLACE(COALESCE(d.placaPatente, ''), ' ', ''), '-', '')) = :patente "
+            + "   OR UPPER(REPLACE(REPLACE(COALESCE(d.placaPatenteCarro, ''), ' ', ''), '-', '')) = :patente) "
+            + "AND (d.estado IS NULL OR (UPPER(d.estado) <> 'RECHAZADA' AND UPPER(d.estado) <> 'ANULADA')) "
+            + "ORDER BY d.fechaDeclaracion DESC, d.hora DESC, d.id DESC")
+    List<DeclaracionArmadorModel> findCandidatosPorPatente(@Param("patente") String patente);
 }

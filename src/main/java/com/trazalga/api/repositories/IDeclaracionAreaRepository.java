@@ -104,4 +104,12 @@ public interface IDeclaracionAreaRepository extends JpaRepository<DeclaracionAre
             + "AND d.fechaDeclaracion = :fecha")
     Double sumCapturaByUsuarioAndFecha(@Param("usuarioId") Long usuarioId,
             @Param("especieId") Long especieId, @Param("fecha") java.util.Date fecha);
+
+    @EntityGraph(attributePaths = {"usuario", "especie", "humedadEstado", "usuarioDestinatario", "usuarioDestinatario.perfil", "usuarioDestinatario.comuna"})
+    @Query("SELECT d FROM DeclaracionAreaModel d "
+            + "WHERE (UPPER(REPLACE(REPLACE(COALESCE(d.placaPatente, ''), ' ', ''), '-', '')) = :patente "
+            + "   OR UPPER(REPLACE(REPLACE(COALESCE(d.placaPatenteCarro, ''), ' ', ''), '-', '')) = :patente) "
+            + "AND (d.estado IS NULL OR (UPPER(d.estado) <> 'RECHAZADA' AND UPPER(d.estado) <> 'ANULADA')) "
+            + "ORDER BY d.fechaDeclaracion DESC, d.hora DESC, d.id DESC")
+    List<DeclaracionAreaModel> findCandidatosPorPatente(@Param("patente") String patente);
 }

@@ -2,12 +2,24 @@ package com.trazalga.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
+import com.trazalga.api.models.DeclaracionAreaModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
+import com.trazalga.api.models.EspecieModel;
+import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IDeclaracionAreaRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
+import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
+import com.trazalga.api.repositories.IUsuarioRepository;
+import org.hibernate.Hibernate;
+import java.util.function.Consumer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -60,6 +72,15 @@ public class EstadoTrasladoPatente {
     private IDeclaracionPlantaDestinoRepository destinoRepository;
 
     @Autowired(required = false)
+    private IDeclaracionRecolectorRepository recolectorRepository;
+
+    @Autowired(required = false)
+    private IDeclaracionArmadorRepository armadorRepository;
+
+    @Autowired(required = false)
+    private IDeclaracionAreaRepository areaRepository;
+
+    @Autowired(required = false)
     private BloqueoCargaService bloqueoCargaService;
 
     @Autowired(required = false)
@@ -75,6 +96,18 @@ public class EstadoTrasladoPatente {
 
     public void setDestinoRepository(IDeclaracionPlantaDestinoRepository destinoRepository) {
         this.destinoRepository = destinoRepository;
+    }
+
+    public void setRecolectorRepository(IDeclaracionRecolectorRepository recolectorRepository) {
+        this.recolectorRepository = recolectorRepository;
+    }
+
+    public void setArmadorRepository(IDeclaracionArmadorRepository armadorRepository) {
+        this.armadorRepository = armadorRepository;
+    }
+
+    public void setAreaRepository(IDeclaracionAreaRepository areaRepository) {
+        this.areaRepository = areaRepository;
     }
 
     public void setBloqueoCargaService(BloqueoCargaService bloqueoCargaService) {
@@ -112,7 +145,8 @@ public class EstadoTrasladoPatente {
         String patente = ConsultaPatenteService.normalizarPatente(patenteInput);
         LocalDateTime momentoConsulta = ahora != null ? ahora : LocalDateTime.now();
 
-        if (patente.isEmpty() || (comercializadorRepository == null && destinoRepository == null)) {
+        if (patente.isEmpty() || (comercializadorRepository == null && destinoRepository == null
+                && recolectorRepository == null && armadorRepository == null && areaRepository == null)) {
             return EvaluacionPatente.builder()
                     .patente(patente)
                     .estado(ESTADO_SIN_REGISTROS)
@@ -127,12 +161,18 @@ public class EstadoTrasladoPatente {
         boolean incluyeDespachoPlanta = configService == null
                 || configService.getBoolean("patente_incluye_despacho_planta", true);
 
+        record OrigenDirectoCandidate(
+                String tipo, Long id, String folio, Date fechaDeclaracion, String hora,
+                UsuarioModel destinatario, EspecieModel especie, Long declaracionDestinatario,
+                String consumidaPorTipo) {}
+
         record CandidatoMovimiento(
                 LocalDateTime tsAutorizacion,
                 long id,
                 String tipo,
                 DeclaracionComercializadorModel com,
-                DeclaracionPlantaDestinoModel destino) {}
+                DeclaracionPlantaDestinoModel destino,
+                OrigenDirectoCandidate origen) {}
 
         List<CandidatoMovimiento> candidatosValidos = new ArrayList<>();
 
@@ -148,7 +188,7 @@ public class EstadoTrasladoPatente {
                         continue;
                     }
                     long id = dc.getId() != null ? dc.getId() : 0L;
-                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "COMERCIALIZADOR", dc, null));
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "COMERCIALIZADOR", dc, null, null));
                 }
             }
         }
@@ -166,7 +206,73 @@ public class EstadoTrasladoPatente {
                         continue;
                     }
                     long id = dpd.getId() != null ? dpd.getId() : 0L;
-                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "PLANTA_DESTINO", null, dpd));
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "PLANTA_DESTINO", null, dpd, null));
+                }
+            }
+        }
+
+        if (recolectorRepository != null) {
+            List<DeclaracionRecolectorModel> recs = recolectorRepository.findCandidatosPorPatente(patente);
+            if (recs != null) {
+                for (DeclaracionRecolectorModel r : recs) {
+                    if (!coincidePatenteCampos(r.getPlacaPatente(), r.getPlacaPatenteCarro(), null, patente)
+                            || estaAnuladoORechazado(r.getEstado())
+                            || !esDestinoDirectoPlanta(r.getTipoDestinatario(), r.getConsumidaPorTipo(), r.getUsuarioDestinatario(), null)) {
+                        continue;
+                    }
+                    LocalDateTime tsDecl = toTimestamp(r.getFechaDeclaracion(), r.getHora());
+                    if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
+                        continue;
+                    }
+                    String folio = r.getFolioDesembarqueRo() != null ? r.getFolioDesembarqueRo() : r.getFolioOrigen();
+                    long id = r.getId() != null ? r.getId() : 0L;
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "RECOLECTOR", null, null,
+                            new OrigenDirectoCandidate("RECOLECTOR", r.getId(), folio, r.getFechaDeclaracion(), r.getHora(),
+                                    r.getUsuarioDestinatario(), r.getEspecie(), r.getDeclaracionDestinatario(), r.getConsumidaPorTipo())));
+                }
+            }
+        }
+
+        if (armadorRepository != null) {
+            List<DeclaracionArmadorModel> arms = armadorRepository.findCandidatosPorPatente(patente);
+            if (arms != null) {
+                for (DeclaracionArmadorModel a : arms) {
+                    if (!coincidePatenteCampos(a.getPlacaPatente(), a.getPlacaPatenteCarro(), null, patente)
+                            || estaAnuladoORechazado(a.getEstado())
+                            || !esDestinoDirectoPlanta(a.getTipoDestinatario(), a.getConsumidaPorTipo(), a.getUsuarioDestinatario(), null)) {
+                        continue;
+                    }
+                    LocalDateTime tsDecl = toTimestamp(a.getFechaDeclaracion(), a.getHora());
+                    if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
+                        continue;
+                    }
+                    String folio = a.getFolioDesembarqueDa() != null ? a.getFolioDesembarqueDa() : a.getFolioOrigen();
+                    long id = a.getId() != null ? a.getId() : 0L;
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "ARMADOR", null, null,
+                            new OrigenDirectoCandidate("ARMADOR", a.getId(), folio, a.getFechaDeclaracion(), a.getHora(),
+                                    a.getUsuarioDestinatario(), a.getEspecie(), a.getDeclaracionDestinatario(), a.getConsumidaPorTipo())));
+                }
+            }
+        }
+
+        if (areaRepository != null) {
+            List<DeclaracionAreaModel> areas = areaRepository.findCandidatosPorPatente(patente);
+            if (areas != null) {
+                for (DeclaracionAreaModel ar : areas) {
+                    if (!coincidePatenteCampos(ar.getPlacaPatente(), ar.getPlacaPatenteCarro(), null, patente)
+                            || estaAnuladoORechazado(ar.getEstado())
+                            || !esDestinoDirectoPlanta(ar.getTipoDestinatario(), ar.getConsumidaPorTipo(), ar.getUsuarioDestinatario(), null)) {
+                        continue;
+                    }
+                    LocalDateTime tsDecl = toTimestamp(ar.getFechaDeclaracion(), ar.getHora());
+                    if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
+                        continue;
+                    }
+                    String folio = ar.getFolioDesembarqueAmerb() != null ? ar.getFolioDesembarqueAmerb() : ar.getFolioOrigen();
+                    long id = ar.getId() != null ? ar.getId() : 0L;
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "AREA", null, null,
+                            new OrigenDirectoCandidate("AREA", ar.getId(), folio, ar.getFechaDeclaracion(), ar.getHora(),
+                                    ar.getUsuarioDestinatario(), ar.getEspecie(), ar.getDeclaracionDestinatario(), ar.getConsumidaPorTipo())));
                 }
             }
         }
@@ -191,6 +297,14 @@ public class EstadoTrasladoPatente {
         if ("PLANTA_DESTINO".equals(ganador.tipo())) {
             return evaluarDestinoPlanta(
                     ganador.destino(), patente, momentoConsulta, vigenciaHoras);
+        }
+        if (ganador.origen() != null) {
+            return evaluarOrigenDirectoPlanta(
+                    ganador.origen().tipo(), ganador.origen().id(), ganador.origen().folio(),
+                    ganador.origen().fechaDeclaracion(), ganador.origen().hora(),
+                    ganador.origen().destinatario(), ganador.origen().especie(),
+                    ganador.origen().declaracionDestinatario(), ganador.origen().consumidaPorTipo(),
+                    patente, momentoConsulta, vigenciaHoras, terminaEnRecepcion);
         }
 
         DeclaracionComercializadorModel reciente = ganador.com();
@@ -489,6 +603,172 @@ public class EstadoTrasladoPatente {
             }
         }
         return LocalDateTime.of(localDate, localTime);
+    }
+
+    /**
+     * ZC.9 (D53): valida y normaliza placa de camión y carro en declaraciones de origen
+     * cuando el destinatario es planta (o si se ingresaron voluntariamente).
+     */
+    public static void normalizarYValidarPatenteOrigen(
+            ConfiguracionGeneralService configService,
+            boolean esPlanta,
+            String rawCamion,
+            String rawCarro,
+            Consumer<String> setCamion,
+            Consumer<String> setCarro) {
+        String camion = ConsultaPatenteService.normalizarPatente(rawCamion);
+        String carro = ConsultaPatenteService.normalizarPatente(rawCarro);
+        String camionFinal = camion.isEmpty() ? null : camion;
+        String carroFinal = carro.isEmpty() ? null : carro;
+
+        if (camionFinal != null && !ConsultaPatenteService.esPatenteValida(camionFinal)) {
+            throw new ValidacionPlantaException("Patente del camión inválida (" + camionFinal
+                    + "): ingrese entre 5 y 8 caracteres alfanuméricos.");
+        }
+        if (carroFinal != null && !ConsultaPatenteService.esPatenteValida(carroFinal)) {
+            throw new ValidacionPlantaException("Patente del carro inválida (" + carroFinal
+                    + "): ingrese entre 5 y 8 caracteres alfanuméricos.");
+        }
+        boolean exigePatente = configService != null
+                && configService.getBoolean("origen_directo_exige_patente", false);
+        if (exigePatente && esPlanta && camionFinal == null) {
+            throw new ValidacionPlantaException(
+                    "Debe ingresar la patente del camión para un traslado directo a planta.");
+        }
+        if (setCamion != null) setCamion.accept(camionFinal);
+        if (setCarro != null) setCarro.accept(carroFinal);
+    }
+
+    public static boolean esUsuarioPlanta(UsuarioModel u) {
+        if (u == null) return false;
+        try {
+            if (!Hibernate.isInitialized(u)) return false;
+            if (u.getPerfil() == null || !Hibernate.isInitialized(u.getPerfil())) return false;
+            Long pid = u.getPerfil().getId();
+            return pid != null && (pid == 5L || pid == 6L || pid == 7L);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    public static boolean esDestinoDirectoPlanta(
+            String tipoDestinatario,
+            String consumidaPorTipo,
+            UsuarioModel destinatario,
+            IUsuarioRepository usuarioRepository) {
+        if ("planta".equalsIgnoreCase(tipoDestinatario)
+                || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(consumidaPorTipo)) {
+            return true;
+        }
+        if (esUsuarioPlanta(destinatario)) {
+            return true;
+        }
+        if (usuarioRepository != null && destinatario != null && destinatario.getId() != null) {
+            Long pid = usuarioRepository.findPerfilIdByUsuarioId(destinatario.getId()).orElse(null);
+            return pid != null && (pid == 5L || pid == 6L || pid == 7L);
+        }
+        return false;
+    }
+
+    private EvaluacionPatente evaluarOrigenDirectoPlanta(
+            String tipo, Long id, String folio, Date fechaDeclaracion, String hora,
+            UsuarioModel destinatario, EspecieModel especie, Long declaracionDestinatario,
+            String consumidaPorTipo, String patente, LocalDateTime momentoConsulta,
+            int vigenciaHoras, boolean terminaEnRecepcion) {
+        LocalDateTime fechaHoraAut = toTimestamp(fechaDeclaracion, hora);
+        String comunaDestino = "Comuna no informada";
+        try {
+            if (destinatario != null && destinatario.getComuna() != null
+                    && destinatario.getComuna().getNombre() != null
+                    && !destinatario.getComuna().getNombre().isBlank()) {
+                comunaDestino = destinatario.getComuna().getNombre().trim();
+            }
+        } catch (Exception ignored) {
+        }
+        String tipoAlga = (especie != null && especie.getNombre() != null && !especie.getNombre().isBlank())
+                ? especie.getNombre().trim() : "Alga parda";
+
+        if (bloqueoCargaService != null && id != null) {
+            Map<Long, MotivoBloqueoDTO> mapBloq = bloqueoCargaService.bloqueosPorTipoEIds(tipo, List.of(id));
+            if (mapBloq != null && mapBloq.containsKey(id)) {
+                MotivoBloqueoDTO b = mapBloq.get(id);
+                String motivo = "Retenido por " + b.getMarca()
+                        + (b.getMarcaId() != null ? " (hallazgo #" + b.getMarcaId() + ")" : "");
+                return EvaluacionPatente.builder()
+                        .patente(patente)
+                        .estado(ESTADO_RETENIDO)
+                        .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                        .fechaHoraAutorizacion(fechaHoraAut)
+                        .fechaHoraSalida(fechaHoraAut)
+                        .comunaDestino(comunaDestino)
+                        .tipoAlga(tipoAlga)
+                        .declaracionId(id)
+                        .folioDespacho(folio)
+                        .motivoRetencion(motivo)
+                        .hallazgoId(b.getMarcaId())
+                        .hallazgoMarca(b.getMarca())
+                        .consultadoEn(momentoConsulta)
+                        .build();
+            }
+        }
+
+        if (terminaEnRecepcion && plantaRepository != null && declaracionDestinatario != null
+                && (consumidaPorTipo == null || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(consumidaPorTipo))) {
+            DeclaracionPlantaAbastecimientoModel recepcion = plantaRepository.findById(declaracionDestinatario).orElse(null);
+            if (recepcion != null) {
+                LocalDateTime tsRecepcion = toTimestamp(recepcion.getFechaIngresoPlanta(), recepcion.getHora());
+                if (tsRecepcion == null || !tsRecepcion.isAfter(momentoConsulta)) {
+                    String nomPlanta = recepcion.getNombrePlanta();
+                    if ((nomPlanta == null || nomPlanta.isBlank()) && recepcion.getUsuario() != null) {
+                        nomPlanta = recepcion.getUsuario().getNombres();
+                    }
+                    return EvaluacionPatente.builder()
+                            .patente(patente)
+                            .estado(ESTADO_FINALIZADO)
+                            .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                            .fechaHoraAutorizacion(fechaHoraAut)
+                            .fechaHoraSalida(fechaHoraAut)
+                            .comunaDestino(comunaDestino)
+                            .tipoAlga(tipoAlga)
+                            .declaracionId(id)
+                            .folioDespacho(folio)
+                            .plantaRecepcionId(recepcion.getId())
+                            .nombrePlantaRecepcion(nomPlanta != null ? nomPlanta : "Planta")
+                            .fechaHoraRecepcion(tsRecepcion)
+                            .consultadoEn(momentoConsulta)
+                            .build();
+                }
+            }
+        }
+
+        LocalDateTime limiteVigencia = fechaHoraAut.plusHours(vigenciaHoras);
+        if (momentoConsulta.isAfter(limiteVigencia)) {
+            return EvaluacionPatente.builder()
+                    .patente(patente)
+                    .estado(ESTADO_VENCIDO)
+                    .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                    .fechaHoraAutorizacion(fechaHoraAut)
+                    .fechaHoraSalida(fechaHoraAut)
+                    .comunaDestino(comunaDestino)
+                    .tipoAlga(tipoAlga)
+                    .declaracionId(id)
+                    .folioDespacho(folio)
+                    .consultadoEn(momentoConsulta)
+                    .build();
+        }
+
+        return EvaluacionPatente.builder()
+                .patente(patente)
+                .estado(ESTADO_AUTORIZADO)
+                .resultadoPublico(RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(fechaHoraAut)
+                .fechaHoraSalida(fechaHoraAut)
+                .comunaDestino(comunaDestino)
+                .tipoAlga(tipoAlga)
+                .declaracionId(id)
+                .folioDespacho(folio)
+                .consultadoEn(momentoConsulta)
+                .build();
     }
 
     /**

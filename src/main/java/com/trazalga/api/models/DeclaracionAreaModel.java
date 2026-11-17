@@ -155,6 +155,12 @@ public class DeclaracionAreaModel {
     @Column(name = "peso_recepcionado", nullable = true)
     private Double pesoRecepcionado;
 
+    @Column(name = "placa_patente", length = 20)
+    private String placaPatente;
+
+    @Column(name = "placa_patente_carro", length = 20)
+    private String placaPatenteCarro;
+
     /**
      * Estado del ciclo de negociación de la declaración:
      *  ENVIADA (default) -> NEGOCIACION (al primer mensaje de gestión)

@@ -93,4 +93,12 @@ public interface IDeclaracionRecolectorRepository extends JpaRepository<Declarac
             + "WHERE d.declaracionDestinatario IN :destinoIds AND UPPER(d.consumidaPorTipo) = :tipo")
     List<DeclaracionRecolectorModel> findConsumidasPorDestinos(
             @Param("tipo") String tipo, @Param("destinoIds") List<Long> destinoIds);
+
+    @EntityGraph(attributePaths = {"usuario", "especie", "humedadEstado", "usuarioDestinatario", "usuarioDestinatario.perfil", "usuarioDestinatario.comuna"})
+    @Query("SELECT d FROM DeclaracionRecolectorModel d "
+            + "WHERE (UPPER(REPLACE(REPLACE(COALESCE(d.placaPatente, ''), ' ', ''), '-', '')) = :patente "
+            + "   OR UPPER(REPLACE(REPLACE(COALESCE(d.placaPatenteCarro, ''), ' ', ''), '-', '')) = :patente) "
+            + "AND (d.estado IS NULL OR (UPPER(d.estado) <> 'RECHAZADA' AND UPPER(d.estado) <> 'ANULADA')) "
+            + "ORDER BY d.fechaDeclaracion DESC, d.hora DESC, d.id DESC")
+    List<DeclaracionRecolectorModel> findCandidatosPorPatente(@Param("patente") String patente);
 }

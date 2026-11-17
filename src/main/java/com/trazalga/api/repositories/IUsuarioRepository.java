@@ -70,4 +70,7 @@ public interface IUsuarioRepository extends JpaRepository<UsuarioModel, Long> {
                "AND (:regionId IS NULL OR r.id IS NULL OR r.id = :regionId)")
         List<Long> findFiscalizadoresIds(@Param("regionId") Long regionId);
 
+        @Query("SELECT u.perfil.id FROM UsuarioModel u WHERE u.id = :id")
+        Optional<Long> findPerfilIdByUsuarioId(@Param("id") Long id);
+
 }

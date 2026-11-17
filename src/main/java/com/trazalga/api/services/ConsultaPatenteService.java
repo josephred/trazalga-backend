@@ -27,16 +27,22 @@ import com.trazalga.api.dto.FichaMarcaDTO;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.models.ConsultaFolioLogModel;
 import com.trazalga.api.models.ConsultaPatenteLogModel;
+import com.trazalga.api.models.DeclaracionAreaModel;
+import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
+import com.trazalga.api.models.DeclaracionRecolectorModel;
 import com.trazalga.api.repositories.IConsultaFolioLogRepository;
 import com.trazalga.api.repositories.IConsultaPatenteLogRepository;
+import com.trazalga.api.repositories.IDeclaracionAreaRepository;
+import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionMarcaRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
+import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.services.EstadoTrasladoPatente.EvaluacionPatente;
 
 /**
@@ -74,6 +80,15 @@ public class ConsultaPatenteService {
 
     @Autowired(required = false)
     private IDeclaracionPlantaDestinoRepository destinoRepository;
+
+    @Autowired(required = false)
+    private IDeclaracionRecolectorRepository recolectorRepository;
+
+    @Autowired(required = false)
+    private IDeclaracionArmadorRepository armadorRepository;
+
+    @Autowired(required = false)
+    private IDeclaracionAreaRepository areaRepository;
 
     @Autowired(required = false)
     private BloqueoCargaService bloqueoCargaService;
@@ -381,6 +396,66 @@ public class ConsultaPatenteService {
             }
         }
 
+        // 4. Traslados directos de origen a planta con patente declarada (ZC.9 / D53)
+        if (recolectorRepository != null) {
+            List<DeclaracionRecolectorModel> recs = recolectorRepository.findCandidatosPorPatente(patente);
+            if (recs != null) {
+                for (DeclaracionRecolectorModel r : recs) {
+                    if (!EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                            r.getTipoDestinatario(), r.getConsumidaPorTipo(), r.getUsuarioDestinatario(), null)
+                            || !enRango(r.getFechaDeclaracion(), desde, hasta)) {
+                        continue;
+                    }
+                    String folio = r.getFolioDesembarqueRo() != null ? r.getFolioDesembarqueRo() : r.getFolioOrigen();
+                    lista.add(construirMovimientoOrigenDirecto(
+                            "RECOLECTOR", r.getId(), r.getFolioOrigen(), folio,
+                            r.getFechaDeclaracion(), r.getHora(), r.getUsuario(), r.getUsuarioDestinatario(),
+                            r.getCodigoDestinatario(), r.getNombreDestinatario(), r.getEspecie(),
+                            r.getHumedadEstado(), r.getDesembarque(), r.getPlacaPatente(),
+                            r.getPlacaPatenteCarro(), r.getDeclaracionDestinatario(), r.getConsumidaPorTipo()));
+                }
+            }
+        }
+        if (armadorRepository != null) {
+            List<DeclaracionArmadorModel> arms = armadorRepository.findCandidatosPorPatente(patente);
+            if (arms != null) {
+                for (DeclaracionArmadorModel a : arms) {
+                    if (!EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                            a.getTipoDestinatario(), a.getConsumidaPorTipo(), a.getUsuarioDestinatario(), null)
+                            || !enRango(a.getFechaDeclaracion(), desde, hasta)) {
+                        continue;
+                    }
+                    String folio = a.getFolioDesembarqueDa() != null ? a.getFolioDesembarqueDa() : a.getFolioOrigen();
+                    lista.add(construirMovimientoOrigenDirecto(
+                            "ARMADOR", a.getId(), a.getFolioOrigen(), folio,
+                            a.getFechaDeclaracion(), a.getHora(), a.getUsuario(), a.getUsuarioDestinatario(),
+                            a.getCodigoDestinatario(), null, a.getEspecie(),
+                            a.getHumedadEstado(), a.getDesembarque(), a.getPlacaPatente(),
+                            a.getPlacaPatenteCarro(), a.getDeclaracionDestinatario(), a.getConsumidaPorTipo()));
+                }
+            }
+        }
+        if (areaRepository != null) {
+            List<DeclaracionAreaModel> areas = areaRepository.findCandidatosPorPatente(patente);
+            if (areas != null) {
+                for (DeclaracionAreaModel ar : areas) {
+                    if (!EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                            ar.getTipoDestinatario(), ar.getConsumidaPorTipo(), ar.getUsuarioDestinatario(), null)
+                            || !enRango(ar.getFechaDeclaracion(), desde, hasta)) {
+                        continue;
+                    }
+                    String folio = ar.getFolioDesembarqueAmerb() != null ? ar.getFolioDesembarqueAmerb() : ar.getFolioOrigen();
+                    BigDecimal kilos = ar.getDesembarque() != null ? BigDecimal.valueOf(ar.getDesembarque()) : null;
+                    lista.add(construirMovimientoOrigenDirecto(
+                            "AREA", ar.getId(), ar.getFolioOrigen(), folio,
+                            ar.getFechaDeclaracion(), ar.getHora(), ar.getUsuario(), ar.getUsuarioDestinatario(),
+                            ar.getCodigoDestinatario(), null, ar.getEspecie(),
+                            ar.getHumedadEstado(), kilos, ar.getPlacaPatente(),
+                            ar.getPlacaPatenteCarro(), ar.getDeclaracionDestinatario(), ar.getConsumidaPorTipo()));
+                }
+            }
+        }
+
         lista.sort((a, b) -> {
             LocalDateTime ta = a.getFechaHoraSalida() != null ? a.getFechaHoraSalida() : LocalDateTime.MIN;
             LocalDateTime tb = b.getFechaHoraSalida() != null ? b.getFechaHoraSalida() : LocalDateTime.MIN;
@@ -611,6 +686,91 @@ public class ConsultaPatenteService {
                 .build();
     }
 
+    private MovimientoPatenteDTO construirMovimientoOrigenDirecto(
+            String tipo, Long id, String folioOrigen, String folioSecundario,
+            Date fechaDeclaracion, String hora,
+            com.trazalga.api.models.UsuarioModel emisor,
+            com.trazalga.api.models.UsuarioModel destinatario,
+            String destRutFallback, String destNomFallback,
+            com.trazalga.api.models.EspecieModel especie,
+            com.trazalga.api.models.HumedadEstadoModel humedad,
+            BigDecimal kilos, String placaPatente, String placaPatenteCarro,
+            Long declaracionDestinatario, String consumidaPorTipo) {
+        LocalDateTime tsSalida = EstadoTrasladoPatente.toTimestamp(fechaDeclaracion, hora);
+        String emisorRut = emisor != null ? emisor.getRut() : null;
+        String emisorNom = emisor != null ? emisor.getNombreCompleto() : tipo;
+        String destNom = destNomFallback;
+        String destRut = destRutFallback;
+        String destComuna = "Comuna no informada";
+        if (destinatario != null) {
+            if (destNom == null || destNom.isBlank()) destNom = destinatario.getNombreCompleto();
+            if (destRut == null || destRut.isBlank()) destRut = destinatario.getRut();
+            if (destinatario.getComuna() != null && destinatario.getComuna().getNombre() != null) {
+                destComuna = destinatario.getComuna().getNombre();
+            }
+        }
+
+        String estadoMov = "EN_TRANSITO";
+        String motivoRet = null;
+        if (bloqueoCargaService != null && id != null) {
+            Map<Long, MotivoBloqueoDTO> bloq = bloqueoCargaService.bloqueosPorTipoEIds(tipo, List.of(id));
+            if (bloq != null && bloq.containsKey(id)) {
+                estadoMov = "RETENIDO";
+                MotivoBloqueoDTO b = bloq.get(id);
+                motivoRet = "Retenido por " + b.getMarca() + " (hallazgo #" + b.getMarcaId() + ")";
+            }
+        }
+
+        Long recPlantaId = null;
+        Date recFecha = null;
+        String recHora = null;
+        String recPlantaNom = null;
+        if (declaracionDestinatario != null
+                && (consumidaPorTipo == null || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(consumidaPorTipo))
+                && plantaRepository != null) {
+            Optional<DeclaracionPlantaAbastecimientoModel> optP = plantaRepository.findById(declaracionDestinatario);
+            if (optP.isPresent()) {
+                DeclaracionPlantaAbastecimientoModel p = optP.get();
+                if (!"RETENIDO".equals(estadoMov)) estadoMov = "RECIBIDO";
+                recPlantaId = p.getId();
+                recFecha = p.getFechaIngresoPlanta();
+                recHora = p.getHora();
+                recPlantaNom = p.getNombrePlanta() != null ? p.getNombrePlanta()
+                        : (p.getUsuario() != null ? p.getUsuario().getNombres() : "Planta");
+            }
+        }
+
+        return MovimientoPatenteDTO.builder()
+                .tipo(tipo)
+                .id(id)
+                .folioOrigen(folioOrigen)
+                .folioSecundario(folioSecundario)
+                .fechaDeclaracion(fechaDeclaracion)
+                .horaDeclaracion(hora)
+                .fechaTraslado(fechaDeclaracion)
+                .fechaHoraSalida(tsSalida)
+                .comercializadorRut(emisorRut)
+                .comercializadorNombre(emisorNom)
+                .patenteCamion(normalizarPatente(placaPatente))
+                .patenteCarro(placaPatenteCarro != null && !placaPatenteCarro.isBlank()
+                        ? normalizarPatente(placaPatenteCarro) : null)
+                .destinoNombre(destNom)
+                .destinoRut(destRut)
+                .destinoComuna(destComuna)
+                .especies(especie != null ? especie.getNombre() : "Alga parda")
+                .estadoHumedad(humedad != null ? humedad.getNombre() : null)
+                .kilos(kilos)
+                .estadoMovimiento(estadoMov)
+                .motivoRetencion(motivoRet)
+                .recepcionPlantaId(recPlantaId)
+                .recepcionFecha(recFecha)
+                .recepcionHora(recHora)
+                .recepcionPlantaNombre(recPlantaNom)
+                .marcas(obtenerMarcas(tipo, id))
+                .enlaceFicha("/consultas/ficha/" + tipo + "/" + id)
+                .build();
+    }
+
     private List<FichaMarcaDTO> obtenerMarcas(String tipo, Long id) {
         if (marcaRepository == null || id == null) {
             return Collections.emptyList();
@@ -657,6 +817,9 @@ public class ConsultaPatenteService {
         ev.setComercializadorRepository(comercializadorRepository);
         ev.setPlantaRepository(plantaRepository);
         ev.setDestinoRepository(destinoRepository);
+        ev.setRecolectorRepository(recolectorRepository);
+        ev.setArmadorRepository(armadorRepository);
+        ev.setAreaRepository(areaRepository);
         ev.setBloqueoCargaService(bloqueoCargaService);
         ev.setConfigService(configService);
         return ev;

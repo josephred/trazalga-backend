@@ -111,6 +111,9 @@ public class DeclaracionArmadorService {
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.ConfiguracionGeneralService configService;
+
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
         
@@ -224,6 +227,18 @@ public class DeclaracionArmadorService {
         UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
         declaracion.setUsuarioDestinatario(usuarioDestinatario);
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                declaracion.getTipoDestinatario(),
+                declaracion.getConsumidaPorTipo(),
+                usuarioDestinatario,
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                request.getPlacaPatente(),
+                request.getPlacaPatenteCarro(),
+                declaracion::setPlacaPatente,
+                declaracion::setPlacaPatenteCarro);
         
         if (request.getCaleta() == null || request.getCaleta().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");
@@ -497,6 +512,18 @@ public class DeclaracionArmadorService {
         UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
         declaracionArmadorModel.setUsuarioDestinatario(usuarioDestinatario);
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                declaracionArmadorModel.getTipoDestinatario(),
+                declaracionArmadorModel.getConsumidaPorTipo(),
+                usuarioDestinatario,
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                request.getPlacaPatente(),
+                request.getPlacaPatenteCarro(),
+                declaracionArmadorModel::setPlacaPatente,
+                declaracionArmadorModel::setPlacaPatenteCarro);
         
         if (request.getCaleta() == null || request.getCaleta().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");

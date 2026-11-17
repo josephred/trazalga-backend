@@ -97,6 +97,12 @@ public class DeclaracionRecolectorService {
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.ConfiguracionGeneralService configService;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
     private void resolverVaraderoDeclarado(DeclaracionRecolectorModel model) {
         if (model == null) return;
         if (model.getVaraderoRelacion() != null && model.getVaraderoRelacion().getId() != null) {
@@ -225,6 +231,19 @@ public class DeclaracionRecolectorService {
         resolveDependencies(declaracionRecolectorModel);
         validarYResolverCaletaComuna(declaracionRecolectorModel);
         resolverVaraderoDeclarado(declaracionRecolectorModel);
+
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                declaracionRecolectorModel.getTipoDestinatario(),
+                declaracionRecolectorModel.getConsumidaPorTipo(),
+                declaracionRecolectorModel.getUsuarioDestinatario(),
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                declaracionRecolectorModel.getPlacaPatente(),
+                declaracionRecolectorModel.getPlacaPatenteCarro(),
+                declaracionRecolectorModel::setPlacaPatente,
+                declaracionRecolectorModel::setPlacaPatenteCarro);
 
         // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
         Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
@@ -426,6 +445,19 @@ public class DeclaracionRecolectorService {
 
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
         declaracionRecolectorModel.setUsuarioDestinatario(request.getUsuarioDestinatario());
+        declaracionRecolectorModel.setTipoDestinatario(request.getTipoDestinatario());
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                request.getTipoDestinatario(),
+                declaracionRecolectorModel.getConsumidaPorTipo(),
+                request.getUsuarioDestinatario(),
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                request.getPlacaPatente(),
+                request.getPlacaPatenteCarro(),
+                declaracionRecolectorModel::setPlacaPatente,
+                declaracionRecolectorModel::setPlacaPatenteCarro);
         
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);

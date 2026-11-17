@@ -106,6 +106,12 @@ public class DeclaracionAreaService {
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.ConfiguracionGeneralService configService;
+
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
+
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
         boolean esCreacion = declaracion.getId() == null;
         // Un POST con el id de una declaración existente la actualiza en el repositorio:
@@ -242,6 +248,19 @@ public class DeclaracionAreaService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
             declaracion.setCaleta(caleta);
         }
+
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                declaracion.getTipoDestinatario(),
+                declaracion.getConsumidaPorTipo(),
+                declaracion.getUsuarioDestinatario(),
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                declaracion.getPlacaPatente(),
+                declaracion.getPlacaPatenteCarro(),
+                declaracion::setPlacaPatente,
+                declaracion::setPlacaPatenteCarro);
 
         // Validar consistencia caleta ↔ AMERB/comuna
         if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null
@@ -417,6 +436,18 @@ public class DeclaracionAreaService {
 
         declaracion.setTipoDestinatario(request.getTipoDestinatario());
         declaracion.setUsuarioDestinatario(request.getUsuarioDestinatario());
+        boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
+                declaracion.getTipoDestinatario(),
+                declaracion.getConsumidaPorTipo(),
+                declaracion.getUsuarioDestinatario(),
+                usuarioRepository);
+        com.trazalga.api.services.EstadoTrasladoPatente.normalizarYValidarPatenteOrigen(
+                configService,
+                esPlantaDirecto,
+                request.getPlacaPatente(),
+                request.getPlacaPatenteCarro(),
+                declaracion::setPlacaPatente,
+                declaracion::setPlacaPatenteCarro);
         declaracion.setComposicion(request.getComposicion());
         sanearComposicion(declaracion);
         declaracion.setLatitud(request.getLatitud());
