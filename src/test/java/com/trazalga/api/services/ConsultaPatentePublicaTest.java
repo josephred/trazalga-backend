@@ -216,7 +216,6 @@ public class ConsultaPatentePublicaTest {
 
         when(mockReq.getRequestURI()).thenReturn("/api/public/patentes/ABCD12");
         when(mockReq.getRemoteAddr()).thenReturn("200.1.2.3");
-        when(mockReq.getHeader("X-Forwarded-For")).thenReturn(null);
 
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);

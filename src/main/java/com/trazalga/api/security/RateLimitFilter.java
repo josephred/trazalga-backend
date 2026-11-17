@@ -1,10 +1,13 @@
 package com.trazalga.api.security;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -12,6 +15,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,6 +29,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Autowired(required = false)
     private ConfiguracionGeneralService configService;
+
+    @Value("${trazalga.proxy.confiables:}")
+    private String proxiesConfiables = "";
+
+    public void setProxiesConfiables(String proxiesConfiables) {
+        this.proxiesConfiables = proxiesConfiables != null ? proxiesConfiables : "";
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -64,12 +76,49 @@ public class RateLimitFilter extends OncePerRequestFilter {
         requestsByIp.clear();
     }
 
+    public int trackedIpCount() {
+        return requestsByIp.size();
+    }
+
+    /**
+     * ZC.6: Purga cada 5 minutos las IP que ya no tienen peticiones dentro de la ventana de 1 minuto.
+     */
+    @Scheduled(fixedRate = 300_000)
+    public void purgarInactivas() {
+        long ahora = System.currentTimeMillis();
+        requestsByIp.entrySet().removeIf(entry -> {
+            Deque<Long> ts = entry.getValue();
+            ts.removeIf(t -> ahora - t > 60_000);
+            return ts.isEmpty();
+        });
+    }
+
     private String getClientIp(HttpServletRequest request) {
+        return resolverIpCliente(request, proxiesConfiables);
+    }
+
+    /**
+     * ZC.6: Solo acepta {@code X-Forwarded-For} si {@code getRemoteAddr()} corresponde
+     * a un proxy configurado en {@code trazalga.proxy.confiables}.
+     */
+    public static String resolverIpCliente(HttpServletRequest request, String proxiesConfiablesRaw) {
         if (request == null) return "127.0.0.1";
-        String xf = request.getHeader("X-Forwarded-For");
-        if (xf != null && !xf.isBlank()) {
-            return xf.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr() != null ? request.getRemoteAddr().trim() : "127.0.0.1";
+        if (proxiesConfiablesRaw != null && !proxiesConfiablesRaw.isBlank()) {
+            Set<String> trusted = Arrays.stream(proxiesConfiablesRaw.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+            if (trusted.contains(remoteAddr)) {
+                String xf = request.getHeader("X-Forwarded-For");
+                if (xf != null && !xf.isBlank()) {
+                    String primera = xf.split(",")[0].trim();
+                    if (!primera.isEmpty()) {
+                        return primera;
+                    }
+                }
+            }
         }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
+        return remoteAddr;
     }
 }

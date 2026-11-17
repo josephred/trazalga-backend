@@ -2,8 +2,10 @@ package com.trazalga.api.services;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDate;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -78,6 +80,28 @@ public class ConsultaPatenteService {
 
     @Autowired(required = false)
     private IDeclaracionMarcaRepository marcaRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${trazalga.proxy.confiables:}")
+    private String proxiesConfiables = "";
+
+    @org.springframework.beans.factory.annotation.Value("${trazalga.consulta.ip-hash-secret:}")
+    private String ipHashSecretProp = "";
+
+    private final byte[] ephemeralHmacKey = generarClaveEfemera();
+
+    private static byte[] generarClaveEfemera() {
+        byte[] key = new byte[32];
+        new SecureRandom().nextBytes(key);
+        return key;
+    }
+
+    public void setProxiesConfiables(String proxiesConfiables) {
+        this.proxiesConfiables = proxiesConfiables != null ? proxiesConfiables : "";
+    }
+
+    public void setIpHashSecret(String ipHashSecret) {
+        this.ipHashSecretProp = ipHashSecret != null ? ipHashSecret : "";
+    }
 
     public static final java.util.regex.Pattern PATENTE_VALIDA =
             java.util.regex.Pattern.compile("^[A-Z0-9]{5,8}$");
@@ -670,19 +694,18 @@ public class ConsultaPatenteService {
     }
 
     public String getClientIp(HttpServletRequest request) {
-        if (request == null) return "127.0.0.1";
-        String xf = request.getHeader("X-Forwarded-For");
-        if (xf != null && !xf.isBlank()) {
-            return xf.split(",")[0].trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
+        return com.trazalga.api.security.RateLimitFilter.resolverIpCliente(request, proxiesConfiables);
     }
 
     public String hashIp(String ip) {
         if (ip == null || ip.isBlank()) return "ANONYMOUS";
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(ip.getBytes(StandardCharsets.UTF_8));
+            byte[] keyBytes = (ipHashSecretProp != null && !ipHashSecretProp.isBlank())
+                    ? ipHashSecretProp.getBytes(StandardCharsets.UTF_8)
+                    : ephemeralHmacKey;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(keyBytes, "HmacSHA256"));
+            byte[] hash = mac.doFinal(ip.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
