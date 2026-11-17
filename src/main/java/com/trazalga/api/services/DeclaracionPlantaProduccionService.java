@@ -135,6 +135,9 @@ public class DeclaracionPlantaProduccionService {
         if (productoAdminService != null) {
             productoAdminService.validarFormatoParaDeclaracion(declaracion.getProductoResultante());
         }
+        if (politicaEscrituraPlanta != null) {
+            politicaEscrituraPlanta.validarContraLotesDeProduccion(declaracion);
+        }
 
         if (declaracion.getFolioDeclaracionPpla() == null || declaracion.getFolioDeclaracionPpla().isEmpty()) {
             declaracion.setFolioDeclaracionPpla(generarFolioPpla());
@@ -217,6 +220,7 @@ public class DeclaracionPlantaProduccionService {
             politicaEscrituraPlanta.verificarLotesDeProduccion(
                     model.getUsuario() != null ? model.getUsuario().getId() : null,
                     request.getDeclaracionesSeleccionadas(), id);
+            politicaEscrituraPlanta.validarContraLotesDeProduccion(request);
         }
 
         model.setFolioOrigen(request.getFolioOrigen());

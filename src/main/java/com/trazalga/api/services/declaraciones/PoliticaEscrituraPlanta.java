@@ -25,6 +25,7 @@ import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
+import com.trazalga.api.repositories.IProductoRepository;
 import com.trazalga.api.services.BloqueoCargaService;
 import com.trazalga.api.services.ConfiguracionGeneralService;
 import com.trazalga.api.services.trazabilidad.SeleccionTokens;
@@ -55,6 +56,7 @@ public class PoliticaEscrituraPlanta {
     @Autowired private IDeclaracionPlantaDestinoRepository destinoRepository;
     @Autowired private BloqueoCargaService bloqueoCargaService;
     @Autowired(required = false) private ConfiguracionGeneralService configService;
+    @Autowired(required = false) private IProductoRepository productoRepository;
 
     // ------------------------------------------------------------------ sesión y dueño
 
@@ -139,6 +141,71 @@ public class PoliticaEscrituraPlanta {
             if (b != null) {
                 throw conflicto("El lote " + folio + " está retenido por " + b.getMarca()
                         + " (hallazgo #" + b.getMarcaId() + ") hasta su fiscalización.");
+            }
+        }
+    }
+
+    /**
+     * Valida kilos, especie única de los lotes (asignando {@code materiaPrimaEspecie})
+     * y coherencia de especie del formato resultante en producción (ZP.4).
+     */
+    @Transactional(readOnly = true)
+    public void validarContraLotesDeProduccion(DeclaracionPlantaProduccionModel produccion) {
+        if (produccion == null || produccion.getCantidadProducto() == null
+                || produccion.getCantidadProducto().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidacionPlantaException("La cantidad de producto resultante debe ser mayor a 0 kg.");
+        }
+
+        List<Long> ids = ids(produccion.getDeclaracionesSeleccionadas(), ABASTECIMIENTO);
+        EspecieModel especieReferencia = produccion.getMateriaPrimaEspecie();
+
+        if (!ids.isEmpty()) {
+            Map<Long, DeclaracionPlantaAbastecimientoModel> porId = new java.util.HashMap<>();
+            for (DeclaracionPlantaAbastecimientoModel a : abastecimientoRepository.findAllById(ids)) {
+                porId.put(a.getId(), a);
+            }
+            EspecieModel especieUnica = null;
+            boolean hayDiferencia = false;
+            List<String> detalleFolios = new java.util.ArrayList<>();
+            for (Long id : ids) {
+                DeclaracionPlantaAbastecimientoModel a = porId.get(id);
+                if (a == null) {
+                    continue;
+                }
+                String folio = a.getFolioDeclaracionAPla() != null ? a.getFolioDeclaracionAPla() : "#" + a.getId();
+                EspecieModel esp = a.getEspecie();
+                String nombreEsp = esp != null ? esp.getNombre() : "sin especie";
+                detalleFolios.add(folio + " (" + nombreEsp + ")");
+                if (especieUnica == null) {
+                    especieUnica = esp;
+                } else if (esp == null || !especieUnica.getId().equals(esp.getId())) {
+                    hayDiferencia = true;
+                }
+            }
+            if (hayDiferencia) {
+                throw new ValidacionPlantaException(
+                        "Todos los lotes seleccionados deben ser de la misma especie. Difieren los folios: "
+                                + String.join(", ", detalleFolios) + ".");
+            }
+            if (especieUnica != null) {
+                especieReferencia = especieUnica;
+                produccion.setMateriaPrimaEspecie(especieUnica);
+            }
+        }
+
+        if (produccion.getProductoResultante() != null) {
+            ProductoModel fmt = produccion.getProductoResultante();
+            if (fmt.getId() != null && productoRepository != null) {
+                fmt = productoRepository.findById(fmt.getId()).orElse(fmt);
+            }
+            if (fmt.getEspecie() != null && (especieReferencia == null
+                    || especieReferencia.getId() == null
+                    || !fmt.getEspecie().getId().equals(especieReferencia.getId()))) {
+                String nomEspLotes = especieReferencia != null && especieReferencia.getNombre() != null
+                        ? " (" + especieReferencia.getNombre() + ")" : "";
+                throw new ValidacionPlantaException("La especie del formato resultante (" + fmt.getNombre()
+                        + " - " + fmt.getEspecie().getNombre() + ") no coincide con la especie de los lotes"
+                        + nomEspLotes + ".");
             }
         }
     }

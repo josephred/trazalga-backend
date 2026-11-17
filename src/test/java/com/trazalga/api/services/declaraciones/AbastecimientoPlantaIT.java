@@ -81,9 +81,11 @@ class AbastecimientoPlantaIT extends IntegracionBase {
         humedad = humedadEstadoRepository.findAll().stream().findFirst().orElseGet(() ->
                 humedadEstadoRepository.saveAndFlush(HumedadEstadoModel.builder()
                         .nombre("Seco").rangoInicio(0).rangoFin(20).build()));
-        producto = productoRepository.findAll().stream().findFirst().orElseGet(() ->
-                productoRepository.saveAndFlush(ProductoModel.builder()
-                        .nombre("Alga Picada Test").descripcion("Picada").build()));
+        producto = productoRepository.findAll().stream()
+                .filter(p -> p.getEspecie() == null || p.getEspecie().getId().equals(especie.getId()))
+                .findFirst()
+                .orElseGet(() -> productoRepository.saveAndFlush(ProductoModel.builder()
+                        .nombre("Alga Picada Test " + seq).descripcion("Picada").build()));
     }
 
     @Test
