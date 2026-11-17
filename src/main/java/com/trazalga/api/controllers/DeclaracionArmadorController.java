@@ -35,6 +35,9 @@ public class DeclaracionArmadorController {
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     /**
      * Obtener todas las declaraciones de armador
      */
@@ -72,6 +75,7 @@ public class DeclaracionArmadorController {
      */
     @GetMapping(path = "/usuario/{idUsuario}")
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(@PathVariable("idUsuario") Long idUsuario){
+        politicaLectura.verificarUsuario(idUsuario);
         return politicaEdicion.anotarLote("ARMADOR", this.declaracionArmadorService.getDeclaracionesArmadorIdUsuario(idUsuario));
     }
 
@@ -91,6 +95,7 @@ public class DeclaracionArmadorController {
      */
     @GetMapping(path = "/{id}")
     public Optional<DeclaracionArmadorModel> getDeclaracionArmadorById(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("ARMADOR", id);
         return this.declaracionArmadorService.getById(id);
     }
 
@@ -105,6 +110,7 @@ public class DeclaracionArmadorController {
             @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
             @Parameter(description = "Al editar un documento consumidor ya guardado, incluye también las declaraciones que ese documento ya consumió")
             @RequestParam(required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }

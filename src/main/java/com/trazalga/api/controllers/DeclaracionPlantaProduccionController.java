@@ -26,6 +26,9 @@ public class DeclaracionPlantaProduccionController {
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     @PostMapping
     @Operation(summary = "Crear una nueva declaración de producción")
     @ApiResponse(responseCode = "201", description = "Declaración creada exitosamente")
@@ -59,6 +62,7 @@ public class DeclaracionPlantaProduccionController {
     @GetMapping("/usuario/{usuarioId}")
     @Operation(summary = "Obtener declaraciones de producción por ID de usuario")
     public ResponseEntity<List<DeclaracionPlantaProduccionModel>> getDeclaracionesPorUsuario(@PathVariable("usuarioId") Long usuarioId) {
+        politicaLectura.verificarUsuario(usuarioId);
         List<DeclaracionPlantaProduccionModel> declaraciones = service.getAllByUsuarioId(usuarioId);
         return ResponseEntity.ok(declaraciones);
     }
@@ -66,6 +70,7 @@ public class DeclaracionPlantaProduccionController {
     @GetMapping("/{id}")
     @Operation(summary = "Obtener una declaración de producción por su ID")
     public ResponseEntity<DeclaracionPlantaProduccionModel> getDeclaracionPorId(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("PLANTA_PRODUCCION", id);
         return service.getById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -78,6 +83,7 @@ public class DeclaracionPlantaProduccionController {
     public ResponseEntity<List<DeclaracionPlantaProduccionModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
             @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
             @RequestParam(value = "consumidasPorId", required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionPlantaProduccionModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
@@ -85,6 +91,7 @@ public class DeclaracionPlantaProduccionController {
     @GetMapping("/detalle-consolidado/{id}")
     @Operation(summary = "Obtener el detalle consolidado (líneas de documento) de una declaración de producción")
     public ResponseEntity<List<Map<String, Object>>> getDetalleConsolidado(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("PLANTA_PRODUCCION", id);
         return ResponseEntity.ok(service.getDetalleConsolidado(id));
     }
 }

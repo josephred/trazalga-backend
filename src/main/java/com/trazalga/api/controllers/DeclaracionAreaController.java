@@ -29,6 +29,9 @@ public class DeclaracionAreaController {
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     @GetMapping
     public ResponseEntity<?> getAllDeclaraciones(
             @RequestParam(required = false) Integer page,
@@ -60,6 +63,7 @@ public class DeclaracionAreaController {
 
     @GetMapping("/usuario/{usuarioId}")
     public List<DeclaracionAreaModel> getDeclaracionesByUsuario(@PathVariable Long usuarioId) {
+        politicaLectura.verificarUsuario(usuarioId);
         return politicaEdicion.anotarLote("AREA", declaracionAreaService.getDeclaracionesByUsuario(usuarioId));
     }
 
@@ -73,6 +77,7 @@ public class DeclaracionAreaController {
 
     @GetMapping("/{id}")
     public ResponseEntity<DeclaracionAreaModel> getById(@PathVariable Long id) {
+        politicaLectura.verificarDeclaracion("AREA", id);
         Optional<DeclaracionAreaModel> declaracion = declaracionAreaService.getById(id);
         return declaracion.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -84,6 +89,7 @@ public class DeclaracionAreaController {
     public ResponseEntity<List<DeclaracionAreaModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
             @PathVariable Long usuarioDestinatarioId,
             @RequestParam(required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionAreaModel> declaraciones = declaracionAreaService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }

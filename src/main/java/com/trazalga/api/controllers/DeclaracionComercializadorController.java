@@ -39,6 +39,9 @@ public class DeclaracionComercializadorController {
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     @GetMapping
     public ResponseEntity<?> getDeclaracionesComercializador(
             @RequestParam(required = false) Integer page,
@@ -70,11 +73,13 @@ public class DeclaracionComercializadorController {
         
     @GetMapping(path = "/usuario/{usuarioId}")
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorIdUsuario(@PathVariable("usuarioId") Long usuarioId){
+        politicaLectura.verificarUsuario(usuarioId);
         return this.declaracionComercializadorService.getDeclaracionesComercializadorIdUsuario(usuarioId);
     }
         
     @GetMapping(path = "/usuariodesc/{usuarioId}")
     public ArrayList<DeclaracionComercializadorModel> getDeclaracionesComercializadorUsuarioIdDesc(@PathVariable("usuarioId") Long usuarioId){
+        politicaLectura.verificarUsuario(usuarioId);
         return this.declaracionComercializadorService.getDeclaracionesComercializadorUsuarioIdDesc(usuarioId);
     }
 
@@ -88,6 +93,7 @@ public class DeclaracionComercializadorController {
     
     @GetMapping(path = "/{id}")
     public Optional<DeclaracionComercializadorModel> getDeclaracionComercializadorById(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("COMERCIALIZADOR", id);
         return this.declaracionComercializadorService.getById(id);
     }
     
@@ -97,6 +103,7 @@ public class DeclaracionComercializadorController {
     public ResponseEntity<List<DeclaracionComercializadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
             @PathVariable Long usuarioDestinatarioId,
             @RequestParam(required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionComercializadorModel> declaraciones = declaracionComercializadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
@@ -136,6 +143,7 @@ public class DeclaracionComercializadorController {
      */
     @GetMapping(path = "/detalle-consolidado/{id}")
     public ResponseEntity<List<java.util.Map<String, Object>>> getDetalleConsolidado(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("COMERCIALIZADOR", id);
         return ResponseEntity.ok(declaracionComercializadorService.getDetalleConsolidado(id));
     }
 }

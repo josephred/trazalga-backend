@@ -29,6 +29,9 @@ public class DeclaracionPlantaDestinoController {
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEscrituraPlanta politicaEscrituraPlanta;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     @PostMapping
     @Operation(summary = "Crear una nueva declaración de destino",
                description = "Registra una nueva declaración sobre el destino de un producto procesado por la planta.")
@@ -82,6 +85,7 @@ public class DeclaracionPlantaDestinoController {
     @ApiResponse(responseCode = "200", description = "Lista de declaraciones obtenida")
     public ResponseEntity<List<DeclaracionPlantaDestinoModel>> getDeclaracionesPorUsuario(
             @Parameter(description = "ID del usuario (planta) para buscar sus declaraciones") @PathVariable("usuarioId") Long usuarioId) {
+        politicaLectura.verificarUsuario(usuarioId);
         List<DeclaracionPlantaDestinoModel> declaraciones = service.getAllByUsuarioId(usuarioId);
         return ResponseEntity.ok(declaraciones);
     }
@@ -92,6 +96,7 @@ public class DeclaracionPlantaDestinoController {
     @ApiResponse(responseCode = "200", description = "Declaración encontrada")
     @ApiResponse(responseCode = "404", description = "Declaración no encontrada", content = @Content)
     public ResponseEntity<DeclaracionPlantaDestinoModel> getDeclaracionPorId(@Parameter(description = "ID de la declaración a buscar") @PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("PLANTA_DESTINO", id);
         return service.getById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -105,6 +110,7 @@ public class DeclaracionPlantaDestinoController {
             @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
             @Parameter(description = "ID opcional de la declaración que consume estas, para incluirlas en edición")
             @RequestParam(required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionPlantaDestinoModel> declaraciones = service.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
@@ -114,6 +120,7 @@ public class DeclaracionPlantaDestinoController {
                description = "Devuelve las líneas consolidadas (especie+producto+kg) de las producciones que componen esta declaración.")
     @ApiResponse(responseCode = "200", description = "Detalle consolidado obtenido")
     public ResponseEntity<List<Map<String, Object>>> getDetalleConsolidado(@PathVariable Long id) {
+        politicaLectura.verificarDeclaracion("PLANTA_DESTINO", id);
         return ResponseEntity.ok(service.getDetalleConsolidado(id));
     }
 }

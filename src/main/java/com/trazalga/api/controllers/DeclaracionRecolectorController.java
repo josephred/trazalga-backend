@@ -40,6 +40,9 @@ public class DeclaracionRecolectorController {
     @Autowired
     private IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaLecturaDeclaracion politicaLectura;
+
     @GetMapping
     public ResponseEntity<?> getDeclaracionesRecolector(
             @RequestParam(required = false) Integer page,
@@ -71,6 +74,7 @@ public class DeclaracionRecolectorController {
     
     @GetMapping(path = "/usuario/{idUsuario}")
     public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolectorIdUsuario(@PathVariable("idUsuario") Long idUsuario){
+        politicaLectura.verificarUsuario(idUsuario);
         return politicaEdicion.anotarLote("RECOLECTOR", this.declaracionRecolectorService.getDeclaracionesRecolectorIdUsuario(idUsuario));
     }
 
@@ -85,6 +89,7 @@ public class DeclaracionRecolectorController {
     
     @GetMapping(path = "/{id}")
     public Optional<DeclaracionRecolectorModel> getDeclaracionRecolectorById(@PathVariable("id") Long id) {
+        politicaLectura.verificarDeclaracion("RECOLECTOR", id);
         return this.declaracionRecolectorService.getById(id);
     }
 
@@ -94,6 +99,7 @@ public class DeclaracionRecolectorController {
     public ResponseEntity<List<DeclaracionRecolectorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
             @PathVariable Long usuarioDestinatarioId,
             @RequestParam(required = false) Long consumidasPorId) {
+        politicaLectura.verificarDestinatario(usuarioDestinatarioId);
         List<DeclaracionRecolectorModel> declaraciones = declaracionRecolectorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
