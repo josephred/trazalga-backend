@@ -1211,4 +1211,11 @@ public class ReportController {
             @RequestParam(required = false) Long regionId) {
         return ResponseEntity.ok(reportService.getFlujosOrigenDestino(startDate, endDate, especieId, regionId));
     }
+
+    @GetMapping("/capas-georreferencia")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<?> getCapasGeorreferencia(
+            @RequestParam(required = false) Long regionId) {
+        return ResponseEntity.ok(reportService.getCapasGeorreferencia(regionId));
+    }
 }

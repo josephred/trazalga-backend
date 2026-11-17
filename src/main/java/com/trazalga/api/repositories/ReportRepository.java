@@ -4907,6 +4907,114 @@ public class ReportRepository {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public java.util.Map<String, Object> getCapasGeorreferencia(Long regionId) {
+        List<java.util.Map<String, Object>> caletas = new java.util.ArrayList<>();
+        List<java.util.Map<String, Object>> varaderos = new java.util.ArrayList<>();
+        List<java.util.Map<String, Object>> plantas = new java.util.ArrayList<>();
+
+        StringBuilder sqlCal = new StringBuilder(
+                "SELECT cal.id, cal.nombre, com.nombre, COALESCE(cal.region_id, com.region_id), reg.nombre, " +
+                "cal.latitud, cal.longitud, cal.fuente_coordenada " +
+                "FROM caleta cal " +
+                "LEFT JOIN comuna com ON cal.comuna_id = com.id " +
+                "LEFT JOIN region reg ON reg.id = COALESCE(cal.region_id, com.region_id)");
+        if (regionId != null) {
+            sqlCal.append(" WHERE COALESCE(cal.region_id, com.region_id) = :regionId");
+        }
+        Query qCal = entityManager.createNativeQuery(sqlCal.toString());
+        if (regionId != null) qCal.setParameter("regionId", regionId);
+        List<Object[]> calRows = qCal.getResultList();
+        int calTotal = 0;
+        int calConCoords = 0;
+        for (Object[] r : calRows) {
+            calTotal++;
+            Double lat = r[5] != null ? ((Number) r[5]).doubleValue() : null;
+            Double lon = r[6] != null ? ((Number) r[6]).doubleValue() : null;
+            if (ReportService.esCoordenadaChileValida(lat, lon)) {
+                calConCoords++;
+                java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("id", r[0] != null ? ((Number) r[0]).longValue() : null);
+                item.put("nombre", r[1] != null ? r[1].toString() : null);
+                item.put("comuna", r[2] != null ? r[2].toString() : null);
+                item.put("regionId", r[3] != null ? ((Number) r[3]).longValue() : null);
+                item.put("region", r[4] != null ? r[4].toString() : null);
+                item.put("latitud", lat);
+                item.put("longitud", lon);
+                item.put("fuente", r[7] != null ? r[7].toString() : null);
+                caletas.add(item);
+            }
+        }
+
+        StringBuilder sqlVar = new StringBuilder(
+                "SELECT v.id, v.nombre, com.nombre, com.region_id, reg.nombre, " +
+                "v.latitud, v.longitud, v.fuente_coordenada " +
+                "FROM varadero v " +
+                "LEFT JOIN comuna com ON v.comuna_id = com.id " +
+                "LEFT JOIN region reg ON com.region_id = reg.id");
+        if (regionId != null) {
+            sqlVar.append(" WHERE com.region_id = :regionId");
+        }
+        Query qVar = entityManager.createNativeQuery(sqlVar.toString());
+        if (regionId != null) qVar.setParameter("regionId", regionId);
+        List<Object[]> varRows = qVar.getResultList();
+        int varTotal = 0;
+        int varConCoords = 0;
+        for (Object[] r : varRows) {
+            varTotal++;
+            Double lat = r[5] != null ? ((Number) r[5]).doubleValue() : null;
+            Double lon = r[6] != null ? ((Number) r[6]).doubleValue() : null;
+            if (ReportService.esCoordenadaChileValida(lat, lon)) {
+                varConCoords++;
+                java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("id", r[0] != null ? ((Number) r[0]).longValue() : null);
+                item.put("nombre", r[1] != null ? r[1].toString() : null);
+                item.put("comuna", r[2] != null ? r[2].toString() : null);
+                item.put("regionId", r[3] != null ? ((Number) r[3]).longValue() : null);
+                item.put("region", r[4] != null ? r[4].toString() : null);
+                item.put("latitud", lat);
+                item.put("longitud", lon);
+                item.put("fuente", r[7] != null ? r[7].toString() : null);
+                varaderos.add(item);
+            }
+        }
+
+        List<Object[]> plRows = entityManager.createNativeQuery(
+                "SELECT pl.id, pl.codigo, pl.nombre, pl.tipo, pl.latitud, pl.longitud, pl.fuente_coordenada FROM planta pl")
+                .getResultList();
+        int plTotal = 0;
+        int plConCoords = 0;
+        for (Object[] r : plRows) {
+            plTotal++;
+            Double lat = r[4] != null ? ((Number) r[4]).doubleValue() : null;
+            Double lon = r[5] != null ? ((Number) r[5]).doubleValue() : null;
+            if (ReportService.esCoordenadaChileValida(lat, lon)) {
+                plConCoords++;
+                java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("id", r[0] != null ? ((Number) r[0]).longValue() : null);
+                item.put("codigo", r[1] != null ? ((Number) r[1]).intValue() : null);
+                item.put("nombre", r[2] != null ? r[2].toString() : null);
+                item.put("tipo", r[3] != null ? r[3].toString() : null);
+                item.put("latitud", lat);
+                item.put("longitud", lon);
+                item.put("fuente", r[6] != null ? r[6].toString() : null);
+                plantas.add(item);
+            }
+        }
+
+        java.util.Map<String, Object> cobertura = new java.util.LinkedHashMap<>();
+        cobertura.put("caletas", java.util.Map.of("total", calTotal, "conCoordenadas", calConCoords));
+        cobertura.put("varaderos", java.util.Map.of("total", varTotal, "conCoordenadas", varConCoords));
+        cobertura.put("plantas", java.util.Map.of("total", plTotal, "conCoordenadas", plConCoords));
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("caletas", caletas);
+        resp.put("varaderos", varaderos);
+        resp.put("plantas", plantas);
+        resp.put("cobertura", cobertura);
+        return resp;
+    }
+
     private static String unirNombreUsuario(Object nombres, Object apellidop, Object apellidom) {
         StringBuilder sb = new StringBuilder();
         for (Object part : new Object[]{nombres, apellidop, apellidom}) {

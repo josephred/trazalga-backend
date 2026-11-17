@@ -1267,6 +1267,10 @@ public class ReportService {
         return o instanceof Number ? ((Number) o).doubleValue() : 0.0;
     }
 
+    public java.util.Map<String, Object> getCapasGeorreferencia(Long regionId) {
+        return reportRepository.getCapasGeorreferencia(regionId);
+    }
+
     public static boolean esCoordenadaChileValida(Double lat, Double lon) {
         if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
             return false;
