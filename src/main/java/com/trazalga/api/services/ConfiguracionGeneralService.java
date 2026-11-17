@@ -147,6 +147,8 @@ public class ConfiguracionGeneralService {
         createIfNotExist("consulta_publica_whatsapp", "", "Número de WhatsApp (código país + número) para denuncia ciudadana sin autorización vigente (vacío = oculto, D38)", "CONSULTAS");
         createIfNotExist("consulta_publica_muestra_comuna", "true", "Si es true, incluye comunaDestino en respuestas públicas AUTORIZADO; false la omite (D37)", "CONSULTAS");
         createIfNotExist("consulta_ciudadana_resultados_anomalos", "VENCIDO,SIN_REGISTROS,RETENIDO", "Resultados de consulta ciudadana considerados anómalos para la bandeja de fiscalización (D39)", "CONSULTAS");
+        createIfNotExist("consulta_patente_log_retencion_dias", "365", "Días de retención de registros en consulta_patente_log antes de su depuración automática (vacío = no borra, ZC.5)", "CONSULTAS");
+        createIfNotExist("consulta_publica_registra_denuncia", "true", "Registra en consulta_patente_log los clics ciudadanos en Fono Denuncia o WhatsApp (ZC.5 / D54)", "CONSULTAS");
 
         // PRIORIDAD 2 — CONSULTA POR FOLIO (T2.2)
         createIfNotExist("consulta_folio_dias_embarcacion", "30", "Días hacia atrás para buscar desembarques por código de embarcación", "CONSULTAS");

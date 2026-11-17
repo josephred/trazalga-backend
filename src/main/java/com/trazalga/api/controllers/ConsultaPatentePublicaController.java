@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,5 +51,24 @@ public class ConsultaPatentePublicaController {
         }
         Map<String, Object> resultado = patenteService.consultar(normalizada, request);
         return ResponseEntity.ok(resultado);
+    }
+
+    @PostMapping("/{patente}/denuncia")
+    @Operation(summary = "Registra intención ciudadana de denuncia sin solicitar datos personales (ZC.5 / D54)")
+    public ResponseEntity<?> registrarIntencionDenuncia(
+            @PathVariable String patente,
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
+        String normalizada = ConsultaPatenteService.normalizarPatente(patente);
+        if (!ConsultaPatenteService.esPatenteValida(normalizada)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Patente no válida"));
+        }
+        String canalRaw = body != null ? body.get("canal") : null;
+        String canal = canalRaw != null ? canalRaw.trim().toUpperCase(java.util.Locale.ROOT) : "";
+        if (!"FONO".equals(canal) && !"WHATSAPP".equals(canal)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Canal no válido"));
+        }
+        patenteService.registrarIntencionDenuncia(normalizada, canal, request);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -162,6 +162,59 @@ public class ConsultaPatenteService {
     }
 
     /**
+     * ZC.5 (D54): Registra intención anónima de denuncia (FONO o WHATSAPP) en consulta_patente_log
+     * cuando consulta_publica_registra_denuncia está activo. Sin datos del ciudadano.
+     */
+    @Transactional(readOnly = false)
+    public boolean registrarIntencionDenuncia(String patenteNorm, String canal, HttpServletRequest request) {
+        if (!esPatenteValida(patenteNorm)) {
+            return false;
+        }
+        boolean activo = configService == null || configService.getBoolean("consulta_publica_registra_denuncia", true);
+        if (!activo) {
+            return false;
+        }
+        String resultado = "FONO".equalsIgnoreCase(canal) ? "DENUNCIA_FONO" : "DENUNCIA_WHATSAPP";
+        registrarLog(patenteNorm, request, resultado);
+        return true;
+    }
+
+    /**
+     * ZC.5: Purga diaria de registros en consulta_patente_log más antiguos que
+     * consulta_patente_log_retencion_dias (vacío o <= 0 no borra).
+     */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 30 3 * * *", zone = "America/Santiago")
+    @Transactional(readOnly = false)
+    public int depurarLogsAntiguos() {
+        return depurarLogsAntiguos(new Date());
+    }
+
+    @Transactional(readOnly = false)
+    public int depurarLogsAntiguos(Date ahoraReferencia) {
+        if (logRepository == null) {
+            return 0;
+        }
+        int dias = 365;
+        if (configService != null) {
+            String raw = configService.getValor("consulta_patente_log_retencion_dias", "365");
+            if (raw == null || raw.trim().isEmpty()) {
+                return 0;
+            }
+            try {
+                dias = Integer.parseInt(raw.trim());
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        if (dias <= 0) {
+            return 0;
+        }
+        Date ref = ahoraReferencia != null ? ahoraReferencia : new Date();
+        Date cutoff = Date.from(ref.toInstant().minus(java.time.Duration.ofDays(dias)));
+        return logRepository.deleteOlderThan(cutoff);
+    }
+
+    /**
      * TN.2 · Devuelve exactamente el mapa de lista blanca de {@link ConsultaPatentePublicaDTO}.
      */
     @Transactional

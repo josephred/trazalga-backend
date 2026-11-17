@@ -4416,12 +4416,21 @@ public class ReportRepository {
         if (finExclusivoTs != null) qTot.setParameter("finExclusivoTs", finExclusivoTs);
 
         long totalConsultas = 0L;
+        long denunciasFono = 0L;
+        long denunciasWhatsapp = 0L;
         for (Object[] row : (List<Object[]>) qTot.getResultList()) {
             String res = row[0] != null ? row[0].toString().trim().toUpperCase(java.util.Locale.ROOT) : "OTRO";
             long count = row[1] != null ? ((Number) row[1]).longValue() : 0L;
-            totalesPorResultado.merge(res, count, Long::sum);
-            totalConsultas += count;
+            if ("DENUNCIA_FONO".equals(res)) {
+                denunciasFono += count;
+            } else if ("DENUNCIA_WHATSAPP".equals(res)) {
+                denunciasWhatsapp += count;
+            } else {
+                totalesPorResultado.merge(res, count, Long::sum);
+                totalConsultas += count;
+            }
         }
+        long intentosDenuncia = denunciasFono + denunciasWhatsapp;
 
         long totalAnomalas = 0L;
         for (String anom : resultadosAnomalos) {
@@ -4447,7 +4456,18 @@ public class ReportRepository {
                 sqlPat.append("          AND l2.fecha < :finExclusivoTs ");
             }
             sqlPat.append("        ORDER BY l2.fecha DESC, l2.id DESC ");
-            sqlPat.append("        LIMIT 1) AS ultimo_resultado ");
+            sqlPat.append("        LIMIT 1) AS ultimo_resultado, ");
+            sqlPat.append("       (SELECT COUNT(*) ");
+            sqlPat.append("        FROM consulta_patente_log ld ");
+            sqlPat.append("        WHERE ld.patente = l.patente ");
+            sqlPat.append("          AND ld.resultado IN ('DENUNCIA_FONO', 'DENUNCIA_WHATSAPP') ");
+            if (inicioTs != null) {
+                sqlPat.append("          AND ld.fecha >= :inicioTs ");
+            }
+            if (finExclusivoTs != null) {
+                sqlPat.append("          AND ld.fecha < :finExclusivoTs ");
+            }
+            sqlPat.append("       ) AS intentos_denuncia ");
             sqlPat.append("FROM consulta_patente_log l ");
             sqlPat.append("WHERE l.resultado IN (:anomalos) ");
             if (inicioTs != null) {
@@ -4472,13 +4492,21 @@ public class ReportRepository {
                 item.put("ultimaConsulta", toIsoTimestamp(row[3]));
                 item.put("origenesDistintos", row[4] != null ? ((Number) row[4]).longValue() : 0L);
                 item.put("ultimoResultado", row[5] != null ? row[5].toString() : "");
+                item.put("intentosDenuncia", row[6] != null ? ((Number) row[6]).longValue() : 0L);
                 patentesAnomalas.add(item);
             }
         }
 
+        long patentes3MasAnomalas = patentesAnomalas.stream()
+                .filter(p -> ((Number) p.getOrDefault("consultas", 0L)).longValue() >= 3L)
+                .count();
+
         java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
         resp.put("totalConsultas", totalConsultas);
         resp.put("totalAnomalas", totalAnomalas);
+        resp.put("intentosDenuncia", intentosDenuncia);
+        resp.put("denunciasPorCanal", java.util.Map.of("FONO", denunciasFono, "WHATSAPP", denunciasWhatsapp));
+        resp.put("patentes3MasAnomalas", patentes3MasAnomalas);
         resp.put("resultadosAnomalosConfigurados", resultadosAnomalos);
         resp.put("totalesPorResultado", totalesPorResultado);
         resp.put("patentesAnomalas", patentesAnomalas);
