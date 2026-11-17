@@ -19,9 +19,11 @@ import com.trazalga.api.models.PlantaModel;
 import com.trazalga.api.models.ProvinciaModel;
 import com.trazalga.api.models.RegionModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.models.VaraderoModel;
 import com.trazalga.api.repositories.IBuzoRepository;
 import com.trazalga.api.repositories.ICaletaRepository;
 import com.trazalga.api.repositories.IComunaRepository;
+import com.trazalga.api.repositories.ICoordenadaCambioLogRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
@@ -34,6 +36,11 @@ import com.trazalga.api.repositories.IPlantaRepository;
 import com.trazalga.api.repositories.IProvinciaRepository;
 import com.trazalga.api.repositories.IRegionRepository;
 import com.trazalga.api.repositories.IUsuarioRepository;
+import com.trazalga.api.repositories.IVaraderoRepository;
+import com.trazalga.api.dto.geo.EstadoFilaCoordenada;
+import com.trazalga.api.dto.geo.ResumenImportacionDto;
+import com.trazalga.api.services.ReportService;
+import com.trazalga.api.services.geo.ImportarCoordenadasService;
 import com.trazalga.api.services.geo.ReferenciaOrigenService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +54,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -71,7 +80,10 @@ class FlujosOrigenDestinoIT extends IntegracionBase {
     @Autowired private IProvinciaRepository provinciaRepo;
     @Autowired private IComunaRepository comunaRepo;
     @Autowired private ICaletaRepository caletaRepo;
+    @Autowired private IVaraderoRepository varaderoRepo;
     @Autowired private IPlantaRepository plantaRepo;
+    @Autowired private ICoordenadaCambioLogRepository cambioLogRepo;
+    @Autowired private ImportarCoordenadasService importarCoordenadasService;
     @Autowired private IExtraccionTipoRepository extraccionTipoRepo;
     @Autowired private IEmbarcacionRepository embarcacionRepo;
     @Autowired private IBuzoRepository buzoRepo;
@@ -92,6 +104,9 @@ class FlujosOrigenDestinoIT extends IntegracionBase {
         comercializadorRepo.deleteAll();
         recolectorRepo.deleteAll();
         armadorRepo.deleteAll();
+        cambioLogRepo.deleteAll();
+        caletaRepo.deleteAll();
+        varaderoRepo.deleteAll();
         plantaRepo.deleteAll();
         referenciaOrigenService.invalidarCache();
         limpiarCacheDetalle();
@@ -295,5 +310,312 @@ class FlujosOrigenDestinoIT extends IntegracionBase {
         assertEquals(1, jsonNegro.path("flujosSinCoordenadas").size());
         assertEquals("Caleta Chungungo QM4", jsonNegro.path("flujosMapa").get(0).path("origen").path("nombre").asText());
         assertNotNull(dpaNegro.getId());
+    }
+
+    @Test
+    @DisplayName("ZM.6: Capas de referencia (seguridad, vacio 0 de 0, filtro por region, sin RUT, invalida fuera de Chile)")
+    void capasGeorreferenciaSeguridadCoberturaSinRutYMaestrosVacios() throws Exception {
+        // 1) Seguridad del endpoint
+        mockMvc.perform(get("/api/reportes/capas-georreferencia"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/reportes/capas-georreferencia").with(user("user").roles("USER")))
+                .andExpect(status().isForbidden());
+
+        // 2) Maestro vacio -> 0 de 0 sin error
+        caletaRepo.deleteAll();
+        varaderoRepo.deleteAll();
+        plantaRepo.deleteAll();
+
+        MvcResult resVacio = mockMvc.perform(get("/api/reportes/capas-georreferencia")
+                        .with(user("fisc").roles("FISCALIZADOR")))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonVacio = objectMapper.readTree(resVacio.getResponse().getContentAsString());
+        assertEquals(0, jsonVacio.path("caletas").size());
+        assertEquals(0, jsonVacio.path("varaderos").size());
+        assertEquals(0, jsonVacio.path("plantas").size());
+        assertEquals(0, jsonVacio.path("cobertura").path("caletas").path("total").asInt());
+        assertEquals(0, jsonVacio.path("cobertura").path("caletas").path("conCoordenadas").asInt());
+        assertEquals(0, jsonVacio.path("cobertura").path("varaderos").path("total").asInt());
+        assertEquals(0, jsonVacio.path("cobertura").path("plantas").path("total").asInt());
+
+        // 3) Poblar dos regiones con coords validas e invalidas ((0,0), lat 95, invertidas)
+        RegionModel regA = regionRepo.saveAndFlush(RegionModel.builder().nombre("Coquimbo ZM6").codigo("04Z").build());
+        RegionModel regB = regionRepo.saveAndFlush(RegionModel.builder().nombre("Biobio ZM6").codigo("08Z").build());
+        ProvinciaModel provA = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("Elqui ZM6").region(regA).build());
+        ProvinciaModel provB = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("Concepcion ZM6").region(regB).build());
+        ComunaModel comA = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("La Serena ZM6").region(regA).provincia(provA).build());
+        ComunaModel comB = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("Talcahuano ZM6").region(regB).provincia(provB).build());
+
+        caletaRepo.saveAndFlush(CaletaModel.builder().nombre("Caleta Valida A").region(regA).comuna(comA)
+                .latitud(-29.91).longitud(-71.26).fuenteCoordenada("MAESTRO").build());
+        caletaRepo.saveAndFlush(CaletaModel.builder().nombre("Caleta Cero A").region(regA).comuna(comA)
+                .latitud(0.0).longitud(0.0).fuenteCoordenada("INVALIDA").build());
+        caletaRepo.saveAndFlush(CaletaModel.builder().nombre("Caleta Invertida B").region(regB).comuna(comB)
+                .latitud(-73.11).longitud(-36.72).fuenteCoordenada("INVERTIDA").build());
+
+        varaderoRepo.saveAndFlush(VaraderoModel.builder().nombre("Varadero Valido A").comuna(comA)
+                .latitud(-29.93).longitud(-71.28).fuenteCoordenada("SERNAPESCA").build());
+        varaderoRepo.saveAndFlush(VaraderoModel.builder().nombre("Varadero Lat95 B").comuna(comB)
+                .latitud(95.0).longitud(-73.10).fuenteCoordenada("ERR").build());
+
+        plantaRepo.saveAndFlush(PlantaModel.builder().id(8801L).codigo(8801).rut("76.111.222-3")
+                .nombre("Planta Valida A").comuna(comA).tipo("PROCESO")
+                .latitud(-29.95).longitud(-71.33).fuenteCoordenada("MAESTRO").build());
+        plantaRepo.saveAndFlush(PlantaModel.builder().id(8802L).codigo(8802).rut("76.222.333-4")
+                .nombre("Planta Sin Coords A").comuna(comA).tipo("SECADO").build());
+        plantaRepo.saveAndFlush(PlantaModel.builder().id(8803L).codigo(8803).rut("76.333.444-5")
+                .nombre("Planta Valida B").comuna(comB).tipo("PROCESO")
+                .latitud(-36.72).longitud(-73.11).fuenteCoordenada("MAESTRO").build());
+        plantaRepo.saveAndFlush(PlantaModel.builder().id(8804L).codigo(8804).rut("76.444.555-6")
+                .nombre("Planta Sin Comuna").tipo("PROCESO")
+                .latitud(-27.06).longitud(-70.82).fuenteCoordenada("MAESTRO").build());
+
+        // Global: todas las plantas validas (2 de 4), pero sin RUT en la respuesta
+        MvcResult resGlobal = mockMvc.perform(get("/api/reportes/capas-georreferencia")
+                        .with(user("aud").roles("AUDITOR")))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonGlobal = objectMapper.readTree(resGlobal.getResponse().getContentAsString());
+        assertEquals(1, jsonGlobal.path("caletas").size());
+        assertEquals(1, jsonGlobal.path("varaderos").size());
+        assertEquals(3, jsonGlobal.path("plantas").size());
+        assertEquals(3, jsonGlobal.path("cobertura").path("caletas").path("total").asInt());
+        assertEquals(1, jsonGlobal.path("cobertura").path("caletas").path("conCoordenadas").asInt());
+        assertEquals(4, jsonGlobal.path("cobertura").path("plantas").path("total").asInt());
+        assertEquals(3, jsonGlobal.path("cobertura").path("plantas").path("conCoordenadas").asInt());
+        for (JsonNode pl : jsonGlobal.path("plantas")) {
+            assertFalse(pl.has("rut"), "Las capas publicadas no deben exponer RUT de planta");
+        }
+
+        // Filtrado por regionA: excluye Biobio y excluye Planta Sin Comuna
+        MvcResult resRegA = mockMvc.perform(get("/api/reportes/capas-georreferencia")
+                        .with(user("adm").roles("ADMIN"))
+                        .param("regionId", String.valueOf(regA.getId())))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonRegA = objectMapper.readTree(resRegA.getResponse().getContentAsString());
+        assertEquals(1, jsonRegA.path("caletas").size());
+        assertEquals(1, jsonRegA.path("varaderos").size());
+        assertEquals(1, jsonRegA.path("plantas").size());
+        assertEquals("Planta Valida A", jsonRegA.path("plantas").get(0).path("nombre").asText());
+        assertEquals(2, jsonRegA.path("cobertura").path("plantas").path("total").asInt());
+        assertEquals(1, jsonRegA.path("cobertura").path("plantas").path("conCoordenadas").asInt());
+    }
+
+    @Test
+    @DisplayName("ZM.6: Multi-comercializador cronologico, validacion coords Chile, filtro regionDestinoId, importador PLANTA y GET /planta LAZY")
+    void flujosFiltroRegionDestinoYMultiComercializadorYPlantaController() throws Exception {
+        // Verificar rechazo de coordenadas invalidas (nula, 0/0, lat 95, invertida)
+        assertTrue(ReportService.esCoordenadaChileValida(-29.95, -71.33));
+        assertFalse(ReportService.esCoordenadaChileValida(null, -71.33));
+        assertFalse(ReportService.esCoordenadaChileValida(0.0, 0.0));
+        assertFalse(ReportService.esCoordenadaChileValida(95.0, -71.33));
+        assertFalse(ReportService.esCoordenadaChileValida(-71.33, -29.95));
+
+        RegionModel regOri = regionRepo.saveAndFlush(RegionModel.builder().nombre("Atacama DestTest").codigo("03D").build());
+        RegionModel regDest1 = regionRepo.saveAndFlush(RegionModel.builder().nombre("Coquimbo DestTest").codigo("04D").build());
+        RegionModel regDest2 = regionRepo.saveAndFlush(RegionModel.builder().nombre("Valparaiso DestTest").codigo("05D").build());
+
+        ProvinciaModel pOri = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("Huasco D").region(regOri).build());
+        ProvinciaModel pDest1 = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("Elqui D").region(regDest1).build());
+        ProvinciaModel pDest2 = provinciaRepo.saveAndFlush(ProvinciaModel.builder().nombre("San Antonio D").region(regDest2).build());
+
+        ComunaModel comOri = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("Huasco Com D").region(regOri).provincia(pOri).build());
+        ComunaModel comDest1 = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("Coquimbo Com D").region(regDest1).provincia(pDest1).build());
+        ComunaModel comDest2 = comunaRepo.saveAndFlush(ComunaModel.builder().nombre("Cartagena Com D").region(regDest2).provincia(pDest2).build());
+
+        CaletaModel calOri = caletaRepo.saveAndFlush(CaletaModel.builder()
+                .nombre("Caleta Carrizal Bajo D").region(regOri).comuna(comOri)
+                .latitud(-28.0811).longitud(-71.1489).fuenteCoordenada("MAESTRO").build());
+
+        EspecieModel esp = especieRepo.saveAndFlush(EspecieModel.builder().nombre("Lessonia ZM6").activo(true).build());
+        HumedadEstadoModel hum = humedadRepo.saveAndFlush(HumedadEstadoModel.builder().nombre("Humedo ZM6").rangoInicio(50).rangoFin(80).build());
+        ExtraccionTipoModel metodo = extraccionTipoRepo.saveAndFlush(ExtraccionTipoModel.builder().nombre("Barreteado ZM6").build());
+
+        UsuarioModel uRec = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("71.111.111-1").nombres("Rec").apellidop("ZM6").comuna(comOri).estado("ACTIVO").build());
+        UsuarioModel uCom1 = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("72.222.222-2").nombres("Com1").apellidop("ZM6").comuna(comOri).estado("ACTIVO").build());
+        UsuarioModel uCom2 = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("73.333.333-3").nombres("Com2").apellidop("ZM6").comuna(comDest1).estado("ACTIVO").build());
+        UsuarioModel uCom3 = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("74.444.444-4").nombres("Com3").apellidop("ZM6").comuna(comDest1).estado("ACTIVO").build());
+        UsuarioModel uPla1 = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("75.555.555-5").nombres("Planta1").apellidop("ZM6").comuna(comDest1).estado("ACTIVO").build());
+        UsuarioModel uPla2 = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("76.666.666-6").nombres("Planta2").apellidop("ZM6").comuna(comDest2).estado("ACTIVO").build());
+        UsuarioModel uPlaSinCom = usuarioRepo.saveAndFlush(UsuarioModel.builder()
+                .rut("77.777.777-7").nombres("PlantaSinCom").apellidop("ZM6").estado("ACTIVO").build());
+
+        PlantaModel planta1 = plantaRepo.saveAndFlush(PlantaModel.builder()
+                .id(9101L).codigo(9101).rut("75.555.555-5").nombre("Planta Destino 1").comuna(comDest1).tipo("PROCESO")
+                .latitud(-29.9610).longitud(-71.3410).fuenteCoordenada("MAESTRO").build());
+        plantaRepo.saveAndFlush(PlantaModel.builder()
+                .id(9102L).codigo(9102).rut("76.666.666-6").nombre("Planta Destino 2").comuna(comDest2).tipo("PROCESO")
+                .latitud(-33.5500).longitud(-71.6000).fuenteCoordenada("MAESTRO").build());
+        PlantaModel plantaSinCom = plantaRepo.saveAndFlush(PlantaModel.builder()
+                .id(9103L).codigo(9103).rut("77.777.777-7").nombre("Planta Pendiente Comuna").tipo("SECADO").build());
+
+        Date f1 = Date.valueOf("2026-09-10");
+        Date f2 = Date.valueOf("2026-09-11");
+        Date f3 = Date.valueOf("2026-09-12");
+
+        // Cadena 1: orig1 -> com1 (GPS valido) -> com2 (sin GPS) -> com3 (GPS invalido lat 95) -> dpa1 (Planta Destino 1)
+        DeclaracionRecolectorModel orig1 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZM6-1").fechaExtraccion(f1).fechaDeclaracion(f1).hora("08:00:00")
+                .nombre("Rec ZM6-1").codigoSernapesca("RPA-ZM6-1").caleta(calOri).comuna(comOri)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("400.00")).captura(new BigDecimal("420.00"))
+                .codigoDestinatario(uCom1.getRut()).nombreDestinatario("Com1 ZM6")
+                .usuarioDestinatario(uCom1).build());
+
+        DeclaracionComercializadorModel com1 = comercializadorRepo.saveAndFlush(DeclaracionComercializadorModel.builder()
+                .usuario(uCom1).folioOrigen("DC-ZM6-1").fechaDeclaracion(f1).hora("10:00:00")
+                .nombreComercializador("Com1 ZM6").codigoSernapesca("COM-1")
+                .latitud(-28.6000).longitud(-71.2000)
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("400.00"))
+                .codigoDestinatario(uCom2.getRut()).nombreDestinatario("Com2 ZM6")
+                .usuarioDestinatario(uCom2)
+                .declaracionesSeleccionadas("RECOLECTOR:" + orig1.getId())
+                .consumidaPorTipo("COMERCIALIZADOR").build());
+        orig1.setDeclaracionDestinatario(com1.getId());
+        orig1.setConsumidaPorTipo("COMERCIALIZADOR");
+        recolectorRepo.saveAndFlush(orig1);
+
+        DeclaracionComercializadorModel com2 = comercializadorRepo.saveAndFlush(DeclaracionComercializadorModel.builder()
+                .usuario(uCom2).folioOrigen("DC-ZM6-2").fechaDeclaracion(f2).hora("11:00:00")
+                .nombreComercializador("Com2 ZM6").codigoSernapesca("COM-2")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("390.00"))
+                .codigoDestinatario(uCom3.getRut()).nombreDestinatario("Com3 ZM6")
+                .usuarioDestinatario(uCom3)
+                .declaracionesSeleccionadas("COMERCIALIZADOR:" + com1.getId())
+                .consumidaPorTipo("COMERCIALIZADOR").build());
+        com1.setDeclaracionDestinatario(com2.getId());
+        comercializadorRepo.saveAndFlush(com1);
+
+        DeclaracionComercializadorModel com3 = comercializadorRepo.saveAndFlush(DeclaracionComercializadorModel.builder()
+                .usuario(uCom3).folioOrigen("DC-ZM6-3").fechaDeclaracion(f2).hora("16:00:00")
+                .nombreComercializador("Com3 ZM6").codigoSernapesca("COM-3")
+                .latitud(95.0).longitud(-71.3000)
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("390.00"))
+                .codigoDestinatario(uPla1.getRut()).nombreDestinatario("Planta Destino 1")
+                .usuarioDestinatario(uPla1)
+                .declaracionesSeleccionadas("COMERCIALIZADOR:" + com2.getId())
+                .consumidaPorTipo("PLANTA_ABASTECIMIENTO").build());
+        com2.setDeclaracionDestinatario(com3.getId());
+        comercializadorRepo.saveAndFlush(com2);
+
+        DeclaracionPlantaAbastecimientoModel dpa1 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPla1).folioDeclaracionAPla("APLA-ZM6-1").fechaIngresoPlanta(f3).hora("09:00:00")
+                .nombrePlanta("Planta Destino 1").codigoSernapesca("9101")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("385.00")).pesoRomanaKg(new BigDecimal("385.00"))
+                .declaracionesSeleccionadas("COMERCIALIZADOR:" + com3.getId()).build());
+        com3.setDeclaracionDestinatario(dpa1.getId());
+        comercializadorRepo.saveAndFlush(com3);
+
+        // Cadena 2 directa -> Planta Destino 2 (Valparaiso)
+        DeclaracionRecolectorModel orig2 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZM6-2").fechaExtraccion(f1).fechaDeclaracion(f1).hora("12:00:00")
+                .nombre("Rec ZM6-2").codigoSernapesca("RPA-ZM6-2").caleta(calOri).comuna(comOri)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("200.00")).captura(new BigDecimal("210.00"))
+                .codigoDestinatario(uPla2.getRut()).nombreDestinatario("Planta Destino 2")
+                .usuarioDestinatario(uPla2).build());
+        DeclaracionPlantaAbastecimientoModel dpa2 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPla2).folioDeclaracionAPla("APLA-ZM6-2").fechaIngresoPlanta(f3).hora("10:00:00")
+                .nombrePlanta("Planta Destino 2").codigoSernapesca("9102")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("198.00")).pesoRomanaKg(new BigDecimal("198.00"))
+                .declaracionesSeleccionadas("RECOLECTOR:" + orig2.getId()).build());
+        orig2.setDeclaracionDestinatario(dpa2.getId());
+        orig2.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
+        recolectorRepo.saveAndFlush(orig2);
+
+        // Cadena 3 directa -> Planta Pendiente Comuna (sin comuna inicial)
+        DeclaracionRecolectorModel orig3 = recolectorRepo.saveAndFlush(DeclaracionRecolectorModel.builder()
+                .usuario(uRec).folioOrigen("RO-ZM6-3").fechaExtraccion(f1).fechaDeclaracion(f1).hora("13:00:00")
+                .nombre("Rec ZM6-3").codigoSernapesca("RPA-ZM6-3").caleta(calOri).comuna(comOri)
+                .especie(esp).extraccionTipo(metodo).humedadEstado(hum)
+                .desembarque(new BigDecimal("150.00")).captura(new BigDecimal("160.00"))
+                .codigoDestinatario(uPlaSinCom.getRut()).nombreDestinatario("Planta Pendiente Comuna")
+                .usuarioDestinatario(uPlaSinCom).build());
+        DeclaracionPlantaAbastecimientoModel dpa3 = abastRepo.saveAndFlush(DeclaracionPlantaAbastecimientoModel.builder()
+                .usuario(uPlaSinCom).folioDeclaracionAPla("APLA-ZM6-3").fechaIngresoPlanta(f3).hora("11:00:00")
+                .nombrePlanta("Planta Pendiente Comuna").codigoSernapesca("9103")
+                .especie(esp).humedadEstado(hum).cantidad(new BigDecimal("148.00")).pesoRomanaKg(new BigDecimal("148.00"))
+                .declaracionesSeleccionadas("RECOLECTOR:" + orig3.getId()).build());
+        orig3.setDeclaracionDestinatario(dpa3.getId());
+        orig3.setConsumidaPorTipo("PLANTA_ABASTECIMIENTO");
+        recolectorRepo.saveAndFlush(orig3);
+        referenciaOrigenService.invalidarCache();
+
+        // A) Filtro por regionDestinoId = regDest1 -> solo flujo a Planta Destino 1 y 3 hops cronologicos
+        MvcResult resDest1 = mockMvc.perform(get("/api/reportes/flujos-origen-destino")
+                        .with(user("fisc").roles("FISCALIZADOR"))
+                        .param("startDate", "2026-09-01")
+                        .param("endDate", "2026-09-30")
+                        .param("regionDestinoId", String.valueOf(regDest1.getId())))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonDest1 = objectMapper.readTree(resDest1.getResponse().getContentAsString());
+        assertEquals(1, jsonDest1.path("declaraciones").size());
+        assertEquals(1, jsonDest1.path("flujosMapa").size());
+
+        JsonNode decl1 = jsonDest1.path("declaraciones").get(0);
+        assertEquals("RO-ZM6-1", decl1.path("origenFolio").asText());
+        assertEquals("Coquimbo Com D", decl1.path("plantaComuna").asText());
+        assertEquals(regDest1.getId().longValue(), decl1.path("plantaRegionId").asLong());
+        assertEquals(3, decl1.path("comercializadores").size());
+        assertEquals("DC-ZM6-1", decl1.path("comercializadores").get(0).path("folio").asText());
+        assertEquals("GPS_DECLARACION", decl1.path("comercializadores").get(0).path("fuente").asText());
+        assertEquals("DC-ZM6-2", decl1.path("comercializadores").get(1).path("folio").asText());
+        assertEquals("SIN_COORDENADAS", decl1.path("comercializadores").get(1).path("fuente").asText());
+        assertEquals("DC-ZM6-3", decl1.path("comercializadores").get(2).path("folio").asText());
+        assertEquals("SIN_COORDENADAS", decl1.path("comercializadores").get(2).path("fuente").asText());
+        assertTrue(decl1.path("comercializadores").get(2).path("latitud").isNull(), "Latitud 95 debe descartarse");
+
+        JsonNode flujo1 = jsonDest1.path("flujosMapa").get(0);
+        assertTrue(flujo1.path("algunComercializadorSinCoordenadas").asBoolean());
+        assertEquals(3, flujo1.path("comercializadores").size());
+
+        // B) ImportarCoordenadasService asigna comuna y coordenadas a Planta Pendiente Comuna (ZM.4)
+        String csvPlanta = "tipo;codigo;nombre;comuna;region;latitud;longitud;datum;fuente\n"
+                + "PLANTA;9103;Planta Pendiente Comuna;Coquimbo Com D;Coquimbo DestTest;-29.9700;-71.3500;WGS84;PLANILLA_PLANTA\n";
+        ResumenImportacionDto impRes = importarCoordenadasService.procesarPlanilla(
+                new ByteArrayInputStream(csvPlanta.getBytes(StandardCharsets.UTF_8)), true, false, "zm6-it");
+        assertEquals(1, impRes.getCalzadas());
+        assertEquals(1, impRes.getAplicadas());
+        assertEquals(EstadoFilaCoordenada.CALZADA, impRes.getFilas().get(0).getEstado());
+
+        PlantaModel actualizada = plantaRepo.findById(plantaSinCom.getId()).orElseThrow();
+        assertNotNull(actualizada.getComuna());
+        assertEquals(comDest1.getId(), actualizada.getComuna().getId());
+        assertEquals(-29.9700, actualizada.getLatitud(), 1e-4);
+
+        // C) GET /planta bajo open-in-view=false no lanza LazyInitializationException y serializa comuna
+        MvcResult resPlantas = mockMvc.perform(get("/planta").with(user("fisc").roles("FISCALIZADOR")))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonPlantas = objectMapper.readTree(resPlantas.getResponse().getContentAsString());
+        assertTrue(jsonPlantas.isArray() && jsonPlantas.size() >= 2);
+        boolean encontroPlanta1ConComuna = false;
+        for (JsonNode p : jsonPlantas) {
+            if (planta1.getId().equals(p.path("id").asLong())) {
+                encontroPlanta1ConComuna = "Coquimbo Com D".equals(p.path("comuna").path("nombre").asText());
+            }
+        }
+        assertTrue(encontroPlanta1ConComuna, "GET /planta debe serializar comuna sin LazyInitializationException");
+
+        // Reconsultar regionDestinoId = regDest1 ahora incluye Planta Destino 1 y Planta Pendiente Comuna
+        referenciaOrigenService.invalidarCache();
+        MvcResult resDest1PostImp = mockMvc.perform(get("/api/reportes/flujos-origen-destino")
+                        .with(user("fisc").roles("FISCALIZADOR"))
+                        .param("startDate", "2026-09-01")
+                        .param("endDate", "2026-09-30")
+                        .param("regionDestinoId", String.valueOf(regDest1.getId())))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode jsonDest1Post = objectMapper.readTree(resDest1PostImp.getResponse().getContentAsString());
+        assertEquals(2, jsonDest1Post.path("declaraciones").size());
     }
 }
