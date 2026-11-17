@@ -22,36 +22,37 @@ import com.trazalga.api.repositories.*;
 @Service
 public class DeclaracionArmadorService {
 
-    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de
+    // fiscalización
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
-    
+
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-    
+
     @Autowired
     private IDeclaracionArmadorRepository declaracionArmadorRepository;
-    
+
     @Autowired
     private IUsuarioRepository usuarioRepository;
-    
+
     @Autowired
     private IEmbarcacionRepository embarcacionRepository;
-    
+
     @Autowired
     private IBuzoRepository buzoRepository;
-    
+
     @Autowired
     private ICaletaRepository caletaRepository;
-    
+
     @Autowired
     private IEspecieRepository especieRepository;
-    
+
     @Autowired
     private IComposicionRepository composicionRepository;
-    
+
     @Autowired
     private IHumedadEstadoRepository humedadEstadoRepository;
-    
+
     @Autowired
     private IComunaRepository comunaRepository;
 
@@ -66,15 +67,17 @@ public class DeclaracionArmadorService {
 
     @Autowired
     private CapturaService capturaService;
-    
+
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmador() {
-        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAll();
+        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository
+                .findAll();
         declaraciones.forEach(this::populateBuzos);
         return declaraciones;
     }
 
     public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(Long id) {
-        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository.findAllByUsuarioId(id);
+        ArrayList<DeclaracionArmadorModel> declaraciones = (ArrayList<DeclaracionArmadorModel>) declaracionArmadorRepository
+                .findAllByUsuarioId(id);
         declaraciones.forEach(this::populateBuzos);
         return declaraciones;
     }
@@ -82,21 +85,28 @@ public class DeclaracionArmadorService {
     @Autowired
     private BloqueoCargaService bloqueoCargaService;
 
-    public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId) {
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository
+                .findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         declaraciones.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerArmadores(declaraciones);
         return declaraciones;
     }
 
-    // Variante para el formulario de edición: además de las no consumidas, incluye las
-    // que ya consumió la declaración que se está editando (consumidasPorId), para que
-    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
-    public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+    // Variante para el formulario de edición: además de las no consumidas, incluye
+    // las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para
+    // que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen
+    // consolidado.
+    public List<DeclaracionArmadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId, Long consumidasPorId) {
         if (consumidasPorId == null) {
             return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
         }
-        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorRepository
+                .findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         declaraciones.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerArmadores(declaraciones);
         return declaraciones;
@@ -115,8 +125,10 @@ public class DeclaracionArmadorService {
     private com.trazalga.api.services.ConfiguracionGeneralService configService;
 
     private ComunaModel resolverComunaCargada(ComunaModel c) {
-        if (c == null) return null;
-        if (org.hibernate.Hibernate.isInitialized(c)) return c;
+        if (c == null)
+            return null;
+        if (org.hibernate.Hibernate.isInitialized(c))
+            return c;
         return c.getId() != null ? comunaRepository.findById(c.getId()).orElse(null) : null;
     }
 
@@ -139,14 +151,15 @@ public class DeclaracionArmadorService {
 
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
-        
+
         if (request.getUsuario() == null || request.getUsuario().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario es obligatorio.");
         }
         UsuarioModel usuario = usuarioRepository.findById(request.getUsuario().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El usuario especificado no existe."));
         declaracion.setUsuario(usuario);
-        
+
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
         Date fechaExt = parseDate(request.getFechaExtraccion());
@@ -173,9 +186,10 @@ public class DeclaracionArmadorService {
         }
         if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null
                 && declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha de extracción no puede ser posterior a la fecha de declaración.");
         }
-        
+
         if (request.getEmbarcacion() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
@@ -187,26 +201,33 @@ public class DeclaracionArmadorService {
             embarcacion = embarcacionRepository.findByCodigo(request.getEmbarcacion().getCodigo()).orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getId() != null) {
-            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
+            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId()))
+                    .orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
             embarcacion = embarcacionRepository.findFirstByNombre(request.getEmbarcacion().getNombre()).orElse(null);
         }
         if (embarcacion == null) {
-            if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
+            if (request.getEmbarcacion().getNombre() != null
+                    && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
                 EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
                 nuevaEmbarcacion.setNombre(request.getEmbarcacion().getNombre());
-                nuevaEmbarcacion.setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+                nuevaEmbarcacion
+                        .setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo()
+                                : String.valueOf(request.getEmbarcacion().getId()));
                 embarcacion = embarcacionRepository.save(nuevaEmbarcacion);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe en la base de datos local.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La embarcación especificada no existe en la base de datos local.");
             }
         }
         declaracion.setEmbarcacion(embarcacion);
-        declaracion.setCodigoSernapescaEmbarcacion(embarcacion.getCodigo() != null ? embarcacion.getCodigo() : String.valueOf(embarcacion.getId()));
-        
+        declaracion.setCodigoSernapescaEmbarcacion(
+                embarcacion.getCodigo() != null ? embarcacion.getCodigo() : String.valueOf(embarcacion.getId()));
+
         if (request.getBuzo() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El buzo (patrón/tripulante principal) es obligatorio.");
         }
         BuzoModel buzo = null;
         if (request.getBuzo().getId() != null) {
@@ -225,30 +246,34 @@ public class DeclaracionArmadorService {
             if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
                 BuzoModel nuevoBuzo = new BuzoModel();
                 nuevoBuzo.setNombre(request.getBuzo().getNombre());
-                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo() : String.valueOf(request.getBuzo().getId()));
+                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo()
+                        : String.valueOf(request.getBuzo().getId()));
                 buzo = buzoRepository.save(nuevoBuzo);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe en la base de datos local.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El buzo especificado no existe en la base de datos local.");
             }
         }
         declaracion.setBuzo(buzo);
         declaracion.setCodigoSernapescaBuzo(buzo.getCodigo() != null ? buzo.getCodigo() : String.valueOf(buzo.getId()));
-        
+
         declaracion.setDesembarque(parseBigDecimal(request.getDesembarque()));
         declaracion.setCaptura(request.getCaptura());
-        declaracion.setTipoDestinatario(request.getTipoDestinatario() != null ? request.getTipoDestinatario() : "comercializador");
-        
+        declaracion.setTipoDestinatario(
+                request.getTipoDestinatario() != null ? request.getTipoDestinatario() : "comercializador");
+
         String codigoDestinatario = null;
         if (request.getUsuarioDestinatario() != null && request.getUsuarioDestinatario().getRut() != null) {
             codigoDestinatario = request.getUsuarioDestinatario().getRut();
         }
         declaracion.setCodigoDestinatario(codigoDestinatario);
-        
+
         if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario es obligatorio.");
         }
         UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El destinatario especificado no existe."));
         declaracion.setUsuarioDestinatario(usuarioDestinatario);
         boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
                 declaracion.getTipoDestinatario(),
@@ -262,55 +287,65 @@ public class DeclaracionArmadorService {
                 request.getPlacaPatenteCarro(),
                 declaracion::setPlacaPatente,
                 declaracion::setPlacaPatenteCarro);
-        
+
         if (request.getCaleta() == null || request.getCaleta().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");
         }
         CaletaModel caleta = caletaRepository.findById(request.getCaleta().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
         declaracion.setCaleta(caleta);
-        
+
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
             if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
                 ComunaModel comunaCaleta = resolverComunaCargada(caleta.getComuna());
-                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
-                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null ? comunaCaleta.getNombre() : "ID " + caleta.getComuna().getId();
+                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null
+                        ? comunaDeclarada.getNombre()
+                        : "ID " + request.getComuna().getId();
+                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null
+                        ? comunaCaleta.getNombre()
+                        : "ID " + caleta.getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
+                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre,
+                                comunaDeclaradaNombre));
             }
             declaracion.setComuna(comunaDeclarada);
         } else if (caleta.getComuna() != null) {
             declaracion.setComuna(resolverComunaCargada(caleta.getComuna()));
         }
-        
+
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie es obligatoria.");
         }
         EspecieModel especie = especieRepository.findById(request.getEspecie().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie especificada no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La especie especificada no existe."));
         declaracion.setEspecie(especie);
-        
+
         if (request.getComposicion() != null && request.getComposicion().getId() != null) {
             Optional<ComposicionModel> composicion = composicionRepository.findById(request.getComposicion().getId());
             composicion.ifPresent(declaracion::setComposicion);
         }
-        
+
         if (request.getHumedadEstado() == null || request.getHumedadEstado().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad es obligatorio.");
         }
         HumedadEstadoModel humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El estado de humedad especificado no existe."));
         declaracion.setHumedadEstado(humedadEstado);
-        
+
         if (request.getExtraccionTipo() != null && request.getExtraccionTipo().getId() != null) {
             extraccionTipoRepository.findById(request.getExtraccionTipo().getId())
                     .ifPresent(declaracion::setExtraccionTipo);
         }
 
-        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de
+        // Captura)
         Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
-                ? declaracion.getUsuario().getComuna().getId() : null;
+                ? declaracion.getUsuario().getComuna().getId()
+                : null;
         Long comunaDesembarqueId = declaracion.getComuna() != null ? declaracion.getComuna().getId() : null;
         Long regionId = resolverRegionId(declaracion.getComuna(), declaracion.getCaleta());
 
@@ -321,8 +356,10 @@ public class DeclaracionArmadorService {
                 .embarcacionId(declaracion.getEmbarcacion() != null ? declaracion.getEmbarcacion().getId() : null)
                 .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
                 .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .humedadNombre(
+                        declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
+                .extraccionTipoId(
+                        declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
@@ -344,9 +381,10 @@ public class DeclaracionArmadorService {
         declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
-        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada
+        // por veda); nulo = el declarado
         declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
-        
+
         DeclaracionArmadorModel savedDeclaracion = declaracionArmadorRepository.save(declaracion);
         if (politicaFechaDeclaracion != null && ajusteFecha != null) {
             politicaFechaDeclaracion.registrar(ajusteFecha, savedDeclaracion.getId());
@@ -354,7 +392,8 @@ public class DeclaracionArmadorService {
 
         // Guardar los buzos asociados en la tabla declaracion_buzos
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
-            PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil() : null;
+            PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil()
+                    : null;
             for (BuzoModel buzoRequest : request.getBuzos()) {
                 BuzoModel b = null;
                 if (buzoRequest.getId() != null) {
@@ -372,10 +411,11 @@ public class DeclaracionArmadorService {
                 if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
                     BuzoModel nuevoB = new BuzoModel();
                     nuevoB.setNombre(buzoRequest.getNombre());
-                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo() : String.valueOf(buzoRequest.getId()));
+                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo()
+                            : String.valueOf(buzoRequest.getId()));
                     b = buzoRepository.save(nuevoB);
                 }
-                
+
                 if (b != null) {
                     DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
                     declaracionBuzo.setPerfil(perfil);
@@ -387,14 +427,15 @@ public class DeclaracionArmadorService {
         }
 
         populateBuzos(savedDeclaracion);
-        
+
         // Procesar marcas de fiscalización y alertas push
         alertaTriggerService.procesarMarcas("ARMADOR", savedDeclaracion.getId(),
                 savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
                 resVal.getMarcas());
 
         // T8.2: Verificación geotemporal de doble operación
-        if (savedDeclaracion.getUsuario() != null && savedDeclaracion.getLatitud() != null && savedDeclaracion.getLongitud() != null) {
+        if (savedDeclaracion.getUsuario() != null && savedDeclaracion.getLatitud() != null
+                && savedDeclaracion.getLongitud() != null) {
             validacionDeclaracionService.verificarDobleOperacion(
                     savedDeclaracion.getUsuario().getId(),
                     savedDeclaracion.getLatitud(),
@@ -403,8 +444,8 @@ public class DeclaracionArmadorService {
                     savedDeclaracion.getHora(),
                     "ARMADOR",
                     savedDeclaracion.getId(),
-                    savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DA-" + savedDeclaracion.getId()
-            );
+                    savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen()
+                            : "DA-" + savedDeclaracion.getId());
         }
 
         // T9.3: Verificación de origen real vs GPS capturado
@@ -412,14 +453,14 @@ public class DeclaracionArmadorService {
         validacionDeclaracionService.verificarOrigenGeo(
                 "ARMADOR",
                 savedDeclaracion.getId(),
-                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DA-" + savedDeclaracion.getId(),
+                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen()
+                        : "DA-" + savedDeclaracion.getId(),
                 savedDeclaracion.getLatitud(),
                 savedDeclaracion.getLongitud(),
                 savedDeclaracion.getPrecisionGpsM(),
                 savedDeclaracion.getEnvioOffline(),
                 caletaId,
-                null
-        );
+                null);
 
         return savedDeclaracion;
     }
@@ -436,17 +477,21 @@ public class DeclaracionArmadorService {
             return null;
         }
         if (declaracionArmadorModel.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
-        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del
+        // fiscalizador (423 si no)
         java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
-                ? politicaEdicion.verificarEdicion("ARMADOR", id) : java.util.Optional.empty();
+                ? politicaEdicion.verificarEdicion("ARMADOR", id)
+                : java.util.Optional.empty();
 
         if (request.getUsuario() == null || request.getUsuario().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario es obligatorio.");
         }
         UsuarioModel usuario = usuarioRepository.findById(request.getUsuario().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El usuario especificado no existe."));
         declaracionArmadorModel.setUsuario(usuario);
 
         declaracionArmadorModel.setFolioOrigen(request.getFolioOrigen());
@@ -454,12 +499,13 @@ public class DeclaracionArmadorService {
         Date fechaExt = parseDate(request.getFechaExtraccion());
         Date fechaDec = parseDate(request.getFechaDeclaracion());
         if (fechaExt != null && fechaDec != null && fechaExt.after(fechaDec)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha de extracción no puede ser posterior a la fecha de declaración.");
         }
         declaracionArmadorModel.setFechaExtraccion(fechaExt);
         declaracionArmadorModel.setFechaDeclaracion(fechaDec);
         declaracionArmadorModel.setHora(request.getHora());
-        
+
         if (request.getEmbarcacion() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
         }
@@ -471,25 +517,31 @@ public class DeclaracionArmadorService {
             embarcacion = embarcacionRepository.findByCodigo(request.getEmbarcacion().getCodigo()).orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getId() != null) {
-            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId())).orElse(null);
+            embarcacion = embarcacionRepository.findByCodigo(String.valueOf(request.getEmbarcacion().getId()))
+                    .orElse(null);
         }
         if (embarcacion == null && request.getEmbarcacion().getNombre() != null) {
             embarcacion = embarcacionRepository.findFirstByNombre(request.getEmbarcacion().getNombre()).orElse(null);
         }
         if (embarcacion == null) {
-            if (request.getEmbarcacion().getNombre() != null && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
+            if (request.getEmbarcacion().getNombre() != null
+                    && !request.getEmbarcacion().getNombre().trim().isEmpty()) {
                 EmbarcacionModel nuevaEmbarcacion = new EmbarcacionModel();
                 nuevaEmbarcacion.setNombre(request.getEmbarcacion().getNombre());
-                nuevaEmbarcacion.setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo() : String.valueOf(request.getEmbarcacion().getId()));
+                nuevaEmbarcacion
+                        .setCodigo(request.getEmbarcacion().getCodigo() != null ? request.getEmbarcacion().getCodigo()
+                                : String.valueOf(request.getEmbarcacion().getId()));
                 embarcacion = embarcacionRepository.save(nuevaEmbarcacion);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación especificada no existe en la base de datos local.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La embarcación especificada no existe en la base de datos local.");
             }
         }
         declaracionArmadorModel.setEmbarcacion(embarcacion);
-        
+
         if (request.getBuzo() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo (patrón/tripulante principal) es obligatorio.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El buzo (patrón/tripulante principal) es obligatorio.");
         }
         BuzoModel buzo = null;
         if (request.getBuzo().getId() != null) {
@@ -508,14 +560,16 @@ public class DeclaracionArmadorService {
             if (request.getBuzo().getNombre() != null && !request.getBuzo().getNombre().trim().isEmpty()) {
                 BuzoModel nuevoBuzo = new BuzoModel();
                 nuevoBuzo.setNombre(request.getBuzo().getNombre());
-                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo() : String.valueOf(request.getBuzo().getId()));
+                nuevoBuzo.setCodigo(request.getBuzo().getCodigo() != null ? request.getBuzo().getCodigo()
+                        : String.valueOf(request.getBuzo().getId()));
                 buzo = buzoRepository.save(nuevoBuzo);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El buzo especificado no existe en la base de datos local.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El buzo especificado no existe en la base de datos local.");
             }
         }
         declaracionArmadorModel.setBuzo(buzo);
-        
+
         declaracionArmadorModel.setDesembarque(parseBigDecimal(request.getDesembarque()));
 
         if (request.getExtraccionTipo() != null && request.getExtraccionTipo().getId() != null) {
@@ -524,12 +578,13 @@ public class DeclaracionArmadorService {
         }
 
         declaracionArmadorModel.setTipoDestinatario(request.getTipoDestinatario());
-        
+
         if (request.getUsuarioDestinatario() == null || request.getUsuarioDestinatario().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario es obligatorio.");
         }
         UsuarioModel usuarioDestinatario = usuarioRepository.findById(request.getUsuarioDestinatario().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destinatario especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El destinatario especificado no existe."));
         declaracionArmadorModel.setUsuarioDestinatario(usuarioDestinatario);
         boolean esPlantaDirecto = com.trazalga.api.services.EstadoTrasladoPatente.esDestinoDirectoPlanta(
                 declaracionArmadorModel.getTipoDestinatario(),
@@ -543,70 +598,94 @@ public class DeclaracionArmadorService {
                 request.getPlacaPatenteCarro(),
                 declaracionArmadorModel::setPlacaPatente,
                 declaracionArmadorModel::setPlacaPatenteCarro);
-        
+
         if (request.getCaleta() == null || request.getCaleta().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta es obligatoria.");
         }
         CaletaModel caleta = caletaRepository.findById(request.getCaleta().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
         declaracionArmadorModel.setCaleta(caleta);
-        
+
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
             if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
                 ComunaModel comunaCaleta = resolverComunaCargada(caleta.getComuna());
-                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
-                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null ? comunaCaleta.getNombre() : "ID " + caleta.getComuna().getId();
+                String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null
+                        ? comunaDeclarada.getNombre()
+                        : "ID " + request.getComuna().getId();
+                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null
+                        ? comunaCaleta.getNombre()
+                        : "ID " + caleta.getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
+                        String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre,
+                                comunaDeclaradaNombre));
             }
             declaracionArmadorModel.setComuna(comunaDeclarada);
         } else if (caleta.getComuna() != null) {
             declaracionArmadorModel.setComuna(resolverComunaCargada(caleta.getComuna()));
         }
-        
+
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie es obligatoria.");
         }
         EspecieModel especie = especieRepository.findById(request.getEspecie().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La especie especificada no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La especie especificada no existe."));
         declaracionArmadorModel.setEspecie(especie);
-        
+
         if (request.getComposicion() != null && request.getComposicion().getId() != null) {
             Optional<ComposicionModel> composicion = composicionRepository.findById(request.getComposicion().getId());
             composicion.ifPresent(declaracionArmadorModel::setComposicion);
         }
-        
+
         if (request.getHumedadEstado() == null || request.getHumedadEstado().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad es obligatorio.");
         }
         HumedadEstadoModel humedadEstado = humedadEstadoRepository.findById(request.getHumedadEstado().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de humedad especificado no existe."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El estado de humedad especificado no existe."));
         declaracionArmadorModel.setHumedadEstado(humedadEstado);
-        
+
         declaracionArmadorModel.setLatitud(request.getLatitud());
         declaracionArmadorModel.setLongitud(request.getLongitud());
 
         // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
-        Long comunaInscripcionId = (declaracionArmadorModel.getUsuario() != null && declaracionArmadorModel.getUsuario().getComuna() != null)
-                ? declaracionArmadorModel.getUsuario().getComuna().getId() : null;
-        Long comunaDesembarqueId = declaracionArmadorModel.getComuna() != null ? declaracionArmadorModel.getComuna().getId() : null;
+        Long comunaInscripcionId = (declaracionArmadorModel.getUsuario() != null
+                && declaracionArmadorModel.getUsuario().getComuna() != null)
+                        ? declaracionArmadorModel.getUsuario().getComuna().getId()
+                        : null;
+        Long comunaDesembarqueId = declaracionArmadorModel.getComuna() != null
+                ? declaracionArmadorModel.getComuna().getId()
+                : null;
         Long regionId = resolverRegionId(declaracionArmadorModel.getComuna(), declaracionArmadorModel.getCaleta());
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("ARMADOR")
-                .usuarioId(declaracionArmadorModel.getUsuario() != null ? declaracionArmadorModel.getUsuario().getId() : null)
+                .usuarioId(declaracionArmadorModel.getUsuario() != null ? declaracionArmadorModel.getUsuario().getId()
+                        : null)
                 .buzoId(declaracionArmadorModel.getBuzo() != null ? declaracionArmadorModel.getBuzo().getId() : null)
-                .embarcacionId(declaracionArmadorModel.getEmbarcacion() != null ? declaracionArmadorModel.getEmbarcacion().getId() : null)
-                .especieId(declaracionArmadorModel.getEspecie() != null ? declaracionArmadorModel.getEspecie().getId() : null)
-                .humedadEstadoId(declaracionArmadorModel.getHumedadEstado() != null ? declaracionArmadorModel.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracionArmadorModel.getHumedadEstado() != null ? declaracionArmadorModel.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracionArmadorModel.getExtraccionTipo() != null ? declaracionArmadorModel.getExtraccionTipo().getId() : null)
+                .embarcacionId(declaracionArmadorModel.getEmbarcacion() != null
+                        ? declaracionArmadorModel.getEmbarcacion().getId()
+                        : null)
+                .especieId(declaracionArmadorModel.getEspecie() != null ? declaracionArmadorModel.getEspecie().getId()
+                        : null)
+                .humedadEstadoId(declaracionArmadorModel.getHumedadEstado() != null
+                        ? declaracionArmadorModel.getHumedadEstado().getId()
+                        : null)
+                .humedadNombre(declaracionArmadorModel.getHumedadEstado() != null
+                        ? declaracionArmadorModel.getHumedadEstado().getNombre()
+                        : null)
+                .extraccionTipoId(declaracionArmadorModel.getExtraccionTipo() != null
+                        ? declaracionArmadorModel.getExtraccionTipo().getId()
+                        : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
                 .fechaExtraccion(declaracionArmadorModel.getFechaExtraccion())
-                .fechaDeclaracion(declaracionArmadorModel.getFechaDeclaracion() != null ? declaracionArmadorModel.getFechaDeclaracion() : new Date())
+                .fechaDeclaracion(declaracionArmadorModel.getFechaDeclaracion() != null
+                        ? declaracionArmadorModel.getFechaDeclaracion()
+                        : new Date())
                 .hora(declaracionArmadorModel.getHora())
                 .desembarqueKg(declaracionArmadorModel.getDesembarque())
                 .esEdicion(true)
@@ -630,7 +709,8 @@ public class DeclaracionArmadorService {
         declaracionBuzosRepository.deleteAll(buzosAnteriores);
 
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
-            PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil() : null;
+            PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil()
+                    : null;
             for (BuzoModel buzoRequest : request.getBuzos()) {
                 BuzoModel b = null;
                 if (buzoRequest.getId() != null) {
@@ -648,10 +728,11 @@ public class DeclaracionArmadorService {
                 if (b == null && buzoRequest.getNombre() != null && !buzoRequest.getNombre().trim().isEmpty()) {
                     BuzoModel nuevoB = new BuzoModel();
                     nuevoB.setNombre(buzoRequest.getNombre());
-                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo() : String.valueOf(buzoRequest.getId()));
+                    nuevoB.setCodigo(buzoRequest.getCodigo() != null ? buzoRequest.getCodigo()
+                            : String.valueOf(buzoRequest.getId()));
                     b = buzoRepository.save(nuevoB);
                 }
-                
+
                 if (b != null) {
                     DeclaracionBuzosModel declaracionBuzo = new DeclaracionBuzosModel();
                     declaracionBuzo.setPerfil(perfil);
@@ -670,13 +751,13 @@ public class DeclaracionArmadorService {
                 resVal.getMarcas());
 
         // Notificar al destinatario que la declaración fue modificada
-        if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
+        if (updatedDeclaracion.getUsuarioDestinatario() != null
+                && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
             gestionMensajeService.notificarModificacion(
-                "ARMADOR", updatedDeclaracion.getId(),
-                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
-                updatedDeclaracion.getUsuarioDestinatario().getId(),
-                updatedDeclaracion.getFolioOrigen()
-            );
+                    "ARMADOR", updatedDeclaracion.getId(),
+                    updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                    updatedDeclaracion.getUsuarioDestinatario().getId(),
+                    updatedDeclaracion.getFolioOrigen());
         }
 
         if (politicaEdicion != null) {
@@ -688,9 +769,11 @@ public class DeclaracionArmadorService {
     public Boolean deleteDeclaracionArmador(Long id) {
         DeclaracionArmadorModel model = declaracionArmadorRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
         }
-        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un
+        // fiscalizador (423)
         if (model != null && politicaEdicion != null) {
             politicaEdicion.verificarEliminacion("ARMADOR", id);
         }
@@ -698,7 +781,7 @@ public class DeclaracionArmadorService {
             // Eliminar buzos asociados primero
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionArmadorId(id);
             declaracionBuzosRepository.deleteAll(buzos);
-            
+
             declaracionArmadorRepository.deleteById(id);
             return true;
         } catch (Exception e) {
@@ -708,7 +791,8 @@ public class DeclaracionArmadorService {
 
     private void populateBuzos(DeclaracionArmadorModel declaracion) {
         if (declaracion != null && declaracion.getId() != null) {
-            List<DeclaracionBuzosModel> declaracionBuzos = declaracionBuzosRepository.findByDeclaracionArmadorId(declaracion.getId());
+            List<DeclaracionBuzosModel> declaracionBuzos = declaracionBuzosRepository
+                    .findByDeclaracionArmadorId(declaracion.getId());
             List<BuzoModel> buzos = new ArrayList<>();
             for (DeclaracionBuzosModel db : declaracionBuzos) {
                 buzos.add(db.getBuzo());
@@ -726,7 +810,7 @@ public class DeclaracionArmadorService {
         List<String> folios = declaracionArmadorRepository.findLastFolioDesembarqueDa();
         return folios.isEmpty() ? null : folios.getFirst();
     }
-    
+
     private Date parseDate(Object dateObj) {
         if (dateObj == null) {
             return null;
@@ -740,7 +824,7 @@ public class DeclaracionArmadorService {
             return null;
         }
     }
-    
+
     private BigDecimal parseBigDecimal(Object value) {
         if (value == null) {
             return null;
