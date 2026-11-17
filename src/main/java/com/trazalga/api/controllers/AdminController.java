@@ -32,6 +32,9 @@ public class AdminController {
     @Autowired
     private com.trazalga.api.services.indicadores.RecalculoRendimientoFinalService recalculoRendimientoFinalService;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.CorregirFechasDeclaracionesService corregirFechasDeclaracionesService;
+
     @GetMapping("/tareas-programadas")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Obtiene el estado de la última ejecución de cada tarea programada (TA.6)")
@@ -60,5 +63,15 @@ public class AdminController {
     public ResponseEntity<java.util.Map<String, Object>> recalcularRendimientoFinal(
             @org.springframework.web.bind.annotation.RequestParam(value = "aplicar", defaultValue = "true") boolean aplicar) {
         return ResponseEntity.ok(recalculoRendimientoFinalService.recalcularHistorico(aplicar));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/declaraciones/corregir-fechas")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Simulación y corrección controlada de fechas desfasadas por UTC usando gps_capturado_en (ZT.3 / D50)")
+    public ResponseEntity<java.util.Map<String, Object>> corregirFechasDeclaraciones(
+            @org.springframework.web.bind.annotation.RequestParam(value = "aplicar", defaultValue = "false") boolean aplicar) {
+        return ResponseEntity.ok(aplicar
+                ? corregirFechasDeclaracionesService.aplicarCorreccion()
+                : corregirFechasDeclaracionesService.simularCorreccion());
     }
 }
