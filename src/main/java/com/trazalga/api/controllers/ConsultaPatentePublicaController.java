@@ -25,6 +25,16 @@ public class ConsultaPatentePublicaController {
     private ConsultaPatenteService patenteService;
 
 
+    @GetMapping({"", "/"})
+    public ResponseEntity<Map<String, Object>> patenteVacia() {
+        return ResponseEntity.badRequest().body(Map.of("error", "Patente no válida"));
+    }
+
+    @GetMapping("/{p1}/{p2}")
+    public ResponseEntity<Map<String, Object>> patenteConBarra() {
+        return ResponseEntity.badRequest().body(Map.of("error", "Patente no válida"));
+    }
+
     @GetMapping("/{patente}")
     @Operation(summary = "Consulta el último movimiento y vigencia de traslado para una patente de camión o carro (sin datos personales)")
     public ResponseEntity<Map<String, Object>> consultarPatente(
@@ -33,7 +43,11 @@ public class ConsultaPatentePublicaController {
         if ("comerciantes".equalsIgnoreCase(patente) || "camiones-comerciantes".equalsIgnoreCase(patente)) {
             return ResponseEntity.notFound().build();
         }
-        Map<String, Object> resultado = patenteService.consultar(patente, request);
+        String normalizada = ConsultaPatenteService.normalizarPatente(patente);
+        if (!ConsultaPatenteService.esPatenteValida(normalizada)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Patente no válida"));
+        }
+        Map<String, Object> resultado = patenteService.consultar(normalizada, request);
         return ResponseEntity.ok(resultado);
     }
 }

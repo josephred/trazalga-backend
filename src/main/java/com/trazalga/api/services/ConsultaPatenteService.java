@@ -74,9 +74,16 @@ public class ConsultaPatenteService {
     @Autowired(required = false)
     private IDeclaracionMarcaRepository marcaRepository;
 
+    public static final java.util.regex.Pattern PATENTE_VALIDA =
+            java.util.regex.Pattern.compile("^[A-Z0-9]{5,8}$");
+
     public static String normalizarPatente(String patente) {
         if (patente == null) return "";
         return patente.toUpperCase().replaceAll("[\\s-]", "").trim();
+    }
+
+    public static boolean esPatenteValida(String patenteNormalizada) {
+        return patenteNormalizada != null && PATENTE_VALIDA.matcher(patenteNormalizada).matches();
     }
 
     /**
