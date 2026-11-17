@@ -80,10 +80,10 @@ public class DeclaracionArmadorController {
      */
     @PostMapping
     public DeclaracionArmadorModel saveDeclaracionArmador(@RequestBody DeclaracionArmadorModel declaracionArmador) {
-    // public String saveDeclaracionArmador(@RequestBody DeclaracionArmadorModel declaracionArmador) {
+        if (declaracionArmador != null && declaracionArmador.getId() != null) {
+            politicaEdicion.verificarSesionYDueno("ARMADOR", declaracionArmador.getId());
+        }
         return politicaEdicion.anotar(this.declaracionArmadorService.saveDeclaracionArmador(declaracionArmador));
-        // return "OOKK";
-        // return new DeclaracionArmadorModel();
     }
     
     /**

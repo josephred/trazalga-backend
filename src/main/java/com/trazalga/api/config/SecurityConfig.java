@@ -3,6 +3,7 @@ package com.trazalga.api.config;
 import java.util.Arrays;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,6 +35,9 @@ public class SecurityConfig {
     @Autowired
     private com.trazalga.api.security.RateLimitFilter rateLimitFilter;
 
+    @Value("${trazalga.seguridad.lecturas-autenticadas:true}")
+    private boolean lecturasAutenticadas;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -52,7 +56,8 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\": \"Acceso denegado\", \"message\": \"No tiene permisos suficientes para realizar esta acción.\"}");
                         })
                 )
-                .authorizeHttpRequests(auth -> auth
+                .authorizeHttpRequests(auth -> {
+                    auth
                         // 1. Opciones CORS preflight siempre permitidas
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
@@ -140,11 +145,46 @@ public class SecurityConfig {
                         .requestMatchers("/api/transporte/mis-frecuentes", "/transporte/mis-frecuentes").authenticated()
 
                         // 13. Transporte: nomina, vehiculos y candidatos para ADMIN, FISCALIZADOR o AUDITOR
-                        .requestMatchers("/api/transporte/**", "/transporte/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+                        .requestMatchers("/api/transporte/**", "/transporte/**").hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR");
 
-                        // 12. Todo lo demás permitido para compatibilidad operativa de la app móvil
-                        .anyRequest().permitAll()
-                )
+                    // 14. ZS.2: Lecturas de declaraciones, usuarios y envíos requieren sesión JWT (conmutable por propiedad)
+                    if (lecturasAutenticadas) {
+                        auth
+                                // Listados generales raíz sin usuario: sólo roles de fiscalización
+                                .requestMatchers(HttpMethod.GET,
+                                        "/declaracionrecolector",
+                                        "/declaracionarmador",
+                                        "/declaracionarea",
+                                        "/declaracioncomercializador",
+                                        "/declaracionplantaabastecimiento",
+                                        "/api/declaracion-planta-abastecimiento",
+                                        "/declaracionplantaproduccion",
+                                        "/api/declaracion-planta-produccion",
+                                        "/api/declaracion-planta-destino"
+                                ).hasAnyRole("ADMIN", "FISCALIZADOR", "AUDITOR")
+                                // Lecturas por usuario, destinatario o id de los 7 controladores, envíos y usuarios
+                                .requestMatchers(HttpMethod.GET,
+                                        "/declaracionrecolector/**",
+                                        "/declaracionarmador/**",
+                                        "/declaracionarea/**",
+                                        "/declaracioncomercializador/**",
+                                        "/declaracionplantaabastecimiento/**",
+                                        "/api/declaracion-planta-abastecimiento/**",
+                                        "/declaracionplantaproduccion/**",
+                                        "/api/declaracion-planta-produccion/**",
+                                        "/api/declaracion-planta-destino/**",
+                                        "/declaracionenvio",
+                                        "/declaracionenvio/**",
+                                        "/usuario",
+                                        "/usuario/**",
+                                        "/api/usuarios",
+                                        "/api/usuarios/**"
+                                ).authenticated();
+                    }
+
+                    // 15. Catálogos públicos y resto de rutas operativas
+                    auth.anyRequest().permitAll();
+                })
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable());
 

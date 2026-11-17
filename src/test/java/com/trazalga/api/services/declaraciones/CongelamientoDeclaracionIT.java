@@ -309,7 +309,7 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
         DeclaracionRecolectorModel d = declarar();
         DeclaracionMarcaModel marca = marcar(d, "EN_VEDA");
 
-        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(anonymous()))
+        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(user(planta.getRut()).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].bloqueada", hasItem(true)))
                 .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].motivoBloqueo",
@@ -329,7 +329,7 @@ class CongelamientoDeclaracionIT extends IntegracionBase {
         marca.setResolucionTipo("LIBERADA");
         marcaRepository.saveAndFlush(marca);
         assertTrue(bloqueoCargaService.bloqueosPara("RECOLECTOR:" + d.getId()).isEmpty());
-        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(anonymous()))
+        mockMvc.perform(get("/declaracionrecolector/usuariosdestinatarios/" + planta.getId()).with(user(planta.getRut()).roles("USER")))
                 .andExpect(jsonPath("$[?(@.id == " + d.getId() + ")].bloqueada", hasItem(false)));
         assertThrows(DeclaracionCongeladaException.class, () -> politica.verificarEdicion("RECOLECTOR", d.getId()));
     }

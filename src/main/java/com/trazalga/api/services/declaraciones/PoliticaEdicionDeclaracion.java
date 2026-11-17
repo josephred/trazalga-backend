@@ -27,6 +27,7 @@ import com.trazalga.api.exceptions.DeclaracionCongeladaException;
 import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAutorizacionModel;
+import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
 import com.trazalga.api.models.DeclaracionRecolectorModel;
@@ -34,6 +35,7 @@ import com.trazalga.api.models.UsuarioModel;
 import com.trazalga.api.repositories.IDeclaracionAreaRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
 import com.trazalga.api.repositories.IDeclaracionAutorizacionRepository;
+import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionMarcaRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
@@ -73,6 +75,7 @@ public class PoliticaEdicionDeclaracion {
     @Autowired private IDeclaracionRecolectorRepository recolectorRepository;
     @Autowired private IDeclaracionArmadorRepository armadorRepository;
     @Autowired private IDeclaracionAreaRepository areaRepository;
+    @Autowired(required = false) private IDeclaracionComercializadorRepository comercializadorRepository;
     @Autowired(required = false) private IDeclaracionPlantaProduccionRepository produccionRepository;
 
     /**
@@ -228,6 +231,19 @@ public class PoliticaEdicionDeclaracion {
      */
     @Transactional(readOnly = true)
     public void verificarSesionYDueno(String tipo, Long declaracionId) {
+        if (declaracionId == null) {
+            return;
+        }
+        if ("COMERCIALIZADOR".equalsIgnoreCase(tipo != null ? tipo.trim() : "")) {
+            if (comercializadorRepository == null || !comercializadorRepository.existsById(declaracionId)) {
+                return;
+            }
+            UsuarioModel duenio = comercializadorRepository.findById(declaracionId)
+                    .map(DeclaracionComercializadorModel::getUsuario)
+                    .orElse(null);
+            verificarSesionYDueno(duenio != null ? duenio.getRut() : null);
+            return;
+        }
         String t = normalizarTipo(tipo);
         UsuarioModel duenio = switch (t) {
             case "RECOLECTOR" -> recolectorRepository.findById(declaracionId).map(DeclaracionRecolectorModel::getUsuario).orElse(null);

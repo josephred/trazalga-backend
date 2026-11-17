@@ -185,10 +185,20 @@ public class SeguridadReportesHallazgosTest {
                 .andExpect(status().isForbidden());
     }
 
-    // 16. Flujo móvil sin token: /usuario sigue accesible para sincronización offline
+    // 16. ZS.2: /usuario sin token devuelve 401 (cerrado); con sesión 200; catálogos públicos siguen en 200
     @Test
-    @DisplayName("TX.1: GET /usuario sin token sigue accesible para compatibilidad con la app móvil")
-    void testAppMovil_UsuarioEndpoint_Permitido() throws Exception {
+    @DisplayName("ZS.2: GET /usuario sin token devuelve 401 Unauthorized y catálogo público sigue en 200")
+    void testUsuarioEndpoint_SinToken_Retorna401() throws Exception {
+        mockMvc.perform(get("/usuario"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/perfil"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "pescador", roles = {"USER"})
+    @DisplayName("ZS.2: GET /usuario con token autenticado devuelve 200 OK")
+    void testUsuarioEndpoint_ConToken_Retorna200() throws Exception {
         mockMvc.perform(get("/usuario"))
                 .andExpect(status().isOk());
     }

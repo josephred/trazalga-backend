@@ -36,6 +36,9 @@ public class DeclaracionComercializadorController {
     @Autowired
     private IDeclaracionComercializadorRepository declaracionComercializadorRepository;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
+
     @GetMapping
     public ResponseEntity<?> getDeclaracionesComercializador(
             @RequestParam(required = false) Integer page,
@@ -77,6 +80,9 @@ public class DeclaracionComercializadorController {
 
     @PostMapping
     public DeclaracionComercializadorModel saveDeclaracionRecoleccion(@RequestBody DeclaracionComercializadorModel declaracionComercializador) {
+        if (declaracionComercializador != null && declaracionComercializador.getId() != null) {
+            politicaEdicion.verificarSesionYDueno("COMERCIALIZADOR", declaracionComercializador.getId());
+        }
         return this.declaracionComercializadorService.saveDeclaracionComercializador(declaracionComercializador);
     }
     
@@ -97,11 +103,13 @@ public class DeclaracionComercializadorController {
 
     @PutMapping(path = "{id}")
     public DeclaracionComercializadorModel updateDeclaracionComercializadorById(@RequestBody DeclaracionComercializadorModel request, @PathVariable("id") Long id) {
+        politicaEdicion.verificarSesionYDueno("COMERCIALIZADOR", id);
         return this.declaracionComercializadorService.updateById(request, id);
     }
 
     @DeleteMapping(path = "/{id}")
     public String deleteById(@PathVariable("id") Long id ){
+        politicaEdicion.verificarSesionYDueno("COMERCIALIZADOR", id);
         boolean ok = this.declaracionComercializadorService.deleteDeclaracionComercializador(id);
         if(ok){
             return " Declaracion " + id + " eliminada ";
