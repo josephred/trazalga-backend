@@ -139,6 +139,7 @@ public class ConfiguracionGeneralService {
         // PUNTO 10 — CONSULTA CIUDADANA DE PATENTES (T10.2 / QC.1)
         createIfNotExist("patente_vigencia_horas", "48", "Horas de vigencia del último movimiento para considerar traslado amparado", "CADENA");
         createIfNotExist("patente_traslado_max_dias", "1", "Días máximos permitidos entre fecha de declaración y fecha de traslado en despachos (ZC.2 / D51; vacío = no valida)", "CADENA");
+        createIfNotExist("patente_incluye_despacho_planta", "true", "Incluye declaraciones de destino de planta como movimientos candidatos en la consulta de patentes (ZC.3 / D52)", "CADENA");
         createIfNotExist("patente_consulta_max_por_minuto", "20", "Máximo de consultas públicas por IP por minuto", "CADENA");
         createIfNotExist("consulta_publica_texto_proteccion", "Las algas pardas son un recurso con medidas de protección. Su extracción y traslado requieren autorización de Sernapesca.", "Leyenda pública sobre protección del recurso expuesta en consulta ciudadana de patentes (vacío = oculta, D42)", "CONSULTAS");
         createIfNotExist("consulta_publica_grafica", "", "Ruta relativa o URL pública de la gráfica informativa en consulta ciudadana de patentes (vacío = oculta)", "CONSULTAS");

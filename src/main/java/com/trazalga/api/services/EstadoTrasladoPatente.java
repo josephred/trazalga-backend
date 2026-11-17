@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.models.DeclaracionComercializadorModel;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
+import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
+import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -55,6 +57,9 @@ public class EstadoTrasladoPatente {
     private IDeclaracionPlantaAbastecimientoRepository plantaRepository;
 
     @Autowired(required = false)
+    private IDeclaracionPlantaDestinoRepository destinoRepository;
+
+    @Autowired(required = false)
     private BloqueoCargaService bloqueoCargaService;
 
     @Autowired(required = false)
@@ -66,6 +71,10 @@ public class EstadoTrasladoPatente {
 
     public void setPlantaRepository(IDeclaracionPlantaAbastecimientoRepository plantaRepository) {
         this.plantaRepository = plantaRepository;
+    }
+
+    public void setDestinoRepository(IDeclaracionPlantaDestinoRepository destinoRepository) {
+        this.destinoRepository = destinoRepository;
     }
 
     public void setBloqueoCargaService(BloqueoCargaService bloqueoCargaService) {
@@ -103,7 +112,7 @@ public class EstadoTrasladoPatente {
         String patente = ConsultaPatenteService.normalizarPatente(patenteInput);
         LocalDateTime momentoConsulta = ahora != null ? ahora : LocalDateTime.now();
 
-        if (patente.isEmpty() || comercializadorRepository == null) {
+        if (patente.isEmpty() || (comercializadorRepository == null && destinoRepository == null)) {
             return EvaluacionPatente.builder()
                     .patente(patente)
                     .estado(ESTADO_SIN_REGISTROS)
@@ -115,34 +124,51 @@ public class EstadoTrasladoPatente {
         int vigenciaHoras = configService != null ? configService.getInt("patente_vigencia_horas", 48) : 48;
         boolean terminaEnRecepcion = configService == null
                 || configService.getBoolean("patente_vigencia_termina_en_recepcion", true);
+        boolean incluyeDespachoPlanta = configService == null
+                || configService.getBoolean("patente_incluye_despacho_planta", true);
 
-        List<DeclaracionComercializadorModel> candidatosRaw = comercializadorRepository.findCandidatosPorPatente(patente);
-        if (candidatosRaw == null || candidatosRaw.isEmpty()) {
-            return EvaluacionPatente.builder()
-                    .patente(patente)
-                    .estado(ESTADO_SIN_REGISTROS)
-                    .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
-                    .consultadoEn(momentoConsulta)
-                    .build();
-        }
+        record CandidatoMovimiento(
+                LocalDateTime tsAutorizacion,
+                long id,
+                String tipo,
+                DeclaracionComercializadorModel com,
+                DeclaracionPlantaDestinoModel destino) {}
 
-        // Filtrar: estado no es RECHAZADA ni ANULADA, y declaración (TIMESTAMP(fecha_declaracion, hora)) no es futura
-        List<DeclaracionComercializadorModel> candidatosValidos = new ArrayList<>();
-        for (DeclaracionComercializadorModel dc : candidatosRaw) {
-            if (!coincidePatente(dc, patente)) {
-                continue;
-            }
-            if (dc.getEstado() != null) {
-                String est = dc.getEstado().trim().toUpperCase();
-                if ("RECHAZADA".equals(est) || "ANULADA".equals(est)) {
-                    continue;
+        List<CandidatoMovimiento> candidatosValidos = new ArrayList<>();
+
+        if (comercializadorRepository != null) {
+            List<DeclaracionComercializadorModel> candidatosCom = comercializadorRepository.findCandidatosPorPatente(patente);
+            if (candidatosCom != null) {
+                for (DeclaracionComercializadorModel dc : candidatosCom) {
+                    if (!coincidePatente(dc, patente) || estaAnuladoORechazado(dc.getEstado())) {
+                        continue;
+                    }
+                    LocalDateTime tsDecl = toTimestamp(dc.getFechaDeclaracion(), dc.getHora());
+                    if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
+                        continue;
+                    }
+                    long id = dc.getId() != null ? dc.getId() : 0L;
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "COMERCIALIZADOR", dc, null));
                 }
             }
-            LocalDateTime tsDecl = toTimestamp(dc.getFechaDeclaracion(), dc.getHora());
-            if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
-                continue;
+        }
+
+        if (incluyeDespachoPlanta && destinoRepository != null) {
+            List<DeclaracionPlantaDestinoModel> candidatosDest = destinoRepository.findCandidatosPorPatente(patente);
+            if (candidatosDest != null) {
+                for (DeclaracionPlantaDestinoModel dpd : candidatosDest) {
+                    if (!coincidePatenteCampos(dpd.getPlacaPatente(), dpd.getPlacaPatenteCarro(), null, patente)
+                            || estaAnuladoORechazado(dpd.getEstado())) {
+                        continue;
+                    }
+                    LocalDateTime tsDecl = toTimestamp(dpd.getFechaDeclaracionDestino(), dpd.getHora());
+                    if (tsDecl == null || tsDecl.isAfter(momentoConsulta)) {
+                        continue;
+                    }
+                    long id = dpd.getId() != null ? dpd.getId() : 0L;
+                    candidatosValidos.add(new CandidatoMovimiento(tsDecl, id, "PLANTA_DESTINO", null, dpd));
+                }
             }
-            candidatosValidos.add(dc);
         }
 
         if (candidatosValidos.isEmpty()) {
@@ -154,18 +180,20 @@ public class EstadoTrasladoPatente {
                     .build();
         }
 
-        // Ordenar por TIMESTAMP(fecha_declaracion, hora) descendente, luego id descendente, y tomar el más reciente
+        // Ordenar por TIMESTAMP descendente, luego id descendente, y tomar el más reciente
         candidatosValidos.sort((a, b) -> {
-            LocalDateTime ta = toTimestamp(a.getFechaDeclaracion(), a.getHora());
-            LocalDateTime tb = toTimestamp(b.getFechaDeclaracion(), b.getHora());
-            int cmp = tb.compareTo(ta);
+            int cmp = b.tsAutorizacion().compareTo(a.tsAutorizacion());
             if (cmp != 0) return cmp;
-            Long ida = a.getId() != null ? a.getId() : 0L;
-            Long idb = b.getId() != null ? b.getId() : 0L;
-            return idb.compareTo(ida);
+            return Long.compare(b.id(), a.id());
         });
 
-        DeclaracionComercializadorModel reciente = candidatosValidos.get(0);
+        CandidatoMovimiento ganador = candidatosValidos.get(0);
+        if ("PLANTA_DESTINO".equals(ganador.tipo())) {
+            return evaluarDestinoPlanta(
+                    ganador.destino(), patente, momentoConsulta, vigenciaHoras);
+        }
+
+        DeclaracionComercializadorModel reciente = ganador.com();
         LocalDateTime fechaHoraAut = toTimestamp(reciente.getFechaDeclaracion(), reciente.getHora());
         LocalDateTime fechaHoraSalida = resolverFechaHoraSalidaAcotada(
                 reciente.getFechaDeclaracion(), reciente.getFechaTraslado(), reciente.getHora());
@@ -258,10 +286,111 @@ public class EstadoTrasladoPatente {
     }
 
     private boolean coincidePatente(DeclaracionComercializadorModel dc, String patenteNorm) {
+        if (dc == null) return false;
+        return coincidePatenteCampos(dc.getPlacaPatente(), dc.getPlacaPatenteCarro(), dc.getPatente(), patenteNorm);
+    }
+
+    public static boolean coincidePatenteCampos(String placaPatente, String placaPatenteCarro, String patenteLegacy, String patenteNorm) {
         if (patenteNorm == null || patenteNorm.isEmpty()) return false;
-        return patenteNorm.equals(ConsultaPatenteService.normalizarPatente(dc.getPlacaPatente()))
-                || patenteNorm.equals(ConsultaPatenteService.normalizarPatente(dc.getPlacaPatenteCarro()))
-                || patenteNorm.equals(ConsultaPatenteService.normalizarPatente(dc.getPatente()));
+        return patenteNorm.equals(ConsultaPatenteService.normalizarPatente(placaPatente))
+                || patenteNorm.equals(ConsultaPatenteService.normalizarPatente(placaPatenteCarro))
+                || patenteNorm.equals(ConsultaPatenteService.normalizarPatente(patenteLegacy));
+    }
+
+    public static boolean estaAnuladoORechazado(String estado) {
+        if (estado == null) return false;
+        String est = estado.trim().toUpperCase();
+        return "RECHAZADA".equals(est) || "ANULADA".equals(est) || "RECHAZADO".equals(est) || "ANULADO".equals(est);
+    }
+
+    private EvaluacionPatente evaluarDestinoPlanta(
+            DeclaracionPlantaDestinoModel dpd,
+            String patente,
+            LocalDateTime momentoConsulta,
+            int vigenciaHoras) {
+        LocalDateTime fechaHoraAut = toTimestamp(dpd.getFechaDeclaracionDestino(), dpd.getHora());
+        Date fSalida = dpd.getFechaTrasladoDestino() != null
+                ? dpd.getFechaTrasladoDestino()
+                : (dpd.getFechaTraslado() != null ? dpd.getFechaTraslado() : dpd.getFechaDeclaracionDestino());
+        LocalDateTime fechaHoraSalida = resolverFechaHoraSalidaAcotada(
+                dpd.getFechaDeclaracionDestino(), fSalida, dpd.getHora());
+        String tipoAlga = (dpd.getEspecie() != null && dpd.getEspecie().getNombre() != null
+                && !dpd.getEspecie().getNombre().isBlank())
+                ? dpd.getEspecie().getNombre().trim()
+                : "Alga parda";
+        String folio = dpd.getFolioDeclaracionDestino() != null ? dpd.getFolioDeclaracionDestino() : dpd.getFolioOrigen();
+
+        // Retenido si el destino o alguna de sus producciones seleccionadas tiene marca bloqueante activa
+        MotivoBloqueoDTO bloqueo = buscarBloqueoActivoDestino(dpd);
+        if (bloqueo != null) {
+            String motivo = "Retenido por " + bloqueo.getMarca()
+                    + (bloqueo.getMarcaId() != null ? " (hallazgo #" + bloqueo.getMarcaId() + ")" : "");
+            return EvaluacionPatente.builder()
+                    .patente(patente)
+                    .estado(ESTADO_RETENIDO)
+                    .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                    .fechaHoraAutorizacion(fechaHoraAut)
+                    .fechaHoraSalida(fechaHoraSalida)
+                    .comunaDestino(null)
+                    .tipoAlga(tipoAlga)
+                    .declaracionId(dpd.getId())
+                    .folioDespacho(folio)
+                    .motivoRetencion(motivo)
+                    .hallazgoId(bloqueo.getMarcaId())
+                    .hallazgoMarca(bloqueo.getMarca())
+                    .consultadoEn(momentoConsulta)
+                    .build();
+        }
+
+        LocalDateTime limiteVigencia = fechaHoraSalida != null
+                ? fechaHoraSalida.plusHours(vigenciaHoras)
+                : fechaHoraAut.plusHours(vigenciaHoras);
+        if (momentoConsulta.isAfter(limiteVigencia)) {
+            return EvaluacionPatente.builder()
+                    .patente(patente)
+                    .estado(ESTADO_VENCIDO)
+                    .resultadoPublico(RESULTADO_PUBLICO_SIN_AUTORIZACION)
+                    .fechaHoraAutorizacion(fechaHoraAut)
+                    .fechaHoraSalida(fechaHoraSalida)
+                    .comunaDestino(null)
+                    .tipoAlga(tipoAlga)
+                    .declaracionId(dpd.getId())
+                    .folioDespacho(folio)
+                    .consultadoEn(momentoConsulta)
+                    .build();
+        }
+
+        return EvaluacionPatente.builder()
+                .patente(patente)
+                .estado(ESTADO_AUTORIZADO)
+                .resultadoPublico(RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(fechaHoraAut)
+                .fechaHoraSalida(fechaHoraSalida)
+                .comunaDestino(null)
+                .tipoAlga(tipoAlga)
+                .declaracionId(dpd.getId())
+                .folioDespacho(folio)
+                .consultadoEn(momentoConsulta)
+                .build();
+    }
+
+    private MotivoBloqueoDTO buscarBloqueoActivoDestino(DeclaracionPlantaDestinoModel dpd) {
+        if (bloqueoCargaService == null || dpd == null) {
+            return null;
+        }
+        if (dpd.getId() != null) {
+            Map<Long, MotivoBloqueoDTO> mapPropio = bloqueoCargaService.bloqueosPorTipoEIds("PLANTA_DESTINO", List.of(dpd.getId()));
+            if (mapPropio != null && mapPropio.containsKey(dpd.getId())) {
+                return mapPropio.get(dpd.getId());
+            }
+        }
+        if (dpd.getDeclaracionesSeleccionadas() != null && !dpd.getDeclaracionesSeleccionadas().isBlank()) {
+            Map<String, MotivoBloqueoDTO> mapProds = bloqueoCargaService.bloqueosPara(dpd.getDeclaracionesSeleccionadas());
+            if (mapProds != null && !mapProds.isEmpty()) {
+                return mapProds.values().iterator().next();
+            }
+        }
+        return null;
     }
 
     private MotivoBloqueoDTO buscarBloqueoActivo(DeclaracionComercializadorModel dc) {
