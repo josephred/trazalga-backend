@@ -880,6 +880,13 @@ public class ReportService {
             int declaracionesCount = 0;
             java.util.Map<Long, Double> recepciones = new java.util.LinkedHashMap<>();
             java.util.Set<String> especies = new java.util.LinkedHashSet<>();
+            java.util.List<java.util.Map<String, Object>> comercializadores = new java.util.ArrayList<>();
+            java.util.Set<String> comVistos = new java.util.LinkedHashSet<>();
+            String comercializadorFolio;
+            Double comercializadorLatitud;
+            Double comercializadorLongitud;
+            String comercializadorFuente;
+            boolean algunComercializadorSinCoordenadas = false;
         }
 
         java.util.Map<String, PairAcc> pairsByKey = new java.util.LinkedHashMap<>();
@@ -915,7 +922,7 @@ public class ReportService {
             String origNombre;
             String origGroupKey;
 
-            if (puntoRefOrigen != null && puntoRefOrigen.getLat() != null && puntoRefOrigen.getLon() != null) {
+            if (puntoRefOrigen != null && esCoordenadaChileValida(puntoRefOrigen.getLat(), puntoRefOrigen.getLon())) {
                 origLat = puntoRefOrigen.getLat();
                 origLon = puntoRefOrigen.getLon();
                 origFuente = "REFERENCIA";
@@ -925,7 +932,7 @@ public class ReportService {
                 origNombre = firstNonBlank(puntoRefOrigen.getNombre(), catalogoNombre, origenTipoDecl);
                 origGroupKey = "REF|" + origTipoPunto + "|" +
                         (origPointId != null ? origPointId : normalizarClave(origNombre));
-            } else if (origGpsLat != null && origGpsLon != null) {
+            } else if (esCoordenadaChileValida(origGpsLat, origGpsLon)) {
                 origLat = origGpsLat;
                 origLon = origGpsLon;
                 origFuente = "GPS";
@@ -964,17 +971,52 @@ public class ReportService {
             String plFuenteDetalle = null;
             String plNombre = plantaNombreDisplay;
 
-            if (puntoRefPlanta != null && puntoRefPlanta.getLat() != null && puntoRefPlanta.getLon() != null) {
+            if (puntoRefPlanta != null && esCoordenadaChileValida(puntoRefPlanta.getLat(), puntoRefPlanta.getLon())) {
                 plLat = puntoRefPlanta.getLat();
                 plLon = puntoRefPlanta.getLon();
                 plFuente = "REFERENCIA";
                 plFuenteDetalle = puntoRefPlanta.getFuente();
                 plNombre = firstNonBlank(puntoRefPlanta.getNombre(), plantaNombreDisplay);
-            } else if (plantaGpsLat != null && plantaGpsLon != null) {
+            } else if (esCoordenadaChileValida(plantaGpsLat, plantaGpsLon)) {
                 plLat = plantaGpsLat;
                 plLon = plantaGpsLon;
                 plFuente = "GPS";
                 plFuenteDetalle = "GPS_RECEPCION";
+            }
+
+            List<java.util.Map<String, Object>> comercializadoresDecl = new java.util.ArrayList<>();
+            Object rawHopsObj = fila.get("comercializadoresRaw");
+            Double comLatPrincipal = null;
+            Double comLonPrincipal = null;
+            String comFuentePrincipal = null;
+            boolean declComSinCoords = false;
+            if (rawHopsObj instanceof List<?> rawHops) {
+                for (Object hObj : rawHops) {
+                    if (hObj instanceof java.util.Map<?, ?> hm) {
+                        Long cId = longOrNull(hm.get("id"));
+                        String cFolio = strOrNull(hm.get("folio"));
+                        Double cLat = doubleOrNull(hm.get("latitud"));
+                        Double cLon = doubleOrNull(hm.get("longitud"));
+                        boolean coordOk = esCoordenadaChileValida(cLat, cLon);
+                        java.util.Map<String, Object> hop = new java.util.LinkedHashMap<>();
+                        hop.put("id", cId);
+                        hop.put("folio", cFolio);
+                        hop.put("latitud", coordOk ? cLat : null);
+                        hop.put("longitud", coordOk ? cLon : null);
+                        hop.put("fuente", coordOk ? "GPS_DECLARACION" : "SIN_COORDENADAS");
+                        comercializadoresDecl.add(hop);
+                        if (coordOk && comLatPrincipal == null) {
+                            comLatPrincipal = cLat;
+                            comLonPrincipal = cLon;
+                            comFuentePrincipal = "GPS_DECLARACION";
+                        } else if (!coordOk) {
+                            declComSinCoords = true;
+                        }
+                    }
+                }
+            }
+            if (!comercializadoresDecl.isEmpty() && comFuentePrincipal == null) {
+                comFuentePrincipal = "SIN_COORDENADAS";
             }
 
             String especie = firstNonBlank(strOrNull(fila.get("origenEspecieNombre")), strOrNull(fila.get("recepcionEspecieNombre")));
@@ -1004,6 +1046,10 @@ public class ReportService {
             declRow.put("regionId", rowRegionId);
             declRow.put("regionNombre", rowRegionNombre);
             declRow.put("comercializadorFolio", strOrNull(fila.get("comercializadorFolio")));
+            declRow.put("comercializadorLatitud", comLatPrincipal);
+            declRow.put("comercializadorLongitud", comLonPrincipal);
+            declRow.put("comercializadorFuente", comFuentePrincipal);
+            declRow.put("comercializadores", comercializadoresDecl);
             declRow.put("plantaNombre", plNombre);
             declRow.put("plantaCodigo", plantaCodigo);
             declRow.put("plantaLatitud", plLat);
@@ -1067,6 +1113,27 @@ public class ReportService {
             if (!esBlanco(especie)) {
                 acc.especies.add(especie);
             }
+            if (!comercializadoresDecl.isEmpty()) {
+                if (esBlanco(acc.comercializadorFolio)) {
+                    acc.comercializadorFolio = strOrNull(fila.get("comercializadorFolio"));
+                }
+                if (acc.comercializadorLatitud == null && comLatPrincipal != null) {
+                    acc.comercializadorLatitud = comLatPrincipal;
+                    acc.comercializadorLongitud = comLonPrincipal;
+                    acc.comercializadorFuente = comFuentePrincipal;
+                } else if (acc.comercializadorFuente == null) {
+                    acc.comercializadorFuente = comFuentePrincipal;
+                }
+                if (declComSinCoords) {
+                    acc.algunComercializadorSinCoordenadas = true;
+                }
+                for (java.util.Map<String, Object> hop : comercializadoresDecl) {
+                    String hKey = String.valueOf(hop.get("id")) + "|" + String.valueOf(hop.get("folio"));
+                    if (acc.comVistos.add(hKey)) {
+                        acc.comercializadores.add(hop);
+                    }
+                }
+            }
         }
 
         List<PairAcc> sortedPairs = new java.util.ArrayList<>(pairsByKey.values());
@@ -1117,6 +1184,12 @@ public class ReportService {
             item.put("id", acc.key);
             item.put("origen", origMap);
             item.put("planta", plantaMap);
+            item.put("comercializadorFolio", acc.comercializadorFolio);
+            item.put("comercializadorLatitud", acc.comercializadorLatitud);
+            item.put("comercializadorLongitud", acc.comercializadorLongitud);
+            item.put("comercializadorFuente", acc.comercializadorFuente);
+            item.put("comercializadores", acc.comercializadores);
+            item.put("algunComercializadorSinCoordenadas", acc.algunComercializadorSinCoordenadas);
             item.put("desembarqueKg", redondearDosDec(acc.desembarqueKg));
             item.put("capturaKg", redondearDosDec(acc.capturaKg));
             item.put("pesoRomanaKg", redondearDosDec(pairRomanaKg));
@@ -1192,6 +1265,16 @@ public class ReportService {
 
     private static double doubleOrZero(Object o) {
         return o instanceof Number ? ((Number) o).doubleValue() : 0.0;
+    }
+
+    public static boolean esCoordenadaChileValida(Double lat, Double lon) {
+        if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
+            return false;
+        }
+        if (lat == 0.0 && lon == 0.0) {
+            return false;
+        }
+        return lat >= -56.0 && lat <= -17.0 && lon >= -76.0 && lon <= -66.0;
     }
 
     private static double redondearDosDec(double v) {

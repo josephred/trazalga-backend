@@ -4595,16 +4595,26 @@ public class ReportRepository {
         class ComRow {
             Long id;
             String folio;
+            Double lat;
+            Double lon;
             java.util.Map<String, List<Long>> tokens;
         }
         class LinkRef {
             String tipo;
             Long id;
-            String comFolio;
-            LinkRef(String tipo, Long id, String comFolio) {
+            List<ComRow> comChain;
+            LinkRef(String tipo, Long id, List<ComRow> comChain) {
                 this.tipo = tipo;
                 this.id = id;
-                this.comFolio = comFolio;
+                this.comChain = comChain != null ? comChain : java.util.Collections.emptyList();
+            }
+        }
+        class BfsComNode {
+            Long id;
+            List<ComRow> pathBackwards;
+            BfsComNode(Long id, List<ComRow> pathBackwards) {
+                this.id = id;
+                this.pathBackwards = pathBackwards;
             }
         }
 
@@ -4649,7 +4659,7 @@ public class ReportRepository {
         String filtroCom = "UPPER(COALESCE(consumida_por_tipo, '')) = 'COMERCIALIZADOR'";
         while (!porExplorarC.isEmpty() && comById.size() < 2000) {
             List<Object[]> cRows = entityManager.createNativeQuery(
-                    "SELECT dc.id, COALESCE(NULLIF(TRIM(dc.folio_origen), ''), NULLIF(TRIM(dc.folio_desembarque_ac), ''), CONCAT('DC-', dc.id)), dc.declaraciones_seleccionadas " +
+                    "SELECT dc.id, COALESCE(NULLIF(TRIM(dc.folio_origen), ''), NULLIF(TRIM(dc.folio_desembarque_ac), ''), CONCAT('DC-', dc.id)), dc.declaraciones_seleccionadas, dc.latitud, dc.longitud " +
                     "FROM declaracion_comercializador dc WHERE dc.id IN (:ids)")
                     .setParameter("ids", porExplorarC)
                     .getResultList();
@@ -4660,6 +4670,8 @@ public class ReportRepository {
                 c.id = ((Number) r[0]).longValue();
                 c.folio = r[1] != null ? r[1].toString() : "DC-" + c.id;
                 c.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[2] != null ? r[2].toString() : null);
+                c.lat = r[3] != null ? ((Number) r[3]).doubleValue() : null;
+                c.lon = r[4] != null ? ((Number) r[4]).doubleValue() : null;
                 comById.put(c.id, c);
                 encontradosLote.add(c.id);
                 for (Long subC : com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR")) {
@@ -4702,20 +4714,28 @@ public class ReportRepository {
             com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA").forEach(id -> registrarDirecto.accept("AREA", id));
             fkP2Ar.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("AREA", id));
 
-            java.util.Deque<Long> colaC = new java.util.ArrayDeque<>();
+            java.util.Deque<BfsComNode> colaC = new java.util.ArrayDeque<>();
             java.util.Set<Long> visitadoC = new java.util.HashSet<>();
-            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR").forEach(colaC::add);
-            fkP2C.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(colaC::add);
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR")
+                    .forEach(cid -> colaC.add(new BfsComNode(cid, java.util.Collections.emptyList())));
+            fkP2C.getOrDefault(p.id, java.util.Collections.emptyList())
+                    .forEach(cid -> colaC.add(new BfsComNode(cid, java.util.Collections.emptyList())));
 
             while (!colaC.isEmpty() && visitadoC.size() < 500) {
-                Long cId = colaC.poll();
+                BfsComNode nodo = colaC.poll();
+                Long cId = nodo != null ? nodo.id : null;
                 if (cId == null || !visitadoC.add(cId)) continue;
                 ComRow c = comById.get(cId);
                 if (c == null) continue;
 
+                List<ComRow> pathDesdePlanta = new java.util.ArrayList<>(nodo.pathBackwards);
+                pathDesdePlanta.add(c);
+                List<ComRow> cadenaCronologica = new java.util.ArrayList<>(pathDesdePlanta);
+                java.util.Collections.reverse(cadenaCronologica);
+
                 java.util.function.BiConsumer<String, Long> registrarViaCom = (tipo, oId) -> {
                     if (oId != null && vistoOrigenEnPlanta.add(tipo + ":" + oId)) {
-                        refs.add(new LinkRef(tipo, oId, c.folio));
+                        refs.add(new LinkRef(tipo, oId, cadenaCronologica));
                     }
                 };
                 com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "RECOLECTOR").forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
@@ -4726,10 +4746,10 @@ public class ReportRepository {
                 fkC2Ar.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("AREA", id));
 
                 com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR").forEach(sub -> {
-                    if (!visitadoC.contains(sub)) colaC.add(sub);
+                    if (!visitadoC.contains(sub)) colaC.add(new BfsComNode(sub, pathDesdePlanta));
                 });
                 fkC2C.getOrDefault(cId, java.util.Collections.emptyList()).forEach(sub -> {
-                    if (!visitadoC.contains(sub)) colaC.add(sub);
+                    if (!visitadoC.contains(sub)) colaC.add(new BfsComNode(sub, pathDesdePlanta));
                 });
             }
 
@@ -4753,7 +4773,20 @@ public class ReportRepository {
                 java.util.Map<String, Object> orig = origenesPorClave.get(lr.tipo + ":" + lr.id);
                 if (orig == null) continue; // filtrado por regionId o inexistente
                 java.util.Map<String, Object> row = new java.util.LinkedHashMap<>(orig);
-                row.put("comercializadorFolio", lr.comFolio);
+                List<java.util.Map<String, Object>> hops = new java.util.ArrayList<>();
+                StringBuilder foliosCom = new StringBuilder();
+                for (ComRow cr : lr.comChain) {
+                    if (foliosCom.length() > 0) foliosCom.append(" → ");
+                    foliosCom.append(cr.folio);
+                    java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
+                    h.put("id", cr.id);
+                    h.put("folio", cr.folio);
+                    h.put("latitud", cr.lat);
+                    h.put("longitud", cr.lon);
+                    hops.add(h);
+                }
+                row.put("comercializadorFolio", foliosCom.length() > 0 ? foliosCom.toString() : null);
+                row.put("comercializadoresRaw", hops);
                 row.put("recepcionId", p.id);
                 row.put("recepcionFolio", p.folio);
                 row.put("recepcionFecha", p.fecha);
