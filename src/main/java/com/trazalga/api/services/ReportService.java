@@ -1291,6 +1291,31 @@ public class ReportService {
         return reportRepository.getCapasGeorreferencia(regionId);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public byte[] exportarFlujosOrigenDestinoExcel(
+            Date startDate,
+            Date endDate,
+            Long especieId,
+            Long regionId,
+            Long regionDestinoId) {
+        java.util.Map<String, Object> data = getFlujosOrigenDestino(
+                startDate, endDate, especieId, regionId, regionDestinoId);
+        return com.trazalga.api.services.geo.FlujosSigExporter.exportarExcel(
+                data, startDate, endDate, especieId, regionId, regionDestinoId);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public byte[] exportarFlujosOrigenDestinoCsv(
+            Date startDate,
+            Date endDate,
+            Long especieId,
+            Long regionId,
+            Long regionDestinoId) {
+        java.util.Map<String, Object> data = getFlujosOrigenDestino(
+                startDate, endDate, especieId, regionId, regionDestinoId);
+        return com.trazalga.api.services.geo.FlujosSigExporter.exportarCsv(data);
+    }
+
     public static boolean esCoordenadaChileValida(Double lat, Double lon) {
         if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
             return false;

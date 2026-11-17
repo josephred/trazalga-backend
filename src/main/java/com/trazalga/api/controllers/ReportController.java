@@ -1220,4 +1220,34 @@ public class ReportController {
             @RequestParam(required = false) Long regionId) {
         return ResponseEntity.ok(reportService.getCapasGeorreferencia(regionId));
     }
+
+    @GetMapping("/flujos-origen-destino/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FISCALIZADOR', 'AUDITOR')")
+    public ResponseEntity<byte[]> exportarFlujosOrigenDestino(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
+            @RequestParam(required = false) Long especieId,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long regionDestinoId) {
+        String fmt = formato != null ? formato.trim().toLowerCase(java.util.Locale.ROOT) : "xlsx";
+        if ("csv".equals(fmt)) {
+            byte[] csvBytes = reportService.exportarFlujosOrigenDestinoCsv(
+                    startDate, endDate, especieId, regionId, regionDestinoId);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=flujos_origen_destino.csv")
+                    .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                    .body(csvBytes);
+        }
+        if (!"xlsx".equals(fmt)) {
+            return ResponseEntity.badRequest().build();
+        }
+        byte[] xlsxBytes = reportService.exportarFlujosOrigenDestinoExcel(
+                startDate, endDate, especieId, regionId, regionDestinoId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=flujos_origen_destino.xlsx")
+                .header(HttpHeaders.CONTENT_TYPE,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .body(xlsxBytes);
+    }
 }
