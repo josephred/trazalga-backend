@@ -75,6 +75,7 @@ public class ConsultaPatenteFiscalizadorDTO {
         private String horaDeclaracion;
         private Date fechaTraslado;
         private LocalDateTime fechaHoraSalida;
+        private Date recibidaEn;
 
         // Comercializador / Emisor
         private String comercializadorRut;

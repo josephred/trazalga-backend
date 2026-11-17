@@ -59,11 +59,16 @@ public class DeclaracionComercializadorModel {
     private Double longitud;
 
     @Column(name = "precision_gps_m", nullable = true)
+
     private Double precisionGpsM;
 
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "gps_capturado_en", nullable = true)
     private Date gpsCapturadoEn;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "recibida_en", nullable = true)
+    private Date recibidaEn;
 
     @Column(name = "envio_offline", nullable = true)
     private Boolean envioOffline;

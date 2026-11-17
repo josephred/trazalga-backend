@@ -167,8 +167,8 @@ public class EstadoTrasladoPatente {
 
         DeclaracionComercializadorModel reciente = candidatosValidos.get(0);
         LocalDateTime fechaHoraAut = toTimestamp(reciente.getFechaDeclaracion(), reciente.getHora());
-        Date fechaSalidaBase = reciente.getFechaTraslado() != null ? reciente.getFechaTraslado() : reciente.getFechaDeclaracion();
-        LocalDateTime fechaHoraSalida = toTimestamp(fechaSalidaBase, reciente.getHora());
+        LocalDateTime fechaHoraSalida = resolverFechaHoraSalidaAcotada(
+                reciente.getFechaDeclaracion(), reciente.getFechaTraslado(), reciente.getHora());
 
         String comunaDestino = resolverComunaDestino(reciente);
         String tipoAlga = resolverTipoAlga(reciente);
@@ -360,5 +360,44 @@ public class EstadoTrasladoPatente {
             }
         }
         return LocalDateTime.of(localDate, localTime);
+    }
+
+    /**
+     * ZC.2 (D51): acota la fecha de salida usada para vigencia a
+     * {@code min(fechaTraslado, fechaDeclaracion + patente_traslado_max_dias)}.
+     * Si el parámetro está vacío, no acota.
+     */
+    public LocalDateTime resolverFechaHoraSalidaAcotada(Date fechaDeclaracion, Date fechaTraslado, String hora) {
+        LocalDateTime tsDecl = toTimestamp(fechaDeclaracion, hora);
+        if (fechaTraslado == null) {
+            return tsDecl;
+        }
+        LocalDateTime tsSalida = toTimestamp(fechaTraslado, hora);
+        if (tsSalida == null || tsDecl == null) {
+            return tsSalida != null ? tsSalida : tsDecl;
+        }
+        Integer maxDias = resolverMaxDiasTraslado();
+        if (maxDias != null) {
+            LocalDate tope = tsDecl.toLocalDate().plusDays(maxDias);
+            if (tsSalida.toLocalDate().isAfter(tope)) {
+                tsSalida = LocalDateTime.of(tope, tsSalida.toLocalTime());
+            }
+        }
+        return tsSalida;
+    }
+
+    private Integer resolverMaxDiasTraslado() {
+        if (configService == null) {
+            return 1;
+        }
+        String raw = configService.getValor("patente_traslado_max_dias", "1");
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
     }
 }

@@ -368,6 +368,7 @@ public class ConsultaPatenteService {
                 .horaDeclaracion(dc.getHora())
                 .fechaTraslado(dc.getFechaTraslado())
                 .fechaHoraSalida(tsSalida)
+                .recibidaEn(dc.getRecibidaEn())
                 .comercializadorRut(comRut)
                 .comercializadorNombre(comNom)
                 .choferDeclarado(dc.getChoferTransporte())

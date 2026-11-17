@@ -19,6 +19,9 @@ import com.trazalga.api.models.DeclaracionArmadorModel;
 import com.trazalga.api.models.DeclaracionAreaModel;
 import com.trazalga.api.dto.MotivoBloqueoDTO;
 import com.trazalga.api.exceptions.CargaBloqueadaException;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
+import com.trazalga.api.services.fechas.FechaSql;
+import java.time.LocalDate;
 import com.trazalga.api.repositories.IDeclaracionComercializadorRepository;
 import com.trazalga.api.repositories.IDeclaracionRecolectorRepository;
 import com.trazalga.api.repositories.IDeclaracionArmadorRepository;
@@ -50,6 +53,9 @@ public class DeclaracionComercializadorService {
 
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
+    @Autowired(required = false)
+    private ConfiguracionGeneralService configService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -164,6 +170,10 @@ public class DeclaracionComercializadorService {
                             declaracionComercializadorModel.getFechaTraslado(),
                             declaracionComercializadorModel::setFechaTraslado)));
         }
+        validarVentanaFechaTraslado(declaracionComercializadorModel);
+        if (esCreacion) {
+            declaracionComercializadorModel.setRecibidaEn(new Date());
+        }
         validarCargasNoBloqueadas(declaracionComercializadorModel.getDeclaracionesSeleccionadas());
         sanearComposicion(declaracionComercializadorModel);
         normalizarPatentes(declaracionComercializadorModel);
@@ -204,6 +214,38 @@ public class DeclaracionComercializadorService {
         return declaracionComercializadorRepository.findById(id);
     }
 
+    /**
+     * ZC.2 (D51): exige que {@code fechaTraslado} esté entre {@code fechaDeclaracion} y
+     * {@code fechaDeclaracion + patente_traslado_max_dias}. Vacío omite la validación.
+     */
+    private void validarVentanaFechaTraslado(DeclaracionComercializadorModel decl) {
+        if (decl == null || decl.getFechaTraslado() == null || decl.getFechaDeclaracion() == null) {
+            return;
+        }
+        int maxDias = 1;
+        if (configService != null) {
+            String raw = configService.getValor("patente_traslado_max_dias", "1");
+            if (raw == null || raw.trim().isEmpty()) {
+                return;
+            }
+            try {
+                maxDias = Math.max(0, Integer.parseInt(raw.trim()));
+            } catch (NumberFormatException e) {
+                return;
+            }
+        }
+        LocalDate fDecl = FechaSql.diaLocal(decl.getFechaDeclaracion());
+        LocalDate fTras = FechaSql.diaLocal(decl.getFechaTraslado());
+        if (fDecl == null || fTras == null) {
+            return;
+        }
+        LocalDate maxFecha = fDecl.plusDays(maxDias);
+        if (fTras.isBefore(fDecl) || fTras.isAfter(maxFecha)) {
+            throw new ValidacionPlantaException("La fecha de traslado (" + fTras
+                    + ") debe estar entre la fecha de declaración (" + fDecl + ") y " + maxFecha + ".");
+        }
+    }
+
     public List<DeclaracionComercializadorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
         List<DeclaracionComercializadorModel> list = declaracionComercializadorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         bloqueoCargaService.enriquecerComercializadores(list);
@@ -227,6 +269,7 @@ public class DeclaracionComercializadorService {
         if (declaracionComercializadorModel.getDeclaracionDestinatario() != null) {
             throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
+        validarVentanaFechaTraslado(request);
         validarCargasNoBloqueadas(request.getDeclaracionesSeleccionadas());
         String oldSeleccionadas = declaracionComercializadorModel.getDeclaracionesSeleccionadas();
 
