@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.trazalga.api.IntegracionBase;
+import com.trazalga.api.exceptions.ValidacionPlantaException;
 import com.trazalga.api.models.DeclaracionMarcaModel;
 import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
@@ -107,6 +108,12 @@ class PlantaEscrituraIT extends IntegracionBase {
         produccionRepository.deleteAll();
         abastecimientoRepository.deleteAll();
         configuracionGeneralService.updateConfig("declaracion_escritura_exige_sesion", "false");
+        configuracionGeneralService.updateConfig("destino_exige_producciones", "true");
+        configuracionGeneralService.updateConfig("destino_tolerancia_pct", "1");
+        configuracionGeneralService.updateConfig("destino_exige_mismo_formato", "true");
+        configuracionGeneralService.updateConfig("produccion_exige_lotes", "true");
+        configuracionGeneralService.updateConfig("produccion_exige_formato_oficial", "false");
+        configuracionGeneralService.updateConfig("marcas_bloqueantes_produccion", "RENDIMIENTO_ANOMALO");
     }
 
     // ------------------------------------------------------------------ selección de lotes
@@ -322,6 +329,164 @@ class PlantaEscrituraIT extends IntegracionBase {
         } finally {
             configuracionGeneralService.updateConfig("planta_exige_humedad_recepcion", "false");
         }
+    }
+
+    @Test
+    @DisplayName("ZP.1: destino sin producciones responde 422 al crear y al modificar")
+    void zp1_destinoSinProducciones_422_creacionYModificacion() throws Exception {
+        String bodyVacio = """
+                {
+                  "usuario": {"id": %d},
+                  "fechaDeclaracionDestino": "2026-11-06",
+                  "hora": "15:00:00",
+                  "nombrePlanta": "Planta NP0",
+                  "especie": {"id": %d},
+                  "producto": {"id": %d},
+                  "cantidad": 100.00
+                }
+                """.formatted(plantaA.getId(), especie.getId(), producto.getId());
+
+        mockMvc.perform(post("/api/declaracion-planta-destino")
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyVacio))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"));
+
+        DeclaracionPlantaAbastecimientoModel lote = abastecimiento(plantaA, "DAPLA-ZP1-1");
+        DeclaracionPlantaProduccionModel prod = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + lote.getId()));
+        DeclaracionPlantaDestinoModel dest = destinoService.save(
+                destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId()));
+
+        mockMvc.perform(put("/api/declaracion-planta-destino/" + dest.getId())
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyVacio))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"));
+    }
+
+    @Test
+    @DisplayName("ZP.2: destino valida cantidad > 0, tolerancia 1%, especie y formato coincidente en creación y modificación")
+    void zp2_destinoCantidadEspecieYFormato_422() throws Exception {
+        DeclaracionPlantaAbastecimientoModel lote = abastecimiento(plantaA, "DAPLA-ZP2-1");
+        DeclaracionPlantaProduccionModel prod = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + lote.getId()));
+        EspecieModel otraEspecie = especieRepository.saveAndFlush(EspecieModel.builder().nombre("Otra ZP2").build());
+        ProductoModel otroFormato = productoRepository.saveAndFlush(ProductoModel.builder().nombre("Otro Formato ZP2").build());
+
+        // Cantidad 0 -> 422
+        DeclaracionPlantaDestinoModel dCero = destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId());
+        dCero.setCantidad(BigDecimal.ZERO);
+        assertThrows(ValidacionPlantaException.class, () -> destinoService.save(dCero));
+
+        // 405 kg sobre 400 kg (> 1% -> max 404.00) -> 422
+        DeclaracionPlantaDestinoModel dExceso = destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId());
+        dExceso.setCantidad(new BigDecimal("405.00"));
+        assertThrows(ValidacionPlantaException.class, () -> destinoService.save(dExceso));
+
+        // Especie distinta -> 422
+        DeclaracionPlantaDestinoModel dEsp = destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId());
+        dEsp.setEspecie(otraEspecie);
+        assertThrows(ValidacionPlantaException.class, () -> destinoService.save(dEsp));
+
+        // Formato distinto (destino_exige_mismo_formato=true) -> 422
+        DeclaracionPlantaDestinoModel dFmt = destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId());
+        dFmt.setProducto(otroFormato);
+        assertThrows(ValidacionPlantaException.class, () -> destinoService.save(dFmt));
+
+        // 404.00 kg exacto en límite 1% -> 201 OK
+        DeclaracionPlantaDestinoModel dOk = destino(plantaA, "PLANTA_PRODUCCION:" + prod.getId());
+        dOk.setCantidad(new BigDecimal("404.00"));
+        DeclaracionPlantaDestinoModel guardada = destinoService.save(dOk);
+        assertNotNull(guardada.getId());
+
+        // Modificación excediendo tolerancia -> 422 vía HTTP (no degradado a 400)
+        String bodyExceso = """
+                {
+                  "usuario": {"id": %d},
+                  "fechaDeclaracionDestino": "2026-11-06",
+                  "hora": "15:00:00",
+                  "nombrePlanta": "Planta NP0",
+                  "especie": {"id": %d},
+                  "producto": {"id": %d},
+                  "cantidad": 405.00,
+                  "declaracionesSeleccionadas": "PLANTA_PRODUCCION:%d"
+                }
+                """.formatted(plantaA.getId(), especie.getId(), producto.getId(), prod.getId());
+        mockMvc.perform(put("/api/declaracion-planta-destino/" + guardada.getId())
+                        .with(user(RUT_PLANTA_A).roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyExceso))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("VALIDACION_PLANTA"));
+    }
+
+    @Test
+    @DisplayName("ZP.3: producción sin lotes -> 422; producción antigua con marca PRODUCCION_SIN_LOTES (D57) -> 409 hasta liberar")
+    void zp3_produccionSinLotes_y_bloqueoD57() {
+        assertThrows(ValidacionPlantaException.class, () -> produccionService.save(produccion(plantaA, null)));
+
+        DeclaracionPlantaProduccionModel antiguaSinLotes = produccionRepository.saveAndFlush(
+                produccion(plantaA, null).setFolioDeclaracionPpla("PPLA-ANT-SIN-LOTES"));
+
+        configuracionGeneralService.updateConfig("marcas_bloqueantes_produccion", "RENDIMIENTO_ANOMALO,PRODUCCION_SIN_LOTES");
+        DeclaracionMarcaModel marca = marcaRepository.saveAndFlush(DeclaracionMarcaModel.builder()
+                .declaracionTipo("PLANTA_PRODUCCION").declaracionId(antiguaSinLotes.getId())
+                .marca("PRODUCCION_SIN_LOTES").detalle("Sin lotes (D57)").build());
+
+        ResponseStatusException ex409 = assertThrows(ResponseStatusException.class,
+                () -> destinoService.save(destino(plantaA, "PLANTA_PRODUCCION:" + antiguaSinLotes.getId())));
+        assertEquals(HttpStatus.CONFLICT, ex409.getStatusCode());
+
+        // Liberada por fiscalizador -> permite despachar
+        marca.setResuelta(true).setResolucionTipo("LIBERADA").setEstadoGestion("RESUELTA");
+        marcaRepository.saveAndFlush(marca);
+        DeclaracionPlantaDestinoModel despachada = destinoService.save(
+                destino(plantaA, "PLANTA_PRODUCCION:" + antiguaSinLotes.getId()));
+        assertNotNull(despachada.getId());
+    }
+
+    @Test
+    @DisplayName("ZP.4: producción valida 0 kg (422), lotes de dos especies con folios (422), formato incompatible (422) y asigna especie desde lotes")
+    void zp4_lotesDosEspeciesFormatoYKilos() {
+        EspecieModel especieB = especieRepository.saveAndFlush(EspecieModel.builder().nombre("Pelillo ZP4").build());
+        ProductoModel formatoB = productoRepository.saveAndFlush(ProductoModel.builder()
+                .nombre("Formato Pelillo ZP4").especie(especieB).activo(true).build());
+
+        DeclaracionPlantaAbastecimientoModel lote1 = abastecimiento(plantaA, "DAPLA-ZP4-ESP1");
+        DeclaracionPlantaAbastecimientoModel lote2EspB = abastecimientoRepository.saveAndFlush(
+                DeclaracionPlantaAbastecimientoModel.builder()
+                        .usuario(plantaA).usuarioDestinatario(plantaA)
+                        .folioDeclaracionAPla("DAPLA-ZP4-ESP2").nombrePlanta("Planta NP0")
+                        .fechaIngresoPlanta(fecha).hora("10:00:00")
+                        .especie(especieB).humedadEstado(humedad).cantidad(new BigDecimal("1000.00"))
+                        .build());
+
+        // 0 kg producto -> 422
+        DeclaracionPlantaProduccionModel pCero = produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + lote1.getId());
+        pCero.setCantidadProducto(BigDecimal.ZERO);
+        assertThrows(ValidacionPlantaException.class, () -> produccionService.save(pCero));
+
+        // Dos especies distintas -> 422 mencionando los folios
+        ValidacionPlantaException exDos = assertThrows(ValidacionPlantaException.class, () ->
+                produccionService.save(produccion(plantaA,
+                        "PLANTA_ABASTECIMIENTO:" + lote1.getId() + ",PLANTA_ABASTECIMIENTO:" + lote2EspB.getId())));
+        assertTrue(exDos.getMessage().contains("DAPLA-ZP4-ESP1"), exDos.getMessage());
+        assertTrue(exDos.getMessage().contains("DAPLA-ZP4-ESP2"), exDos.getMessage());
+
+        // Formato cuya especie no coincide (incluso con produccion_exige_formato_oficial=false) -> 422
+        configuracionGeneralService.updateConfig("produccion_exige_formato_oficial", "false");
+        DeclaracionPlantaProduccionModel pFmtMal = produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + lote1.getId());
+        pFmtMal.setProductoResultante(formatoB);
+        assertThrows(ValidacionPlantaException.class, () -> produccionService.save(pFmtMal));
+
+        // Cliente envía otra especie en materiaPrimaEspecie, pero el servidor asigna la especie real de los lotes
+        DeclaracionPlantaProduccionModel pAsignada = produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + lote1.getId());
+        pAsignada.setMateriaPrimaEspecie(especieB);
+        DeclaracionPlantaProduccionModel guardada = produccionService.save(pAsignada);
+        assertEquals(especie.getId(), guardada.getMateriaPrimaEspecie().getId());
     }
 
     // ------------------------------------------------------------------ utilidades

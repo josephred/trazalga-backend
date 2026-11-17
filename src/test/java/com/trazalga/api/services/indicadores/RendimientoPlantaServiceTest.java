@@ -484,5 +484,42 @@ class RendimientoPlantaServiceTest {
         service.registrarHallazgosPostGuardado(decl, res);
         verifyNoInteractions(hallazgoService);
     }
+
+    @Test
+    @DisplayName("ZP.7 (Parte M): límite exacto de factores respaldo (29,33 % sin marca vs 29,34 % con RENDIMIENTO_ANOMALO)")
+    void zp7_limiteExacto2933SinMarca_2934ConMarca() {
+        when(factorConversionService.findFactorVigente(eq(1L), eq(1L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("1.00"))));
+        when(factorConversionService.findFactorVigente(eq(1L), eq(3L), any()))
+                .thenReturn(Optional.of(factor(new BigDecimal("3.5800"))));
+
+        DeclaracionPlantaAbastecimientoModel lote = DeclaracionPlantaAbastecimientoModel.builder()
+                .id(16L).especie(pelillo).humedadEstadoRecepcion(humHumedo).pesoRomanaKg(new BigDecimal("10000")).build();
+        CapturaOrigenProduccion.ResultadoCapturaOrigen capCompleta = new CapturaOrigenProduccion.ResultadoCapturaOrigen(
+                new BigDecimal("10000.00"), true, 1, List.of(), null);
+
+        // 2932.96 kg secos sobre 10000 kg -> 29.33 % (rendimientoFinalPct=29.33, <= límite exacto 27.93296*1.05) -> sin marca
+        DeclaracionPlantaProduccionModel limite = DeclaracionPlantaProduccionModel.builder()
+                .id(105L).folioDeclaracionPpla("PPLA-LIM-2933").usuario(planta)
+                .fechaProduccion(Date.valueOf("2026-11-16"))
+                .materiaPrimaEspecie(pelillo).productoResultante(prodSeco)
+                .cantidadProducto(new BigDecimal("2932.96")).build();
+        RendimientoPlantaService.ResultadoRendimiento resLimite = service.evaluarYActualizar(
+                limite, List.of(lote), capCompleta, new java.util.Date());
+        assertEquals(new BigDecimal("29.33"), limite.getRendimientoFinalPct());
+        assertFalse(resLimite.anomalo());
+        service.registrarHallazgosPostGuardado(limite, resLimite);
+        verify(hallazgoService, never()).registrar(any(), any(), eq("RENDIMIENTO_ANOMALO"), any(), any(), any(), any(), any(), any());
+
+        // Una centésima porcentual más (29.34 % -> 2934 kg) -> RENDIMIENTO_ANOMALO
+        limite.setCantidadProducto(new BigDecimal("2934"));
+        RendimientoPlantaService.ResultadoRendimiento resExceso = service.evaluarYActualizar(
+                limite, List.of(lote), capCompleta, new java.util.Date());
+        assertTrue(resExceso.anomalo());
+        service.registrarHallazgosPostGuardado(limite, resExceso);
+        verify(hallazgoService).registrar(
+                eq("PLANTA_PRODUCCION"), eq(105L), eq("RENDIMIENTO_ANOMALO"), eq("EXCESO"),
+                any(CriterioHallazgo.class), anyString(), eq("VALIDACION"), eq(99L), isNull());
+    }
 }
 
