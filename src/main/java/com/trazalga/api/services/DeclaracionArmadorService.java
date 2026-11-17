@@ -108,6 +108,9 @@ public class DeclaracionArmadorService {
     @Autowired
     private GestionMensajeService gestionMensajeService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
         
@@ -122,12 +125,30 @@ public class DeclaracionArmadorService {
         declaracion.setFolioDesembarqueDa(request.getFolioDesembarqueDa());
         Date fechaExt = parseDate(request.getFechaExtraccion());
         Date fechaDec = parseDate(request.getFechaDeclaracion());
-        if (fechaExt != null && fechaDec != null && fechaExt.after(fechaDec)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
-        }
         declaracion.setFechaExtraccion(fechaExt);
         declaracion.setFechaDeclaracion(fechaDec);
         declaracion.setHora(request.getHora());
+        declaracion.setLatitud(request.getLatitud());
+        declaracion.setLongitud(request.getLongitud());
+        declaracion.setPrecisionGpsM(request.getPrecisionGpsM());
+        declaracion.setGpsCapturadoEn(request.getGpsCapturadoEn());
+        declaracion.setEnvioOffline(request.getEnvioOffline());
+
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (request.getId() == null && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "ARMADOR",
+                    declaracion.getFechaDeclaracion(),
+                    declaracion.getHora(),
+                    declaracion::setFechaDeclaracion,
+                    List.of(new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                            declaracion.getFechaExtraccion(),
+                            declaracion::setFechaExtraccion)));
+        }
+        if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null
+                && declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+        }
         
         if (request.getEmbarcacion() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La embarcación es obligatoria.");
@@ -293,6 +314,9 @@ public class DeclaracionArmadorService {
         declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
         
         DeclaracionArmadorModel savedDeclaracion = declaracionArmadorRepository.save(declaracion);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, savedDeclaracion.getId());
+        }
 
         // Guardar los buzos asociados en la tabla declaracion_buzos
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {

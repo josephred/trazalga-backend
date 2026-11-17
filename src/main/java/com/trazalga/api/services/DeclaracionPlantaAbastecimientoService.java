@@ -72,6 +72,9 @@ public class DeclaracionPlantaAbastecimientoService {
     @Autowired(required = false)
     private TransporteResolverService transporteResolverService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -151,6 +154,7 @@ public class DeclaracionPlantaAbastecimientoService {
 
     @Transactional
     public DeclaracionPlantaAbastecimientoModel save(DeclaracionPlantaAbastecimientoModel declaracion) {
+        boolean esCreacion = declaracion.getId() == null;
         validarVersionMinima();
         validarCargasNoBloqueadas(declaracion.getDeclaracionesSeleccionadas());
         validarPesoRomana(declaracion);
@@ -167,6 +171,21 @@ public class DeclaracionPlantaAbastecimientoService {
         if (declaracion.getFechaIngresoPlanta() == null) {
             declaracion.setFechaIngresoPlanta(new Date());
         }
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "PLANTA_ABASTECIMIENTO",
+                    declaracion.getFechaIngresoPlanta(),
+                    declaracion.getHora(),
+                    declaracion::setFechaIngresoPlanta,
+                    List.of(
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracion.getFechaTraslado(),
+                                    declaracion::setFechaTraslado),
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracion.getFechaPesaje(),
+                                    declaracion::setFechaPesaje)));
+        }
         sanearComposicion(declaracion);
         normalizarPatentes(declaracion);
         resolverTransporte(declaracion);
@@ -175,6 +194,9 @@ public class DeclaracionPlantaAbastecimientoService {
             declaracion.setUsuarioDestinatario(declaracion.getUsuario());
         }
         DeclaracionPlantaAbastecimientoModel saved = repository.save(declaracion);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, saved.getId());
+        }
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(

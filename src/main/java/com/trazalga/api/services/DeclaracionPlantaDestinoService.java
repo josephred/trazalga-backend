@@ -34,6 +34,9 @@ public class DeclaracionPlantaDestinoService {
     @Autowired(required = false)
     private ProductoAdminService productoAdminService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -103,6 +106,7 @@ public class DeclaracionPlantaDestinoService {
 
     @Transactional
     public DeclaracionPlantaDestinoModel save(DeclaracionPlantaDestinoModel declaracion) {
+        boolean esCreacion = declaracion.getId() == null;
         // NP.0: las producciones deben ser de la planta, estar libres, no anuladas y no retenidas (409)
         if (politicaEscrituraPlanta != null) {
             politicaEscrituraPlanta.verificarProduccionesDeDestino(
@@ -120,8 +124,26 @@ public class DeclaracionPlantaDestinoService {
         if (declaracion.getFechaDeclaracionDestino() == null) {
             declaracion.setFechaDeclaracionDestino(new Date());
         }
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "PLANTA_DESTINO",
+                    declaracion.getFechaDeclaracionDestino(),
+                    declaracion.getHora(),
+                    declaracion::setFechaDeclaracionDestino,
+                    List.of(
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracion.getFechaTrasladoDestino(),
+                                    declaracion::setFechaTrasladoDestino),
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracion.getFechaTraslado(),
+                                    declaracion::setFechaTraslado)));
+        }
 
         DeclaracionPlantaDestinoModel saved = repository.save(declaracion);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, saved.getId());
+        }
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(

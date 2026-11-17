@@ -94,6 +94,9 @@ public class DeclaracionRecolectorService {
     @Autowired(required = false)
     private com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     private void resolverVaraderoDeclarado(DeclaracionRecolectorModel model) {
         if (model == null) return;
         if (model.getVaraderoRelacion() != null && model.getVaraderoRelacion().getId() != null) {
@@ -173,10 +176,11 @@ public class DeclaracionRecolectorService {
     }
 
     public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+        boolean esCreacion = declaracionRecolectorModel.getId() == null;
         // La app 2.4.0 edita recolectores con POST y el id existente (el repositorio lo actualiza):
         // se aplican las mismas reglas que en updateById (recibida por un destinatario y congelamiento).
         java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
-        if (declaracionRecolectorModel.getId() != null) {
+        if (!esCreacion) {
             DeclaracionRecolectorModel existente = declaracionRecolectorRepository.findById(declaracionRecolectorModel.getId()).orElse(null);
             if (existente != null) {
                 if (existente.getDeclaracionDestinatario() != null) {
@@ -186,6 +190,24 @@ public class DeclaracionRecolectorService {
                     autorizacionEdicion = politicaEdicion.verificarEdicion("RECOLECTOR", existente.getId());
                 }
             }
+        }
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "RECOLECTOR",
+                    declaracionRecolectorModel.getFechaDeclaracion(),
+                    declaracionRecolectorModel.getHora(),
+                    declaracionRecolectorModel::setFechaDeclaracion,
+                    List.of(
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracionRecolectorModel.getFechaExtraccion(),
+                                    declaracionRecolectorModel::setFechaExtraccion),
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracionRecolectorModel.getPeriodoExtraccionInicio(),
+                                    declaracionRecolectorModel::setPeriodoExtraccionInicio),
+                            new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                                    declaracionRecolectorModel.getPeriodoExtraccionFin(),
+                                    declaracionRecolectorModel::setPeriodoExtraccionFin)));
         }
         if (declaracionRecolectorModel.getFechaDeclaracion() != null) {
             if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel.getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
@@ -243,6 +265,9 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, saved.getId());
+        }
 
         // Guardar buzos
         if (declaracionRecolectorModel.getBuzos() != null && !declaracionRecolectorModel.getBuzos().isEmpty()) {

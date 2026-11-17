@@ -103,11 +103,15 @@ public class DeclaracionAreaService {
     @Autowired
     private GestionMensajeService gestionMensajeService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
+        boolean esCreacion = declaracion.getId() == null;
         // Un POST con el id de una declaración existente la actualiza en el repositorio:
         // se aplican las mismas reglas que en updateDeclaracion (recibida por un destinatario y congelamiento).
         java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
-        if (declaracion.getId() != null) {
+        if (!esCreacion) {
             DeclaracionAreaModel existente = declaracionAreaRepository.findById(declaracion.getId()).orElse(null);
             if (existente != null) {
                 if (existente.getDeclaracionDestinatario() != null) {
@@ -117,6 +121,17 @@ public class DeclaracionAreaService {
                     autorizacionEdicion = politicaEdicion.verificarEdicion("AREA", existente.getId());
                 }
             }
+        }
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "AREA",
+                    declaracion.getFechaDeclaracion(),
+                    declaracion.getHora(),
+                    declaracion::setFechaDeclaracion,
+                    List.of(new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                            declaracion.getFechaExtraccion(),
+                            declaracion::setFechaExtraccion)));
         }
         if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null) {
             if (declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
@@ -303,6 +318,9 @@ public class DeclaracionAreaService {
         declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionAreaModel savedDeclaracion = declaracionAreaRepository.save(declaracion);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, savedDeclaracion.getId());
+        }
 
         // Guardar los buzos asociados en la tabla declaracion_buzos
         if (declaracion.getBuzos() != null && !declaracion.getBuzos().isEmpty()) {

@@ -43,6 +43,9 @@ public class DeclaracionPlantaProduccionService {
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicionDeclaracion;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -122,6 +125,7 @@ public class DeclaracionPlantaProduccionService {
 
     @Transactional
     public DeclaracionPlantaProduccionModel save(DeclaracionPlantaProduccionModel declaracion) {
+        boolean esCreacion = declaracion.getId() == null;
         // NP.0: los lotes deben ser de la planta, estar libres, no anulados y no retenidos (409)
         if (politicaEscrituraPlanta != null) {
             politicaEscrituraPlanta.verificarLotesDeProduccion(
@@ -139,6 +143,17 @@ public class DeclaracionPlantaProduccionService {
         if (declaracion.getFechaProduccion() == null) {
             declaracion.setFechaProduccion(new Date());
         }
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "PLANTA_PRODUCCION",
+                    declaracion.getFechaProduccion(),
+                    declaracion.getHora(),
+                    declaracion::setFechaProduccion,
+                    List.of(new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                            declaracion.getFechaTraslado(),
+                            declaracion::setFechaTraslado)));
+        }
 
         // NA.1 (D24): en producción el destinatario interno es siempre la misma planta que produce
         if (declaracion.getUsuario() != null) {
@@ -152,6 +167,9 @@ public class DeclaracionPlantaProduccionService {
         }
 
         DeclaracionPlantaProduccionModel saved = repository.save(declaracion);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, saved.getId());
+        }
 
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(

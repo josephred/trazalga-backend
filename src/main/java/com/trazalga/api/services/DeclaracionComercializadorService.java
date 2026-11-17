@@ -48,6 +48,9 @@ public class DeclaracionComercializadorService {
     @Autowired(required = false)
     private TransporteResolverService transporteResolverService;
 
+    @Autowired(required = false)
+    private com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion politicaFechaDeclaracion;
+
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
@@ -149,11 +152,26 @@ public class DeclaracionComercializadorService {
 
     @Transactional
     public DeclaracionComercializadorModel saveDeclaracionComercializador(DeclaracionComercializadorModel declaracionComercializadorModel){
+        boolean esCreacion = declaracionComercializadorModel.getId() == null;
+        com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.AjustePendiente ajusteFecha = null;
+        if (esCreacion && politicaFechaDeclaracion != null) {
+            ajusteFecha = politicaFechaDeclaracion.ajustarSiFutura(
+                    "COMERCIALIZADOR",
+                    declaracionComercializadorModel.getFechaDeclaracion(),
+                    declaracionComercializadorModel.getHora(),
+                    declaracionComercializadorModel::setFechaDeclaracion,
+                    List.of(new com.trazalga.api.services.declaraciones.PoliticaFechaDeclaracion.FechaAcompanante(
+                            declaracionComercializadorModel.getFechaTraslado(),
+                            declaracionComercializadorModel::setFechaTraslado)));
+        }
         validarCargasNoBloqueadas(declaracionComercializadorModel.getDeclaracionesSeleccionadas());
         sanearComposicion(declaracionComercializadorModel);
         normalizarPatentes(declaracionComercializadorModel);
         resolverTransporte(declaracionComercializadorModel);
         DeclaracionComercializadorModel saved = declaracionComercializadorRepository.save(declaracionComercializadorModel);
+        if (politicaFechaDeclaracion != null && ajusteFecha != null) {
+            politicaFechaDeclaracion.registrar(ajusteFecha, saved.getId());
+        }
         if (saved.getDeclaracionesSeleccionadas() != null && !saved.getDeclaracionesSeleccionadas().isEmpty()) {
             marcarDeclaracionesComoConsumidas(
                 saved.getDeclaracionesSeleccionadas(),

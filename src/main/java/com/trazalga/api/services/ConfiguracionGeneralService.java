@@ -50,6 +50,8 @@ public class ConfiguracionGeneralService {
         createIfNotExist("declaracion_congelar_marcas", "EN_VEDA,CUOTA_EXCEDIDA,POSTERIOR_CIERRE,LED_EXCEDIDO", "Marcas que congelan una declaración de recolector, armador o área (separadas por coma)", "CADENA");
         createIfNotExist("declaracion_autorizacion_horas", "48", "Horas que tiene el dueño para usar una autorización de edición dada por un fiscalizador", "CADENA");
         createIfNotExist("declaracion_escritura_exige_sesion", "false", "Exige sesión para modificar o eliminar declaraciones de origen y de planta. Encender cuando la app 2.5.0+ esté instalada", "CADENA");
+        createIfNotExist("declaracion_corrige_fecha_futura", "true", "Resta un día al crear declaraciones recibidas con fecha futura por desfase UTC en el teléfono (ZT.2)", "INTEGRIDAD");
+        createIfNotExist("declaracion_tolerancia_reloj_min", "15", "Tolerancia en minutos para considerar futura la fecha/hora de una declaración al crearla (ZT.2)", "INTEGRIDAD");
         // Refinamiento 06-11 · punto 1 (D20): el LED por embarcación o buzo cuenta también las declaraciones de área
         createIfNotExist("led_suma_declaraciones_area", "true", "El acumulado diario del LED (evaluación en línea y monitoreo del panel) suma también las declaraciones de área de manejo de la misma embarcación, buzo o usuario (refinamiento 06-11)", "CADENA");
 
