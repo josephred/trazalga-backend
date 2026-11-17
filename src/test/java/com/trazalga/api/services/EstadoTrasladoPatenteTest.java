@@ -230,4 +230,23 @@ public class EstadoTrasladoPatenteTest {
         assertEquals(EstadoTrasladoPatente.ESTADO_SIN_REGISTROS, ev.getEstado());
         assertEquals(EstadoTrasladoPatente.RESULTADO_PUBLICO_SIN_AUTORIZACION, ev.getResultadoPublico());
     }
+
+    @Test
+    @DisplayName("ZT.4: Despacho nocturno 22:30 (con fecha corregida a hoy) consultado a las 22:35 responde AUTORIZADO")
+    void testDespachoNocturno2230Consultado2235Autorizado() {
+        DeclaracionComercializadorModel dc = crearDespacho(
+                107L, "BBCC11", null,
+                LocalDate.of(2026, 11, 16), "22:30:00",
+                "Coquimbo", "Huiro negro", "ACTIVA");
+
+        when(comercializadorRepository.findCandidatosPorPatente("BBCC11"))
+                .thenReturn(Collections.singletonList(dc));
+
+        LocalDateTime momentoConsulta = LocalDateTime.of(2026, 11, 16, 22, 35, 0);
+        EvaluacionPatente ev = estadoTrasladoPatente.evaluar("BBCC11", momentoConsulta);
+
+        assertNotNull(ev);
+        assertEquals(EstadoTrasladoPatente.ESTADO_AUTORIZADO, ev.getEstado());
+        assertEquals(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO, ev.getResultadoPublico());
+    }
 }
