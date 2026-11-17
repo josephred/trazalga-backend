@@ -114,6 +114,29 @@ public class DeclaracionArmadorService {
     @Autowired(required = false)
     private com.trazalga.api.services.ConfiguracionGeneralService configService;
 
+    private ComunaModel resolverComunaCargada(ComunaModel c) {
+        if (c == null) return null;
+        if (org.hibernate.Hibernate.isInitialized(c)) return c;
+        return c.getId() != null ? comunaRepository.findById(c.getId()).orElse(null) : null;
+    }
+
+    private Long resolverRegionId(ComunaModel comuna, CaletaModel caleta) {
+        if (caleta != null && caleta.getRegion() != null) {
+            return caleta.getRegion().getId();
+        }
+        ComunaModel com = resolverComunaCargada(comuna);
+        if (com != null && com.getRegion() != null) {
+            return com.getRegion().getId();
+        }
+        if (caleta != null && caleta.getComuna() != null) {
+            ComunaModel comCal = resolverComunaCargada(caleta.getComuna());
+            if (comCal != null && comCal.getRegion() != null) {
+                return comCal.getRegion().getId();
+            }
+        }
+        return null;
+    }
+
     public DeclaracionArmadorModel saveDeclaracionArmador(DeclaracionArmadorModel request) {
         DeclaracionArmadorModel declaracion = new DeclaracionArmadorModel();
         
@@ -250,14 +273,15 @@ public class DeclaracionArmadorService {
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
             if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
+                ComunaModel comunaCaleta = resolverComunaCargada(caleta.getComuna());
                 String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
-                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
+                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null ? comunaCaleta.getNombre() : "ID " + caleta.getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
             }
             declaracion.setComuna(comunaDeclarada);
         } else if (caleta.getComuna() != null) {
-            declaracion.setComuna(caleta.getComuna());
+            declaracion.setComuna(resolverComunaCargada(caleta.getComuna()));
         }
         
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {
@@ -288,12 +312,7 @@ public class DeclaracionArmadorService {
         Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
                 ? declaracion.getUsuario().getComuna().getId() : null;
         Long comunaDesembarqueId = declaracion.getComuna() != null ? declaracion.getComuna().getId() : null;
-        Long regionId = null;
-        if (declaracion.getComuna() != null && declaracion.getComuna().getRegion() != null) {
-            regionId = declaracion.getComuna().getRegion().getId();
-        } else if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
-            regionId = declaracion.getCaleta().getComuna().getRegion().getId();
-        }
+        Long regionId = resolverRegionId(declaracion.getComuna(), declaracion.getCaleta());
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("ARMADOR")
@@ -535,14 +554,15 @@ public class DeclaracionArmadorService {
         if (request.getComuna() != null && request.getComuna().getId() != null) {
             ComunaModel comunaDeclarada = comunaRepository.findById(request.getComuna().getId()).orElse(null);
             if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(request.getComuna().getId())) {
+                ComunaModel comunaCaleta = resolverComunaCargada(caleta.getComuna());
                 String comunaDeclaradaNombre = comunaDeclarada != null && comunaDeclarada.getNombre() != null ? comunaDeclarada.getNombre() : "ID " + request.getComuna().getId();
-                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
+                String comunaCaletaNombre = comunaCaleta != null && comunaCaleta.getNombre() != null ? comunaCaleta.getNombre() : "ID " + caleta.getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         String.format("La caleta %s pertenece a %s, no a %s", caleta.getNombre(), comunaCaletaNombre, comunaDeclaradaNombre));
             }
             declaracionArmadorModel.setComuna(comunaDeclarada);
         } else if (caleta.getComuna() != null) {
-            declaracionArmadorModel.setComuna(caleta.getComuna());
+            declaracionArmadorModel.setComuna(resolverComunaCargada(caleta.getComuna()));
         }
         
         if (request.getEspecie() == null || request.getEspecie().getId() == null) {
@@ -571,12 +591,7 @@ public class DeclaracionArmadorService {
         Long comunaInscripcionId = (declaracionArmadorModel.getUsuario() != null && declaracionArmadorModel.getUsuario().getComuna() != null)
                 ? declaracionArmadorModel.getUsuario().getComuna().getId() : null;
         Long comunaDesembarqueId = declaracionArmadorModel.getComuna() != null ? declaracionArmadorModel.getComuna().getId() : null;
-        Long regionId = null;
-        if (declaracionArmadorModel.getComuna() != null && declaracionArmadorModel.getComuna().getRegion() != null) {
-            regionId = declaracionArmadorModel.getComuna().getRegion().getId();
-        } else if (declaracionArmadorModel.getCaleta() != null && declaracionArmadorModel.getCaleta().getComuna() != null && declaracionArmadorModel.getCaleta().getComuna().getRegion() != null) {
-            regionId = declaracionArmadorModel.getCaleta().getComuna().getRegion().getId();
-        }
+        Long regionId = resolverRegionId(declaracionArmadorModel.getComuna(), declaracionArmadorModel.getCaleta());
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("ARMADOR")

@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -314,6 +316,110 @@ public class ConsultaPatentePublicaTest {
         Map<String, Object> mapSoloFono = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 1, 0));
         assertTrue(mapSoloFono.containsKey("fonoDenuncia"));
         assertFalse(mapSoloFono.containsKey("whatsappDenuncia"));
+    }
+
+    @Test
+    @DisplayName("ZC.5: depurarLogsAntiguos purga registros > retención configurada y no borra si el parámetro está vacío")
+    void testDepurarLogsAntiguos_UsaRetencionYRespetaVacio() {
+        Date ahoraRef = java.util.Date.from(LocalDateTime.of(2026, 11, 17, 3, 30, 0)
+                .atZone(java.time.ZoneId.of("America/Santiago")).toInstant());
+
+        when(configService.getValor(eq("consulta_patente_log_retencion_dias"), anyString())).thenReturn("365");
+        when(logRepository.deleteOlderThan(any(Date.class))).thenReturn(4);
+
+        int borrados = patenteService.depurarLogsAntiguos(ahoraRef);
+        assertEquals(4, borrados);
+        org.mockito.ArgumentCaptor<Date> cutoffCaptor = org.mockito.ArgumentCaptor.forClass(Date.class);
+        verify(logRepository).deleteOlderThan(cutoffCaptor.capture());
+        long diffDias = java.time.Duration.between(cutoffCaptor.getValue().toInstant(), ahoraRef.toInstant()).toDays();
+        assertEquals(365L, diffDias);
+
+        reset(logRepository);
+        when(configService.getValor(eq("consulta_patente_log_retencion_dias"), anyString())).thenReturn("   ");
+        assertEquals(0, patenteService.depurarLogsAntiguos(ahoraRef));
+        verify(logRepository, never()).deleteOlderThan(any());
+    }
+
+    @Test
+    @DisplayName("ZC.6: hashIp con HMAC-SHA256 es determinístico y distinto a SHA-256 simple")
+    void testHashIp_HmacDeterministicoYDistintoDeSha256Simple() throws Exception {
+        patenteService.setIpHashSecret("clave-hmac-zc6-prueba");
+        String hmac1 = patenteService.hashIp("190.10.20.30");
+        String hmac2 = patenteService.hashIp("190.10.20.30");
+
+        assertNotNull(hmac1);
+        assertEquals(64, hmac1.length());
+        assertEquals(hmac1, hmac2);
+
+        MessageDigest sha = MessageDigest.getInstance("SHA-256");
+        byte[] raw = sha.digest("190.10.20.30".getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : raw) sb.append(String.format("%02x", b));
+        assertNotEquals(sb.toString(), hmac1);
+    }
+
+    @Test
+    @DisplayName("ZC.6: RateLimitFilter ignora X-Forwarded-For desde IP no confiable y bloquea intento 21; acepta proxy confiable")
+    void testRateLimiting_IgnoraXForwardedForNoConfiableYPurgadoLimpia() throws Exception {
+        RateLimitFilter rateLimiter = new RateLimitFilter();
+        org.springframework.test.util.ReflectionTestUtils.setField(rateLimiter, "configService", configService);
+        rateLimiter.setProxiesConfiables("");
+
+        HttpServletResponse mockRes = mock(HttpServletResponse.class);
+        FilterChain mockChain = mock(FilterChain.class);
+        PrintWriter pw = new PrintWriter(new StringWriter());
+        lenient().when(mockRes.getWriter()).thenReturn(pw);
+
+        for (int i = 1; i <= 20; i++) {
+            HttpServletRequest req = mock(HttpServletRequest.class);
+            when(req.getRequestURI()).thenReturn("/api/public/patentes/ABCD12");
+            when(req.getRemoteAddr()).thenReturn("200.5.6.7");
+            lenient().when(req.getHeader("X-Forwarded-For")).thenReturn("10.0.0." + i);
+            rateLimiter.doFilter(req, mockRes, mockChain);
+        }
+        verify(mockChain, times(20)).doFilter(any(), eq(mockRes));
+
+        HttpServletRequest req21 = mock(HttpServletRequest.class);
+        when(req21.getRequestURI()).thenReturn("/api/public/patentes/ABCD12");
+        when(req21.getRemoteAddr()).thenReturn("200.5.6.7");
+        lenient().when(req21.getHeader("X-Forwarded-For")).thenReturn("10.0.0.99");
+        rateLimiter.doFilter(req21, mockRes, mockChain);
+
+        verify(mockRes).setStatus(429);
+        assertEquals(1, rateLimiter.trackedIpCount());
+        rateLimiter.purgarInactivas();
+        assertEquals(1, rateLimiter.trackedIpCount());
+
+        HttpServletRequest trustedReq = mock(HttpServletRequest.class);
+        when(trustedReq.getRemoteAddr()).thenReturn("10.1.0.10");
+        when(trustedReq.getHeader("X-Forwarded-For")).thenReturn("181.20.30.40, 10.1.0.10");
+        assertEquals("10.1.0.10", RateLimitFilter.resolverIpCliente(trustedReq, ""));
+        assertEquals("181.20.30.40", RateLimitFilter.resolverIpCliente(trustedReq, "10.1.0.10"));
+    }
+
+    @Test
+    @DisplayName("ZC.3: Evaluación de PLANTA_DESTINO nunca expone comunaDestino ni datos personales de comprador")
+    void testAutorizado_PlantaDestinoNuncaExponeDatosCompradorNiComuna() {
+        EvaluacionPatente ev = EvaluacionPatente.builder()
+                .patente("PD1234")
+                .estado(EstadoTrasladoPatente.ESTADO_AUTORIZADO)
+                .resultadoPublico(EstadoTrasladoPatente.RESULTADO_PUBLICO_AUTORIZADO)
+                .fechaHoraAutorizacion(LocalDateTime.of(2026, 10, 22, 8, 0, 0))
+                .comunaDestino(null)
+                .tipoAlga("Huiro palo")
+                .consultadoEn(AHORA_REFERENCIA)
+                .build();
+
+        when(estadoTrasladoPatente.evaluar(eq("PD1234"), any())).thenReturn(ev);
+        when(configService.getValor(eq("consulta_publica_muestra_comuna"), anyString())).thenReturn("true");
+        when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
+
+        Map<String, Object> map = patenteService.consultar("PD1234", request, AHORA_REFERENCIA);
+        assertEquals("AUTORIZADO", map.get("resultado"));
+        assertFalse(map.containsKey("comunaDestino"));
+        assertFalse(map.containsKey("nombreDestino"));
+        assertFalse(map.containsKey("rutDestino"));
+        verificarAusenciaDatosPersonales(map);
     }
 
     private void verificarAusenciaDatosPersonales(Map<String, Object> map) {

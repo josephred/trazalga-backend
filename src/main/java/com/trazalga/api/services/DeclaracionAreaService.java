@@ -112,6 +112,15 @@ public class DeclaracionAreaService {
     @Autowired(required = false)
     private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
 
+    @Autowired(required = false)
+    private com.trazalga.api.repositories.IComunaRepository comunaRepository;
+
+    private com.trazalga.api.models.ComunaModel resolverComunaCargada(com.trazalga.api.models.ComunaModel c) {
+        if (c == null) return null;
+        if (org.hibernate.Hibernate.isInitialized(c) || comunaRepository == null) return c;
+        return c.getId() != null ? comunaRepository.findById(c.getId()).orElse(null) : null;
+    }
+
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
         boolean esCreacion = declaracion.getId() == null;
         // Un POST con el id de una declaración existente la actualiza en el repositorio:
@@ -266,9 +275,11 @@ public class DeclaracionAreaService {
         if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null
                 && declaracion.getAmerb() != null && declaracion.getAmerb().getComuna() != null) {
             if (!declaracion.getCaleta().getComuna().getId().equals(declaracion.getAmerb().getComuna().getId())) {
+                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(declaracion.getCaleta().getComuna());
+                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(declaracion.getAmerb().getComuna());
                 String caletaNombre = declaracion.getCaleta().getNombre() != null ? declaracion.getCaleta().getNombre() : "ID " + declaracion.getCaleta().getId();
-                String comunaCaletaNombre = declaracion.getCaleta().getComuna().getNombre() != null ? declaracion.getCaleta().getComuna().getNombre() : "ID " + declaracion.getCaleta().getComuna().getId();
-                String comunaAmerbNombre = declaracion.getAmerb().getComuna().getNombre() != null ? declaracion.getAmerb().getComuna().getNombre() : "ID " + declaracion.getAmerb().getComuna().getId();
+                String comunaCaletaNombre = comCaleta != null && comCaleta.getNombre() != null ? comCaleta.getNombre() : "ID " + declaracion.getCaleta().getComuna().getId();
+                String comunaAmerbNombre = comAmerb != null && comAmerb.getNombre() != null ? comAmerb.getNombre() : "ID " + declaracion.getAmerb().getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre, comunaAmerbNombre));
             }
@@ -283,16 +294,24 @@ public class DeclaracionAreaService {
         if (declaracion.getAmerb() != null) {
             if (declaracion.getAmerb().getComuna() != null) {
                 comunaDesembarqueId = declaracion.getAmerb().getComuna().getId();
-                if (declaracion.getAmerb().getComuna().getRegion() != null) {
-                    regionId = declaracion.getAmerb().getComuna().getRegion().getId();
+                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(declaracion.getAmerb().getComuna());
+                if (comAmerb != null && comAmerb.getRegion() != null) {
+                    regionId = comAmerb.getRegion().getId();
                 }
             }
             if (regionId == null && declaracion.getAmerb().getRegionModel() != null) {
                 regionId = declaracion.getAmerb().getRegionModel().getId();
             }
         }
-        if (regionId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
-            regionId = declaracion.getCaleta().getComuna().getRegion().getId();
+        if (regionId == null && declaracion.getCaleta() != null) {
+            if (declaracion.getCaleta().getRegion() != null) {
+                regionId = declaracion.getCaleta().getRegion().getId();
+            } else if (declaracion.getCaleta().getComuna() != null) {
+                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(declaracion.getCaleta().getComuna());
+                if (comCaleta != null && comCaleta.getRegion() != null) {
+                    regionId = comCaleta.getRegion().getId();
+                }
+            }
         }
         if (comunaDesembarqueId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null) {
             comunaDesembarqueId = declaracion.getCaleta().getComuna().getId();
