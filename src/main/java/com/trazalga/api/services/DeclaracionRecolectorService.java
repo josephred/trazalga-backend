@@ -27,10 +27,11 @@ import com.trazalga.api.repositories.IBuzoRepository;
 @Service
 public class DeclaracionRecolectorService {
 
-    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de
+    // fiscalización
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
-    
+
     @Autowired
     IDeclaracionRecolectorRepository declaracionRecolectorRepository;
 
@@ -45,15 +46,17 @@ public class DeclaracionRecolectorService {
 
     @Autowired
     private CapturaService capturaService;
-    
-    public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolector(){
-        ArrayList<DeclaracionRecolectorModel> list = (ArrayList<DeclaracionRecolectorModel>) declaracionRecolectorRepository.findAll();
+
+    public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolector() {
+        ArrayList<DeclaracionRecolectorModel> list = (ArrayList<DeclaracionRecolectorModel>) declaracionRecolectorRepository
+                .findAll();
         list.forEach(this::populateBuzos);
         return list;
     }
 
-    public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolectorIdUsuario(Long id){
-        ArrayList<DeclaracionRecolectorModel> list = (ArrayList<DeclaracionRecolectorModel>) declaracionRecolectorRepository.findAllByUsuarioId(id);
+    public ArrayList<DeclaracionRecolectorModel> getDeclaracionesRecolectorIdUsuario(Long id) {
+        ArrayList<DeclaracionRecolectorModel> list = (ArrayList<DeclaracionRecolectorModel>) declaracionRecolectorRepository
+                .findAllByUsuarioId(id);
         list.forEach(this::populateBuzos);
         return list;
     }
@@ -61,26 +64,32 @@ public class DeclaracionRecolectorService {
     @Autowired
     private BloqueoCargaService bloqueoCargaService;
 
-    public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId) {
+        List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository
+                .findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         list.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerRecolectores(list);
         return list;
     }
 
-    // Variante para el formulario de edición: además de las no consumidas, incluye las
-    // que ya consumió la declaración que se está editando (consumidasPorId), para que
-    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
-    public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+    // Variante para el formulario de edición: además de las no consumidas, incluye
+    // las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para
+    // que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen
+    // consolidado.
+    public List<DeclaracionRecolectorModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId, Long consumidasPorId) {
         if (consumidasPorId == null) {
             return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
         }
-        List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        List<DeclaracionRecolectorModel> list = declaracionRecolectorRepository
+                .findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         list.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerRecolectores(list);
         return list;
     }
-
 
     @Autowired
     private AlertaTriggerService alertaTriggerService;
@@ -104,18 +113,23 @@ public class DeclaracionRecolectorService {
     private com.trazalga.api.repositories.IUsuarioRepository usuarioRepository;
 
     private void resolverVaraderoDeclarado(DeclaracionRecolectorModel model) {
-        if (model == null) return;
+        if (model == null)
+            return;
         if (model.getVaraderoRelacion() != null && model.getVaraderoRelacion().getId() != null) {
             if (entityManager != null) {
-                model.setVaraderoRelacion(entityManager.find(com.trazalga.api.models.VaraderoModel.class, model.getVaraderoRelacion().getId()));
+                model.setVaraderoRelacion(entityManager.find(com.trazalga.api.models.VaraderoModel.class,
+                        model.getVaraderoRelacion().getId()));
             }
             return;
         }
         if (referenciaOrigenService != null && model.getVaradero() != null && !model.getVaradero().trim().isEmpty()) {
             Long comunaId = model.getComuna() != null ? model.getComuna().getId()
-                    : (model.getCaleta() != null && model.getCaleta().getComuna() != null ? model.getCaleta().getComuna().getId() : null);
+                    : (model.getCaleta() != null && model.getCaleta().getComuna() != null
+                            ? model.getCaleta().getComuna().getId()
+                            : null);
             if (comunaId != null) {
-                com.trazalga.api.models.VaraderoModel calzado = referenciaOrigenService.calzarVaradero(model.getVaradero(), comunaId);
+                com.trazalga.api.models.VaraderoModel calzado = referenciaOrigenService
+                        .calzarVaradero(model.getVaradero(), comunaId);
                 model.setVaraderoRelacion(calzado);
             } else {
                 model.setVaraderoRelacion(null);
@@ -127,28 +141,34 @@ public class DeclaracionRecolectorService {
 
     private void resolveDependencies(DeclaracionRecolectorModel model) {
         if (model.getUsuario() != null && model.getUsuario().getId() != null) {
-            model.setUsuario(entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
+            model.setUsuario(
+                    entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuario().getId()));
         }
         if (model.getCaleta() != null && model.getCaleta().getId() != null) {
             model.setCaleta(entityManager.find(com.trazalga.api.models.CaletaModel.class, model.getCaleta().getId()));
         }
         if (model.getEspecie() != null && model.getEspecie().getId() != null) {
-            model.setEspecie(entityManager.find(com.trazalga.api.models.EspecieModel.class, model.getEspecie().getId()));
+            model.setEspecie(
+                    entityManager.find(com.trazalga.api.models.EspecieModel.class, model.getEspecie().getId()));
         }
         if (model.getComuna() != null && model.getComuna().getId() != null) {
             model.setComuna(entityManager.find(com.trazalga.api.models.ComunaModel.class, model.getComuna().getId()));
         }
         if (model.getExtraccionTipo() != null && model.getExtraccionTipo().getId() != null) {
-            model.setExtraccionTipo(entityManager.find(com.trazalga.api.models.ExtraccionTipoModel.class, model.getExtraccionTipo().getId()));
+            model.setExtraccionTipo(entityManager.find(com.trazalga.api.models.ExtraccionTipoModel.class,
+                    model.getExtraccionTipo().getId()));
         }
         if (model.getComposicion() != null && model.getComposicion().getId() != null) {
-            model.setComposicion(entityManager.find(com.trazalga.api.models.ComposicionModel.class, model.getComposicion().getId()));
+            model.setComposicion(
+                    entityManager.find(com.trazalga.api.models.ComposicionModel.class, model.getComposicion().getId()));
         }
         if (model.getHumedadEstado() != null && model.getHumedadEstado().getId() != null) {
-            model.setHumedadEstado(entityManager.find(com.trazalga.api.models.HumedadEstadoModel.class, model.getHumedadEstado().getId()));
+            model.setHumedadEstado(entityManager.find(com.trazalga.api.models.HumedadEstadoModel.class,
+                    model.getHumedadEstado().getId()));
         }
         if (model.getUsuarioDestinatario() != null && model.getUsuarioDestinatario().getId() != null) {
-            model.setUsuarioDestinatario(entityManager.find(com.trazalga.api.models.UsuarioModel.class, model.getUsuarioDestinatario().getId()));
+            model.setUsuarioDestinatario(entityManager.find(com.trazalga.api.models.UsuarioModel.class,
+                    model.getUsuarioDestinatario().getId()));
         }
     }
 
@@ -161,7 +181,8 @@ public class DeclaracionRecolectorService {
             caleta = entityManager.find(com.trazalga.api.models.CaletaModel.class, caleta.getId());
             model.setCaleta(caleta);
         }
-        if (caleta == null) return;
+        if (caleta == null)
+            return;
 
         if (model.getComuna() != null && model.getComuna().getId() != null) {
             com.trazalga.api.models.ComunaModel comuna = model.getComuna();
@@ -171,26 +192,34 @@ public class DeclaracionRecolectorService {
             }
             if (caleta.getComuna() != null && !caleta.getComuna().getId().equals(model.getComuna().getId())) {
                 String caletaNombre = caleta.getNombre() != null ? caleta.getNombre() : "ID " + caleta.getId();
-                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre() : "ID " + caleta.getComuna().getId();
-                String comunaDeclaradaNombre = comuna != null && comuna.getNombre() != null ? comuna.getNombre() : "ID " + model.getComuna().getId();
+                String comunaCaletaNombre = caleta.getComuna().getNombre() != null ? caleta.getComuna().getNombre()
+                        : "ID " + caleta.getComuna().getId();
+                String comunaDeclaradaNombre = comuna != null && comuna.getNombre() != null ? comuna.getNombre()
+                        : "ID " + model.getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre, comunaDeclaradaNombre));
+                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre,
+                                comunaDeclaradaNombre));
             }
         } else if (caleta.getComuna() != null) {
             model.setComuna(caleta.getComuna());
         }
     }
 
-    public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel){
+    public DeclaracionRecolectorModel saveDeclaracionRecolector(DeclaracionRecolectorModel declaracionRecolectorModel) {
         boolean esCreacion = declaracionRecolectorModel.getId() == null;
-        // La app 2.4.0 edita recolectores con POST y el id existente (el repositorio lo actualiza):
-        // se aplican las mismas reglas que en updateById (recibida por un destinatario y congelamiento).
-        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
+        // La app 2.4.0 edita recolectores con POST y el id existente (el repositorio lo
+        // actualiza):
+        // se aplican las mismas reglas que en updateById (recibida por un destinatario
+        // y congelamiento).
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional
+                .empty();
         if (!esCreacion) {
-            DeclaracionRecolectorModel existente = declaracionRecolectorRepository.findById(declaracionRecolectorModel.getId()).orElse(null);
+            DeclaracionRecolectorModel existente = declaracionRecolectorRepository
+                    .findById(declaracionRecolectorModel.getId()).orElse(null);
             if (existente != null) {
                 if (existente.getDeclaracionDestinatario() != null) {
-                    throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+                    throw new IllegalArgumentException(
+                            "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
                 }
                 if (politicaEdicion != null) {
                     autorizacionEdicion = politicaEdicion.verificarEdicion("RECOLECTOR", existente.getId());
@@ -216,14 +245,20 @@ public class DeclaracionRecolectorService {
                                     declaracionRecolectorModel::setPeriodoExtraccionFin)));
         }
         if (declaracionRecolectorModel.getFechaDeclaracion() != null) {
-            if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel.getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            if (declaracionRecolectorModel.getFechaExtraccion() != null && declaracionRecolectorModel
+                    .getFechaExtraccion().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La fecha de extracción no puede ser posterior a la fecha de declaración.");
             }
-            if (declaracionRecolectorModel.getPeriodoExtraccionInicio() != null && declaracionRecolectorModel.getPeriodoExtraccionInicio().after(declaracionRecolectorModel.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
+            if (declaracionRecolectorModel.getPeriodoExtraccionInicio() != null && declaracionRecolectorModel
+                    .getPeriodoExtraccionInicio().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
             }
-            if (declaracionRecolectorModel.getPeriodoExtraccionFin() != null && declaracionRecolectorModel.getPeriodoExtraccionFin().after(declaracionRecolectorModel.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
+            if (declaracionRecolectorModel.getPeriodoExtraccionFin() != null && declaracionRecolectorModel
+                    .getPeriodoExtraccionFin().after(declaracionRecolectorModel.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
             }
         }
         sanearComposicion(declaracionRecolectorModel);
@@ -245,20 +280,37 @@ public class DeclaracionRecolectorService {
                 declaracionRecolectorModel::setPlacaPatente,
                 declaracionRecolectorModel::setPlacaPatenteCarro);
 
-        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
-        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
-                ? declaracionRecolectorModel.getUsuario().getComuna().getId() : null;
-        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null ? declaracionRecolectorModel.getComuna().getId() : null;
-        Long regionId = (declaracionRecolectorModel.getComuna() != null && declaracionRecolectorModel.getComuna().getRegion() != null)
-                ? declaracionRecolectorModel.getComuna().getRegion().getId() : null;
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de
+        // Captura)
+        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null
+                && declaracionRecolectorModel.getUsuario().getComuna() != null)
+                        ? declaracionRecolectorModel.getUsuario().getComuna().getId()
+                        : null;
+        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null
+                ? declaracionRecolectorModel.getComuna().getId()
+                : null;
+        Long regionId = (declaracionRecolectorModel.getComuna() != null
+                && declaracionRecolectorModel.getComuna().getRegion() != null)
+                        ? declaracionRecolectorModel.getComuna().getRegion().getId()
+                        : null;
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("RECOLECTOR")
-                .usuarioId(declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null)
-                .especieId(declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null)
-                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null ? declaracionRecolectorModel.getExtraccionTipo().getId() : null)
+                .usuarioId(declaracionRecolectorModel.getUsuario() != null
+                        ? declaracionRecolectorModel.getUsuario().getId()
+                        : null)
+                .especieId(declaracionRecolectorModel.getEspecie() != null
+                        ? declaracionRecolectorModel.getEspecie().getId()
+                        : null)
+                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null
+                        ? declaracionRecolectorModel.getHumedadEstado().getId()
+                        : null)
+                .humedadNombre(declaracionRecolectorModel.getHumedadEstado() != null
+                        ? declaracionRecolectorModel.getHumedadEstado().getNombre()
+                        : null)
+                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null
+                        ? declaracionRecolectorModel.getExtraccionTipo().getId()
+                        : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
@@ -271,7 +323,8 @@ public class DeclaracionRecolectorService {
         ResultadoValidacion resVal = validacionDeclaracionService.validar(ctx);
         if (resVal.esRechazado()) {
             alertaTriggerService.procesarMarcas("RECOLECTOR", null,
-                    declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null,
+                    declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId()
+                            : null,
                     resVal.getMarcas());
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
@@ -280,7 +333,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
         declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
         declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
-        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada
+        // por veda); nulo = el declarado
         declaracionRecolectorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionRecolectorModel saved = declaracionRecolectorRepository.save(declaracionRecolectorModel);
@@ -304,7 +358,7 @@ public class DeclaracionRecolectorService {
             }
         }
         populateBuzos(saved);
-        
+
         // Procesar marcas de fiscalización y notificaciones push
         alertaTriggerService.procesarMarcas("RECOLECTOR", saved.getId(),
                 saved.getUsuario() != null ? saved.getUsuario().getId() : null,
@@ -320,15 +374,17 @@ public class DeclaracionRecolectorService {
                     saved.getHora(),
                     "RECOLECTOR",
                     saved.getId(),
-                    saved.getFolioOrigen() != null ? saved.getFolioOrigen() : "DR-" + saved.getId()
-            );
+                    saved.getFolioOrigen() != null ? saved.getFolioOrigen() : "DR-" + saved.getId());
         }
 
-        // T9.3 / TG.2 / TG.5: Verificación de origen real vs GPS capturado (con varadero declarado)
+        // T9.3 / TG.2 / TG.5: Verificación de origen real vs GPS capturado (con
+        // varadero declarado)
         Long caletaId = saved.getCaleta() != null ? saved.getCaleta().getId() : null;
         Long varaderoId = saved.getVaraderoRelacion() != null ? saved.getVaraderoRelacion().getId() : null;
         Long comunaIdGeo = saved.getComuna() != null ? saved.getComuna().getId()
-                : (saved.getCaleta() != null && saved.getCaleta().getComuna() != null ? saved.getCaleta().getComuna().getId() : null);
+                : (saved.getCaleta() != null && saved.getCaleta().getComuna() != null
+                        ? saved.getCaleta().getComuna().getId()
+                        : null);
         validacionDeclaracionService.verificarOrigenGeo(
                 "RECOLECTOR",
                 saved.getId(),
@@ -341,8 +397,7 @@ public class DeclaracionRecolectorService {
                 null,
                 varaderoId,
                 saved.getVaradero(),
-                comunaIdGeo
-        );
+                comunaIdGeo);
 
         if (politicaEdicion != null) {
             politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
@@ -350,34 +405,46 @@ public class DeclaracionRecolectorService {
         return saved;
     }
 
-    public Optional<DeclaracionRecolectorModel> getById(Long id){
+    public Optional<DeclaracionRecolectorModel> getById(Long id) {
         Optional<DeclaracionRecolectorModel> opt = declaracionRecolectorRepository.findById(id);
         opt.ifPresent(this::populateBuzos);
         return opt;
     }
 
-    public DeclaracionRecolectorModel updateById(DeclaracionRecolectorModel request, Long id){
+    public DeclaracionRecolectorModel updateById(DeclaracionRecolectorModel request, Long id) {
         if (request.getFechaDeclaracion() != null) {
-            if (request.getFechaExtraccion() != null && request.getFechaExtraccion().after(request.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+            if (request.getFechaExtraccion() != null
+                    && request.getFechaExtraccion().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La fecha de extracción no puede ser posterior a la fecha de declaración.");
             }
-            if (request.getPeriodoExtraccionInicio() != null && request.getPeriodoExtraccionInicio().after(request.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
+            if (request.getPeriodoExtraccionInicio() != null
+                    && request.getPeriodoExtraccionInicio().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El período de inicio de extracción no puede ser posterior a la fecha de declaración.");
             }
-            if (request.getPeriodoExtraccionFin() != null && request.getPeriodoExtraccionFin().after(request.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
+            if (request.getPeriodoExtraccionFin() != null
+                    && request.getPeriodoExtraccionFin().after(request.getFechaDeclaracion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El período de fin de extracción no puede ser posterior a la fecha de declaración.");
             }
         }
         DeclaracionRecolectorModel declaracionRecolectorModel = declaracionRecolectorRepository.findById(id).get();
         if (declaracionRecolectorModel.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
-        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del
+        // fiscalizador (423 si no)
         java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
-                ? politicaEdicion.verificarEdicion("RECOLECTOR", id) : java.util.Optional.empty();
-        // findById deja el usuario como proxy LAZY; fuera de transacción (open-in-view=false) leer su comuna
-        // más abajo lanzaba LazyInitializationException. Se carga igual que en resolveDependencies.
-        if (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getId() != null) {
+                ? politicaEdicion.verificarEdicion("RECOLECTOR", id)
+                : java.util.Optional.empty();
+        // findById deja el usuario como proxy LAZY; fuera de transacción
+        // (open-in-view=false) leer su comuna
+        // más abajo lanzaba LazyInitializationException. Se carga igual que en
+        // resolveDependencies.
+        if (declaracionRecolectorModel.getUsuario() != null
+                && declaracionRecolectorModel.getUsuario().getId() != null) {
             declaracionRecolectorModel.setUsuario(entityManager.find(com.trazalga.api.models.UsuarioModel.class,
                     declaracionRecolectorModel.getUsuario().getId()));
         }
@@ -392,9 +459,9 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setHora(request.getHora());
         declaracionRecolectorModel.setNombre(request.getNombre());
         declaracionRecolectorModel.setCodigoSernapesca(request.getCodigoSernapesca());
-        declaracionRecolectorModel.setVaradero(request.getVaradero());        
+        declaracionRecolectorModel.setVaradero(request.getVaradero());
         declaracionRecolectorModel.setCaleta(request.getCaleta());
-        //declaracionRecolectorModel.setGeorreferencia(request.getGeorreferencia());
+        // declaracionRecolectorModel.setGeorreferencia(request.getGeorreferencia());
         declaracionRecolectorModel.setLatitud(request.getLatitud());
         declaracionRecolectorModel.setLongitud(request.getLongitud());
         declaracionRecolectorModel.setEspecie(request.getEspecie());
@@ -408,24 +475,42 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setDesembarque(request.getDesembarque());
 
         // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
-        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null && declaracionRecolectorModel.getUsuario().getComuna() != null)
-                ? declaracionRecolectorModel.getUsuario().getComuna().getId() : null;
-        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null ? declaracionRecolectorModel.getComuna().getId() : null;
-        Long regionId = (declaracionRecolectorModel.getComuna() != null && declaracionRecolectorModel.getComuna().getRegion() != null)
-                ? declaracionRecolectorModel.getComuna().getRegion().getId() : null;
+        Long comunaInscripcionId = (declaracionRecolectorModel.getUsuario() != null
+                && declaracionRecolectorModel.getUsuario().getComuna() != null)
+                        ? declaracionRecolectorModel.getUsuario().getComuna().getId()
+                        : null;
+        Long comunaDesembarqueId = declaracionRecolectorModel.getComuna() != null
+                ? declaracionRecolectorModel.getComuna().getId()
+                : null;
+        Long regionId = (declaracionRecolectorModel.getComuna() != null
+                && declaracionRecolectorModel.getComuna().getRegion() != null)
+                        ? declaracionRecolectorModel.getComuna().getRegion().getId()
+                        : null;
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("RECOLECTOR")
-                .usuarioId(declaracionRecolectorModel.getUsuario() != null ? declaracionRecolectorModel.getUsuario().getId() : null)
-                .especieId(declaracionRecolectorModel.getEspecie() != null ? declaracionRecolectorModel.getEspecie().getId() : null)
-                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracionRecolectorModel.getHumedadEstado() != null ? declaracionRecolectorModel.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null ? declaracionRecolectorModel.getExtraccionTipo().getId() : null)
+                .usuarioId(declaracionRecolectorModel.getUsuario() != null
+                        ? declaracionRecolectorModel.getUsuario().getId()
+                        : null)
+                .especieId(declaracionRecolectorModel.getEspecie() != null
+                        ? declaracionRecolectorModel.getEspecie().getId()
+                        : null)
+                .humedadEstadoId(declaracionRecolectorModel.getHumedadEstado() != null
+                        ? declaracionRecolectorModel.getHumedadEstado().getId()
+                        : null)
+                .humedadNombre(declaracionRecolectorModel.getHumedadEstado() != null
+                        ? declaracionRecolectorModel.getHumedadEstado().getNombre()
+                        : null)
+                .extraccionTipoId(declaracionRecolectorModel.getExtraccionTipo() != null
+                        ? declaracionRecolectorModel.getExtraccionTipo().getId()
+                        : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
                 .fechaExtraccion(declaracionRecolectorModel.getFechaExtraccion())
-                .fechaDeclaracion(declaracionRecolectorModel.getFechaDeclaracion() != null ? declaracionRecolectorModel.getFechaDeclaracion() : new Date())
+                .fechaDeclaracion(declaracionRecolectorModel.getFechaDeclaracion() != null
+                        ? declaracionRecolectorModel.getFechaDeclaracion()
+                        : new Date())
                 .hora(declaracionRecolectorModel.getHora())
                 .desembarqueKg(declaracionRecolectorModel.getDesembarque())
                 .esEdicion(true)
@@ -440,7 +525,8 @@ public class DeclaracionRecolectorService {
         declaracionRecolectorModel.setCaptura(resVal.getCapturaCalculada());
         declaracionRecolectorModel.setFactorAplicado(resVal.getFactorAplicado());
         declaracionRecolectorModel.setFactorConversionId(resVal.getFactorConversionId());
-        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada
+        // por veda); nulo = el declarado
         declaracionRecolectorModel.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         declaracionRecolectorModel.setCodigoDestinatario(request.getCodigoDestinatario());
@@ -458,7 +544,7 @@ public class DeclaracionRecolectorService {
                 request.getPlacaPatenteCarro(),
                 declaracionRecolectorModel::setPlacaPatente,
                 declaracionRecolectorModel::setPlacaPatenteCarro);
-        
+
         sanearComposicion(declaracionRecolectorModel);
         calcularTasaDiaria(declaracionRecolectorModel);
         DeclaracionRecolectorModel updated = declaracionRecolectorRepository.save(declaracionRecolectorModel);
@@ -491,11 +577,10 @@ public class DeclaracionRecolectorService {
         // Notificar al destinatario que la declaración fue modificada
         if (updated.getUsuarioDestinatario() != null && updated.getUsuarioDestinatario().getId() != null) {
             gestionMensajeService.notificarModificacion(
-                "RECOLECTOR", updated.getId(),
-                updated.getUsuario() != null ? updated.getUsuario().getId() : null,
-                updated.getUsuarioDestinatario().getId(),
-                updated.getFolioOrigen()
-            );
+                    "RECOLECTOR", updated.getId(),
+                    updated.getUsuario() != null ? updated.getUsuario().getId() : null,
+                    updated.getUsuarioDestinatario().getId(),
+                    updated.getFolioOrigen());
         }
 
         if (politicaEdicion != null) {
@@ -504,26 +589,31 @@ public class DeclaracionRecolectorService {
         return updated;
     }
 
-    public Boolean deleteDeclaracionRecolector(Long id){
+    public Boolean deleteDeclaracionRecolector(Long id) {
         DeclaracionRecolectorModel model = declaracionRecolectorRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
         }
-        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un
+        // fiscalizador (423)
         if (model != null && politicaEdicion != null) {
             politicaEdicion.verificarEliminacion("RECOLECTOR", id);
         }
-        try{
+        try {
             List<DeclaracionBuzosModel> buzos = declaracionBuzosRepository.findByDeclaracionRecolectorId(id);
             declaracionBuzosRepository.deleteAll(buzos);
             declaracionRecolectorRepository.deleteById(id);
             return true;
-        } catch( Exception e){return false;}
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void populateBuzos(DeclaracionRecolectorModel model) {
         if (model != null && model.getId() != null) {
-            List<DeclaracionBuzosModel> dbList = declaracionBuzosRepository.findByDeclaracionRecolectorId(model.getId());
+            List<DeclaracionBuzosModel> dbList = declaracionBuzosRepository
+                    .findByDeclaracionRecolectorId(model.getId());
             List<BuzoModel> buzos = new ArrayList<>();
             for (DeclaracionBuzosModel db : dbList) {
                 buzos.add(db.getBuzo());
@@ -542,7 +632,6 @@ public class DeclaracionRecolectorService {
         return folios.isEmpty() ? null : folios.getFirst();
     }
 
-
     /**
      * Calcula la tasa diaria de recolección y sincroniza fechaExtraccion.
      * Fórmula: tasa = desembarque / (DATEDIFF(fin, inicio) + 1)
@@ -554,16 +643,16 @@ public class DeclaracionRecolectorService {
                 && model.getDesembarque() != null) {
 
             long diffMs = model.getPeriodoExtraccionFin().getTime()
-                        - model.getPeriodoExtraccionInicio().getTime();
+                    - model.getPeriodoExtraccionInicio().getTime();
             long dias = TimeUnit.DAYS.convert(diffMs, TimeUnit.MILLISECONDS) + 1;
 
             if (dias <= 0) {
                 throw new IllegalArgumentException(
-                    "Periodo de extracción inválido: la fecha de inicio no puede ser posterior a la fecha de fin.");
+                        "Periodo de extracción inválido: la fecha de inicio no puede ser posterior a la fecha de fin.");
             }
 
             BigDecimal tasaDiaria = model.getDesembarque()
-                .divide(BigDecimal.valueOf(dias), 3, RoundingMode.HALF_UP);
+                    .divide(BigDecimal.valueOf(dias), 3, RoundingMode.HALF_UP);
             model.setTasaDiariaRecoleccion(tasaDiaria);
 
             // Retrocompatibilidad: fecha_extraccion = fecha fin del periodo
@@ -572,8 +661,8 @@ public class DeclaracionRecolectorService {
     }
 
     private void sanearComposicion(DeclaracionRecolectorModel model) {
-        if (model.getComposicion() != null && 
-            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+        if (model.getComposicion() != null &&
+                (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
             model.setComposicion(null);
         }
     }

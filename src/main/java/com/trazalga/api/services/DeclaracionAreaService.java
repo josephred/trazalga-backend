@@ -30,7 +30,8 @@ import org.springframework.http.HttpStatus;
 @Service
 public class DeclaracionAreaService {
 
-    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de fiscalización
+    // Refinamiento 30-10 · punto 3: declaraciones congeladas por alerta de
+    // fiscalización
     @Autowired(required = false)
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
 
@@ -68,7 +69,8 @@ public class DeclaracionAreaService {
     }
 
     public List<DeclaracionAreaModel> getDeclaracionesByUsuario(Long usuarioId) {
-        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findAllByUsuarioIdOrderByFechaDeclaracionDesc(usuarioId);
+        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository
+                .findAllByUsuarioIdOrderByFechaDeclaracionDesc(usuarioId);
         declaraciones.forEach(this::populateBuzos);
         return declaraciones;
     }
@@ -77,21 +79,28 @@ public class DeclaracionAreaService {
     private BloqueoCargaService bloqueoCargaService;
 
     // NUEVO MÉTODO AÑADIDO
-    public List<DeclaracionAreaModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId) {
-        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
+    public List<DeclaracionAreaModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId) {
+        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository
+                .findByUsuarioDestinatarioIdAndDeclaracionDestinatarioIsNull(usuarioDestinatarioId);
         declaraciones.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerAreas(declaraciones);
         return declaraciones;
     }
 
-    // Variante para el formulario de edición: además de las no consumidas, incluye las
-    // que ya consumió la declaración que se está editando (consumidasPorId), para que
-    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen consolidado.
-    public List<DeclaracionAreaModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(Long usuarioDestinatarioId, Long consumidasPorId) {
+    // Variante para el formulario de edición: además de las no consumidas, incluye
+    // las
+    // que ya consumió la declaración que se está editando (consumidasPorId), para
+    // que
+    // el formulario pueda re-mostrarlas seleccionadas y recalcular el resumen
+    // consolidado.
+    public List<DeclaracionAreaModel> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
+            Long usuarioDestinatarioId, Long consumidasPorId) {
         if (consumidasPorId == null) {
             return getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId);
         }
-        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository.findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
+        List<DeclaracionAreaModel> declaraciones = declaracionAreaRepository
+                .findAsignadasParaEditar(usuarioDestinatarioId, consumidasPorId);
         declaraciones.forEach(this::populateBuzos);
         bloqueoCargaService.enriquecerAreas(declaraciones);
         return declaraciones;
@@ -116,21 +125,27 @@ public class DeclaracionAreaService {
     private com.trazalga.api.repositories.IComunaRepository comunaRepository;
 
     private com.trazalga.api.models.ComunaModel resolverComunaCargada(com.trazalga.api.models.ComunaModel c) {
-        if (c == null) return null;
-        if (org.hibernate.Hibernate.isInitialized(c) || comunaRepository == null) return c;
+        if (c == null)
+            return null;
+        if (org.hibernate.Hibernate.isInitialized(c) || comunaRepository == null)
+            return c;
         return c.getId() != null ? comunaRepository.findById(c.getId()).orElse(null) : null;
     }
 
     public DeclaracionAreaModel saveDeclaracion(DeclaracionAreaModel declaracion) {
         boolean esCreacion = declaracion.getId() == null;
-        // Un POST con el id de una declaración existente la actualiza en el repositorio:
-        // se aplican las mismas reglas que en updateDeclaracion (recibida por un destinatario y congelamiento).
-        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional.empty();
+        // Un POST con el id de una declaración existente la actualiza en el
+        // repositorio:
+        // se aplican las mismas reglas que en updateDeclaracion (recibida por un
+        // destinatario y congelamiento).
+        java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = java.util.Optional
+                .empty();
         if (!esCreacion) {
             DeclaracionAreaModel existente = declaracionAreaRepository.findById(declaracion.getId()).orElse(null);
             if (existente != null) {
                 if (existente.getDeclaracionDestinatario() != null) {
-                    throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+                    throw new IllegalArgumentException(
+                            "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
                 }
                 if (politicaEdicion != null) {
                     autorizacionEdicion = politicaEdicion.verificarEdicion("AREA", existente.getId());
@@ -150,7 +165,8 @@ public class DeclaracionAreaService {
         }
         if (declaracion.getFechaExtraccion() != null && declaracion.getFechaDeclaracion() != null) {
             if (declaracion.getFechaExtraccion().after(declaracion.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La fecha de extracción no puede ser posterior a la fecha de declaración.");
             }
         }
         sanearComposicion(declaracion);
@@ -170,15 +186,16 @@ public class DeclaracionAreaService {
 
             // 2. Buscar por folioOrganizacion
             if (amerbEncontrada == null && declaracion.getAmerb().getFolioOrganizacion() != null) {
-                amerbEncontrada = amerbRepository.findByFolioOrganizacion(declaracion.getAmerb().getFolioOrganizacion());
+                amerbEncontrada = amerbRepository
+                        .findByFolioOrganizacion(declaracion.getAmerb().getFolioOrganizacion());
             }
 
             // 3. Buscar por nombre (extraer la parte antes del " - ")
             if (amerbEncontrada == null && declaracion.getAmerb().getNombre() != null) {
                 String nombreAmerb = declaracion.getAmerb().getNombre();
                 String nombreBusqueda = nombreAmerb.contains(" - ")
-                    ? nombreAmerb.substring(0, nombreAmerb.indexOf(" - ")).trim()
-                    : nombreAmerb.trim();
+                        ? nombreAmerb.substring(0, nombreAmerb.indexOf(" - ")).trim()
+                        : nombreAmerb.trim();
                 List<AmerbModel> amerbsPorNombre = amerbRepository.findByNombreContaining(nombreBusqueda);
                 if (!amerbsPorNombre.isEmpty()) {
                     amerbEncontrada = amerbsPorNombre.get(0);
@@ -192,9 +209,11 @@ public class DeclaracionAreaService {
                 // No existe en la BD local: crear automáticamente con los datos de Sernapesca
                 AmerbModel nuevaAmerb = new AmerbModel();
                 nuevaAmerb.setNombre(declaracion.getAmerb().getNombre() != null
-                    ? declaracion.getAmerb().getNombre() : "AMERB Sin Nombre");
+                        ? declaracion.getAmerb().getNombre()
+                        : "AMERB Sin Nombre");
                 nuevaAmerb.setRegion(declaracion.getAmerb().getRegion() != null
-                    ? declaracion.getAmerb().getRegion() : "Sin Región");
+                        ? declaracion.getAmerb().getRegion()
+                        : "Sin Región");
                 nuevaAmerb.setUbicacion(declaracion.getAmerb().getUbicacion());
                 nuevaAmerb.setFolioOrganizacion(declaracion.getAmerb().getFolioOrganizacion());
                 nuevaAmerb.setCodigoSernapesca(declaracion.getAmerb().getCodigoSernapesca());
@@ -209,10 +228,12 @@ public class DeclaracionAreaService {
         if (declaracion.getEmbarcacion() != null) {
             EmbarcacionModel embarcacionEncontrada = null;
             if (declaracion.getEmbarcacion().getId() != null) {
-                embarcacionEncontrada = embarcacionRepository.findById(declaracion.getEmbarcacion().getId()).orElse(null);
+                embarcacionEncontrada = embarcacionRepository.findById(declaracion.getEmbarcacion().getId())
+                        .orElse(null);
             }
             if (embarcacionEncontrada == null && declaracion.getEmbarcacion().getCodigo() != null) {
-                embarcacionEncontrada = embarcacionRepository.findByCodigo(declaracion.getEmbarcacion().getCodigo()).orElse(null);
+                embarcacionEncontrada = embarcacionRepository.findByCodigo(declaracion.getEmbarcacion().getCodigo())
+                        .orElse(null);
             }
             if (embarcacionEncontrada != null) {
                 declaracion.setEmbarcacion(embarcacionEncontrada);
@@ -254,7 +275,8 @@ public class DeclaracionAreaService {
         // Manejar caleta
         if (declaracion.getCaleta() != null && declaracion.getCaleta().getId() != null) {
             CaletaModel caleta = caletaRepository.findById(declaracion.getCaleta().getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La caleta especificada no existe."));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "La caleta especificada no existe."));
             declaracion.setCaleta(caleta);
         }
 
@@ -275,26 +297,35 @@ public class DeclaracionAreaService {
         if (declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null
                 && declaracion.getAmerb() != null && declaracion.getAmerb().getComuna() != null) {
             if (!declaracion.getCaleta().getComuna().getId().equals(declaracion.getAmerb().getComuna().getId())) {
-                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(declaracion.getCaleta().getComuna());
-                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(declaracion.getAmerb().getComuna());
-                String caletaNombre = declaracion.getCaleta().getNombre() != null ? declaracion.getCaleta().getNombre() : "ID " + declaracion.getCaleta().getId();
-                String comunaCaletaNombre = comCaleta != null && comCaleta.getNombre() != null ? comCaleta.getNombre() : "ID " + declaracion.getCaleta().getComuna().getId();
-                String comunaAmerbNombre = comAmerb != null && comAmerb.getNombre() != null ? comAmerb.getNombre() : "ID " + declaracion.getAmerb().getComuna().getId();
+                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(
+                        declaracion.getCaleta().getComuna());
+                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(
+                        declaracion.getAmerb().getComuna());
+                String caletaNombre = declaracion.getCaleta().getNombre() != null ? declaracion.getCaleta().getNombre()
+                        : "ID " + declaracion.getCaleta().getId();
+                String comunaCaletaNombre = comCaleta != null && comCaleta.getNombre() != null ? comCaleta.getNombre()
+                        : "ID " + declaracion.getCaleta().getComuna().getId();
+                String comunaAmerbNombre = comAmerb != null && comAmerb.getNombre() != null ? comAmerb.getNombre()
+                        : "ID " + declaracion.getAmerb().getComuna().getId();
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre, comunaAmerbNombre));
+                        String.format("La caleta %s pertenece a %s, no a %s", caletaNombre, comunaCaletaNombre,
+                                comunaAmerbNombre));
             }
         }
 
-        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de Captura)
+        // Validación del servidor (Veda, Cuota, LED, Desembarque atípico, y cálculo de
+        // Captura)
         Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
-                ? declaracion.getUsuario().getComuna().getId() : null;
+                ? declaracion.getUsuario().getComuna().getId()
+                : null;
         Long comunaDesembarqueId = null;
         Long regionId = null;
 
         if (declaracion.getAmerb() != null) {
             if (declaracion.getAmerb().getComuna() != null) {
                 comunaDesembarqueId = declaracion.getAmerb().getComuna().getId();
-                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(declaracion.getAmerb().getComuna());
+                com.trazalga.api.models.ComunaModel comAmerb = resolverComunaCargada(
+                        declaracion.getAmerb().getComuna());
                 if (comAmerb != null && comAmerb.getRegion() != null) {
                     regionId = comAmerb.getRegion().getId();
                 }
@@ -307,17 +338,21 @@ public class DeclaracionAreaService {
             if (declaracion.getCaleta().getRegion() != null) {
                 regionId = declaracion.getCaleta().getRegion().getId();
             } else if (declaracion.getCaleta().getComuna() != null) {
-                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(declaracion.getCaleta().getComuna());
+                com.trazalga.api.models.ComunaModel comCaleta = resolverComunaCargada(
+                        declaracion.getCaleta().getComuna());
                 if (comCaleta != null && comCaleta.getRegion() != null) {
                     regionId = comCaleta.getRegion().getId();
                 }
             }
         }
-        if (comunaDesembarqueId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null) {
+        if (comunaDesembarqueId == null && declaracion.getCaleta() != null
+                && declaracion.getCaleta().getComuna() != null) {
             comunaDesembarqueId = declaracion.getCaleta().getComuna().getId();
         }
 
-        BigDecimal desembarqueBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : BigDecimal.ZERO;
+        BigDecimal desembarqueBd = declaracion.getDesembarque() != null
+                ? BigDecimal.valueOf(declaracion.getDesembarque())
+                : BigDecimal.ZERO;
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("AREA")
@@ -327,8 +362,10 @@ public class DeclaracionAreaService {
                 .amerbId(declaracion.getAmerb() != null ? declaracion.getAmerb().getId() : null)
                 .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
                 .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .humedadNombre(
+                        declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
+                .extraccionTipoId(
+                        declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
@@ -346,13 +383,15 @@ public class DeclaracionAreaService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, resVal.getMotivoRechazo());
         }
 
-        // El servidor es la única autoridad de cálculo: ignora declaracion.captura previa
+        // El servidor es la única autoridad de cálculo: ignora declaracion.captura
+        // previa
         if (resVal.getCapturaCalculada() != null) {
             declaracion.setCaptura(resVal.getCapturaCalculada().doubleValue());
         }
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
-        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada
+        // por veda); nulo = el declarado
         declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionAreaModel savedDeclaracion = declaracionAreaRepository.save(declaracion);
@@ -362,7 +401,8 @@ public class DeclaracionAreaService {
 
         // Guardar los buzos asociados en la tabla declaracion_buzos
         if (declaracion.getBuzos() != null && !declaracion.getBuzos().isEmpty()) {
-            PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil() : null;
+            PerfilModel perfil = savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getPerfil()
+                    : null;
             for (BuzoModel buzoRequest : declaracion.getBuzos()) {
                 if (buzoRequest.getId() != null) {
                     Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
@@ -378,14 +418,15 @@ public class DeclaracionAreaService {
         }
 
         populateBuzos(savedDeclaracion);
-        
+
         // Procesar marcas de fiscalización y alertas push
         alertaTriggerService.procesarMarcas("AREA", savedDeclaracion.getId(),
                 savedDeclaracion.getUsuario() != null ? savedDeclaracion.getUsuario().getId() : null,
                 resVal.getMarcas());
 
         // T8.2: Verificación geotemporal de doble operación
-        if (savedDeclaracion.getUsuario() != null && savedDeclaracion.getLatitud() != null && savedDeclaracion.getLongitud() != null) {
+        if (savedDeclaracion.getUsuario() != null && savedDeclaracion.getLatitud() != null
+                && savedDeclaracion.getLongitud() != null) {
             validacionDeclaracionService.verificarDobleOperacion(
                     savedDeclaracion.getUsuario().getId(),
                     savedDeclaracion.getLatitud(),
@@ -394,8 +435,8 @@ public class DeclaracionAreaService {
                     savedDeclaracion.getHora(),
                     "AREA",
                     savedDeclaracion.getId(),
-                    savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DAM-" + savedDeclaracion.getId()
-            );
+                    savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen()
+                            : "DAM-" + savedDeclaracion.getId());
         }
 
         // T9.3: Verificación de origen real vs GPS capturado
@@ -404,14 +445,14 @@ public class DeclaracionAreaService {
         validacionDeclaracionService.verificarOrigenGeo(
                 "AREA",
                 savedDeclaracion.getId(),
-                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen() : "DAM-" + savedDeclaracion.getId(),
+                savedDeclaracion.getFolioOrigen() != null ? savedDeclaracion.getFolioOrigen()
+                        : "DAM-" + savedDeclaracion.getId(),
                 savedDeclaracion.getLatitud(),
                 savedDeclaracion.getLongitud(),
                 savedDeclaracion.getPrecisionGpsM(),
                 savedDeclaracion.getEnvioOffline(),
                 caletaId,
-                amerbId
-        );
+                amerbId);
 
         if (politicaEdicion != null) {
             politicaEdicion.registrarUsoAutorizacion(autorizacionEdicion);
@@ -428,17 +469,21 @@ public class DeclaracionAreaService {
     public DeclaracionAreaModel updateDeclaracion(Long id, DeclaracionAreaModel request) {
         if (request.getFechaExtraccion() != null && request.getFechaDeclaracion() != null) {
             if (request.getFechaExtraccion().after(request.getFechaDeclaracion())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de extracción no puede ser posterior a la fecha de declaración.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La fecha de extracción no puede ser posterior a la fecha de declaración.");
             }
         }
         DeclaracionAreaModel declaracion = declaracionAreaRepository.findById(id).orElseThrow();
         if (declaracion.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser modificada.");
         }
-        // Con una alerta que la congela, sólo se modifica con autorización vigente del fiscalizador (423 si no)
+        // Con una alerta que la congela, sólo se modifica con autorización vigente del
+        // fiscalizador (423 si no)
         java.util.Optional<com.trazalga.api.models.DeclaracionAutorizacionModel> autorizacionEdicion = politicaEdicion != null
-                ? politicaEdicion.verificarEdicion("AREA", id) : java.util.Optional.empty();
-        
+                ? politicaEdicion.verificarEdicion("AREA", id)
+                : java.util.Optional.empty();
+
         declaracion.setFolioOrigen(request.getFolioOrigen());
         declaracion.setFolioDesembarqueAmerb(request.getFolioDesembarqueAmerb());
         declaracion.setFechaExtraccion(request.getFechaExtraccion());
@@ -478,7 +523,8 @@ public class DeclaracionAreaService {
 
         // Recalcular captura y revalidar pipeline normativo al editar (TC.5 / K12)
         Long comunaInscripcionId = (declaracion.getUsuario() != null && declaracion.getUsuario().getComuna() != null)
-                ? declaracion.getUsuario().getComuna().getId() : null;
+                ? declaracion.getUsuario().getComuna().getId()
+                : null;
         Long comunaDesembarqueId = null;
         Long regionId = null;
         if (declaracion.getAmerb() != null && declaracion.getAmerb().getComuna() != null) {
@@ -487,14 +533,18 @@ public class DeclaracionAreaService {
                 regionId = declaracion.getAmerb().getComuna().getRegion().getId();
             }
         }
-        if (regionId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null && declaracion.getCaleta().getComuna().getRegion() != null) {
+        if (regionId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null
+                && declaracion.getCaleta().getComuna().getRegion() != null) {
             regionId = declaracion.getCaleta().getComuna().getRegion().getId();
         }
-        if (comunaDesembarqueId == null && declaracion.getCaleta() != null && declaracion.getCaleta().getComuna() != null) {
+        if (comunaDesembarqueId == null && declaracion.getCaleta() != null
+                && declaracion.getCaleta().getComuna() != null) {
             comunaDesembarqueId = declaracion.getCaleta().getComuna().getId();
         }
 
-        BigDecimal desembarqueBd = declaracion.getDesembarque() != null ? BigDecimal.valueOf(declaracion.getDesembarque()) : BigDecimal.ZERO;
+        BigDecimal desembarqueBd = declaracion.getDesembarque() != null
+                ? BigDecimal.valueOf(declaracion.getDesembarque())
+                : BigDecimal.ZERO;
 
         ContextoDeclaracion ctx = ContextoDeclaracion.builder()
                 .tipoDeclaracion("AREA")
@@ -504,13 +554,16 @@ public class DeclaracionAreaService {
                 .amerbId(declaracion.getAmerb() != null ? declaracion.getAmerb().getId() : null)
                 .especieId(declaracion.getEspecie() != null ? declaracion.getEspecie().getId() : null)
                 .humedadEstadoId(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getId() : null)
-                .humedadNombre(declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
-                .extraccionTipoId(declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
+                .humedadNombre(
+                        declaracion.getHumedadEstado() != null ? declaracion.getHumedadEstado().getNombre() : null)
+                .extraccionTipoId(
+                        declaracion.getExtraccionTipo() != null ? declaracion.getExtraccionTipo().getId() : null)
                 .comunaDesembarqueId(comunaDesembarqueId)
                 .comunaInscripcionId(comunaInscripcionId)
                 .regionId(regionId)
                 .fechaExtraccion(declaracion.getFechaExtraccion())
-                .fechaDeclaracion(declaracion.getFechaDeclaracion() != null ? declaracion.getFechaDeclaracion() : new Date())
+                .fechaDeclaracion(
+                        declaracion.getFechaDeclaracion() != null ? declaracion.getFechaDeclaracion() : new Date())
                 .hora(declaracion.getHora())
                 .desembarqueKg(desembarqueBd)
                 .esEdicion(true)
@@ -527,7 +580,8 @@ public class DeclaracionAreaService {
         }
         declaracion.setFactorAplicado(resVal.getFactorAplicado());
         declaracion.setFactorConversionId(resVal.getFactorConversionId());
-        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada por veda); nulo = el declarado
+        // Refinamiento 23-10: método cuya cuota recibe la captura (imputación cruzada
+        // por veda); nulo = el declarado
         declaracion.setExtraccionTipoImputacionId(resVal.getExtraccionTipoImputacionId());
 
         DeclaracionAreaModel updatedDeclaracion = declaracionAreaRepository.save(declaracion);
@@ -537,7 +591,8 @@ public class DeclaracionAreaService {
         declaracionBuzosRepository.deleteAll(buzosAnteriores);
 
         if (request.getBuzos() != null && !request.getBuzos().isEmpty()) {
-            PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil() : null;
+            PerfilModel perfil = updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getPerfil()
+                    : null;
             for (BuzoModel buzoRequest : request.getBuzos()) {
                 if (buzoRequest.getId() != null) {
                     Optional<BuzoModel> buzoOpt = buzoRepository.findById(buzoRequest.getId());
@@ -560,13 +615,13 @@ public class DeclaracionAreaService {
                 resVal.getMarcas());
 
         // Notificar al destinatario que la declaración fue modificada
-        if (updatedDeclaracion.getUsuarioDestinatario() != null && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
+        if (updatedDeclaracion.getUsuarioDestinatario() != null
+                && updatedDeclaracion.getUsuarioDestinatario().getId() != null) {
             gestionMensajeService.notificarModificacion(
-                "AREA", updatedDeclaracion.getId(),
-                updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
-                updatedDeclaracion.getUsuarioDestinatario().getId(),
-                updatedDeclaracion.getFolioOrigen()
-            );
+                    "AREA", updatedDeclaracion.getId(),
+                    updatedDeclaracion.getUsuario() != null ? updatedDeclaracion.getUsuario().getId() : null,
+                    updatedDeclaracion.getUsuarioDestinatario().getId(),
+                    updatedDeclaracion.getFolioOrigen());
         }
 
         if (politicaEdicion != null) {
@@ -578,9 +633,11 @@ public class DeclaracionAreaService {
     public boolean deleteDeclaracion(Long id) {
         DeclaracionAreaModel model = declaracionAreaRepository.findById(id).orElse(null);
         if (model != null && model.getDeclaracionDestinatario() != null) {
-            throw new IllegalArgumentException("Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
+            throw new IllegalArgumentException(
+                    "Esta declaración ya ha sido seleccionada o ingresada en otra declaración y no puede ser eliminada.");
         }
-        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un fiscalizador (423)
+        // Con una alerta que la congela, el dueño no la elimina nunca: la elimina un
+        // fiscalizador (423)
         if (model != null && politicaEdicion != null) {
             politicaEdicion.verificarEliminacion("AREA", id);
         }
@@ -598,7 +655,8 @@ public class DeclaracionAreaService {
 
     private void populateBuzos(DeclaracionAreaModel declaracion) {
         if (declaracion != null && declaracion.getId() != null) {
-            List<DeclaracionBuzosModel> declaracionBuzos = declaracionBuzosRepository.findByDeclaracionAreaId(declaracion.getId());
+            List<DeclaracionBuzosModel> declaracionBuzos = declaracionBuzosRepository
+                    .findByDeclaracionAreaId(declaracion.getId());
             List<BuzoModel> buzos = new ArrayList<>();
             for (DeclaracionBuzosModel db : declaracionBuzos) {
                 buzos.add(db.getBuzo());
@@ -618,8 +676,8 @@ public class DeclaracionAreaService {
     }
 
     private void sanearComposicion(DeclaracionAreaModel model) {
-        if (model.getComposicion() != null && 
-            (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
+        if (model.getComposicion() != null &&
+                (model.getComposicion().getId() == null || model.getComposicion().getId() == 0)) {
             model.setComposicion(null);
         }
     }
