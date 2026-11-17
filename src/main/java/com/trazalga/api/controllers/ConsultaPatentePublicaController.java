@@ -19,15 +19,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping({"/api/public/patentes", "/public/patentes"})
+@RequestMapping({ "/api/public/patentes", "/public/patentes" })
 @Tag(name = "Consulta Pública de Patentes", description = "Servicio público de verificación de vigencia de traslado de algas por patente de camión o carro")
 public class ConsultaPatentePublicaController {
 
     @Autowired
     private ConsultaPatenteService patenteService;
 
-
-    @GetMapping({"", "/"})
+    @GetMapping({ "", "/" })
     public ResponseEntity<Map<String, Object>> patenteVacia() {
         return ResponseEntity.badRequest().body(Map.of("error", "Patente no válida"));
     }

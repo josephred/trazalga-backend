@@ -52,17 +52,16 @@ public class ConsultaPatentePublicaTest {
     void setUp() {
         lenient().when(configService.getInt(eq("patente_vigencia_horas"), anyInt())).thenReturn(48);
         lenient().when(configService.getInt(eq("patente_consulta_max_por_minuto"), anyInt())).thenReturn(20);
-        lenient().when(configService.getValor(eq("consulta_publica_texto_proteccion"), anyString())).thenReturn("Texto legal");
+        lenient().when(configService.getValor(eq("consulta_publica_texto_proteccion"), anyString()))
+                .thenReturn("Texto legal");
         lenient().when(request.getRemoteAddr()).thenReturn("192.168.1.50");
     }
 
     private static final Set<String> WHITELIST_AUTORIZADO = Set.of(
-            "patente", "resultado", "fechaHoraAutorizacion", "comunaDestino", "tipoAlga", "texto", "consultadoEn"
-    );
+            "patente", "resultado", "fechaHoraAutorizacion", "comunaDestino", "tipoAlga", "texto", "consultadoEn");
 
     private static final Set<String> WHITELIST_SIN_AUTORIZACION = Set.of(
-            "patente", "resultado", "texto", "consultadoEn"
-    );
+            "patente", "resultado", "texto", "consultadoEn");
 
     @Test
     @DisplayName("TN.6 Caso 1: Autorizado -> respuesta pública contiene exactamente la lista blanca de AUTORIZADO")
@@ -90,7 +89,8 @@ public class ConsultaPatentePublicaTest {
         assertEquals("Texto legal", map.get("texto"));
         assertEquals("2026-10-22T18:00:00", map.get("consultadoEn"));
 
-        assertEquals(WHITELIST_AUTORIZADO, map.keySet(), "Las claves deben coincidir estrictamente con la lista blanca");
+        assertEquals(WHITELIST_AUTORIZADO, map.keySet(),
+                "Las claves deben coincidir estrictamente con la lista blanca");
         verificarAusenciaDatosPersonales(map);
     }
 
@@ -255,7 +255,8 @@ public class ConsultaPatentePublicaTest {
         Map<String, Object> map = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 0, 0));
 
         assertEquals("AUTORIZADO", map.get("resultado"));
-        assertFalse(map.containsKey("comunaDestino"), "comunaDestino debe omitirse si consulta_publica_muestra_comuna=false");
+        assertFalse(map.containsKey("comunaDestino"),
+                "comunaDestino debe omitirse si consulta_publica_muestra_comuna=false");
         Set<String> esperadoSinComuna = new java.util.HashSet<>(WHITELIST_AUTORIZADO);
         esperadoSinComuna.remove("comunaDestino");
         assertEquals(esperadoSinComuna, map.keySet());
@@ -276,7 +277,8 @@ public class ConsultaPatentePublicaTest {
                 .build();
 
         when(estadoTrasladoPatente.evaluar(eq("ABCD12"), any())).thenReturn(ev);
-        lenient().when(configService.getValor(eq("consulta_publica_fono_denuncia"), anyString())).thenReturn("800123456");
+        lenient().when(configService.getValor(eq("consulta_publica_fono_denuncia"), anyString()))
+                .thenReturn("800123456");
         lenient().when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("56911112222");
         when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
 
@@ -303,7 +305,8 @@ public class ConsultaPatentePublicaTest {
         when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("56911112222");
         when(configService.getValor(eq("consulta_publica_grafica"), anyString())).thenReturn("");
 
-        Map<String, Object> mapAmbos = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 0, 0));
+        Map<String, Object> mapAmbos = patenteService.consultar("ABCD12", null,
+                LocalDateTime.of(2026, 9, 25, 15, 0, 0));
         assertEquals("+56 800 111 222", mapAmbos.get("fonoDenuncia"));
         assertEquals("56911112222", mapAmbos.get("whatsappDenuncia"));
         Set<String> esperadoAmbos = new java.util.HashSet<>(WHITELIST_SIN_AUTORIZACION);
@@ -313,7 +316,8 @@ public class ConsultaPatentePublicaTest {
         verificarAusenciaDatosPersonales(mapAmbos);
 
         when(configService.getValor(eq("consulta_publica_whatsapp"), anyString())).thenReturn("   ");
-        Map<String, Object> mapSoloFono = patenteService.consultar("ABCD12", null, LocalDateTime.of(2026, 9, 25, 15, 1, 0));
+        Map<String, Object> mapSoloFono = patenteService.consultar("ABCD12", null,
+                LocalDateTime.of(2026, 9, 25, 15, 1, 0));
         assertTrue(mapSoloFono.containsKey("fonoDenuncia"));
         assertFalse(mapSoloFono.containsKey("whatsappDenuncia"));
     }
@@ -354,7 +358,8 @@ public class ConsultaPatentePublicaTest {
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
         byte[] raw = sha.digest("190.10.20.30".getBytes(StandardCharsets.UTF_8));
         StringBuilder sb = new StringBuilder();
-        for (byte b : raw) sb.append(String.format("%02x", b));
+        for (byte b : raw)
+            sb.append(String.format("%02x", b));
         assertNotEquals(sb.toString(), hmac1);
     }
 
@@ -426,8 +431,7 @@ public class ConsultaPatentePublicaTest {
         List<String> camposProhibidos = List.of(
                 "rut", "rutChofer", "chofer", "choferTransporte", "nombreComercializador",
                 "usuarioId", "folio", "kg", "kilos", "destino", "comunaOrigen", "planta", "valor",
-                "ipHash", "ip_hash"
-        );
+                "ipHash", "ip_hash");
         for (String campo : camposProhibidos) {
             assertFalse(map.containsKey(campo), "La respuesta pública NO debe contener '" + campo + "'");
         }

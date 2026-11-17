@@ -26,7 +26,10 @@ public class ReportRepository {
     @org.springframework.context.annotation.Lazy
     private com.trazalga.api.services.FactorConversionService factorConversionService;
 
-    /** Suma diaria del LED, compartida con la evaluación en línea (refinamiento 06-11, NL.4). */
+    /**
+     * Suma diaria del LED, compartida con la evaluación en línea (refinamiento
+     * 06-11, NL.4).
+     */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.trazalga.api.services.indicadores.AcumuladoDiarioLed acumuladoDiarioLed;
 
@@ -60,7 +63,8 @@ public class ReportRepository {
         return null;
     }
 
-    public void setVariacionPesoService(com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService) {
+    public void setVariacionPesoService(
+            com.trazalga.api.services.indicadores.VariacionPesoService variacionPesoService) {
         this.variacionPesoService = variacionPesoService;
     }
 
@@ -77,16 +81,38 @@ public class ReportRepository {
         String tableName;
         String dateColumn = "fecha_declaracion";
         String amountColumn = "desembarque";
-        
+
         switch (tipoReporte) {
-            case 1: tableName = "declaracion_recolector"; break;
-            case 2: tableName = "declaracion_armador"; break;
-            case 3: tableName = "declaracion_area"; break;
-            case 4: tableName = "declaracion_comercializador"; amountColumn = "cantidad"; break;
-            case 5: tableName = "declaracion_planta_abastecimiento"; amountColumn = "cantidad"; dateColumn = "fecha_ingreso_planta"; break;
-            case 6: tableName = "declaracion_planta_produccion"; amountColumn = "cantidad_producto"; dateColumn = "fecha_produccion"; break;
-            case 7: tableName = "declaracion_planta_destino"; amountColumn = "cantidad"; dateColumn = "fecha_declaracion_destino"; break;
-            default: throw new IllegalArgumentException("Tipo de reporte no válido: " + tipoReporte);
+            case 1:
+                tableName = "declaracion_recolector";
+                break;
+            case 2:
+                tableName = "declaracion_armador";
+                break;
+            case 3:
+                tableName = "declaracion_area";
+                break;
+            case 4:
+                tableName = "declaracion_comercializador";
+                amountColumn = "cantidad";
+                break;
+            case 5:
+                tableName = "declaracion_planta_abastecimiento";
+                amountColumn = "cantidad";
+                dateColumn = "fecha_ingreso_planta";
+                break;
+            case 6:
+                tableName = "declaracion_planta_produccion";
+                amountColumn = "cantidad_producto";
+                dateColumn = "fecha_produccion";
+                break;
+            case 7:
+                tableName = "declaracion_planta_destino";
+                amountColumn = "cantidad";
+                dateColumn = "fecha_declaracion_destino";
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de reporte no válido: " + tipoReporte);
         }
 
         StringBuilder sql = new StringBuilder();
@@ -95,20 +121,23 @@ public class ReportRepository {
         if (tipoReporte == 5 || tipoReporte == 6) {
             sql.append("NULL as r_nombres, NULL as r_apellidop, NULL as r_apellidom, NULL as r_rut, ");
         } else {
-            sql.append("ud.nombres as r_nombres, ud.apellidop as r_apellidop, ud.apellidom as r_apellidom, ud.rut as r_rut, ");
+            sql.append(
+                    "ud.nombres as r_nombres, ud.apellidop as r_apellidop, ud.apellidom as r_apellidom, ud.rut as r_rut, ");
         }
         sql.append("d.").append(amountColumn).append(", e.nombre as especie_nombre ");
-        
+
         if (tipoReporte == 1) {
             sql.append(", dc.folio_origen as folio_comercializador ");
-            sql.append(", udc.nombres as p_abast_nombres, udc.rut as p_abast_rut, dc.fecha_declaracion as fecha_comercializador ");
-            sql.append(", udpa.nombres as p_prod_nombres, udpa.rut as p_prod_rut, dpa.fecha_ingreso_planta as fecha_planta_abast ");
+            sql.append(
+                    ", udc.nombres as p_abast_nombres, udc.rut as p_abast_rut, dc.fecha_declaracion as fecha_comercializador ");
+            sql.append(
+                    ", udpa.nombres as p_prod_nombres, udpa.rut as p_prod_rut, dpa.fecha_ingreso_planta as fecha_planta_abast ");
         } else {
             sql.append(", NULL as folio_comercializador ");
             sql.append(", NULL as p_abast_nombres, NULL as p_abast_rut, NULL as fecha_comercializador ");
             sql.append(", NULL as p_prod_nombres, NULL as p_prod_rut, NULL as fecha_planta_abast ");
         }
-        
+
         if (tipoReporte >= 1 && tipoReporte <= 5) {
             sql.append(", c.nombre as composicion_nombre, h.nombre as humedad_nombre ");
         } else if (tipoReporte == 6) {
@@ -116,23 +145,29 @@ public class ReportRepository {
         } else {
             sql.append(", NULL as composicion_nombre, NULL as humedad_nombre ");
         }
-        
+
         sql.append(", d.latitud, d.longitud ");
 
-        // QE.2: Metadatos de origen y destino (indices 25..36) sin alterar indices 0..24
+        // QE.2: Metadatos de origen y destino (indices 25..36) sin alterar indices
+        // 0..24
         if (tipoReporte == 1) {
-            sql.append(", d.caleta_id, NULL as orig_amerb_id, d.varadero_id, d.varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
+            sql.append(
+                    ", d.caleta_id, NULL as orig_amerb_id, d.varadero_id, d.varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
         } else if (tipoReporte == 2) {
-            sql.append(", d.caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
+            sql.append(
+                    ", d.caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, COALESCE(d.comuna_id, cal.comuna_id) ");
         } else if (tipoReporte == 3) {
             sql.append(", d.caleta_id, d.amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, cal.comuna_id ");
         } else {
-            sql.append(", NULL as orig_caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, NULL as orig_comuna_id ");
+            sql.append(
+                    ", NULL as orig_caleta_id, NULL as orig_amerb_id, NULL as orig_varadero_id, NULL as orig_varadero, NULL as orig_comuna_id ");
         }
 
         if (tipoReporte >= 1 && tipoReporte <= 3) {
-            sql.append(", COALESCE(dpa_dir.codigo_sernapesca, dpa.codigo_sernapesca), COALESCE(up_dir.rut, up_dpa.rut), COALESCE(dpa_dir.nombre_planta, dpa.nombre_planta) ");
-            sql.append(", COALESCE(dpa_dir.latitud, dpa.latitud, dc.latitud), COALESCE(dpa_dir.longitud, dpa.longitud, dc.longitud) ");
+            sql.append(
+                    ", COALESCE(dpa_dir.codigo_sernapesca, dpa.codigo_sernapesca), COALESCE(up_dir.rut, up_dpa.rut), COALESCE(dpa_dir.nombre_planta, dpa.nombre_planta) ");
+            sql.append(
+                    ", COALESCE(dpa_dir.latitud, dpa.latitud, dc.latitud), COALESCE(dpa_dir.longitud, dpa.longitud, dc.longitud) ");
             sql.append(", CASE WHEN dpa_dir.id IS NOT NULL OR dpa.id IS NOT NULL THEN 1 ELSE 0 END ");
             sql.append(", NULL as src_cod_serna ");
         } else if (tipoReporte == 4) {
@@ -140,13 +175,17 @@ public class ReportRepository {
             sql.append(", CASE WHEN dpa.id IS NOT NULL THEN 1 ELSE 0 END ");
             sql.append(", NULL as src_cod_serna ");
         } else if (tipoReporte == 5) {
-            sql.append(", d.codigo_sernapesca, u.rut, d.nombre_planta, d.latitud, d.longitud, 1, NULL as src_cod_serna ");
+            sql.append(
+                    ", d.codigo_sernapesca, u.rut, d.nombre_planta, d.latitud, d.longitud, 1, NULL as src_cod_serna ");
         } else if (tipoReporte == 6) {
-            sql.append(", NULL as dest_cod, NULL as dest_rut, NULL as dest_nombre, NULL as dest_lat, NULL as dest_lon, 0 ");
+            sql.append(
+                    ", NULL as dest_cod, NULL as dest_rut, NULL as dest_nombre, NULL as dest_lat, NULL as dest_lon, 0 ");
             sql.append(", d.codigo_sernapesca ");
         } else {
-            sql.append(", d.codigo_sernapesca_destino, d.rut_destino, d.nombre_destino, NULL as dest_lat, NULL as dest_lon ");
-            sql.append(", CASE WHEN d.codigo_sernapesca_destino IS NOT NULL OR d.rut_destino IS NOT NULL THEN 1 ELSE 0 END ");
+            sql.append(
+                    ", d.codigo_sernapesca_destino, d.rut_destino, d.nombre_destino, NULL as dest_lat, NULL as dest_lon ");
+            sql.append(
+                    ", CASE WHEN d.codigo_sernapesca_destino IS NOT NULL OR d.rut_destino IS NOT NULL THEN 1 ELSE 0 END ");
             sql.append(", d.codigo_sernapesca ");
         }
 
@@ -165,7 +204,8 @@ public class ReportRepository {
 
         if (tipoReporte >= 1 && tipoReporte <= 3) {
             sql.append("LEFT JOIN caleta cal ON d.caleta_id = cal.id ");
-            sql.append("LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id AND (d.consumida_por_tipo IS NULL OR UPPER(d.consumida_por_tipo) = 'COMERCIALIZADOR') ");
+            sql.append(
+                    "LEFT JOIN declaracion_comercializador dc ON d.declaracion_destinatario_id = dc.id AND (d.consumida_por_tipo IS NULL OR UPPER(d.consumida_por_tipo) = 'COMERCIALIZADOR') ");
             if (tipoReporte == 1) {
                 sql.append("LEFT JOIN usuario udc ON dc.usuario_destinatario_id = udc.id ");
             }
@@ -174,10 +214,12 @@ public class ReportRepository {
                 sql.append("LEFT JOIN usuario udpa ON dpa.usuario_destinatario_id = udpa.id ");
             }
             sql.append("LEFT JOIN usuario up_dpa ON dpa.usuario_id = up_dpa.id ");
-            sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa_dir ON d.declaracion_destinatario_id = dpa_dir.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
+            sql.append(
+                    "LEFT JOIN declaracion_planta_abastecimiento dpa_dir ON d.declaracion_destinatario_id = dpa_dir.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
             sql.append("LEFT JOIN usuario up_dir ON dpa_dir.usuario_id = up_dir.id ");
         } else if (tipoReporte == 4) {
-            sql.append("LEFT JOIN declaracion_planta_abastecimiento dpa ON d.declaracion_destinatario_id = dpa.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
+            sql.append(
+                    "LEFT JOIN declaracion_planta_abastecimiento dpa ON d.declaracion_destinatario_id = dpa.id AND UPPER(COALESCE(d.consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO') ");
             sql.append("LEFT JOIN usuario udpa ON dpa.usuario_id = udpa.id ");
         }
 
@@ -198,12 +240,12 @@ public class ReportRepository {
 
         return results.stream().map(row -> {
             String emisorNombre = (row[4] != null ? row[4].toString() : "") + " " +
-                                 (row[5] != null ? row[5].toString() : "") + " " +
-                                 (row[6] != null ? row[6].toString() : "");
-            
+                    (row[5] != null ? row[5].toString() : "") + " " +
+                    (row[6] != null ? row[6].toString() : "");
+
             String receptorNombre = (row[8] != null ? row[8].toString() : "") + " " +
-                                   (row[9] != null ? row[9].toString() : "") + " " +
-                                   (row[10] != null ? row[10].toString() : "");
+                    (row[9] != null ? row[9].toString() : "") + " " +
+                    (row[10] != null ? row[10].toString() : "");
 
             Date dateVal = null;
             if (row[2] instanceof java.sql.Timestamp) {
@@ -217,20 +259,25 @@ public class ReportRepository {
             String pAbastCompleto = pAbastNombre.isEmpty() ? "" : pAbastNombre + " (" + pAbastRut + ")";
 
             Date fechaComercializador = null;
-            if (row[17] instanceof java.sql.Timestamp) fechaComercializador = new Date(((java.sql.Timestamp) row[17]).getTime());
-            else if (row[17] instanceof Date) fechaComercializador = (Date) row[17];
+            if (row[17] instanceof java.sql.Timestamp)
+                fechaComercializador = new Date(((java.sql.Timestamp) row[17]).getTime());
+            else if (row[17] instanceof Date)
+                fechaComercializador = (Date) row[17];
 
             String pProdNombre = (row[18] != null ? row[18].toString() : "");
             String pProdRut = (row[19] != null ? row[19].toString() : "");
             String pProdCompleto = pProdNombre.isEmpty() ? "" : pProdNombre + " (" + pProdRut + ")";
 
             Date fechaPlantaAbast = null;
-            if (row[20] instanceof java.sql.Timestamp) fechaPlantaAbast = new Date(((java.sql.Timestamp) row[20]).getTime());
-            else if (row[20] instanceof Date) fechaPlantaAbast = (Date) row[20];
+            if (row[20] instanceof java.sql.Timestamp)
+                fechaPlantaAbast = new Date(((java.sql.Timestamp) row[20]).getTime());
+            else if (row[20] instanceof Date)
+                fechaPlantaAbast = (Date) row[20];
 
             Double gpsLat = row.length > 23 && row[23] != null ? ((Number) row[23]).doubleValue() : null;
             Double gpsLon = row.length > 24 && row[24] != null ? ((Number) row[24]).doubleValue() : null;
-            Double[][] coordsOD = resolverCoordsOrigenDestinoReport(tipoReporte, row, gpsLat, gpsLon, emisorNombre.trim(), row[7] != null ? row[7].toString() : null, referenciaOrigenService);
+            Double[][] coordsOD = resolverCoordsOrigenDestinoReport(tipoReporte, row, gpsLat, gpsLon,
+                    emisorNombre.trim(), row[7] != null ? row[7].toString() : null, referenciaOrigenService);
 
             return ReportDTO.builder()
                     .id(((Number) row[0]).longValue())
@@ -318,8 +365,8 @@ public class ReportRepository {
             boolean esPlanta = row.length > 35 && row[35] instanceof Number && ((Number) row[35]).intValue() == 1;
 
             if (esPlanta && refSvc != null) {
-                com.trazalga.api.dto.geo.PuntoReferencia plDestRef =
-                        refSvc.resolverPlantaOficial(destCod, destRut, destNombre);
+                com.trazalga.api.dto.geo.PuntoReferencia plDestRef = refSvc.resolverPlantaOficial(destCod, destRut,
+                        destNombre);
                 if (plDestRef != null && plDestRef.getLat() != null && plDestRef.getLon() != null) {
                     destLat = plDestRef.getLat();
                     destLon = plDestRef.getLon();
@@ -331,19 +378,27 @@ public class ReportRepository {
             }
         }
 
-        return new Double[][]{{origLat, origLon}, {destLat, destLon}};
+        return new Double[][] { { origLat, origLon }, { destLat, destLon } };
     }
 
     private String getReportLabel(Integer tipo) {
         switch (tipo) {
-            case 1: return "Recolector";
-            case 2: return "Armador";
-            case 3: return "Área de Manejo";
-            case 4: return "Comercializador";
-            case 5: return "Planta Abastecimiento";
-            case 6: return "Planta Producción";
-            case 7: return "Planta Destino";
-            default: return "Desconocido";
+            case 1:
+                return "Recolector";
+            case 2:
+                return "Armador";
+            case 3:
+                return "Área de Manejo";
+            case 4:
+                return "Comercializador";
+            case 5:
+                return "Planta Abastecimiento";
+            case 6:
+                return "Planta Producción";
+            case 7:
+                return "Planta Destino";
+            default:
+                return "Desconocido";
         }
     }
 
@@ -358,23 +413,25 @@ public class ReportRepository {
         }
 
         String sql = "SELECT DATE(fecha_declaracion) as fecha, " +
-            "COUNT(id) as decDiarias, " +
-            "COALESCE(SUM(desembarque), 0) as totDiario " +
-            "FROM (" +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_armador " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion FROM declaracion_area " +
-            ") as d" + dateFilter + " " +
-            "GROUP BY DATE(fecha_declaracion) ORDER BY DATE(fecha_declaracion) ASC";
-        
+                "COUNT(id) as decDiarias, " +
+                "COALESCE(SUM(desembarque), 0) as totDiario " +
+                "FROM (" +
+                "    SELECT id, desembarque, fecha_declaracion FROM declaracion_recolector " +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, fecha_declaracion FROM declaracion_armador " +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, fecha_declaracion FROM declaracion_area " +
+                ") as d" + dateFilter + " " +
+                "GROUP BY DATE(fecha_declaracion) ORDER BY DATE(fecha_declaracion) ASC";
+
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
-        
+
         return results.stream().map(row -> {
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("fecha", row[0] != null ? row[0].toString() : "");
@@ -388,10 +445,12 @@ public class ReportRepository {
         return getExtraccionVedaMetrics(startDate, endDate, null, null);
     }
 
-    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
-            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
+            filterBuilder.append(
+                    " AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
         } else if (startDate != null) {
             filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) >= :startDate");
         } else if (endDate != null) {
@@ -407,53 +466,64 @@ public class ReportRepository {
         }
 
         String sql = "SELECT " +
-            "COUNT(*) as total_declaraciones_veda, " +
-            "COALESCE(SUM(sub.desembarque), 0) as total_kg_veda " +
-            "FROM (" +
-            "    SELECT decl.id, decl.tipo_perfil, decl.desembarque " +
-            "    FROM (" +
-            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
-            "        UNION ALL " +
-            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
-            "        UNION ALL " +
-            "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil FROM declaracion_area " +
-            "    ) as decl " +
-            "    LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
-            "    LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
-            "    LEFT JOIN amerb am ON decl.amerb_id = am.id " +
-            "    INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "        AND v.activo = true " +
-            "        AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
-            "        AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
-            "        AND ( " +
-            "            (v.recurrencia_anual = true " +
-            "             AND v.meses_veda IS NOT NULL " +
-            "             AND ( " +
-            "                 CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
-            "                 OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
-            "             )) " +
-            "            OR " +
-            "            ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
-            "             AND v.fecha_inicio IS NOT NULL " +
-            "             AND v.fecha_fin IS NOT NULL " +
-            "             AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
-            "        ) " +
-            "    WHERE 1=1" + filterBuilder.toString() + " " +
-            "    GROUP BY decl.id, decl.tipo_perfil, decl.desembarque " +
-            ") sub";
-        
+                "COUNT(*) as total_declaraciones_veda, " +
+                "COALESCE(SUM(sub.desembarque), 0) as total_kg_veda " +
+                "FROM (" +
+                "    SELECT decl.id, decl.tipo_perfil, decl.desembarque " +
+                "    FROM (" +
+                "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector "
+                +
+                "        UNION ALL " +
+                "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil FROM declaracion_armador "
+                +
+                "        UNION ALL " +
+                "        SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil FROM declaracion_area "
+                +
+                "    ) as decl " +
+                "    LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
+                "    LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
+                "    LEFT JOIN amerb am ON decl.amerb_id = am.id " +
+                "    INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+                "        AND v.activo = true " +
+                "        AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
+                "        AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) "
+                +
+                "        AND ( " +
+                "            (v.recurrencia_anual = true " +
+                "             AND v.meses_veda IS NOT NULL " +
+                "             AND ( " +
+                "                 CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') "
+                +
+                "                 OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') "
+                +
+                "             )) " +
+                "            OR " +
+                "            ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
+                "             AND v.fecha_inicio IS NOT NULL " +
+                "             AND v.fecha_fin IS NOT NULL " +
+                "             AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) "
+                +
+                "        ) " +
+                "    WHERE 1=1" + filterBuilder.toString() + " " +
+                "    GROUP BY decl.id, decl.tipo_perfil, decl.desembarque " +
+                ") sub";
+
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) query.setParameter("especieId", especieId);
-        if (regionId != null) query.setParameter("regionId", regionId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            query.setParameter("especieId", especieId);
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
 
         Object[] result = (Object[]) query.getSingleResult();
-        
+
         java.util.Map<String, Object> map = new java.util.HashMap<>();
         map.put("declaracionesVeda", result[0] != null ? ((Number) result[0]).longValue() : 0);
         map.put("totalKgVeda", result[1] != null ? ((Number) result[1]).doubleValue() : 0.0);
-        
+
         return map;
     }
 
@@ -461,10 +531,12 @@ public class ReportRepository {
         return getExtraccionVedaDetalle(startDate, endDate, null, null);
     }
 
-    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
-            filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
+            filterBuilder.append(
+                    " AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN :startDate AND :endDate");
         } else if (startDate != null) {
             filterBuilder.append(" AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) >= :startDate");
         } else if (endDate != null) {
@@ -480,75 +552,88 @@ public class ReportRepository {
         }
 
         String sql = "SELECT " +
-            "decl.id, decl.tipo_perfil, decl.folio, " +
-            "COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) as fecha_faena, " +
-            "decl.desembarque, " +
-            "e.nombre as especie_nombre, " +
-            "COALESCE(ext.nombre, 'No especificado') as metodo_nombre, " +
-            "u.rut as declarante_rut, " +
-            "CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as declarante_nombre, " +
-            "COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, '—') as caleta_nombre, " +
-            "COALESCE(c.nombre, '—') as comuna_nombre, " +
-            "COALESCE(reg.nombre, '—') as region_nombre, " +
-            "MIN(v.id) as resolucion_id, " +
-            "MIN(COALESCE(v.resolucion, 'Subpesca')) as resolucion_nombre, " +
-            "MIN(COALESCE(v.observacion, '')) as observacion, " +
-            "MAX(dm.id) as marca_id, " +
-            "MAX(COALESCE(dm.estado_gestion, 'PENDIENTE')) as estado_gestion, " +
-            "MAX(COALESCE(dm.observacion_resolucion, '')) as observacion_gestion " +
-            "FROM (" +
-            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_ro, CONCAT('DR-', id)) as folio FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_da, CONCAT('DA-', id)) as folio FROM declaracion_armador " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_amerb, CONCAT('DAM-', id)) as folio FROM declaracion_area " +
-            ") as decl " +
-            "LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
-            "LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id " +
-            "LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
-            "LEFT JOIN amerb am ON decl.amerb_id = am.id " +
-            "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id, am.region_id) " +
-            "LEFT JOIN especie e ON decl.especie_id = e.id " +
-            "LEFT JOIN extraccion_tipo ext ON decl.extraccion_tipo_id = ext.id " +
-            "LEFT JOIN usuario u ON decl.usuario_id = u.id " +
-            "LEFT JOIN declaracion_marca dm ON dm.declaracion_tipo = decl.tipo_perfil AND dm.declaracion_id = decl.id AND dm.marca = 'EN_VEDA' " +
-            "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
-            "    AND v.activo = true " +
-            "    AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
-            "    AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
-            "    AND ( " +
-            "        (v.recurrencia_anual = true " +
-            "         AND v.meses_veda IS NOT NULL " +
-            "         AND ( " +
-            "             CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
-            "             OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') " +
-            "         )) " +
-            "        OR " +
-            "        ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
-            "         AND v.fecha_inicio IS NOT NULL " +
-            "         AND v.fecha_fin IS NOT NULL " +
-            "         AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) " +
-            "    ) " +
-            "WHERE 1=1" + filterBuilder.toString() + " " +
-            "GROUP BY decl.id, decl.tipo_perfil, decl.folio, decl.fecha_extraccion, decl.fecha_declaracion, decl.desembarque, " +
-            "e.nombre, ext.nombre, u.rut, u.nombres, u.apellidop, cal.nombre, c_cal.nombre, c.nombre, reg.nombre " +
-            "ORDER BY COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) DESC, decl.id DESC";
+                "decl.id, decl.tipo_perfil, decl.folio, " +
+                "COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) as fecha_faena, " +
+                "decl.desembarque, " +
+                "e.nombre as especie_nombre, " +
+                "COALESCE(ext.nombre, 'No especificado') as metodo_nombre, " +
+                "u.rut as declarante_rut, " +
+                "CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as declarante_nombre, " +
+                "COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, '—') as caleta_nombre, "
+                +
+                "COALESCE(c.nombre, '—') as comuna_nombre, " +
+                "COALESCE(reg.nombre, '—') as region_nombre, " +
+                "MIN(v.id) as resolucion_id, " +
+                "MIN(COALESCE(v.resolucion, 'Subpesca')) as resolucion_nombre, " +
+                "MIN(COALESCE(v.observacion, '')) as observacion, " +
+                "MAX(dm.id) as marca_id, " +
+                "MAX(COALESCE(dm.estado_gestion, 'PENDIENTE')) as estado_gestion, " +
+                "MAX(COALESCE(dm.observacion_resolucion, '')) as observacion_gestion " +
+                "FROM (" +
+                "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'RECOLECTOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_ro, CONCAT('DR-', id)) as folio FROM declaracion_recolector "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, comuna_id, NULL as amerb_id, 'ARMADOR' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_da, CONCAT('DA-', id)) as folio FROM declaracion_armador "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, especie_id, extraccion_tipo_id, fecha_extraccion, fecha_declaracion, usuario_id, caleta_id, NULL as comuna_id, amerb_id, 'AREA' as tipo_perfil, COALESCE(folio_origen, folio_desembarque_amerb, CONCAT('DAM-', id)) as folio FROM declaracion_area "
+                +
+                ") as decl " +
+                "LEFT JOIN caleta cal ON decl.caleta_id = cal.id " +
+                "LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id " +
+                "LEFT JOIN comuna c ON COALESCE(decl.comuna_id, cal.comuna_id) = c.id " +
+                "LEFT JOIN amerb am ON decl.amerb_id = am.id " +
+                "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id, am.region_id) " +
+                "LEFT JOIN especie e ON decl.especie_id = e.id " +
+                "LEFT JOIN extraccion_tipo ext ON decl.extraccion_tipo_id = ext.id " +
+                "LEFT JOIN usuario u ON decl.usuario_id = u.id " +
+                "LEFT JOIN declaracion_marca dm ON dm.declaracion_tipo = decl.tipo_perfil AND dm.declaracion_id = decl.id AND dm.marca = 'EN_VEDA' "
+                +
+                "INNER JOIN veda_especie v ON decl.especie_id = v.especie_id " +
+                "    AND v.activo = true " +
+                "    AND (v.extraccion_tipo_id IS NULL OR v.extraccion_tipo_id = decl.extraccion_tipo_id) " +
+                "    AND (v.region_id IS NULL OR v.region_id = COALESCE(c.region_id, cal.region_id, am.region_id)) " +
+                "    AND ( " +
+                "        (v.recurrencia_anual = true " +
+                "         AND v.meses_veda IS NOT NULL " +
+                "         AND ( " +
+                "             CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') "
+                +
+                "             OR CONCAT(',', REPLACE(v.meses_veda, ' ', ''), ',') LIKE CONCAT('%,0', MONTH(COALESCE(decl.fecha_extraccion, decl.fecha_declaracion)), ',%') "
+                +
+                "         )) " +
+                "        OR " +
+                "        ((v.recurrencia_anual = false OR v.recurrencia_anual IS NULL) " +
+                "         AND v.fecha_inicio IS NOT NULL " +
+                "         AND v.fecha_fin IS NOT NULL " +
+                "         AND COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) BETWEEN v.fecha_inicio AND v.fecha_fin) "
+                +
+                "    ) " +
+                "WHERE 1=1" + filterBuilder.toString() + " " +
+                "GROUP BY decl.id, decl.tipo_perfil, decl.folio, decl.fecha_extraccion, decl.fecha_declaracion, decl.desembarque, "
+                +
+                "e.nombre, ext.nombre, u.rut, u.nombres, u.apellidop, cal.nombre, c_cal.nombre, c.nombre, reg.nombre " +
+                "ORDER BY COALESCE(decl.fecha_extraccion, decl.fecha_declaracion) DESC, decl.id DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) query.setParameter("especieId", especieId);
-        if (regionId != null) query.setParameter("regionId", regionId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            query.setParameter("especieId", especieId);
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
-        
+
         return results.stream().map(row -> {
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", row[0]);
             map.put("perfil", row[1]);
             map.put("tipoDeclaracion", row[1]);
             map.put("folio", row[2] != null ? row[2].toString() : ("FAENA-" + row[0]));
-            
+
             Date dateVal = null;
             if (row[3] instanceof java.sql.Timestamp) {
                 dateVal = new Date(((java.sql.Timestamp) row[3]).getTime());
@@ -561,24 +646,24 @@ public class ReportRepository {
             map.put("kilos", row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
             map.put("especie", row[5] != null ? row[5].toString() : "—");
             map.put("metodo", row[6] != null ? row[6].toString() : "No especificado");
-            
+
             String rut = row[7] != null ? row[7].toString() : "";
             String nombre = row[8] != null ? row[8].toString().trim() : "";
             map.put("rut", rut);
             map.put("nombreDeclarante", nombre);
             map.put("actor", rut + (nombre.isEmpty() ? "" : " - " + nombre));
-            
+
             map.put("caleta", row[9] != null ? row[9].toString() : "—");
             map.put("comuna", row[10] != null ? row[10].toString() : "—");
             map.put("region", row[11] != null ? row[11].toString() : "—");
             map.put("resolucionId", row[12] != null ? ((Number) row[12]).longValue() : null);
             map.put("resolucion", row[13] != null ? row[13].toString() : "Subpesca");
             map.put("observacion", row[14] != null ? row[14].toString() : "");
-            
+
             map.put("marcaId", row.length > 15 && row[15] != null ? ((Number) row[15]).longValue() : null);
             map.put("estadoGestion", row.length > 16 && row[16] != null ? row[16].toString() : "PENDIENTE");
             map.put("observacionGestion", row.length > 17 && row[17] != null ? row[17].toString() : "");
-            
+
             return map;
         }).collect(Collectors.toList());
     }
@@ -594,28 +679,35 @@ public class ReportRepository {
         }
 
         String perfilNormalizado = (perfil == null || perfil.isEmpty() || "TODOS".equalsIgnoreCase(perfil))
-            ? null : perfil.toUpperCase();
+                ? null
+                : perfil.toUpperCase();
         String perfilFilter = perfilNormalizado != null ? " AND decl.tipo_perfil = :perfil" : "";
 
         String sql = "SELECT e.nombre as especie_nombre, " +
-            "COUNT(decl.id) as total_declaraciones, " +
-            "COALESCE(SUM(decl.desembarque), 0) as volumen_kg " +
-            "FROM (" +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, especie_id, fecha_declaracion, 'AREA' as tipo_perfil FROM declaracion_area " +
-            ") as decl " +
-            "INNER JOIN especie e ON decl.especie_id = e.id " +
-            "WHERE 1=1" + dateFilter + perfilFilter + " " +
-            "GROUP BY e.nombre " +
-            "ORDER BY volumen_kg DESC";
+                "COUNT(decl.id) as total_declaraciones, " +
+                "COALESCE(SUM(decl.desembarque), 0) as volumen_kg " +
+                "FROM (" +
+                "    SELECT id, desembarque, especie_id, fecha_declaracion, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, especie_id, fecha_declaracion, 'ARMADOR' as tipo_perfil FROM declaracion_armador "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, especie_id, fecha_declaracion, 'AREA' as tipo_perfil FROM declaracion_area "
+                +
+                ") as decl " +
+                "INNER JOIN especie e ON decl.especie_id = e.id " +
+                "WHERE 1=1" + dateFilter + perfilFilter + " " +
+                "GROUP BY e.nombre " +
+                "ORDER BY volumen_kg DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (perfilNormalizado != null) query.setParameter("perfil", perfilNormalizado);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (perfilNormalizado != null)
+            query.setParameter("perfil", perfilNormalizado);
 
         List<Object[]> results = query.getResultList();
 
@@ -650,14 +742,18 @@ public class ReportRepository {
 
         // 1. Serie diaria de volumen extraído en AMERB
         String sql = "SELECT DATE(d.fecha_declaracion) as fecha, COALESCE(SUM(d.desembarque), 0) as vol " +
-            "FROM declaracion_area d WHERE 1=1" + dateFilter + amerbFilter + especieFilter + " " +
-            "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
+                "FROM declaracion_area d WHERE 1=1" + dateFilter + amerbFilter + especieFilter + " " +
+                "GROUP BY DATE(d.fecha_declaracion) ORDER BY DATE(d.fecha_declaracion) ASC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (amerbId != null) query.setParameter("amerbId", amerbId);
-        if (especieId != null) query.setParameter("especieId", especieId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (amerbId != null)
+            query.setParameter("amerbId", amerbId);
+        if (especieId != null)
+            query.setParameter("especieId", especieId);
 
         List<Object[]> rows = query.getResultList();
         List<java.util.Map<String, Object>> serie = new java.util.ArrayList<>();
@@ -672,18 +768,21 @@ public class ReportRepository {
             serie.add(punto);
         }
 
-        // 2. Cuota de referencia (solo si se especifica especie), priorizando la del AMERB
+        // 2. Cuota de referencia (solo si se especifica especie), priorizando la del
+        // AMERB
         Double limiteKg = null;
         String cuotaPeriodo = null;
         if (especieId != null) {
             String cuotaCondAmerb = amerbId != null
-                    ? " AND (amerb_id = :amerbId OR amerb_id IS NULL)" : " AND amerb_id IS NULL";
+                    ? " AND (amerb_id = :amerbId OR amerb_id IS NULL)"
+                    : " AND amerb_id IS NULL";
             String cuotaSql = "SELECT limite_kg, periodo FROM cuota_extraccion " +
-                "WHERE perfil = 'AREA' AND activo = 1 AND especie_id = :especieId" + cuotaCondAmerb + " " +
-                "ORDER BY (amerb_id IS NOT NULL) DESC LIMIT 1";
+                    "WHERE perfil = 'AREA' AND activo = 1 AND especie_id = :especieId" + cuotaCondAmerb + " " +
+                    "ORDER BY (amerb_id IS NOT NULL) DESC LIMIT 1";
             Query cq = entityManager.createNativeQuery(cuotaSql);
             cq.setParameter("especieId", especieId);
-            if (amerbId != null) cq.setParameter("amerbId", amerbId);
+            if (amerbId != null)
+                cq.setParameter("amerbId", amerbId);
             List<Object[]> cuotaRows = cq.getResultList();
             if (!cuotaRows.isEmpty()) {
                 Object[] cr = cuotaRows.get(0);
@@ -694,9 +793,9 @@ public class ReportRepository {
 
         // 3. Opciones de filtro: AMERBs y especies con declaraciones de área
         List<java.util.Map<String, Object>> amerbsDisponibles = listarOpciones(
-            "SELECT DISTINCT a.id, a.nombre FROM declaracion_area d INNER JOIN amerb a ON a.id = d.amerb_id ORDER BY a.nombre");
+                "SELECT DISTINCT a.id, a.nombre FROM declaracion_area d INNER JOIN amerb a ON a.id = d.amerb_id ORDER BY a.nombre");
         List<java.util.Map<String, Object>> especiesDisponibles = listarOpciones(
-            "SELECT DISTINCT e.id, e.nombre FROM declaracion_area d INNER JOIN especie e ON e.id = d.especie_id ORDER BY e.nombre");
+                "SELECT DISTINCT e.id, e.nombre FROM declaracion_area d INNER JOIN especie e ON e.id = d.especie_id ORDER BY e.nombre");
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("serie", serie);
@@ -704,7 +803,8 @@ public class ReportRepository {
         out.put("limiteKg", limiteKg);
         out.put("cuotaPeriodo", cuotaPeriodo);
         out.put("porcentajeCuota", (limiteKg != null && limiteKg > 0)
-                ? Math.round(acumulado / limiteKg * 1000.0) / 10.0 : null);
+                ? Math.round(acumulado / limiteKg * 1000.0) / 10.0
+                : null);
         out.put("amerbsDisponibles", amerbsDisponibles);
         out.put("especiesDisponibles", especiesDisponibles);
         return out;
@@ -722,9 +822,12 @@ public class ReportRepository {
 
     /**
      * Indicador "Doble Operación" (AMERB #5): posibles duplicidades de captura del
-     * mismo actor y especie, el mismo día, en ALA (recolector/armador) y AMERB (area),
-     * con volúmenes dentro de una tolerancia. Solo lectura; para revisión del fiscalizador.
-     * El criterio (mismo día + volumen ±tolerancia) es una definición inicial pendiente
+     * mismo actor y especie, el mismo día, en ALA (recolector/armador) y AMERB
+     * (area),
+     * con volúmenes dentro de una tolerancia. Solo lectura; para revisión del
+     * fiscalizador.
+     * El criterio (mismo día + volumen ±tolerancia) es una definición inicial
+     * pendiente
      * de formalizar con SERNAPESCA; la tolerancia llega por parámetro (default 5%).
      */
     public java.util.Map<String, Object> getDobleOperacion(Date startDate, Date endDate, Double toleranciaPct) {
@@ -740,35 +843,39 @@ public class ReportRepository {
         }
 
         String sql = "SELECT " +
-            "area.fecha_declaracion AS fecha, " +
-            "u.rut, u.nombres, u.apellidop, " +
-            "e.nombre AS especie, " +
-            "ala.tipo_ala, " +
-            "ala.id AS ala_id, ala.desembarque AS kg_ala, " +
-            "area.id AS area_id, area.desembarque AS kg_amerb, " +
-            "am.nombre AS amerb_nombre, " +
-            "ROUND(ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100, 1) AS variacion_pct " +
-            "FROM declaracion_area area " +
-            "INNER JOIN (" +
-            "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'RECOLECTOR' AS tipo_ala FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'ARMADOR' AS tipo_ala FROM declaracion_armador " +
-            ") ala " +
-            "    ON ala.usuario_id = area.usuario_id " +
-            "    AND ala.especie_id = area.especie_id " +
-            "    AND ala.fecha_declaracion = area.fecha_declaracion " +
-            "    AND ala.desembarque > 0 " +
-            "    AND (ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100) <= :tolerancia " +
-            "INNER JOIN especie e ON e.id = area.especie_id " +
-            "INNER JOIN usuario u ON u.id = area.usuario_id " +
-            "LEFT JOIN amerb am ON am.id = area.amerb_id " +
-            "WHERE 1=1" + dateFilter + " " +
-            "ORDER BY area.fecha_declaracion DESC, u.rut";
+                "area.fecha_declaracion AS fecha, " +
+                "u.rut, u.nombres, u.apellidop, " +
+                "e.nombre AS especie, " +
+                "ala.tipo_ala, " +
+                "ala.id AS ala_id, ala.desembarque AS kg_ala, " +
+                "area.id AS area_id, area.desembarque AS kg_amerb, " +
+                "am.nombre AS amerb_nombre, " +
+                "ROUND(ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100, 1) AS variacion_pct " +
+                "FROM declaracion_area area " +
+                "INNER JOIN (" +
+                "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'RECOLECTOR' AS tipo_ala FROM declaracion_recolector "
+                +
+                "    UNION ALL " +
+                "    SELECT id, usuario_id, especie_id, fecha_declaracion, desembarque, 'ARMADOR' AS tipo_ala FROM declaracion_armador "
+                +
+                ") ala " +
+                "    ON ala.usuario_id = area.usuario_id " +
+                "    AND ala.especie_id = area.especie_id " +
+                "    AND ala.fecha_declaracion = area.fecha_declaracion " +
+                "    AND ala.desembarque > 0 " +
+                "    AND (ABS(area.desembarque - ala.desembarque) / ala.desembarque * 100) <= :tolerancia " +
+                "INNER JOIN especie e ON e.id = area.especie_id " +
+                "INNER JOIN usuario u ON u.id = area.usuario_id " +
+                "LEFT JOIN amerb am ON am.id = area.amerb_id " +
+                "WHERE 1=1" + dateFilter + " " +
+                "ORDER BY area.fecha_declaracion DESC, u.rut";
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("tolerancia", tolerancia);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> rows = query.getResultList();
 
@@ -806,37 +913,48 @@ public class ReportRepository {
             dateFilter = " WHERE fecha_declaracion <= :endDate";
         }
 
-        // Base sobre todas las declaraciones para total y actores. 
-        // Volumen, inconsistencias y casos abiertos se mantienen enfocados en el origen.
+        // Base sobre todas las declaraciones para total y actores.
+        // Volumen, inconsistencias y casos abiertos se mantienen enfocados en el
+        // origen.
         String sql = "SELECT COUNT(id) as total_declaraciones, " +
-            "COALESCE(SUM(CASE WHEN is_origen = 1 THEN desembarque ELSE 0 END), 0) as total_volumen, " +
-            "COUNT(DISTINCT usuario_id) as actores_distintos, " +
-            "SUM(CASE WHEN estado IN ('NEGOCIACION','RECHAZADA') THEN 1 ELSE 0 END) as casos_abiertos, " +
-            "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas, " +
-            "SUM(CASE WHEN tipo_decl = 1 THEN 1 ELSE 0 END) as total_recolector, " +
-            "SUM(CASE WHEN tipo_decl = 2 THEN 1 ELSE 0 END) as total_armador, " +
-            "SUM(CASE WHEN tipo_decl = 3 THEN 1 ELSE 0 END) as total_area, " +
-            "SUM(CASE WHEN tipo_decl = 4 THEN 1 ELSE 0 END) as total_comercializador, " +
-            // Volumen comprado por el comercializador = suma de la cantidad de sus declaraciones
-            "COALESCE(SUM(CASE WHEN tipo_decl = 4 THEN desembarque ELSE 0 END), 0) as volumen_comprado FROM (" +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 1 as tipo_decl FROM declaracion_recolector " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 2 as tipo_decl FROM declaracion_armador " +
-            "    UNION ALL " +
-            "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 3 as tipo_decl FROM declaracion_area " +
-            "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_declaracion, usuario_id, estado, 0 as is_origen, 4 as tipo_decl FROM declaracion_comercializador " +
-            "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_ingreso_planta as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 5 as tipo_decl FROM declaracion_planta_abastecimiento " +
-            "    UNION ALL " +
-            "    SELECT id, cantidad_producto as desembarque, fecha_produccion as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 6 as tipo_decl FROM declaracion_planta_produccion " +
-            "    UNION ALL " +
-            "    SELECT id, cantidad as desembarque, fecha_declaracion_destino as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 7 as tipo_decl FROM declaracion_planta_destino " +
-            ") as decl " + dateFilter;
-            
+                "COALESCE(SUM(CASE WHEN is_origen = 1 THEN desembarque ELSE 0 END), 0) as total_volumen, " +
+                "COUNT(DISTINCT usuario_id) as actores_distintos, " +
+                "SUM(CASE WHEN estado IN ('NEGOCIACION','RECHAZADA') THEN 1 ELSE 0 END) as casos_abiertos, " +
+                "SUM(CASE WHEN estado = 'RECHAZADA' THEN 1 ELSE 0 END) as rechazadas, " +
+                "SUM(CASE WHEN tipo_decl = 1 THEN 1 ELSE 0 END) as total_recolector, " +
+                "SUM(CASE WHEN tipo_decl = 2 THEN 1 ELSE 0 END) as total_armador, " +
+                "SUM(CASE WHEN tipo_decl = 3 THEN 1 ELSE 0 END) as total_area, " +
+                "SUM(CASE WHEN tipo_decl = 4 THEN 1 ELSE 0 END) as total_comercializador, " +
+                // Volumen comprado por el comercializador = suma de la cantidad de sus
+                // declaraciones
+                "COALESCE(SUM(CASE WHEN tipo_decl = 4 THEN desembarque ELSE 0 END), 0) as volumen_comprado FROM (" +
+                "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 1 as tipo_decl FROM declaracion_recolector "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 2 as tipo_decl FROM declaracion_armador "
+                +
+                "    UNION ALL " +
+                "    SELECT id, desembarque, fecha_declaracion, usuario_id, estado, 1 as is_origen, 3 as tipo_decl FROM declaracion_area "
+                +
+                "    UNION ALL " +
+                "    SELECT id, cantidad as desembarque, fecha_declaracion, usuario_id, estado, 0 as is_origen, 4 as tipo_decl FROM declaracion_comercializador "
+                +
+                "    UNION ALL " +
+                "    SELECT id, cantidad as desembarque, fecha_ingreso_planta as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 5 as tipo_decl FROM declaracion_planta_abastecimiento "
+                +
+                "    UNION ALL " +
+                "    SELECT id, cantidad_producto as desembarque, fecha_produccion as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 6 as tipo_decl FROM declaracion_planta_produccion "
+                +
+                "    UNION ALL " +
+                "    SELECT id, cantidad as desembarque, fecha_declaracion_destino as fecha_declaracion, usuario_id, 'ACEPTADA' as estado, 0 as is_origen, 7 as tipo_decl FROM declaracion_planta_destino "
+                +
+                ") as decl " + dateFilter;
+
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
@@ -855,13 +973,18 @@ public class ReportRepository {
         long fueraUmbralPeso = ((Number) getVariacionPesoMetrics(startDate, endDate, null)
                 .getOrDefault("fueraUmbral", 0L)).longValue();
 
-        // Alertas activas: incidentes críticos del período (extracción en veda + variación de peso
-        // fuera de umbral). El atraso de validación >48h se muestra en su propio widget y no se
-        // suma aquí para no dominar el KPI mientras el flujo de consumo esté poco usado.
+        // Alertas activas: incidentes críticos del período (extracción en veda +
+        // variación de peso
+        // fuera de umbral). El atraso de validación >48h se muestra en su propio widget
+        // y no se
+        // suma aquí para no dominar el KPI mientras el flujo de consumo esté poco
+        // usado.
         long alertasActivas = enVeda + fueraUmbralPeso;
-        // Inconsistencias: declaraciones en veda o rechazadas, sobre el total del período
+        // Inconsistencias: declaraciones en veda o rechazadas, sobre el total del
+        // período
         double inconsistenciasPct = total > 0
-                ? Math.round((enVeda + rechazadas) * 1000.0 / total) / 10.0 : 0.0;
+                ? Math.round((enVeda + rechazadas) * 1000.0 / total) / 10.0
+                : 0.0;
 
         java.util.Map<String, Object> map = new java.util.HashMap<>();
         map.put("declaracionesTotales", total);
@@ -879,16 +1002,20 @@ public class ReportRepository {
     }
 
     // Indicador "Tiempo entre extracción y validación".
-    // Definición de "validación" (según observación SERNAPESCA "A Comercializador"): momento en que la
-    // declaración de origen (recolector/armador/área) es consumida por la declaración de un comercializador.
+    // Definición de "validación" (según observación SERNAPESCA "A
+    // Comercializador"): momento en que la
+    // declaración de origen (recolector/armador/área) es consumida por la
+    // declaración de un comercializador.
     // Origen del intervalo: fecha_declaracion + hora de la declaración de origen.
-    // Si el cliente define otro eslabón como cierre (ej. planta), basta cambiar el JOIN de esta consulta.
-    private static final String SQL_ORIGENES_VALIDACION =
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector " +
-        "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'ARMADOR' as tipo_perfil FROM declaracion_armador " +
-        "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'AREA' as tipo_perfil FROM declaracion_area ";
+    // Si el cliente define otro eslabón como cierre (ej. planta), basta cambiar el
+    // JOIN de esta consulta.
+    private static final String SQL_ORIGENES_VALIDACION = "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'RECOLECTOR' as tipo_perfil FROM declaracion_recolector "
+            +
+            "    UNION ALL " +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'ARMADOR' as tipo_perfil FROM declaracion_armador "
+            +
+            "    UNION ALL " +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion, hora, desembarque, declaracion_destinatario_id, consumida_por_tipo, 'AREA' as tipo_perfil FROM declaracion_area ";
 
     public java.util.Map<String, Object> getTiempoValidacionMetrics(Date startDate, Date endDate) {
         String dateFilter = "";
@@ -901,29 +1028,40 @@ public class ReportRepository {
         }
 
         String sql = "SELECT " +
-            "COUNT(decl.id) as total, " +
-            "SUM(CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END) as validadas, " +
-            "AVG(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as prom_min, " +
-            "MAX(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as max_min, " +
-            "SUM(CASE WHEN c.id IS NULL AND TIMESTAMP(decl.fecha_declaracion, decl.hora) < NOW() - INTERVAL 48 HOUR THEN 1 ELSE 0 END) as pendientes_48h " +
-            "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
-            "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' " +
-            "WHERE 1=1" + dateFilter;
+                "COUNT(decl.id) as total, " +
+                "SUM(CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END) as validadas, " +
+                "AVG(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as prom_min, "
+                +
+                "MAX(CASE WHEN c.id IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), TIMESTAMP(c.fecha_declaracion, c.hora)) END) as max_min, "
+                +
+                "SUM(CASE WHEN c.id IS NULL AND TIMESTAMP(decl.fecha_declaracion, decl.hora) < NOW() - INTERVAL 48 HOUR THEN 1 ELSE 0 END) as pendientes_48h "
+                +
+                "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
+                "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' "
+                +
+                "WHERE 1=1" + dateFilter;
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
         long total = result[0] != null ? ((Number) result[0]).longValue() : 0;
         long validadas = result[1] != null ? ((Number) result[1]).longValue() : 0;
-        Double promHoras = result[2] != null ? Double.valueOf(Math.round(((Number) result[2]).doubleValue() / 60.0 * 10.0) / 10.0) : null;
-        Double maxHoras = result[3] != null ? Double.valueOf(Math.round(((Number) result[3]).doubleValue() / 60.0 * 10.0) / 10.0) : null;
+        Double promHoras = result[2] != null
+                ? Double.valueOf(Math.round(((Number) result[2]).doubleValue() / 60.0 * 10.0) / 10.0)
+                : null;
+        Double maxHoras = result[3] != null
+                ? Double.valueOf(Math.round(((Number) result[3]).doubleValue() / 60.0 * 10.0) / 10.0)
+                : null;
         long pendientes48h = result[4] != null ? ((Number) result[4]).longValue() : 0;
 
         java.util.Map<String, Object> map = new java.util.HashMap<>();
-        map.put("definicionValidacion", "Recepción por comercializador (declaración que consume el documento de origen)");
+        map.put("definicionValidacion",
+                "Recepción por comercializador (declaración que consume el documento de origen)");
         map.put("totalDeclaraciones", total);
         map.put("validadas", validadas);
         map.put("pendientes", total - validadas);
@@ -947,24 +1085,28 @@ public class ReportRepository {
         // Se devuelven las 50 validaciones más lentas y los 50 pendientes más antiguos,
         // para que ninguno de los dos estados quede fuera del detalle.
         String cuerpo = "SELECT decl.id, decl.tipo_perfil, decl.fecha_declaracion, decl.hora, decl.desembarque, " +
-            "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop, " +
-            "CASE WHEN c.id IS NULL THEN 'PENDIENTE' ELSE 'VALIDADA' END as estado, " +
-            "ROUND(TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), COALESCE(TIMESTAMP(c.fecha_declaracion, c.hora), NOW())) / 60.0, 1) as horas " +
-            "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
-            "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' " +
-            "INNER JOIN especie e ON decl.especie_id = e.id " +
-            "INNER JOIN usuario u ON decl.usuario_id = u.id " +
-            "WHERE 1=1" + dateFilter;
+                "e.nombre as especie_nombre, u.rut, u.nombres, u.apellidop, " +
+                "CASE WHEN c.id IS NULL THEN 'PENDIENTE' ELSE 'VALIDADA' END as estado, " +
+                "ROUND(TIMESTAMPDIFF(MINUTE, TIMESTAMP(decl.fecha_declaracion, decl.hora), COALESCE(TIMESTAMP(c.fecha_declaracion, c.hora), NOW())) / 60.0, 1) as horas "
+                +
+                "FROM (" + SQL_ORIGENES_VALIDACION + ") as decl " +
+                "LEFT JOIN declaracion_comercializador c ON decl.declaracion_destinatario_id = c.id AND decl.consumida_por_tipo = 'COMERCIALIZADOR' "
+                +
+                "INNER JOIN especie e ON decl.especie_id = e.id " +
+                "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+                "WHERE 1=1" + dateFilter;
 
         String sql = "SELECT * FROM (" +
-            "(" + cuerpo + " AND c.id IS NOT NULL ORDER BY horas DESC LIMIT 50) " +
-            "UNION ALL " +
-            "(" + cuerpo + " AND c.id IS NULL ORDER BY horas DESC LIMIT 50)" +
-            ") as t ORDER BY estado DESC, horas DESC";
+                "(" + cuerpo + " AND c.id IS NOT NULL ORDER BY horas DESC LIMIT 50) " +
+                "UNION ALL " +
+                "(" + cuerpo + " AND c.id IS NULL ORDER BY horas DESC LIMIT 50)" +
+                ") as t ORDER BY estado DESC, horas DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
 
@@ -984,7 +1126,8 @@ public class ReportRepository {
             map.put("kg", row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
             map.put("especie", row[5]);
 
-            String nombreActor = (row[7] != null ? row[7].toString() : "") + " " + (row[8] != null ? row[8].toString() : "");
+            String nombreActor = (row[7] != null ? row[7].toString() : "") + " "
+                    + (row[8] != null ? row[8].toString() : "");
             map.put("actor", nombreActor.trim());
             map.put("rut", row[6] != null ? row[6].toString() : "");
             map.put("estado", row[9]);
@@ -995,79 +1138,85 @@ public class ReportRepository {
 
     // Indicador "Variación de peso" (posible adulteración).
     // Dos poblaciones separadas:
-    //  - PESAJE: Pesaje físico en romana o báscula (vinculante para fiscalización).
-    //  - DOCUMENTO: Conciliación documental / cruce de guías (origen→comercializador y comercializador→planta).
-    private static final String SQL_PESAJES =
-        "SELECT decl.tipo_registro, decl.eslabon, decl.fecha, u.nombres, u.apellidop, e.nombre as especie, " +
-        "decl.kg_declarado as kg_origen, decl.peso_recepcionado as kg_destino, " +
-        "ROUND((decl.peso_recepcionado - decl.kg_declarado) / decl.kg_declarado * 100, 1) as pct, " +
-        "decl.voucher_romana_numero " +
-        "FROM (" +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion as fecha, desembarque as kg_declarado, peso_recepcionado, NULL as voucher_romana_numero, 'PESAJE' as tipo_registro, 'RECOLECTOR' as eslabon FROM declaracion_recolector " +
-        "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'ARMADOR' FROM declaracion_armador " +
-        "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'AREA' FROM declaracion_area " +
-        "    UNION ALL " +
-        "    SELECT id, especie_id, usuario_id, fecha_declaracion, cantidad, peso_recepcionado, NULL, 'PESAJE', 'COMERCIALIZADOR' FROM declaracion_comercializador " +
-        "    UNION ALL " +
-        "    SELECT p.id, p.especie_id, p.usuario_id, p.fecha_ingreso_planta, " +
-        "           COALESCE(c_sum.tot_orig, p.cantidad), " +
-        "           p.peso_romana_kg, " +
-        "           p.voucher_romana_numero, " +
-        "           'PESAJE', 'PLANTA' " +
-        "    FROM declaracion_planta_abastecimiento p " +
-        "    LEFT JOIN (" +
-        "        SELECT declaracion_destinatario_id, SUM(cantidad) as tot_orig " +
-        "        FROM declaracion_comercializador " +
-        "        WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
-        "        GROUP BY declaracion_destinatario_id " +
-        "    ) c_sum ON c_sum.declaracion_destinatario_id = p.id " +
-        "    WHERE p.peso_romana_kg IS NOT NULL " +
-        "      AND p.voucher_romana_numero IS NOT NULL " +
-        "      AND TRIM(p.voucher_romana_numero) <> '' " +
-        ") as decl " +
-        "INNER JOIN especie e ON decl.especie_id = e.id " +
-        "INNER JOIN usuario u ON decl.usuario_id = u.id " +
-        "WHERE decl.peso_recepcionado IS NOT NULL AND decl.kg_declarado > 0";
+    // - PESAJE: Pesaje físico en romana o báscula (vinculante para fiscalización).
+    // - DOCUMENTO: Conciliación documental / cruce de guías (origen→comercializador
+    // y comercializador→planta).
+    private static final String SQL_PESAJES = "SELECT decl.tipo_registro, decl.eslabon, decl.fecha, u.nombres, u.apellidop, e.nombre as especie, "
+            +
+            "decl.kg_declarado as kg_origen, decl.peso_recepcionado as kg_destino, " +
+            "ROUND((decl.peso_recepcionado - decl.kg_declarado) / decl.kg_declarado * 100, 1) as pct, " +
+            "decl.voucher_romana_numero " +
+            "FROM (" +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion as fecha, desembarque as kg_declarado, peso_recepcionado, NULL as voucher_romana_numero, 'PESAJE' as tipo_registro, 'RECOLECTOR' as eslabon FROM declaracion_recolector "
+            +
+            "    UNION ALL " +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'ARMADOR' FROM declaracion_armador "
+            +
+            "    UNION ALL " +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion, desembarque, peso_recepcionado, NULL, 'PESAJE', 'AREA' FROM declaracion_area "
+            +
+            "    UNION ALL " +
+            "    SELECT id, especie_id, usuario_id, fecha_declaracion, cantidad, peso_recepcionado, NULL, 'PESAJE', 'COMERCIALIZADOR' FROM declaracion_comercializador "
+            +
+            "    UNION ALL " +
+            "    SELECT p.id, p.especie_id, p.usuario_id, p.fecha_ingreso_planta, " +
+            "           COALESCE(c_sum.tot_orig, p.cantidad), " +
+            "           p.peso_romana_kg, " +
+            "           p.voucher_romana_numero, " +
+            "           'PESAJE', 'PLANTA' " +
+            "    FROM declaracion_planta_abastecimiento p " +
+            "    LEFT JOIN (" +
+            "        SELECT declaracion_destinatario_id, SUM(cantidad) as tot_orig " +
+            "        FROM declaracion_comercializador " +
+            "        WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+            "        GROUP BY declaracion_destinatario_id " +
+            "    ) c_sum ON c_sum.declaracion_destinatario_id = p.id " +
+            "    WHERE p.peso_romana_kg IS NOT NULL " +
+            "      AND p.voucher_romana_numero IS NOT NULL " +
+            "      AND TRIM(p.voucher_romana_numero) <> '' " +
+            ") as decl " +
+            "INNER JOIN especie e ON decl.especie_id = e.id " +
+            "INNER JOIN usuario u ON decl.usuario_id = u.id " +
+            "WHERE decl.peso_recepcionado IS NOT NULL AND decl.kg_declarado > 0";
 
-    private static final String SQL_ORIGENES_KG =
-        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_recolector " +
-        "    UNION ALL " +
-        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_armador " +
-        "    UNION ALL " +
-        "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_area ";
+    private static final String SQL_ORIGENES_KG = "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_recolector "
+            +
+            "    UNION ALL " +
+            "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_armador " +
+            "    UNION ALL " +
+            "    SELECT desembarque, declaracion_destinatario_id, consumida_por_tipo FROM declaracion_area ";
 
-    private static final String SQL_DOCS_COMERCIALIZADOR =
-        "SELECT 'DOCUMENTO' as tipo_registro, 'ORIGEN-COMERCIALIZADOR' as eslabon, c.fecha_declaracion as fecha, " +
-        "u.nombres, u.apellidop, e.nombre as especie, " +
-        "SUM(o.desembarque) as kg_origen, c.cantidad as kg_destino, " +
-        "ROUND((c.cantidad - SUM(o.desembarque)) / SUM(o.desembarque) * 100, 1) as pct, " +
-        "NULL as voucher_romana_numero " +
-        "FROM declaracion_comercializador c " +
-        "INNER JOIN (" + SQL_ORIGENES_KG + ") as o " +
-        "    ON o.declaracion_destinatario_id = c.id AND o.consumida_por_tipo = 'COMERCIALIZADOR' " +
-        "INNER JOIN especie e ON c.especie_id = e.id " +
-        "INNER JOIN usuario u ON c.usuario_id = u.id " +
-        "WHERE 1=1 %s " +
-        "GROUP BY c.id, c.cantidad, c.fecha_declaracion, u.nombres, u.apellidop, e.nombre " +
-        "HAVING SUM(o.desembarque) > 0";
+    private static final String SQL_DOCS_COMERCIALIZADOR = "SELECT 'DOCUMENTO' as tipo_registro, 'ORIGEN-COMERCIALIZADOR' as eslabon, c.fecha_declaracion as fecha, "
+            +
+            "u.nombres, u.apellidop, e.nombre as especie, " +
+            "SUM(o.desembarque) as kg_origen, c.cantidad as kg_destino, " +
+            "ROUND((c.cantidad - SUM(o.desembarque)) / SUM(o.desembarque) * 100, 1) as pct, " +
+            "NULL as voucher_romana_numero " +
+            "FROM declaracion_comercializador c " +
+            "INNER JOIN (" + SQL_ORIGENES_KG + ") as o " +
+            "    ON o.declaracion_destinatario_id = c.id AND o.consumida_por_tipo = 'COMERCIALIZADOR' " +
+            "INNER JOIN especie e ON c.especie_id = e.id " +
+            "INNER JOIN usuario u ON c.usuario_id = u.id " +
+            "WHERE 1=1 %s " +
+            "GROUP BY c.id, c.cantidad, c.fecha_declaracion, u.nombres, u.apellidop, e.nombre " +
+            "HAVING SUM(o.desembarque) > 0";
 
-    private static final String SQL_DOCS_PLANTA =
-        "SELECT 'DOCUMENTO' as tipo_registro, 'COMERCIALIZADOR-PLANTA' as eslabon, p.fecha_ingreso_planta as fecha, " +
-        "u.nombres, u.apellidop, e.nombre as especie, " +
-        "SUM(c2.cantidad) as kg_origen, p.cantidad as kg_destino, " +
-        "ROUND((p.cantidad - SUM(c2.cantidad)) / SUM(c2.cantidad) * 100, 1) as pct, " +
-        "NULL as voucher_romana_numero " +
-        "FROM declaracion_planta_abastecimiento p " +
-        "INNER JOIN declaracion_comercializador c2 " +
-        "    ON c2.declaracion_destinatario_id = p.id AND c2.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
-        "INNER JOIN especie e ON p.especie_id = e.id " +
-        "INNER JOIN usuario u ON p.usuario_id = u.id " +
-        "WHERE 1=1 %s " +
-        "  AND (p.peso_romana_kg IS NULL OR p.voucher_romana_numero IS NULL OR TRIM(p.voucher_romana_numero) = '') " +
-        "GROUP BY p.id, p.cantidad, p.fecha_ingreso_planta, u.nombres, u.apellidop, e.nombre " +
-        "HAVING SUM(c2.cantidad) > 0";
+    private static final String SQL_DOCS_PLANTA = "SELECT 'DOCUMENTO' as tipo_registro, 'COMERCIALIZADOR-PLANTA' as eslabon, p.fecha_ingreso_planta as fecha, "
+            +
+            "u.nombres, u.apellidop, e.nombre as especie, " +
+            "SUM(c2.cantidad) as kg_origen, p.cantidad as kg_destino, " +
+            "ROUND((p.cantidad - SUM(c2.cantidad)) / SUM(c2.cantidad) * 100, 1) as pct, " +
+            "NULL as voucher_romana_numero " +
+            "FROM declaracion_planta_abastecimiento p " +
+            "INNER JOIN declaracion_comercializador c2 " +
+            "    ON c2.declaracion_destinatario_id = p.id AND c2.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
+            "INNER JOIN especie e ON p.especie_id = e.id " +
+            "INNER JOIN usuario u ON p.usuario_id = u.id " +
+            "WHERE 1=1 %s " +
+            "  AND (p.peso_romana_kg IS NULL OR p.voucher_romana_numero IS NULL OR TRIM(p.voucher_romana_numero) = '') "
+            +
+            "GROUP BY p.id, p.cantidad, p.fecha_ingreso_planta, u.nombres, u.apellidop, e.nombre " +
+            "HAVING SUM(c2.cantidad) > 0";
 
     private String sqlVariacionPesoUnion(Date startDate, Date endDate) {
         String filtroPesaje = "";
@@ -1088,28 +1237,30 @@ public class ReportRepository {
         }
 
         return "(" + SQL_PESAJES + filtroPesaje + ") " +
-               "UNION ALL (" + SQL_DOCS_COMERCIALIZADOR.replace("%s", filtroComercializador) + ") " +
-               "UNION ALL (" + SQL_DOCS_PLANTA.replace("%s", filtroPlanta) + ")";
+                "UNION ALL (" + SQL_DOCS_COMERCIALIZADOR.replace("%s", filtroComercializador) + ") " +
+                "UNION ALL (" + SQL_DOCS_PLANTA.replace("%s", filtroPlanta) + ")";
     }
 
     public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
         double umbral = umbralPct != null ? umbralPct : 5.0;
 
         String sql = "SELECT COUNT(*), " +
-            "AVG(ABS(t.pct)), " +
-            "SUM(CASE WHEN ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN t.tipo_registro = 'PESAJE' THEN 1 ELSE 0 END), " +
-            "AVG(CASE WHEN t.tipo_registro = 'PESAJE' THEN ABS(t.pct) ELSE NULL END), " +
-            "SUM(CASE WHEN t.tipo_registro = 'PESAJE' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN 1 ELSE 0 END), " +
-            "AVG(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN ABS(t.pct) ELSE NULL END), " +
-            "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END) " +
-            "FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t";
+                "AVG(ABS(t.pct)), " +
+                "SUM(CASE WHEN ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
+                "SUM(CASE WHEN t.tipo_registro = 'PESAJE' THEN 1 ELSE 0 END), " +
+                "AVG(CASE WHEN t.tipo_registro = 'PESAJE' THEN ABS(t.pct) ELSE NULL END), " +
+                "SUM(CASE WHEN t.tipo_registro = 'PESAJE' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END), " +
+                "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN 1 ELSE 0 END), " +
+                "AVG(CASE WHEN t.tipo_registro = 'DOCUMENTO' THEN ABS(t.pct) ELSE NULL END), " +
+                "SUM(CASE WHEN t.tipo_registro = 'DOCUMENTO' AND ABS(t.pct) > :umbral THEN 1 ELSE 0 END) " +
+                "FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t";
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("umbral", umbral);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         Object[] result = (Object[]) query.getSingleResult();
 
@@ -1204,15 +1355,18 @@ public class ReportRepository {
      * T6.2: Resuelve hacia atrás la cadena de custodia origen -> planta (romana).
      * Por cada recepción en planta con romana (peso_romana_kg > 0), encuentra los
      * desembarques en origen (recolector, armador o área) que la componen, ya sea
-     * en forma directa o a través de un comercializador (profundidad máxima 2 con cycle protection).
+     * en forma directa o a través de un comercializador (profundidad máxima 2 con
+     * cycle protection).
      */
-    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         double umbral = 5.0;
 
         String sqlPlanta = "SELECT dpa.id, dpa.folio_origen, dpa.peso_romana_kg, " +
                 "dpa.fecha_pesaje, dpa.fecha_ingreso_planta, dpa.voucher_romana_numero, dpa.voucher_romana_adjunto, " +
                 "dpa.declaraciones_seleccionadas, dpa.especie_id, " +
-                "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre, " +
+                "u.rut as planta_rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as planta_nombre, "
+                +
                 "dpa.humedad_estado_id, he_orig.nombre as humedad_origen_nombre, " +
                 "dpa.humedad_estado_recepcion_id, he_rec.nombre as humedad_recepcion_nombre " +
                 "FROM declaracion_planta_abastecimiento dpa " +
@@ -1234,9 +1388,12 @@ public class ReportRepository {
         sqlPlanta += "ORDER BY dpa.fecha_ingreso_planta DESC, dpa.id DESC";
 
         Query qPlanta = entityManager.createNativeQuery(sqlPlanta);
-        if (startDate != null) qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) qPlanta.setParameter("especieId", especieId);
+        if (startDate != null)
+            qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            qPlanta.setParameter("especieId", especieId);
 
         @SuppressWarnings("unchecked")
         List<Object[]> plantRows = qPlanta.getResultList();
@@ -1296,8 +1453,10 @@ public class ReportRepository {
             p.humedadRecepcionNombre = r.length > 14 && r[14] != null ? r[14].toString() : null;
             p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(p.decSel);
 
-            List<Long> cIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR");
-            List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR");
+            List<Long> cIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens,
+                    "COMERCIALIZADOR");
+            List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens,
+                    "RECOLECTOR");
             List<Long> armIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR");
             List<Long> arIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA");
 
@@ -1313,49 +1472,57 @@ public class ReportRepository {
         if (!plantIds.isEmpty()) {
             String sqlFkC = "SELECT declaracion_destinatario_id, id FROM declaracion_comercializador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkCRows = entityManager.createNativeQuery(sqlFkC).setParameter("ids", plantIds).getResultList();
+            List<Object[]> fkCRows = entityManager.createNativeQuery(sqlFkC).setParameter("ids", plantIds)
+                    .getResultList();
             for (Object[] row : fkCRows) {
                 Long pId = ((Number) row[0]).longValue();
                 Long cId = ((Number) row[1]).longValue();
                 allComercializadorIds.add(cId);
                 for (PlantaRowData p : plantas) {
-                    if (p.id.equals(pId) && !p.fkComercializadores.contains(cId)) p.fkComercializadores.add(cId);
+                    if (p.id.equals(pId) && !p.fkComercializadores.contains(cId))
+                        p.fkComercializadores.add(cId);
                 }
             }
 
             String sqlFkR = "SELECT declaracion_destinatario_id, id FROM declaracion_recolector WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkRRows = entityManager.createNativeQuery(sqlFkR).setParameter("ids", plantIds).getResultList();
+            List<Object[]> fkRRows = entityManager.createNativeQuery(sqlFkR).setParameter("ids", plantIds)
+                    .getResultList();
             for (Object[] row : fkRRows) {
                 Long pId = ((Number) row[0]).longValue();
                 Long rId = ((Number) row[1]).longValue();
                 allRecolectorIds.add(rId);
                 for (PlantaRowData p : plantas) {
-                    if (p.id.equals(pId) && !p.fkRecolectores.contains(rId)) p.fkRecolectores.add(rId);
+                    if (p.id.equals(pId) && !p.fkRecolectores.contains(rId))
+                        p.fkRecolectores.add(rId);
                 }
             }
 
             String sqlFkA = "SELECT declaracion_destinatario_id, id FROM declaracion_armador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkARows = entityManager.createNativeQuery(sqlFkA).setParameter("ids", plantIds).getResultList();
+            List<Object[]> fkARows = entityManager.createNativeQuery(sqlFkA).setParameter("ids", plantIds)
+                    .getResultList();
             for (Object[] row : fkARows) {
                 Long pId = ((Number) row[0]).longValue();
                 Long aId = ((Number) row[1]).longValue();
                 allArmadorIds.add(aId);
                 for (PlantaRowData p : plantas) {
-                    if (p.id.equals(pId) && !p.fkArmadores.contains(aId)) p.fkArmadores.add(aId);
+                    if (p.id.equals(pId) && !p.fkArmadores.contains(aId))
+                        p.fkArmadores.add(aId);
                 }
             }
 
             String sqlFkAr = "SELECT declaracion_destinatario_id, id FROM declaracion_area WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND declaracion_destinatario_id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkArRows = entityManager.createNativeQuery(sqlFkAr).setParameter("ids", plantIds).getResultList();
+            List<Object[]> fkArRows = entityManager.createNativeQuery(sqlFkAr).setParameter("ids", plantIds)
+                    .getResultList();
             for (Object[] row : fkArRows) {
                 Long pId = ((Number) row[0]).longValue();
                 Long arId = ((Number) row[1]).longValue();
                 allAreaIds.add(arId);
                 for (PlantaRowData p : plantas) {
-                    if (p.id.equals(pId) && !p.fkAreas.contains(arId)) p.fkAreas.add(arId);
+                    if (p.id.equals(pId) && !p.fkAreas.contains(arId))
+                        p.fkAreas.add(arId);
                 }
             }
         }
@@ -1376,13 +1543,15 @@ public class ReportRepository {
 
         java.util.Map<Long, ComData> comMap = new java.util.HashMap<>();
         if (!allComercializadorIds.isEmpty()) {
-            String sqlC = "SELECT c.id, c.folio_origen, c.cantidad, c.fecha_declaracion, c.declaraciones_seleccionadas, " +
+            String sqlC = "SELECT c.id, c.folio_origen, c.cantidad, c.fecha_declaracion, c.declaraciones_seleccionadas, "
+                    +
                     "u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor " +
                     "FROM declaracion_comercializador c " +
                     "JOIN usuario u ON c.usuario_id = u.id " +
                     "WHERE c.id IN (:cIds)";
             @SuppressWarnings("unchecked")
-            List<Object[]> cRows = entityManager.createNativeQuery(sqlC).setParameter("cIds", allComercializadorIds).getResultList();
+            List<Object[]> cRows = entityManager.createNativeQuery(sqlC).setParameter("cIds", allComercializadorIds)
+                    .getResultList();
             for (Object[] r : cRows) {
                 ComData ci = new ComData();
                 ci.id = ((Number) r[0]).longValue();
@@ -1394,9 +1563,12 @@ public class ReportRepository {
                 ci.actor = r[6] != null ? r[6].toString() : "";
                 ci.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(ci.decSel);
 
-                List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "RECOLECTOR");
-                List<Long> armIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "ARMADOR");
-                List<Long> arIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "AREA");
+                List<Long> recIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens,
+                        "RECOLECTOR");
+                List<Long> armIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens,
+                        "ARMADOR");
+                List<Long> arIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens,
+                        "AREA");
 
                 allRecolectorIds.addAll(recIds);
                 allArmadorIds.addAll(armIds);
@@ -1407,35 +1579,41 @@ public class ReportRepository {
 
             String sqlFkCR = "SELECT declaracion_destinatario_id, id FROM declaracion_recolector WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkCRRows = entityManager.createNativeQuery(sqlFkCR).setParameter("cIds", allComercializadorIds).getResultList();
+            List<Object[]> fkCRRows = entityManager.createNativeQuery(sqlFkCR)
+                    .setParameter("cIds", allComercializadorIds).getResultList();
             for (Object[] row : fkCRRows) {
                 Long cId = ((Number) row[0]).longValue();
                 Long rId = ((Number) row[1]).longValue();
                 allRecolectorIds.add(rId);
                 ComData ci = comMap.get(cId);
-                if (ci != null && !ci.fkRecolectores.contains(rId)) ci.fkRecolectores.add(rId);
+                if (ci != null && !ci.fkRecolectores.contains(rId))
+                    ci.fkRecolectores.add(rId);
             }
 
             String sqlFkCA = "SELECT declaracion_destinatario_id, id FROM declaracion_armador WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkCARows = entityManager.createNativeQuery(sqlFkCA).setParameter("cIds", allComercializadorIds).getResultList();
+            List<Object[]> fkCARows = entityManager.createNativeQuery(sqlFkCA)
+                    .setParameter("cIds", allComercializadorIds).getResultList();
             for (Object[] row : fkCARows) {
                 Long cId = ((Number) row[0]).longValue();
                 Long aId = ((Number) row[1]).longValue();
                 allArmadorIds.add(aId);
                 ComData ci = comMap.get(cId);
-                if (ci != null && !ci.fkArmadores.contains(aId)) ci.fkArmadores.add(aId);
+                if (ci != null && !ci.fkArmadores.contains(aId))
+                    ci.fkArmadores.add(aId);
             }
 
             String sqlFkCAr = "SELECT declaracion_destinatario_id, id FROM declaracion_area WHERE consumida_por_tipo = 'COMERCIALIZADOR' AND declaracion_destinatario_id IN (:cIds)";
             @SuppressWarnings("unchecked")
-            List<Object[]> fkCArRows = entityManager.createNativeQuery(sqlFkCAr).setParameter("cIds", allComercializadorIds).getResultList();
+            List<Object[]> fkCArRows = entityManager.createNativeQuery(sqlFkCAr)
+                    .setParameter("cIds", allComercializadorIds).getResultList();
             for (Object[] row : fkCArRows) {
                 Long cId = ((Number) row[0]).longValue();
                 Long arId = ((Number) row[1]).longValue();
                 allAreaIds.add(arId);
                 ComData ci = comMap.get(cId);
-                if (ci != null && !ci.fkAreas.contains(arId)) ci.fkAreas.add(arId);
+                if (ci != null && !ci.fkAreas.contains(arId))
+                    ci.fkAreas.add(arId);
             }
         }
 
@@ -1455,7 +1633,8 @@ public class ReportRepository {
         java.util.Map<Long, OrigenData> recMap = new java.util.HashMap<>();
         if (!allRecolectorIds.isEmpty()) {
             String sqlR = "SELECT r.id, r.folio_origen, r.desembarque, r.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, "
+                    +
                     "COALESCE(r.captura, r.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_recolector r " +
                     "JOIN usuario u ON r.usuario_id = u.id " +
@@ -1463,7 +1642,8 @@ public class ReportRepository {
                     "LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id " +
                     "WHERE r.id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> rRows = entityManager.createNativeQuery(sqlR).setParameter("ids", allRecolectorIds).getResultList();
+            List<Object[]> rRows = entityManager.createNativeQuery(sqlR).setParameter("ids", allRecolectorIds)
+                    .getResultList();
             for (Object[] r : rRows) {
                 OrigenData oi = new OrigenData();
                 oi.tipo = "RECOLECTOR";
@@ -1483,7 +1663,8 @@ public class ReportRepository {
         java.util.Map<Long, OrigenData> armMap = new java.util.HashMap<>();
         if (!allArmadorIds.isEmpty()) {
             String sqlA = "SELECT a.id, a.folio_origen, a.desembarque, a.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, "
+                    +
                     "COALESCE(a.captura, a.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_armador a " +
                     "JOIN usuario u ON a.usuario_id = u.id " +
@@ -1491,7 +1672,8 @@ public class ReportRepository {
                     "LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id " +
                     "WHERE a.id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> aRows = entityManager.createNativeQuery(sqlA).setParameter("ids", allArmadorIds).getResultList();
+            List<Object[]> aRows = entityManager.createNativeQuery(sqlA).setParameter("ids", allArmadorIds)
+                    .getResultList();
             for (Object[] r : aRows) {
                 OrigenData oi = new OrigenData();
                 oi.tipo = "ARMADOR";
@@ -1511,7 +1693,8 @@ public class ReportRepository {
         java.util.Map<Long, OrigenData> areaMap = new java.util.HashMap<>();
         if (!allAreaIds.isEmpty()) {
             String sqlAr = "SELECT ar.id, ar.folio_origen, ar.desembarque, ar.fecha_declaracion, " +
-                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, " +
+                    "COALESCE(e.nombre, 'Sin especie'), u.rut, TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, "
+                    +
                     "COALESCE(ar.captura, ar.desembarque) as captura, h.nombre as humedad_nombre " +
                     "FROM declaracion_area ar " +
                     "JOIN usuario u ON ar.usuario_id = u.id " +
@@ -1519,7 +1702,8 @@ public class ReportRepository {
                     "LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id " +
                     "WHERE ar.id IN (:ids)";
             @SuppressWarnings("unchecked")
-            List<Object[]> arRows = entityManager.createNativeQuery(sqlAr).setParameter("ids", allAreaIds).getResultList();
+            List<Object[]> arRows = entityManager.createNativeQuery(sqlAr).setParameter("ids", allAreaIds)
+                    .getResultList();
             for (Object[] r : arRows) {
                 OrigenData oi = new OrigenData();
                 oi.tipo = "AREA";
@@ -1544,8 +1728,11 @@ public class ReportRepository {
             List<java.util.Map<String, Object>> intermediarios = new java.util.ArrayList<>();
 
             // 1. Orígenes directos (profundidad 1)
-            List<Long> pRecIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR"));
-            for (Long fid : p.fkRecolectores) if (!pRecIds.contains(fid)) pRecIds.add(fid);
+            List<Long> pRecIds = new java.util.ArrayList<>(
+                    com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR"));
+            for (Long fid : p.fkRecolectores)
+                if (!pRecIds.contains(fid))
+                    pRecIds.add(fid);
             for (Long rid : pRecIds) {
                 String k = "RECOLECTOR:" + rid;
                 if (!visited.contains(k) && recMap.containsKey(rid)) {
@@ -1566,8 +1753,11 @@ public class ReportRepository {
                 }
             }
 
-            List<Long> pArmIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR"));
-            for (Long fid : p.fkArmadores) if (!pArmIds.contains(fid)) pArmIds.add(fid);
+            List<Long> pArmIds = new java.util.ArrayList<>(
+                    com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR"));
+            for (Long fid : p.fkArmadores)
+                if (!pArmIds.contains(fid))
+                    pArmIds.add(fid);
             for (Long aid : pArmIds) {
                 String k = "ARMADOR:" + aid;
                 if (!visited.contains(k) && armMap.containsKey(aid)) {
@@ -1588,8 +1778,11 @@ public class ReportRepository {
                 }
             }
 
-            List<Long> pArIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA"));
-            for (Long fid : p.fkAreas) if (!pArIds.contains(fid)) pArIds.add(fid);
+            List<Long> pArIds = new java.util.ArrayList<>(
+                    com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA"));
+            for (Long fid : p.fkAreas)
+                if (!pArIds.contains(fid))
+                    pArIds.add(fid);
             for (Long arid : pArIds) {
                 String k = "AREA:" + arid;
                 if (!visited.contains(k) && areaMap.containsKey(arid)) {
@@ -1611,8 +1804,11 @@ public class ReportRepository {
             }
 
             // 2. Intermediarios (Comercializador - Profundidad 1 y 2)
-            List<Long> pCIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
-            for (Long fid : p.fkComercializadores) if (!pCIds.contains(fid)) pCIds.add(fid);
+            List<Long> pCIds = new java.util.ArrayList<>(
+                    com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
+            for (Long fid : p.fkComercializadores)
+                if (!pCIds.contains(fid))
+                    pCIds.add(fid);
             for (Long cid : pCIds) {
                 String ck = "COMERCIALIZADOR:" + cid;
                 if (!visited.contains(ck) && comMap.containsKey(cid)) {
@@ -1629,8 +1825,12 @@ public class ReportRepository {
                     intermediarios.add(mInter);
 
                     // Profundidad 2: orígenes biológicos que abastecieron a este comercializador
-                    List<Long> cRecIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "RECOLECTOR"));
-                    for (Long fid : ci.fkRecolectores) if (!cRecIds.contains(fid)) cRecIds.add(fid);
+                    List<Long> cRecIds = new java.util.ArrayList<>(
+                            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens,
+                                    "RECOLECTOR"));
+                    for (Long fid : ci.fkRecolectores)
+                        if (!cRecIds.contains(fid))
+                            cRecIds.add(fid);
                     for (Long rid : cRecIds) {
                         String k = "RECOLECTOR:" + rid;
                         if (!visited.contains(k) && recMap.containsKey(rid)) {
@@ -1651,8 +1851,11 @@ public class ReportRepository {
                         }
                     }
 
-                    List<Long> cArmIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "ARMADOR"));
-                    for (Long fid : ci.fkArmadores) if (!cArmIds.contains(fid)) cArmIds.add(fid);
+                    List<Long> cArmIds = new java.util.ArrayList<>(
+                            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "ARMADOR"));
+                    for (Long fid : ci.fkArmadores)
+                        if (!cArmIds.contains(fid))
+                            cArmIds.add(fid);
                     for (Long aid : cArmIds) {
                         String k = "ARMADOR:" + aid;
                         if (!visited.contains(k) && armMap.containsKey(aid)) {
@@ -1673,8 +1876,11 @@ public class ReportRepository {
                         }
                     }
 
-                    List<Long> cArIds = new java.util.ArrayList<>(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "AREA"));
-                    for (Long fid : ci.fkAreas) if (!cArIds.contains(fid)) cArIds.add(fid);
+                    List<Long> cArIds = new java.util.ArrayList<>(
+                            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(ci.tokens, "AREA"));
+                    for (Long fid : ci.fkAreas)
+                        if (!cArIds.contains(fid))
+                            cArIds.add(fid);
                     for (Long arid : cArIds) {
                         String k = "AREA:" + arid;
                         if (!visited.contains(k) && areaMap.containsKey(arid)) {
@@ -1716,7 +1922,8 @@ public class ReportRepository {
             Double factorRecepcion = null;
             if (factorConversionService != null && p.espId != null && humedadPlantaId != null) {
                 try {
-                    factorRecepcion = factorConversionService.findFactorVigente(p.espId, humedadPlantaId, p.fechaIngreso)
+                    factorRecepcion = factorConversionService
+                            .findFactorVigente(p.espId, humedadPlantaId, p.fechaIngreso)
                             .map(f -> f.getFactor().doubleValue())
                             .orElse(null);
                 } catch (Exception e) {
@@ -1755,7 +1962,11 @@ public class ReportRepository {
             item.put("capturaPlanta", Math.round(capturaPlanta * 10.0) / 10.0);
             item.put("factorRecepcion", factorRecepcion);
             item.put("humedadOrigenId", p.humedadOrigenId);
-            item.put("humedadOrigen", p.humedadOrigenNombre != null ? p.humedadOrigenNombre : (!origenes.isEmpty() && origenes.get(0).get("humedad") != null ? origenes.get(0).get("humedad") : null));
+            item.put("humedadOrigen",
+                    p.humedadOrigenNombre != null ? p.humedadOrigenNombre
+                            : (!origenes.isEmpty() && origenes.get(0).get("humedad") != null
+                                    ? origenes.get(0).get("humedad")
+                                    : null));
             item.put("humedadRecepcionId", p.humedadRecepcionId);
             item.put("humedadRecepcion", p.humedadRecepcionNombre);
             item.put("variacionPct", variacionPct);
@@ -1776,11 +1987,13 @@ public class ReportRepository {
 
     public List<java.util.Map<String, Object>> getVariacionPesoDetalle(Date startDate, Date endDate) {
         String sql = "SELECT * FROM (" + sqlVariacionPesoUnion(startDate, endDate) + ") as t " +
-            "ORDER BY ABS(t.pct) DESC LIMIT 100";
+                "ORDER BY ABS(t.pct) DESC LIMIT 100";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
 
@@ -1818,38 +2031,54 @@ public class ReportRepository {
             dateFilter = " AND d.fecha_declaracion <= :endDate";
         }
 
-        String sql = "SELECT d.id, 'RECOLECTOR' as tipo_perfil, d.folio_origen as folio, d.fecha_declaracion, d.estado, " +
-            "u.nombres as dec_nombres, u.apellidop as dec_apellidop, dest.nombres as dest_nombres, dest.apellidop as dest_apellidop, " +
-            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as motivo, " +
-            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as fecha_mensaje " +
-            "FROM declaracion_recolector d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
-            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
-            "UNION ALL " +
-            "SELECT d.id, 'ARMADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
-            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
-            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
-            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
-            "FROM declaracion_armador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
-            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
-            "UNION ALL " +
-            "SELECT d.id, 'AREA', d.folio_origen, d.fecha_declaracion, d.estado, " +
-            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
-            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
-            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
-            "FROM declaracion_area d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
-            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
-            "UNION ALL " +
-            "SELECT d.id, 'COMERCIALIZADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
-            "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
-            "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), " +
-            "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) " +
-            "FROM declaracion_comercializador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id " +
-            "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
-            "ORDER BY fecha_mensaje DESC";
+        String sql = "SELECT d.id, 'RECOLECTOR' as tipo_perfil, d.folio_origen as folio, d.fecha_declaracion, d.estado, "
+                +
+                "u.nombres as dec_nombres, u.apellidop as dec_apellidop, dest.nombres as dest_nombres, dest.apellidop as dest_apellidop, "
+                +
+                "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as motivo, "
+                +
+                "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'RECOLECTOR' ORDER BY gm.fecha_envio DESC LIMIT 1) as fecha_mensaje "
+                +
+                "FROM declaracion_recolector d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id "
+                +
+                "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+                "UNION ALL " +
+                "SELECT d.id, 'ARMADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
+                "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+                "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), "
+                +
+                "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'ARMADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) "
+                +
+                "FROM declaracion_armador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id "
+                +
+                "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+                "UNION ALL " +
+                "SELECT d.id, 'AREA', d.folio_origen, d.fecha_declaracion, d.estado, " +
+                "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+                "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1), "
+                +
+                "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'AREA' ORDER BY gm.fecha_envio DESC LIMIT 1) "
+                +
+                "FROM declaracion_area d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id "
+                +
+                "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+                "UNION ALL " +
+                "SELECT d.id, 'COMERCIALIZADOR', d.folio_origen, d.fecha_declaracion, d.estado, " +
+                "u.nombres, u.apellidop, dest.nombres, dest.apellidop, " +
+                "(SELECT mensaje FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1), "
+                +
+                "(SELECT fecha_envio FROM gestion_mensaje gm WHERE gm.declaracion_id = d.id AND gm.declaracion_tipo = 'COMERCIALIZADOR' ORDER BY gm.fecha_envio DESC LIMIT 1) "
+                +
+                "FROM declaracion_comercializador d LEFT JOIN usuario u ON d.usuario_id = u.id LEFT JOIN usuario dest ON d.usuario_destinatario_id = dest.id "
+                +
+                "WHERE d.estado IN ('NEGOCIACION', 'RECHAZADA')" + dateFilter + " " +
+                "ORDER BY fecha_mensaje DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", startDate);
-        if (endDate != null) query.setParameter("endDate", endDate);
+        if (startDate != null)
+            query.setParameter("startDate", startDate);
+        if (endDate != null)
+            query.setParameter("endDate", endDate);
 
         List<Object[]> results = query.getResultList();
 
@@ -1858,7 +2087,7 @@ public class ReportRepository {
             map.put("id", row[0]);
             map.put("perfil", row[1]);
             map.put("folio", row[2] != null ? row[2].toString() : "");
-            
+
             Date dateVal = null;
             if (row[3] instanceof java.sql.Timestamp) {
                 dateVal = new Date(((java.sql.Timestamp) row[3]).getTime());
@@ -1868,14 +2097,16 @@ public class ReportRepository {
             map.put("fecha", dateVal);
             map.put("estado", row[4]);
 
-            String declarante = (row[5] != null ? row[5].toString() : "") + " " + (row[6] != null ? row[6].toString() : "");
+            String declarante = (row[5] != null ? row[5].toString() : "") + " "
+                    + (row[6] != null ? row[6].toString() : "");
             map.put("declarante", declarante.trim());
 
-            String destinatario = (row[7] != null ? row[7].toString() : "") + " " + (row[8] != null ? row[8].toString() : "");
+            String destinatario = (row[7] != null ? row[7].toString() : "") + " "
+                    + (row[8] != null ? row[8].toString() : "");
             map.put("destinatario", destinatario.trim());
 
             map.put("motivo", row[9] != null ? row[9].toString() : "Sin motivo registrado");
-            
+
             Date fechaMsg = null;
             if (row[10] instanceof java.sql.Timestamp) {
                 fechaMsg = new Date(((java.sql.Timestamp) row[10]).getTime());
@@ -1883,7 +2114,7 @@ public class ReportRepository {
                 fechaMsg = (Date) row[10];
             }
             map.put("fechaMensaje", fechaMsg);
-            
+
             return map;
         }).collect(Collectors.toList());
     }
@@ -1897,27 +2128,35 @@ public class ReportRepository {
 
     private String getTipoString(Integer tipo) {
         switch (tipo) {
-            case 1: return "RECOLECTOR";
-            case 2: return "ARMADOR";
-            case 3: return "AREA";
-            case 4: return "COMERCIALIZADOR";
-            case 5: return "PLANTA_ABASTECIMIENTO";
-            case 6: return "PLANTA_PRODUCCION";
-            case 7: return "PLANTA_DESTINO";
-            default: return "DESCONOCIDO";
+            case 1:
+                return "RECOLECTOR";
+            case 2:
+                return "ARMADOR";
+            case 3:
+                return "AREA";
+            case 4:
+                return "COMERCIALIZADOR";
+            case 5:
+                return "PLANTA_ABASTECIMIENTO";
+            case 6:
+                return "PLANTA_PRODUCCION";
+            case 7:
+                return "PLANTA_DESTINO";
+            default:
+                return "DESCONOCIDO";
         }
     }
 
     private List<String> getPossibleParentTypes(String tipo) {
         switch (tipo) {
-            case "COMERCIALIZADOR": 
+            case "COMERCIALIZADOR":
             case "PLANTA_ABASTECIMIENTO":
                 return java.util.Arrays.asList("RECOLECTOR", "ARMADOR", "AREA", "COMERCIALIZADOR");
-            case "PLANTA_PRODUCCION": 
+            case "PLANTA_PRODUCCION":
                 return java.util.Arrays.asList("PLANTA_ABASTECIMIENTO");
-            case "PLANTA_DESTINO": 
+            case "PLANTA_DESTINO":
                 return java.util.Arrays.asList("PLANTA_PRODUCCION", "PLANTA_ABASTECIMIENTO");
-            default: 
+            default:
                 return new java.util.ArrayList<>();
         }
     }
@@ -1929,56 +2168,96 @@ public class ReportRepository {
         String amountCol = "desembarque";
         String folioCol = "folio_origen";
         boolean hasSeleccionadas = false;
-        
+
         switch (tipoStr) {
-            case "RECOLECTOR": tableName = "declaracion_recolector"; roleName = "Recolector"; break;
-            case "ARMADOR": tableName = "declaracion_armador"; roleName = "Armador"; break;
-            case "AREA": tableName = "declaracion_area"; roleName = "Área de Manejo"; break;
-            case "COMERCIALIZADOR": tableName = "declaracion_comercializador"; roleName = "Comercializador"; amountCol = "cantidad"; hasSeleccionadas = true; break;
-            case "PLANTA_ABASTECIMIENTO": tableName = "declaracion_planta_abastecimiento"; roleName = "Planta Abastecimiento"; amountCol = "cantidad"; dateCol = "fecha_ingreso_planta"; folioCol = "folio_declaracion_a_pla"; hasSeleccionadas = true; break;
-            case "PLANTA_PRODUCCION": tableName = "declaracion_planta_produccion"; roleName = "Planta Producción"; amountCol = "cantidad_producto"; dateCol = "fecha_produccion"; folioCol = "folio_declaracion_p_pla"; hasSeleccionadas = true; break;
-            case "PLANTA_DESTINO": tableName = "declaracion_planta_destino"; roleName = "Planta Destino"; amountCol = "cantidad"; dateCol = "fecha_declaracion_destino"; folioCol = "folio_declaracion_destino"; hasSeleccionadas = true; break;
-            default: return null;
+            case "RECOLECTOR":
+                tableName = "declaracion_recolector";
+                roleName = "Recolector";
+                break;
+            case "ARMADOR":
+                tableName = "declaracion_armador";
+                roleName = "Armador";
+                break;
+            case "AREA":
+                tableName = "declaracion_area";
+                roleName = "Área de Manejo";
+                break;
+            case "COMERCIALIZADOR":
+                tableName = "declaracion_comercializador";
+                roleName = "Comercializador";
+                amountCol = "cantidad";
+                hasSeleccionadas = true;
+                break;
+            case "PLANTA_ABASTECIMIENTO":
+                tableName = "declaracion_planta_abastecimiento";
+                roleName = "Planta Abastecimiento";
+                amountCol = "cantidad";
+                dateCol = "fecha_ingreso_planta";
+                folioCol = "folio_declaracion_a_pla";
+                hasSeleccionadas = true;
+                break;
+            case "PLANTA_PRODUCCION":
+                tableName = "declaracion_planta_produccion";
+                roleName = "Planta Producción";
+                amountCol = "cantidad_producto";
+                dateCol = "fecha_produccion";
+                folioCol = "folio_declaracion_p_pla";
+                hasSeleccionadas = true;
+                break;
+            case "PLANTA_DESTINO":
+                tableName = "declaracion_planta_destino";
+                roleName = "Planta Destino";
+                amountCol = "cantidad";
+                dateCol = "fecha_declaracion_destino";
+                folioCol = "folio_declaracion_destino";
+                hasSeleccionadas = true;
+                break;
+            default:
+                return null;
         }
 
         String selCol = hasSeleccionadas ? "d.declaraciones_seleccionadas" : "NULL as declaraciones_seleccionadas";
-        
-        String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol + ", " +
-                     "d.declaracion_destinatario_id, d.consumida_por_tipo, " + selCol + " " +
-                     "FROM " + tableName + " d " +
-                     "INNER JOIN usuario u ON d.usuario_id = u.id " +
-                     "WHERE d.id = :id";
-                     
+
+        String sql = "SELECT d.id, u.nombres, u.apellidop, u.rut, d." + dateCol + ", d." + amountCol + ", d." + folioCol
+                + ", " +
+                "d.declaracion_destinatario_id, d.consumida_por_tipo, " + selCol + " " +
+                "FROM " + tableName + " d " +
+                "INNER JOIN usuario u ON d.usuario_id = u.id " +
+                "WHERE d.id = :id";
+
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("id", id);
         List<Object[]> results = query.getResultList();
-        
-        if (results.isEmpty()) return null;
-        
+
+        if (results.isEmpty())
+            return null;
+
         Object[] row = results.get(0);
         String actor = (row[1] != null ? row[1].toString() : "") + " " + (row[2] != null ? row[2].toString() : "");
         Date d = null;
-        if (row[4] instanceof java.sql.Timestamp) d = new Date(((java.sql.Timestamp) row[4]).getTime());
-        else if (row[4] instanceof Date) d = (Date) row[4];
-        
+        if (row[4] instanceof java.sql.Timestamp)
+            d = new Date(((java.sql.Timestamp) row[4]).getTime());
+        else if (row[4] instanceof Date)
+            d = (Date) row[4];
+
         com.trazalga.api.dto.TrazabilidadNodoDTO dto = com.trazalga.api.dto.TrazabilidadNodoDTO.builder()
-            .idUnico(tipoStr + ":" + id)
-            .idDeclaracion(((Number)row[0]).longValue())
-            .tipoNodo(roleName)
-            .nombreActor(actor.trim())
-            .rutActor(row[3] != null ? row[3].toString() : "")
-            .fecha(d)
-            .cantidad(row[5] != null ? new java.math.BigDecimal(row[5].toString()) : java.math.BigDecimal.ZERO)
-            .descripcionEvento("Declaración de tipo " + roleName)
-            .folio(row[6] != null ? row[6].toString() : "")
-            .build();
-            
+                .idUnico(tipoStr + ":" + id)
+                .idDeclaracion(((Number) row[0]).longValue())
+                .tipoNodo(roleName)
+                .nombreActor(actor.trim())
+                .rutActor(row[3] != null ? row[3].toString() : "")
+                .fecha(d)
+                .cantidad(row[5] != null ? new java.math.BigDecimal(row[5].toString()) : java.math.BigDecimal.ZERO)
+                .descripcionEvento("Declaración de tipo " + roleName)
+                .folio(row[6] != null ? row[6].toString() : "")
+                .build();
+
         RawNode raw = new RawNode();
         raw.dto = dto;
-        raw.declaracionDestinatarioId = row[7] != null ? ((Number)row[7]).longValue() : null;
+        raw.declaracionDestinatarioId = row[7] != null ? ((Number) row[7]).longValue() : null;
         raw.consumidaPorTipo = row[8] != null ? row[8].toString() : null;
         raw.declaracionesSeleccionadas = row[9] != null ? row[9].toString() : null;
-        
+
         return raw;
     }
 
@@ -1988,7 +2267,7 @@ public class ReportRepository {
         }
         java.util.Queue<String> queue = new java.util.LinkedList<>();
         java.util.Set<String> visited = new java.util.HashSet<>();
-        
+
         List<com.trazalga.api.dto.TrazabilidadNodoDTO> nodos = new java.util.ArrayList<>();
         List<com.trazalga.api.dto.TrazabilidadEdgeDTO> enlaces = new java.util.ArrayList<>();
 
@@ -2004,7 +2283,8 @@ public class ReportRepository {
             Long currId = Long.parseLong(parts[1]);
 
             RawNode raw = fetchRawNode(currTipo, currId);
-            if (raw == null) continue;
+            if (raw == null)
+                continue;
 
             nodos.add(raw.dto);
 
@@ -2020,8 +2300,9 @@ public class ReportRepository {
 
             // Backward edges (parents)
             if (raw.declaracionesSeleccionadas != null && !raw.declaracionesSeleccionadas.isEmpty()) {
-                java.util.Map<String, List<Long>> parsed = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(raw.declaracionesSeleccionadas);
-                
+                java.util.Map<String, List<Long>> parsed = com.trazalga.api.services.trazabilidad.SeleccionTokens
+                        .parse(raw.declaracionesSeleccionadas);
+
                 List<String> possibleParentTypes = getPossibleParentTypes(currTipo);
                 for (String pType : possibleParentTypes) {
                     List<Long> pIds = com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(parsed, pType);
@@ -2036,8 +2317,9 @@ public class ReportRepository {
                 }
             }
         }
-        
-        java.util.Set<String> validNodeIds = nodos.stream().map(com.trazalga.api.dto.TrazabilidadNodoDTO::getIdUnico).collect(Collectors.toSet());
+
+        java.util.Set<String> validNodeIds = nodos.stream().map(com.trazalga.api.dto.TrazabilidadNodoDTO::getIdUnico)
+                .collect(Collectors.toSet());
         enlaces.removeIf(e -> !validNodeIds.contains(e.getSource()) || !validNodeIds.contains(e.getTarget()));
 
         return new com.trazalga.api.dto.TrazabilidadResponseDTO(nodos, enlaces);
@@ -2048,17 +2330,23 @@ public class ReportRepository {
     // =========================================================================
 
     private Date toReportDate(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.sql.Timestamp) return new Date(((java.sql.Timestamp) o).getTime());
-        if (o instanceof java.sql.Date) return new Date(((java.sql.Date) o).getTime());
-        if (o instanceof Date) return (Date) o;
+        if (o == null)
+            return null;
+        if (o instanceof java.sql.Timestamp)
+            return new Date(((java.sql.Timestamp) o).getTime());
+        if (o instanceof java.sql.Date)
+            return new Date(((java.sql.Date) o).getTime());
+        if (o instanceof Date)
+            return (Date) o;
         return null;
     }
 
     private int diffDays(Date start, Date end) {
-        if (start == null || end == null) return 0;
+        if (start == null || end == null)
+            return 0;
         long diff = end.getTime() - start.getTime();
-        if (diff <= 0) return 0;
+        if (diff <= 0)
+            return 0;
         return (int) (diff / (1000L * 60 * 60 * 24));
     }
 
@@ -2082,107 +2370,131 @@ public class ReportRepository {
         }
 
         return "SELECT " +
-            "orig.folio_origen, " +                                            // 0
-            "orig.eslabon_origen, " +                                          // 1
-            "orig.actor_origen, " +                                            // 2
-            "orig.rut_origen, " +                                              // 3
-            "orig.especie, " +                                                 // 4
-            "orig.humedad_origen, " +                                          // 5
-            "orig.fecha_origen, " +                                            // 6
-            "orig.kg_origen, " +                                               // 7
-            "orig.captura_origen, " +                                          // 8
-            "orig.factor_aplicado, " +                                         // 9
-            "orig.embarcacion, " +                                             // 10
-            "c.cantidad as kg_comercializador, " +                             // 11
-            "c.fecha_declaracion as fecha_comercializador, " +                 // 12
-            "TRIM(CONCAT(COALESCE(uc.nombres, ''), ' ', COALESCE(uc.apellidop, ''))) as actor_comercializador, " + // 13
-            "COALESCE(p_via_c.peso_romana_kg, p_via_c.cantidad, p_directa.peso_romana_kg, p_directa.cantidad) as kg_planta, " + // 14
-            "COALESCE(p_via_c.fecha_ingreso_planta, p_directa.fecha_ingreso_planta) as fecha_planta, " +                         // 15
-            "COALESCE(TRIM(CONCAT(COALESCE(up_c.nombres, ''), ' ', COALESCE(up_c.apellidop, ''))), TRIM(CONCAT(COALESCE(up_d.nombres, ''), ' ', COALESCE(up_d.apellidop, '')))) as actor_planta, " + // 16
-            "orig.marcas_activas, " +                                          // 17
-            "orig.hora_origen, " +                                             // 18
-            "c.hora as hora_comercializador, " +                               // 19
-            "COALESCE(p_via_c.hora, p_directa.hora) as hora_planta, " +        // 20
-            "COALESCE(c_tot.tot_orig, p_tot.tot_orig_directo, orig.kg_origen) as kg_origen_despacho, " + // 21
-            "c.id as id_comercializador, " +                                   // 22
-            "COALESCE(p_via_c.id, p_directa.id) as id_planta, " +              // 23
-            "COALESCE(hp_c.nombre, hp_d.nombre, hc.nombre, orig.humedad_origen) as humedad_destino " + // 24
-            "FROM (" +
-            "    SELECT 'RECOLECTOR' as eslabon_origen, r.id as orig_id, r.declaracion_destinatario_id as dest_id, r.consumida_por_tipo as dest_tipo, " +
-            "    COALESCE(r.folio_origen, r.folio_desembarque_ro, CONCAT('RO-', r.id)) as folio_origen, r.fecha_declaracion as fecha_origen, r.hora as hora_origen, " +
-            "    r.desembarque as kg_origen, r.captura as captura_origen, r.factor_aplicado as factor_aplicado, " +
-            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
-            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
-            "    u.rut as rut_origen, NULL as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = r.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas " +
-            "    FROM declaracion_recolector r " +
-            "    INNER JOIN usuario u ON r.usuario_id = u.id " +
-            "    INNER JOIN especie e ON r.especie_id = e.id " +
-            "    LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id " +
-            "    WHERE 1=1 " + filterRecolector +
-            "    UNION ALL " +
-            "    SELECT 'ARMADOR' as eslabon_origen, a.id as orig_id, a.declaracion_destinatario_id as dest_id, a.consumida_por_tipo as dest_tipo, " +
-            "    COALESCE(a.folio_origen, a.folio_desembarque_da, CONCAT('DA-', a.id)) as folio_origen, a.fecha_declaracion as fecha_origen, a.hora as hora_origen, " +
-            "    a.desembarque as kg_origen, a.captura as captura_origen, a.factor_aplicado as factor_aplicado, " +
-            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
-            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
-            "    u.rut as rut_origen, emb.nombre as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = a.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) as marcas_activas " +
-            "    FROM declaracion_armador a " +
-            "    INNER JOIN usuario u ON a.usuario_id = u.id " +
-            "    INNER JOIN especie e ON a.especie_id = e.id " +
-            "    LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id " +
-            "    LEFT JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
-            "    WHERE 1=1 " + filterArmador +
-            "    UNION ALL " +
-            "    SELECT 'AREA' as eslabon_origen, ar.id as orig_id, ar.declaracion_destinatario_id as dest_id, ar.consumida_por_tipo as dest_tipo, " +
-            "    COALESCE(ar.folio_origen, ar.folio_desembarque_amerb, CONCAT('DAM-', ar.id)) as folio_origen, ar.fecha_declaracion as fecha_origen, ar.hora as hora_origen, " +
-            "    ar.desembarque as kg_origen, ar.captura as captura_origen, ar.factor_aplicado as factor_aplicado, " +
-            "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
-            "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
-            "    u.rut as rut_origen, NULL as embarcacion, " +
-            "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = ar.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) as marcas_activas " +
-            "    FROM declaracion_area ar " +
-            "    INNER JOIN usuario u ON ar.usuario_id = u.id " +
-            "    INNER JOIN especie e ON ar.especie_id = e.id " +
-            "    LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id " +
-            "    WHERE 1=1 " + filterArea +
-            ") orig " +
-            "LEFT JOIN declaracion_comercializador c " +
-            "    ON (orig.dest_tipo = 'COMERCIALIZADOR' AND c.id = orig.dest_id) " +
-            "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND c.folio_origen = orig.folio_origen) " +
-            "LEFT JOIN humedad_estado hc ON c.humedad_estado_id = hc.id " +
-            "LEFT JOIN usuario uc ON c.usuario_id = uc.id " +
-            "LEFT JOIN declaracion_planta_abastecimiento p_via_c " +
-            "    ON (c.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND p_via_c.id = c.declaracion_destinatario_id) " +
-            "    OR (c.declaracion_destinatario_id IS NULL AND c.folio_origen IS NOT NULL AND c.folio_origen <> '' AND p_via_c.folio_origen = c.folio_origen) " +
-            "LEFT JOIN humedad_estado hp_c ON COALESCE(p_via_c.humedad_estado_recepcion_id, p_via_c.humedad_estado_id) = hp_c.id " +
-            "LEFT JOIN usuario up_c ON p_via_c.usuario_id = up_c.id " +
-            "LEFT JOIN declaracion_planta_abastecimiento p_directa " +
-            "    ON (orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = orig.dest_id) " +
-            "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND p_directa.folio_origen = orig.folio_origen) " +
-            "LEFT JOIN humedad_estado hp_d ON COALESCE(p_directa.humedad_estado_recepcion_id, p_directa.humedad_estado_id) = hp_d.id " +
-            "LEFT JOIN usuario up_d ON p_directa.usuario_id = up_d.id " +
-            "LEFT JOIN (" +
-            "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig " +
-            "    FROM (" +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
-            "        UNION ALL " +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
-            "        UNION ALL " +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'COMERCIALIZADOR' " +
-            "    ) o_com GROUP BY declaracion_destinatario_id " +
-            ") c_tot ON c.id = c_tot.declaracion_destinatario_id " +
-            "LEFT JOIN (" +
-            "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig_directo " +
-            "    FROM (" +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
-            "        UNION ALL " +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
-            "        UNION ALL " +
-            "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' " +
-            "    ) o_dir GROUP BY declaracion_destinatario_id " +
-            ") p_tot ON orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = p_tot.declaracion_destinatario_id";
+                "orig.folio_origen, " + // 0
+                "orig.eslabon_origen, " + // 1
+                "orig.actor_origen, " + // 2
+                "orig.rut_origen, " + // 3
+                "orig.especie, " + // 4
+                "orig.humedad_origen, " + // 5
+                "orig.fecha_origen, " + // 6
+                "orig.kg_origen, " + // 7
+                "orig.captura_origen, " + // 8
+                "orig.factor_aplicado, " + // 9
+                "orig.embarcacion, " + // 10
+                "c.cantidad as kg_comercializador, " + // 11
+                "c.fecha_declaracion as fecha_comercializador, " + // 12
+                "TRIM(CONCAT(COALESCE(uc.nombres, ''), ' ', COALESCE(uc.apellidop, ''))) as actor_comercializador, " + // 13
+                "COALESCE(p_via_c.peso_romana_kg, p_via_c.cantidad, p_directa.peso_romana_kg, p_directa.cantidad) as kg_planta, "
+                + // 14
+                "COALESCE(p_via_c.fecha_ingreso_planta, p_directa.fecha_ingreso_planta) as fecha_planta, " + // 15
+                "COALESCE(TRIM(CONCAT(COALESCE(up_c.nombres, ''), ' ', COALESCE(up_c.apellidop, ''))), TRIM(CONCAT(COALESCE(up_d.nombres, ''), ' ', COALESCE(up_d.apellidop, '')))) as actor_planta, "
+                + // 16
+                "orig.marcas_activas, " + // 17
+                "orig.hora_origen, " + // 18
+                "c.hora as hora_comercializador, " + // 19
+                "COALESCE(p_via_c.hora, p_directa.hora) as hora_planta, " + // 20
+                "COALESCE(c_tot.tot_orig, p_tot.tot_orig_directo, orig.kg_origen) as kg_origen_despacho, " + // 21
+                "c.id as id_comercializador, " + // 22
+                "COALESCE(p_via_c.id, p_directa.id) as id_planta, " + // 23
+                "COALESCE(hp_c.nombre, hp_d.nombre, hc.nombre, orig.humedad_origen) as humedad_destino " + // 24
+                "FROM (" +
+                "    SELECT 'RECOLECTOR' as eslabon_origen, r.id as orig_id, r.declaracion_destinatario_id as dest_id, r.consumida_por_tipo as dest_tipo, "
+                +
+                "    COALESCE(r.folio_origen, r.folio_desembarque_ro, CONCAT('RO-', r.id)) as folio_origen, r.fecha_declaracion as fecha_origen, r.hora as hora_origen, "
+                +
+                "    r.desembarque as kg_origen, r.captura as captura_origen, r.factor_aplicado as factor_aplicado, " +
+                "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+                "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+                "    u.rut as rut_origen, NULL as embarcacion, " +
+                "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = r.id AND dm.declaracion_tipo = 'RECOLECTOR' AND dm.resuelta = false) as marcas_activas "
+                +
+                "    FROM declaracion_recolector r " +
+                "    INNER JOIN usuario u ON r.usuario_id = u.id " +
+                "    INNER JOIN especie e ON r.especie_id = e.id " +
+                "    LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id " +
+                "    WHERE 1=1 " + filterRecolector +
+                "    UNION ALL " +
+                "    SELECT 'ARMADOR' as eslabon_origen, a.id as orig_id, a.declaracion_destinatario_id as dest_id, a.consumida_por_tipo as dest_tipo, "
+                +
+                "    COALESCE(a.folio_origen, a.folio_desembarque_da, CONCAT('DA-', a.id)) as folio_origen, a.fecha_declaracion as fecha_origen, a.hora as hora_origen, "
+                +
+                "    a.desembarque as kg_origen, a.captura as captura_origen, a.factor_aplicado as factor_aplicado, " +
+                "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+                "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+                "    u.rut as rut_origen, emb.nombre as embarcacion, " +
+                "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = a.id AND dm.declaracion_tipo = 'ARMADOR' AND dm.resuelta = false) as marcas_activas "
+                +
+                "    FROM declaracion_armador a " +
+                "    INNER JOIN usuario u ON a.usuario_id = u.id " +
+                "    INNER JOIN especie e ON a.especie_id = e.id " +
+                "    LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id " +
+                "    LEFT JOIN embarcacion emb ON a.embarcacion_id = emb.id " +
+                "    WHERE 1=1 " + filterArmador +
+                "    UNION ALL " +
+                "    SELECT 'AREA' as eslabon_origen, ar.id as orig_id, ar.declaracion_destinatario_id as dest_id, ar.consumida_por_tipo as dest_tipo, "
+                +
+                "    COALESCE(ar.folio_origen, ar.folio_desembarque_amerb, CONCAT('DAM-', ar.id)) as folio_origen, ar.fecha_declaracion as fecha_origen, ar.hora as hora_origen, "
+                +
+                "    ar.desembarque as kg_origen, ar.captura as captura_origen, ar.factor_aplicado as factor_aplicado, "
+                +
+                "    e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad_origen, " +
+                "    TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor_origen, " +
+                "    u.rut as rut_origen, NULL as embarcacion, " +
+                "    (SELECT GROUP_CONCAT(DISTINCT dm.marca) FROM declaracion_marca dm WHERE dm.declaracion_id = ar.id AND dm.declaracion_tipo = 'AREA' AND dm.resuelta = false) as marcas_activas "
+                +
+                "    FROM declaracion_area ar " +
+                "    INNER JOIN usuario u ON ar.usuario_id = u.id " +
+                "    INNER JOIN especie e ON ar.especie_id = e.id " +
+                "    LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id " +
+                "    WHERE 1=1 " + filterArea +
+                ") orig " +
+                "LEFT JOIN declaracion_comercializador c " +
+                "    ON (orig.dest_tipo = 'COMERCIALIZADOR' AND c.id = orig.dest_id) " +
+                "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND c.folio_origen = orig.folio_origen) "
+                +
+                "LEFT JOIN humedad_estado hc ON c.humedad_estado_id = hc.id " +
+                "LEFT JOIN usuario uc ON c.usuario_id = uc.id " +
+                "LEFT JOIN declaracion_planta_abastecimiento p_via_c " +
+                "    ON (c.consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' AND p_via_c.id = c.declaracion_destinatario_id) "
+                +
+                "    OR (c.declaracion_destinatario_id IS NULL AND c.folio_origen IS NOT NULL AND c.folio_origen <> '' AND p_via_c.folio_origen = c.folio_origen) "
+                +
+                "LEFT JOIN humedad_estado hp_c ON COALESCE(p_via_c.humedad_estado_recepcion_id, p_via_c.humedad_estado_id) = hp_c.id "
+                +
+                "LEFT JOIN usuario up_c ON p_via_c.usuario_id = up_c.id " +
+                "LEFT JOIN declaracion_planta_abastecimiento p_directa " +
+                "    ON (orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = orig.dest_id) " +
+                "    OR (orig.dest_id IS NULL AND orig.folio_origen IS NOT NULL AND orig.folio_origen <> '' AND p_directa.folio_origen = orig.folio_origen) "
+                +
+                "LEFT JOIN humedad_estado hp_d ON COALESCE(p_directa.humedad_estado_recepcion_id, p_directa.humedad_estado_id) = hp_d.id "
+                +
+                "LEFT JOIN usuario up_d ON p_directa.usuario_id = up_d.id " +
+                "LEFT JOIN (" +
+                "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig " +
+                "    FROM (" +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'COMERCIALIZADOR' "
+                +
+                "        UNION ALL " +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'COMERCIALIZADOR' "
+                +
+                "        UNION ALL " +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'COMERCIALIZADOR' "
+                +
+                "    ) o_com GROUP BY declaracion_destinatario_id " +
+                ") c_tot ON c.id = c_tot.declaracion_destinatario_id " +
+                "LEFT JOIN (" +
+                "    SELECT declaracion_destinatario_id, SUM(desembarque) as tot_orig_directo " +
+                "    FROM (" +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_recolector WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' "
+                +
+                "        UNION ALL " +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_armador WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' "
+                +
+                "        UNION ALL " +
+                "        SELECT desembarque, declaracion_destinatario_id FROM declaracion_area WHERE consumida_por_tipo = 'PLANTA_ABASTECIMIENTO' "
+                +
+                "    ) o_dir GROUP BY declaracion_destinatario_id " +
+                ") p_tot ON orig.dest_tipo = 'PLANTA_ABASTECIMIENTO' AND p_directa.id = p_tot.declaracion_destinatario_id";
     }
 
     public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(
@@ -2193,8 +2505,10 @@ public class ReportRepository {
 
         String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC LIMIT 200";
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
         Date now = new Date();
@@ -2236,9 +2550,12 @@ public class ReportRepository {
             String humedadDestino = row.length > 24 && row[24] != null ? row[24].toString() : humedadOrigen;
 
             // TV.4: El deltaPct de un lote es el del último tramo cerrado:
-            // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o venta directa a planta),
-            //    reutilizando la evaluación canónica TV.1 de esa recepción para todos sus lotes;
-            // 2) si sólo declaró el comercializador, es el acopio, origen -> comercializador por despacho (T2.5);
+            // 1) si la planta ya recibió, es el tramo Comercializador -> Planta de TV.1 (o
+            // venta directa a planta),
+            // reutilizando la evaluación canónica TV.1 de esa recepción para todos sus
+            // lotes;
+            // 2) si sólo declaró el comercializador, es el acopio, origen ->
+            // comercializador por despacho (T2.5);
             // 3) si no hay ninguno, queda nulo, con el rótulo «sin tramo cerrado».
             double kgBase;
             double kgDestino;
@@ -2264,7 +2581,8 @@ public class ReportRepository {
                 deltaPct = resTV1.getDeltaPct();
                 deltaKg = resTV1.getDeltaKg();
                 diasTranscurridos = (int) Math.round(resTV1.getDiasTransito());
-                tramoCerrado = (kgComercializador != null && kgComercializador > 0) ? "COMERCIALIZADOR_PLANTA" : "DIRECTO";
+                tramoCerrado = (kgComercializador != null && kgComercializador > 0) ? "COMERCIALIZADOR_PLANTA"
+                        : "DIRECTO";
                 kgBase = resTV1.getKgDespacho();
                 kgDestino = resTV1.getKgRomana();
             } else if (kgPlanta != null && kgPlanta > 0) {
@@ -2286,7 +2604,8 @@ public class ReportRepository {
                 tramoCerrado = "ACOPIO";
                 deltaKg = kgDestino - kgBase;
                 deltaPct = kgBase > 0 ? (deltaKg / kgBase) * 100.0 : 0.0;
-                diasTranscurridos = fechaComercializador != null ? diffDays(fechaOrigen, fechaComercializador) : (fechaOrigen != null ? diffDays(fechaOrigen, now) : 0);
+                diasTranscurridos = fechaComercializador != null ? diffDays(fechaOrigen, fechaComercializador)
+                        : (fechaOrigen != null ? diffDays(fechaOrigen, now) : 0);
             } else {
                 kgBase = kgOrigen;
                 kgDestino = kgOrigen;
@@ -2304,7 +2623,8 @@ public class ReportRepository {
 
             // Semáforo de retención
             String semaforo = "VERDE";
-            boolean esEstadoSujeto = estadosSujetos != null && estadosSujetos.toUpperCase().contains(humedadOrigen.toUpperCase());
+            boolean esEstadoSujeto = estadosSujetos != null
+                    && estadosSujetos.toUpperCase().contains(humedadOrigen.toUpperCase());
             if (esEstadoSujeto && diasEnBodega >= diasRoja) {
                 semaforo = "ROJA";
             } else if (esEstadoSujeto && diasEnBodega >= diasNaranja) {
@@ -2319,7 +2639,8 @@ public class ReportRepository {
                 }
             }
 
-            // TV.4: Severidad biológica canónica delegada en TV.1 o EvaluadorCoherenciaBiologica
+            // TV.4: Severidad biológica canónica delegada en TV.1 o
+            // EvaluadorCoherenciaBiologica
             boolean alertaMerma = false;
             String motivoMerma = null;
             String inconsistenciaBiologica = "NINGUNA";
@@ -2346,11 +2667,10 @@ public class ReportRepository {
                         mermaMaxSeco != null ? mermaMaxSeco : 3.0,
                         false,
                         umbralVariacion != null ? umbralVariacion : 5.0,
-                        riesgoRojo
-                );
+                        riesgoRojo);
 
-                com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica.ResultadoEvaluacion resBio =
-                        evaluador.evaluar(humedadOrigen, humedadDestino, deltaPct, null, diasTranscurridos, pVar);
+                com.trazalga.api.services.indicadores.EvaluadorCoherenciaBiologica.ResultadoEvaluacion resBio = evaluador
+                        .evaluar(humedadOrigen, humedadDestino, deltaPct, null, diasTranscurridos, pVar);
 
                 severidadBiologica = resBio.semaforo().toSeveridadIndicador8();
                 inconsistenciaBiologica = resBio.criterio();
@@ -2358,7 +2678,8 @@ public class ReportRepository {
                 motivoMerma = resBio.descripcion();
             }
 
-            boolean alertaVariacion = deltaPct != null && Math.abs(deltaPct) > (umbralVariacion != null ? umbralVariacion : 5.0);
+            boolean alertaVariacion = deltaPct != null
+                    && Math.abs(deltaPct) > (umbralVariacion != null ? umbralVariacion : 5.0);
 
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("folioOrigen", folioOrigen);
@@ -2373,7 +2694,8 @@ public class ReportRepository {
             map.put("capturaOrigen", Math.round(capturaOrigen * 100.0) / 100.0);
             map.put("factorAplicado", factorAplicado);
             map.put("embarcacion", embarcacion);
-            map.put("kgComercializador", kgComercializador != null ? Math.round(kgComercializador * 100.0) / 100.0 : null);
+            map.put("kgComercializador",
+                    kgComercializador != null ? Math.round(kgComercializador * 100.0) / 100.0 : null);
             map.put("fechaComercializador", fechaComercializador);
             map.put("actorComercializador", actorComercializador);
             map.put("kgPlanta", kgPlanta != null ? Math.round(kgPlanta * 100.0) / 100.0 : null);
@@ -2405,7 +2727,8 @@ public class ReportRepository {
             Double umbralVariacion, Double mermaMinHumedo, Double mermaMaxSeco,
             int diasMinHumedo, int diasAmarilla, int diasNaranja, int diasRoja,
             String estadosSujetos) {
-        return getTrazabilidadLoteDetalle(startDate, endDate, semaforoFiltro, umbralVariacion, mermaMinHumedo, mermaMaxSeco,
+        return getTrazabilidadLoteDetalle(startDate, endDate, semaforoFiltro, umbralVariacion, mermaMinHumedo,
+                mermaMaxSeco,
                 diasMinHumedo, diasAmarilla, diasNaranja, diasRoja, estadosSujetos, true);
     }
 
@@ -2437,21 +2760,29 @@ public class ReportRepository {
             sumKgOrigen += (Double) m.get("kgOrigen");
             sumKgDestino += (Double) m.get("kgDestino");
             sumDeltaPct += (Double) m.get("deltaPct");
-            if (Boolean.TRUE.equals(m.get("enBodegaVirtual"))) enBodegaVirtual++;
+            if (Boolean.TRUE.equals(m.get("enBodegaVirtual")))
+                enBodegaVirtual++;
             String sem = (String) m.get("semaforo");
-            if ("VERDE".equals(sem)) verde++;
-            else if ("AMARILLA".equals(sem)) amarillo++;
-            else if ("NARANJA".equals(sem)) naranja++;
-            else if ("ROJA".equals(sem)) rojo++;
-            if (Boolean.TRUE.equals(m.get("alertaMerma"))) alertasMerma++;
-            if (Boolean.TRUE.equals(m.get("alertaVariacion"))) alertasVariacion++;
+            if ("VERDE".equals(sem))
+                verde++;
+            else if ("AMARILLA".equals(sem))
+                amarillo++;
+            else if ("NARANJA".equals(sem))
+                naranja++;
+            else if ("ROJA".equals(sem))
+                rojo++;
+            if (Boolean.TRUE.equals(m.get("alertaMerma")))
+                alertasMerma++;
+            if (Boolean.TRUE.equals(m.get("alertaVariacion")))
+                alertasVariacion++;
         }
 
         java.util.Map<String, Object> metrics = new java.util.HashMap<>();
         metrics.put("totalLotes", totalLotes);
         metrics.put("totalKgOrigen", Math.round(sumKgOrigen * 100.0) / 100.0);
         metrics.put("totalKgDestino", Math.round(sumKgDestino * 100.0) / 100.0);
-        metrics.put("promedioVariacionPct", totalLotes > 0 ? Math.round((sumDeltaPct / totalLotes) * 10.0) / 10.0 : 0.0);
+        metrics.put("promedioVariacionPct",
+                totalLotes > 0 ? Math.round((sumDeltaPct / totalLotes) * 10.0) / 10.0 : 0.0);
         metrics.put("lotesEnBodegaVirtual", enBodegaVirtual);
         metrics.put("semaforoVerde", verde);
         metrics.put("semaforoAmarillo", amarillo);
@@ -2482,115 +2813,154 @@ public class ReportRepository {
     // INDICADOR 1 — DESEMBARQUE FÍSICO
     // =========================================================================
     // NOTA ARQUITECTÓNICA DE IMPUTACIÓN TERRITORIAL (R1.3 / R3.6):
-    // El Desembarque Físico se imputa exclusivamente a la caleta y comuna física donde
-    // ocurrió la descarga real en playa/muelle (reflejando la presión biológica extractiva
+    // El Desembarque Físico se imputa exclusivamente a la caleta y comuna física
+    // donde
+    // ocurrió la descarga real en playa/muelle (reflejando la presión biológica
+    // extractiva
     // sobre el ecosistema costero específico).
-    // A diferencia de esto, el consumo de cuotas de extracción para recolectores de orilla
-    // y buzos (Indicador 3) se imputa a la comuna de inscripción en el Registro Pesquero
-    // Artesanal (RPA) de Sernapesca (resguardando los derechos territoriales de la organización/caleta base).
-    // Para armadores y AMERB, el consumo sigue la caleta base de la nave o el área decretada.
+    // A diferencia de esto, el consumo de cuotas de extracción para recolectores de
+    // orilla
+    // y buzos (Indicador 3) se imputa a la comuna de inscripción en el Registro
+    // Pesquero
+    // Artesanal (RPA) de Sernapesca (resguardando los derechos territoriales de la
+    // organización/caleta base).
+    // Para armadores y AMERB, el consumo sigue la caleta base de la nave o el área
+    // decretada.
 
     private String sqlDesembarqueFisicoBase(Date startDate, Date endDate, Long especieId, Long comunaId, Long regionId,
-                                           Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil,
-                                           boolean fRecolector, boolean fArmador, boolean fArea) {
+            Long provinciaId, Long caletaId, Long usuarioId, Long macrozonaId, String perfil,
+            boolean fRecolector, boolean fArmador, boolean fArea) {
         StringBuilder sb = new StringBuilder();
         boolean first = true;
 
-        if (fRecolector && (perfil == null || "TODOS".equalsIgnoreCase(perfil) || "RECOLECTOR".equalsIgnoreCase(perfil))) {
-            sb.append("SELECT r.id, 'RECOLECTOR' as perfil, r.folio_origen as folio, r.fecha_declaracion as fecha, r.hora, ")
-              .append("r.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
-              .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
-              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
-              .append("FROM declaracion_recolector r ")
-              .append("INNER JOIN usuario u ON r.usuario_id = u.id ")
-              .append("INNER JOIN especie e ON r.especie_id = e.id ")
-              .append("LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id ")
-              .append("LEFT JOIN caleta cal ON r.caleta_id = cal.id ")
-              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
-              .append("LEFT JOIN comuna c ON COALESCE(r.comuna_id, cal.comuna_id) = c.id ")
-              .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
-              .append("WHERE 1=1 ");
-            if (startDate != null) sb.append("AND r.fecha_declaracion >= :startDate ");
-            if (endDate != null) sb.append("AND r.fecha_declaracion <= :endDate ");
-            if (especieId != null) sb.append("AND r.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND c.id = :comunaId ");
-            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
-            if (regionId != null) sb.append("AND reg.id = :regionId ");
-            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
-            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+        if (fRecolector
+                && (perfil == null || "TODOS".equalsIgnoreCase(perfil) || "RECOLECTOR".equalsIgnoreCase(perfil))) {
+            sb.append(
+                    "SELECT r.id, 'RECOLECTOR' as perfil, r.folio_origen as folio, r.fecha_declaracion as fecha, r.hora, ")
+                    .append("r.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
+                    .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
+                    .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+                    .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
+                    .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+                    .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
+                    .append("FROM declaracion_recolector r ")
+                    .append("INNER JOIN usuario u ON r.usuario_id = u.id ")
+                    .append("INNER JOIN especie e ON r.especie_id = e.id ")
+                    .append("LEFT JOIN humedad_estado h ON r.humedad_estado_id = h.id ")
+                    .append("LEFT JOIN caleta cal ON r.caleta_id = cal.id ")
+                    .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
+                    .append("LEFT JOIN comuna c ON COALESCE(r.comuna_id, cal.comuna_id) = c.id ")
+                    .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
+                    .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
+                    .append("WHERE 1=1 ");
+            if (startDate != null)
+                sb.append("AND r.fecha_declaracion >= :startDate ");
+            if (endDate != null)
+                sb.append("AND r.fecha_declaracion <= :endDate ");
+            if (especieId != null)
+                sb.append("AND r.especie_id = :especieId ");
+            if (comunaId != null)
+                sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null)
+                sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null)
+                sb.append("AND reg.id = :regionId ");
+            if (caletaId != null)
+                sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null)
+                sb.append("AND u.id = :usuarioId ");
             if (macrozonaId != null) {
-                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+                sb.append(
+                        "AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
             }
             first = false;
         }
 
         if (fArmador && (perfil == null || "TODOS".equalsIgnoreCase(perfil) || "ARMADOR".equalsIgnoreCase(perfil))) {
-            if (!first) sb.append(" UNION ALL ");
-            sb.append("SELECT a.id, 'ARMADOR' as perfil, a.folio_origen as folio, a.fecha_declaracion as fecha, a.hora, ")
-              .append("a.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
-              .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
-              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
-              .append("FROM declaracion_armador a ")
-              .append("INNER JOIN usuario u ON a.usuario_id = u.id ")
-              .append("INNER JOIN especie e ON a.especie_id = e.id ")
-              .append("LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id ")
-              .append("LEFT JOIN caleta cal ON a.caleta_id = cal.id ")
-              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
-              .append("LEFT JOIN comuna c ON COALESCE(a.comuna_id, cal.comuna_id) = c.id ")
-              .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
-              .append("WHERE 1=1 ");
-            if (startDate != null) sb.append("AND a.fecha_declaracion >= :startDate ");
-            if (endDate != null) sb.append("AND a.fecha_declaracion <= :endDate ");
-            if (especieId != null) sb.append("AND a.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND c.id = :comunaId ");
-            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
-            if (regionId != null) sb.append("AND reg.id = :regionId ");
-            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
-            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+            if (!first)
+                sb.append(" UNION ALL ");
+            sb.append(
+                    "SELECT a.id, 'ARMADOR' as perfil, a.folio_origen as folio, a.fecha_declaracion as fecha, a.hora, ")
+                    .append("a.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
+                    .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
+                    .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+                    .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
+                    .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+                    .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
+                    .append("FROM declaracion_armador a ")
+                    .append("INNER JOIN usuario u ON a.usuario_id = u.id ")
+                    .append("INNER JOIN especie e ON a.especie_id = e.id ")
+                    .append("LEFT JOIN humedad_estado h ON a.humedad_estado_id = h.id ")
+                    .append("LEFT JOIN caleta cal ON a.caleta_id = cal.id ")
+                    .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
+                    .append("LEFT JOIN comuna c ON COALESCE(a.comuna_id, cal.comuna_id) = c.id ")
+                    .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
+                    .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
+                    .append("WHERE 1=1 ");
+            if (startDate != null)
+                sb.append("AND a.fecha_declaracion >= :startDate ");
+            if (endDate != null)
+                sb.append("AND a.fecha_declaracion <= :endDate ");
+            if (especieId != null)
+                sb.append("AND a.especie_id = :especieId ");
+            if (comunaId != null)
+                sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null)
+                sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null)
+                sb.append("AND reg.id = :regionId ");
+            if (caletaId != null)
+                sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null)
+                sb.append("AND u.id = :usuarioId ");
             if (macrozonaId != null) {
-                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+                sb.append(
+                        "AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
             }
             first = false;
         }
 
         if (fArea && (perfil == null || "TODOS".equalsIgnoreCase(perfil) || "AREA".equalsIgnoreCase(perfil))) {
-            if (!first) sb.append(" UNION ALL ");
-            sb.append("SELECT ar.id, 'AREA' as perfil, ar.folio_origen as folio, ar.fecha_declaracion as fecha, ar.hora, ")
-              .append("ar.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
-              .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
-              .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
-              .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
-              .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
-              .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
-              .append("FROM declaracion_area ar ")
-              .append("INNER JOIN usuario u ON ar.usuario_id = u.id ")
-              .append("INNER JOIN especie e ON ar.especie_id = e.id ")
-              .append("LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id ")
-              .append("LEFT JOIN caleta cal ON ar.caleta_id = cal.id ")
-              .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
-              .append("LEFT JOIN amerb am ON ar.amerb_id = am.id ")
-              .append("LEFT JOIN comuna c ON COALESCE(am.comuna_id, cal.comuna_id) = c.id ")
-              .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
-              .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
-              .append("WHERE 1=1 ");
-            if (startDate != null) sb.append("AND ar.fecha_declaracion >= :startDate ");
-            if (endDate != null) sb.append("AND ar.fecha_declaracion <= :endDate ");
-            if (especieId != null) sb.append("AND ar.especie_id = :especieId ");
-            if (comunaId != null) sb.append("AND c.id = :comunaId ");
-            if (provinciaId != null) sb.append("AND prov.id = :provinciaId ");
-            if (regionId != null) sb.append("AND reg.id = :regionId ");
-            if (caletaId != null) sb.append("AND cal.id = :caletaId ");
-            if (usuarioId != null) sb.append("AND u.id = :usuarioId ");
+            if (!first)
+                sb.append(" UNION ALL ");
+            sb.append(
+                    "SELECT ar.id, 'AREA' as perfil, ar.folio_origen as folio, ar.fecha_declaracion as fecha, ar.hora, ")
+                    .append("ar.desembarque as kg, e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, ")
+                    .append("TRIM(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, ''))) as actor, u.rut, ")
+                    .append("COALESCE(c.nombre, 'Sin Comuna') as comuna, COALESCE(prov.nombre, 'Sin Provincia') as provincia, COALESCE(reg.nombre, 'Sin Región') as region, ")
+                    .append("COALESCE(CASE WHEN cal.nombre IS NOT NULL AND c_cal.nombre IS NOT NULL THEN CONCAT(cal.nombre, ' (', c_cal.nombre, ')') WHEN cal.nombre IS NOT NULL THEN cal.nombre ELSE NULL END, 'Sin Caleta') as caleta, ")
+                    .append("u.id as usuario_id, cal.id as caleta_id, c.id as comuna_id, prov.id as provincia_id, reg.id as region_id, e.id as especie_id, ")
+                    .append("COALESCE((SELECT mz.nombre FROM macrozona_region mr JOIN macrozona mz ON mr.macrozona_id = mz.id WHERE mr.region_id = reg.id AND mz.activo = true AND mz.es_nacional = false LIMIT 1), 'Sin Macrozona') as macrozona ")
+                    .append("FROM declaracion_area ar ")
+                    .append("INNER JOIN usuario u ON ar.usuario_id = u.id ")
+                    .append("INNER JOIN especie e ON ar.especie_id = e.id ")
+                    .append("LEFT JOIN humedad_estado h ON ar.humedad_estado_id = h.id ")
+                    .append("LEFT JOIN caleta cal ON ar.caleta_id = cal.id ")
+                    .append("LEFT JOIN comuna c_cal ON cal.comuna_id = c_cal.id ")
+                    .append("LEFT JOIN amerb am ON ar.amerb_id = am.id ")
+                    .append("LEFT JOIN comuna c ON COALESCE(am.comuna_id, cal.comuna_id) = c.id ")
+                    .append("LEFT JOIN provincia prov ON c.provincia_id = prov.id ")
+                    .append("LEFT JOIN region reg ON COALESCE(c.region_id, cal.region_id) = reg.id ")
+                    .append("WHERE 1=1 ");
+            if (startDate != null)
+                sb.append("AND ar.fecha_declaracion >= :startDate ");
+            if (endDate != null)
+                sb.append("AND ar.fecha_declaracion <= :endDate ");
+            if (especieId != null)
+                sb.append("AND ar.especie_id = :especieId ");
+            if (comunaId != null)
+                sb.append("AND c.id = :comunaId ");
+            if (provinciaId != null)
+                sb.append("AND prov.id = :provinciaId ");
+            if (regionId != null)
+                sb.append("AND reg.id = :regionId ");
+            if (caletaId != null)
+                sb.append("AND cal.id = :caletaId ");
+            if (usuarioId != null)
+                sb.append("AND u.id = :usuarioId ");
             if (macrozonaId != null) {
-                sb.append("AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
+                sb.append(
+                        "AND (reg.id IN (SELECT mr.region_id FROM macrozona_region mr WHERE mr.macrozona_id = :macrozonaId) OR EXISTS (SELECT 1 FROM macrozona mz WHERE mz.id = :macrozonaId AND mz.es_nacional = true)) ");
             }
         }
 
@@ -2598,17 +2968,26 @@ public class ReportRepository {
     }
 
     private void bindDesembarqueFisicoParams(Query query, Date startDate, Date endDate, Long especieId,
-                                            Long comunaId, Long regionId, Long provinciaId, Long caletaId,
-                                            Long usuarioId, Long macrozonaId) {
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) query.setParameter("especieId", especieId);
-        if (comunaId != null) query.setParameter("comunaId", comunaId);
-        if (regionId != null) query.setParameter("regionId", regionId);
-        if (provinciaId != null) query.setParameter("provinciaId", provinciaId);
-        if (caletaId != null) query.setParameter("caletaId", caletaId);
-        if (usuarioId != null) query.setParameter("usuarioId", usuarioId);
-        if (macrozonaId != null) query.setParameter("macrozonaId", macrozonaId);
+            Long comunaId, Long regionId, Long provinciaId, Long caletaId,
+            Long usuarioId, Long macrozonaId) {
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            query.setParameter("especieId", especieId);
+        if (comunaId != null)
+            query.setParameter("comunaId", comunaId);
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
+        if (provinciaId != null)
+            query.setParameter("provinciaId", provinciaId);
+        if (caletaId != null)
+            query.setParameter("caletaId", caletaId);
+        if (usuarioId != null)
+            query.setParameter("usuarioId", usuarioId);
+        if (macrozonaId != null)
+            query.setParameter("macrozonaId", macrozonaId);
     }
 
     public List<java.util.Map<String, Object>> getDesembarqueFisicoDetalle(
@@ -2679,21 +3058,21 @@ public class ReportRepository {
                 fRecolector, fArmador, fArea);
 
         String sql = "SELECT " +
-                     "especie, " +
-                     "comuna, " +
-                     "provincia, " +
-                     "region, " +
-                     "caleta, " +
-                     "actor, " +
-                     "rut, " +
-                     "DATE_FORMAT(fecha, '%Y-%m-%d'), " +
-                     "SUM(kg), " +
-                     "COUNT(*), " +
-                     "SUM(CASE WHEN kg > :umbral THEN 1 ELSE 0 END), " +
-                     "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END), " +
-                     "macrozona " +
-                     "FROM (" + baseSql + ") as t " +
-                     "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d'), macrozona, caleta_id, comuna_id";
+                "especie, " +
+                "comuna, " +
+                "provincia, " +
+                "region, " +
+                "caleta, " +
+                "actor, " +
+                "rut, " +
+                "DATE_FORMAT(fecha, '%Y-%m-%d'), " +
+                "SUM(kg), " +
+                "COUNT(*), " +
+                "SUM(CASE WHEN kg > :umbral THEN 1 ELSE 0 END), " +
+                "SUM(CASE WHEN kg > :umbral THEN kg ELSE 0 END), " +
+                "macrozona " +
+                "FROM (" + baseSql + ") as t " +
+                "GROUP BY especie, comuna, provincia, region, caleta, actor, rut, DATE_FORMAT(fecha, '%Y-%m-%d'), macrozona, caleta_id, comuna_id";
 
         double threshold = umbralAtipico != null ? umbralAtipico : 5000.0;
         Query query = entityManager.createNativeQuery(sql);
@@ -2747,46 +3126,73 @@ public class ReportRepository {
             String actorEtiqueta = (rut != null && !rut.isEmpty()) ? act + " (" + rut + ")" : act;
 
             Agregado agEsp = porEspecieMap.computeIfAbsent(esp, k -> new Agregado());
-            agEsp.kg += kg; agEsp.count += count; agEsp.atip += atip; agEsp.volAtip += volAtip;
+            agEsp.kg += kg;
+            agEsp.count += count;
+            agEsp.atip += atip;
+            agEsp.volAtip += volAtip;
 
             Agregado agCal = porCaletaMap.computeIfAbsent(cal, k -> new Agregado());
-            agCal.kg += kg; agCal.count += count; agCal.atip += atip; agCal.volAtip += volAtip;
+            agCal.kg += kg;
+            agCal.count += count;
+            agCal.atip += atip;
+            agCal.volAtip += volAtip;
 
             Agregado agRec = porRecolectorMap.computeIfAbsent(actorEtiqueta, k -> new Agregado());
-            agRec.kg += kg; agRec.count += count; agRec.atip += atip; agRec.volAtip += volAtip;
+            agRec.kg += kg;
+            agRec.count += count;
+            agRec.atip += atip;
+            agRec.volAtip += volAtip;
 
             Agregado agCom = porComunaMap.computeIfAbsent(com, k -> new Agregado());
-            agCom.kg += kg; agCom.count += count; agCom.atip += atip; agCom.volAtip += volAtip;
+            agCom.kg += kg;
+            agCom.count += count;
+            agCom.atip += atip;
+            agCom.volAtip += volAtip;
 
             Agregado agProv = porProvinciaMap.computeIfAbsent(prov, k -> new Agregado());
-            agProv.kg += kg; agProv.count += count; agProv.atip += atip; agProv.volAtip += volAtip;
+            agProv.kg += kg;
+            agProv.count += count;
+            agProv.atip += atip;
+            agProv.volAtip += volAtip;
 
             Agregado agReg = porRegionMap.computeIfAbsent(reg, k -> new Agregado());
-            agReg.kg += kg; agReg.count += count; agReg.atip += atip; agReg.volAtip += volAtip;
+            agReg.kg += kg;
+            agReg.count += count;
+            agReg.atip += atip;
+            agReg.volAtip += volAtip;
 
             Agregado agMz = porMacrozonaMap.computeIfAbsent(mz, k -> new Agregado());
-            agMz.kg += kg; agMz.count += count; agMz.atip += atip; agMz.volAtip += volAtip;
+            agMz.kg += kg;
+            agMz.count += count;
+            agMz.atip += atip;
+            agMz.volAtip += volAtip;
 
             porFechaMap.put(fec, porFechaMap.getOrDefault(fec, 0.0) + kg);
         }
 
         final double finalTotalKg = totalKg;
 
-        java.util.function.BiFunction<String, java.util.Map<String, Agregado>, List<java.util.Map<String, Object>>> toListHelper =
-                (propName, map) -> map.entrySet().stream()
+        java.util.function.BiFunction<String, java.util.Map<String, Agregado>, List<java.util.Map<String, Object>>> toListHelper = (
+                propName, map) -> map.entrySet().stream()
                         .map(e -> {
                             java.util.Map<String, Object> m = new java.util.HashMap<>();
                             m.put(propName, e.getKey());
                             m.put("grupo", e.getKey());
                             m.put("totalKg", Math.round(e.getValue().kg * 100.0) / 100.0);
                             m.put("totalDeclaraciones", e.getValue().count);
-                            m.put("promedioDeclaracionKg", e.getValue().count > 0 ? Math.round((e.getValue().kg / e.getValue().count) * 100.0) / 100.0 : 0.0);
+                            m.put("promedioDeclaracionKg",
+                                    e.getValue().count > 0
+                                            ? Math.round((e.getValue().kg / e.getValue().count) * 100.0) / 100.0
+                                            : 0.0);
                             m.put("declaracionesAtipicas", e.getValue().atip);
                             m.put("volumenAtipicoKg", Math.round(e.getValue().volAtip * 100.0) / 100.0);
-                            m.put("porcentaje", finalTotalKg > 0 ? Math.round((e.getValue().kg / finalTotalKg) * 1000.0) / 10.0 : 0.0);
+                            m.put("porcentaje",
+                                    finalTotalKg > 0 ? Math.round((e.getValue().kg / finalTotalKg) * 1000.0) / 10.0
+                                            : 0.0);
                             return m;
                         })
-                        .sorted((a, b) -> Double.compare(((Number) b.get("totalKg")).doubleValue(), ((Number) a.get("totalKg")).doubleValue()))
+                        .sorted((a, b) -> Double.compare(((Number) b.get("totalKg")).doubleValue(),
+                                ((Number) a.get("totalKg")).doubleValue()))
                         .collect(Collectors.toList());
 
         List<java.util.Map<String, Object>> porEspecieList = toListHelper.apply("especie", porEspecieMap);
@@ -2836,7 +3242,8 @@ public class ReportRepository {
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalKg * 100.0) / 100.0);
         out.put("totalDeclaraciones", totalDeclaraciones);
-        out.put("promedioDeclaracionKg", totalDeclaraciones > 0 ? Math.round((totalKg / totalDeclaraciones) * 100.0) / 100.0 : 0.0);
+        out.put("promedioDeclaracionKg",
+                totalDeclaraciones > 0 ? Math.round((totalKg / totalDeclaraciones) * 100.0) / 100.0 : 0.0);
         out.put("declaracionesAtipicas", totalAtipicos);
         out.put("volumenAtipicoKg", Math.round(volumenAtipico * 100.0) / 100.0);
         out.put("umbralAtipicoKg", threshold);
@@ -2890,23 +3297,29 @@ public class ReportRepository {
         }
 
         String sql = "SELECT e.nombre as especie, COALESCE(h.nombre, 'HÚMEDO') as humedad, " +
-            "SUM(t.desembarque) as kg_desembarque, SUM(t.captura) as kg_captura, " +
-            "AVG(COALESCE(t.factor_aplicado, 1.0)) as factor_promedio, COUNT(*) as declaraciones " +
-            "FROM (" +
-            "    SELECT r.especie_id, r.humedad_estado_id, r.desembarque, r.captura, r.factor_aplicado FROM declaracion_recolector r WHERE 1=1 " + filterRec +
-            "    UNION ALL " +
-            "    SELECT a.especie_id, a.humedad_estado_id, a.desembarque, a.captura, a.factor_aplicado FROM declaracion_armador a WHERE 1=1 " + filterArm +
-            "    UNION ALL " +
-            "    SELECT ar.especie_id, ar.humedad_estado_id, ar.desembarque, ar.captura, ar.factor_aplicado FROM declaracion_area ar WHERE 1=1 " + filterArea +
-            ") as t " +
-            "INNER JOIN especie e ON t.especie_id = e.id " +
-            "LEFT JOIN humedad_estado h ON t.humedad_estado_id = h.id " +
-            "GROUP BY e.nombre, h.nombre";
+                "SUM(t.desembarque) as kg_desembarque, SUM(t.captura) as kg_captura, " +
+                "AVG(COALESCE(t.factor_aplicado, 1.0)) as factor_promedio, COUNT(*) as declaraciones " +
+                "FROM (" +
+                "    SELECT r.especie_id, r.humedad_estado_id, r.desembarque, r.captura, r.factor_aplicado FROM declaracion_recolector r WHERE 1=1 "
+                + filterRec +
+                "    UNION ALL " +
+                "    SELECT a.especie_id, a.humedad_estado_id, a.desembarque, a.captura, a.factor_aplicado FROM declaracion_armador a WHERE 1=1 "
+                + filterArm +
+                "    UNION ALL " +
+                "    SELECT ar.especie_id, ar.humedad_estado_id, ar.desembarque, ar.captura, ar.factor_aplicado FROM declaracion_area ar WHERE 1=1 "
+                + filterArea +
+                ") as t " +
+                "INNER JOIN especie e ON t.especie_id = e.id " +
+                "LEFT JOIN humedad_estado h ON t.humedad_estado_id = h.id " +
+                "GROUP BY e.nombre, h.nombre";
 
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) query.setParameter("especieId", especieId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            query.setParameter("especieId", especieId);
 
         List<Object[]> rows = query.getResultList();
         double totalDesembarque = 0;
@@ -2934,7 +3347,9 @@ public class ReportRepository {
             desglose.add(item);
         }
 
-        Double factorPondRedondeado = totalDesembarque > 0 ? Double.valueOf(Math.round((totalCaptura / totalDesembarque) * 1000.0) / 1000.0) : null;
+        Double factorPondRedondeado = totalDesembarque > 0
+                ? Double.valueOf(Math.round((totalCaptura / totalDesembarque) * 1000.0) / 1000.0)
+                : null;
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
         out.put("totalDesembarqueKg", Math.round(totalDesembarque * 100.0) / 100.0);
@@ -2950,14 +3365,20 @@ public class ReportRepository {
     // INDICADOR 4 — LÍMITE DE EXTRACCIÓN DIARIO (LED)
     // =========================================================================
 
-    /** Una faena del día para el LED: los kilos de un origen, agrupados por unidad, especie, método y región. */
+    /**
+     * Una faena del día para el LED: los kilos de un origen, agrupados por unidad,
+     * especie, método y región.
+     */
     private record FaenaLed(String origen, Long embarcacionId, String embarcacionNombre, String embarcacionCodigo,
-                            Long buzoId, String buzoNombre, Long usuarioId, String usuarioRut, String usuarioNombre,
-                            Long especieId, String especie, Long extraccionTipoId, String metodo, Long regionId,
-                            double desembarqueKg, double capturaKg) {
+            Long buzoId, String buzoNombre, Long usuarioId, String usuarioRut, String usuarioNombre,
+            Long especieId, String especie, Long extraccionTipoId, String metodo, Long regionId,
+            double desembarqueKg, double capturaKg) {
     }
 
-    /** Las filas del monitoreo que comparten regla, unidad y especie: se comparan juntas contra el límite. */
+    /**
+     * Las filas del monitoreo que comparten regla, unidad y especie: se comparan
+     * juntas contra el límite.
+     */
     private static final class GrupoLed {
         FaenaLed primera;
         Object[] regla;
@@ -2983,7 +3404,8 @@ public class ReportRepository {
     }
 
     /**
-     * Faenas de un día en una tabla de declaraciones de origen. {@code dia} viaja como {@code DATE}
+     * Faenas de un día en una tabla de declaraciones de origen. {@code dia} viaja
+     * como {@code DATE}
      * (ver {@link com.trazalga.api.services.fechas.FechaSql}).
      */
     @SuppressWarnings("unchecked")
@@ -3015,7 +3437,8 @@ public class ReportRepository {
         List<FaenaLed> out = new java.util.ArrayList<>();
         for (Object[] r : rows) {
             int i = recolector ? 0 : 5;
-            String nombreUsuario = ((r[i + 2] != null ? r[i + 2] : "") + " " + (r[i + 3] != null ? r[i + 3] : "")).trim();
+            String nombreUsuario = ((r[i + 2] != null ? r[i + 2] : "") + " " + (r[i + 3] != null ? r[i + 3] : ""))
+                    .trim();
             out.add(new FaenaLed(origen,
                     recolector ? null : lng(r[0]), recolector ? null : str(r[1]), recolector ? null : str(r[2]),
                     recolector ? null : lng(r[3]), recolector ? null : str(r[4]),
@@ -3028,8 +3451,10 @@ public class ReportRepository {
 
     /**
      * La regla más específica para una faena. Mismo criterio que
-     * {@code LimiteExtraccionDiarioService.evaluar}: perfil, especie, método y región.
-     * Columnas de la regla: 0 id, 1 nombre, 2 límite, 3 tolerancia, 4 modo, 5 unidad, 6 especie, 7 método,
+     * {@code LimiteExtraccionDiarioService.evaluar}: perfil, especie, método y
+     * región.
+     * Columnas de la regla: 0 id, 1 nombre, 2 límite, 3 tolerancia, 4 modo, 5
+     * unidad, 6 especie, 7 método,
      * 8 región, 9 perfil, 10 métrica.
      */
     private static Object[] reglaLed(List<Object[]> reglas, FaenaLed f) {
@@ -3041,11 +3466,16 @@ public class ReportRepository {
             Long rReg = lng(reg[8]);
             String rPerfil = str(reg[9]);
             boolean perfilEspecifico = rPerfil != null && !"TODOS".equalsIgnoreCase(rPerfil);
-            if (perfilEspecifico && !f.origen().equalsIgnoreCase(rPerfil)) continue;
-            if (rEsp != null && !rEsp.equals(f.especieId())) continue;
-            if (rExt != null && !rExt.equals(f.extraccionTipoId())) continue;
-            if (rReg != null && !rReg.equals(f.regionId())) continue;
-            int score = (rEsp != null ? 4 : 0) + (rExt != null ? 2 : 0) + (rReg != null ? 1 : 0) + (perfilEspecifico ? 1 : 0);
+            if (perfilEspecifico && !f.origen().equalsIgnoreCase(rPerfil))
+                continue;
+            if (rEsp != null && !rEsp.equals(f.especieId()))
+                continue;
+            if (rExt != null && !rExt.equals(f.extraccionTipoId()))
+                continue;
+            if (rReg != null && !rReg.equals(f.regionId()))
+                continue;
+            int score = (rEsp != null ? 4 : 0) + (rExt != null ? 2 : 0) + (rReg != null ? 1 : 0)
+                    + (perfilEspecifico ? 1 : 0);
             if (score > mejorScore) {
                 mejorScore = score;
                 mejor = reg;
@@ -3057,11 +3487,15 @@ public class ReportRepository {
     /**
      * Monitoreo del LED de un día (refinamiento 06-11, NL.2 y NL.4).
      * <ul>
-     *   <li>La fecha viaja como {@code DATE}: antes viajaba como {@code TIMESTAMP} y no calzaba con
-     *       {@code fecha_declaracion}.</li>
-     *   <li>Cada fila se agrupa por la unidad (embarcación, buzo o usuario) y la métrica (desembarque o
-     *       captura) de su regla, y su total es el de {@code AcumuladoDiarioLed}, el mismo de la evaluación
-     *       en línea. Con {@code led_suma_declaraciones_area} activo, incluye las declaraciones de área.</li>
+     * <li>La fecha viaja como {@code DATE}: antes viajaba como {@code TIMESTAMP} y
+     * no calzaba con
+     * {@code fecha_declaracion}.</li>
+     * <li>Cada fila se agrupa por la unidad (embarcación, buzo o usuario) y la
+     * métrica (desembarque o
+     * captura) de su regla, y su total es el de {@code AcumuladoDiarioLed}, el
+     * mismo de la evaluación
+     * en línea. Con {@code led_suma_declaraciones_area} activo, incluye las
+     * declaraciones de área.</li>
      * </ul>
      */
     @SuppressWarnings("unchecked")
@@ -3071,12 +3505,13 @@ public class ReportRepository {
         boolean sumaArea = acumuladoDiarioLed != null && acumuladoDiarioLed.sumaArea();
 
         // 1. Obtener todas las reglas LED activas y vigentes
-        String sqlReglas = "SELECT id, nombre_regla, limite_kg, margen_tolerancia_pct, modo_accion, unidad_agregacion, " +
-                           "especie_id, extraccion_tipo_id, region_id, perfil_aplicable, metrica " +
-                           "FROM limite_extraccion_diario_config WHERE activo = true " +
-                           "AND (vigencia_inicio IS NULL OR vigencia_inicio <= :fecha) " +
-                           "AND (vigencia_fin IS NULL OR vigencia_fin >= :fecha) " +
-                           "ORDER BY id ASC";
+        String sqlReglas = "SELECT id, nombre_regla, limite_kg, margen_tolerancia_pct, modo_accion, unidad_agregacion, "
+                +
+                "especie_id, extraccion_tipo_id, region_id, perfil_aplicable, metrica " +
+                "FROM limite_extraccion_diario_config WHERE activo = true " +
+                "AND (vigencia_inicio IS NULL OR vigencia_inicio <= :fecha) " +
+                "AND (vigencia_fin IS NULL OR vigencia_fin >= :fecha) " +
+                "ORDER BY id ASC";
         Query qReglas = entityManager.createNativeQuery(sqlReglas);
         qReglas.setParameter("fecha", dia);
         List<Object[]> listaReglas = qReglas.getResultList();
@@ -3139,8 +3574,10 @@ public class ReportRepository {
                 }
                 Long unidadId = "BUZO".equals(unidad) ? f.buzoId()
                         : "USUARIO".equals(unidad) ? f.usuarioId() : f.embarcacionId();
-                if (unidadId == null || (!"EMBARCACION".equals(unidad) && !"BUZO".equals(unidad) && !"USUARIO".equals(unidad))) {
-                    // Por ejemplo, un recolector frente a una regla por embarcación: no hay unidad que acumular
+                if (unidadId == null
+                        || (!"EMBARCACION".equals(unidad) && !"BUZO".equals(unidad) && !"USUARIO".equals(unidad))) {
+                    // Por ejemplo, un recolector frente a una regla por embarcación: no hay unidad
+                    // que acumular
                     sinUnidad++;
                     continue;
                 }
@@ -3159,8 +3596,10 @@ public class ReportRepository {
             }
             g.kgFilas += captura ? f.capturaKg() : f.desembarqueKg();
             g.origenes.add(f.origen());
-            if (f.metodo() != null) g.metodos.add(f.metodo());
-            if (f.especie() != null) g.especies.add(f.especie());
+            if (f.metodo() != null)
+                g.metodos.add(f.metodo());
+            if (f.especie() != null)
+                g.especies.add(f.especie());
         }
 
         List<java.util.Map<String, Object>> detalle = new java.util.ArrayList<>();
@@ -3210,7 +3649,8 @@ public class ReportRepository {
                 dentro++;
             }
 
-            // Qué se monitorea en la fila: la embarcación, el buzo o el usuario, según la unidad de la regla
+            // Qué se monitorea en la fila: la embarcación, el buzo o el usuario, según la
+            // unidad de la regla
             String tipo = g.unidad != null ? g.unidad : (f.embarcacionId() != null ? "EMBARCACION" : "USUARIO");
             Long id;
             String nombre;
@@ -3274,13 +3714,17 @@ public class ReportRepository {
     /**
      * Hallazgos {@code LED_EXCEDIDO} del período (refinamiento 06-11, NL.2 y NL.3).
      * <ul>
-     *   <li>Cruza la marca con la declaración de armador, de área o de recolector, según su tipo.</li>
-     *   <li>No rellena: si no hay declaración ni texto que calce, los kilos, el límite y el exceso van en
-     *       {@code null}. El límite sale de la regla de la marca y el folio, de la declaración.</li>
+     * <li>Cruza la marca con la declaración de armador, de área o de recolector,
+     * según su tipo.</li>
+     * <li>No rellena: si no hay declaración ni texto que calce, los kilos, el
+     * límite y el exceso van en
+     * {@code null}. El límite sale de la regla de la marca y el folio, de la
+     * declaración.</li>
      * </ul>
      */
     @SuppressWarnings("unchecked")
-    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId, Long embarcacionId) {
+    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId,
+            Long embarcacionId) {
         String fechaHallazgo = "COALESCE(da.fecha_declaracion, dar.fecha_declaracion, dr.fecha_declaracion, DATE(dm.created_at))";
         StringBuilder filterBuilder = new StringBuilder();
         if (startDate != null && endDate != null) {
@@ -3300,60 +3744,66 @@ public class ReportRepository {
         }
 
         String sql = "SELECT " +
-            "dm.id as marca_id, " +
-            "dm.declaracion_tipo, " +
-            "dm.declaracion_id, " +
-            "dm.detalle, " +
-            "dm.regla_id, " +
-            "dm.resuelta, " +
-            "dm.created_at, " +
-            "COALESCE(da.folio_origen, dar.folio_origen, dr.folio_origen) as folio_origen, " +
-            "COALESCE(da.folio_desembarque_da, dar.folio_desembarque_amerb, dr.folio_desembarque_ro) as folio_desembarque, " +
-            "COALESCE(da.fecha_declaracion, dar.fecha_declaracion, dr.fecha_declaracion) as fecha_declaracion, " +
-            "COALESCE(da.desembarque, dar.desembarque, dr.desembarque) as kg_desembarque, " +
-            "emb.id as emb_id, " +
-            "emb.nombre as emb_nombre, " +
-            "emb.codigo as emb_codigo, " +
-            "u.id as usr_id, " +
-            "u.rut as usr_rut, " +
-            "u.nombres as usr_nombres, " +
-            "u.apellidop as usr_apellidop, " +
-            "cal.id as cal_id, " +
-            "cal.nombre as cal_nombre, " +
-            "c.nombre as com_nombre, " +
-            "reg.id as reg_id, " +
-            "reg.nombre as reg_nombre, " +
-            "cfg.nombre_regla, " +
-            "cfg.limite_kg as regla_limite_kg, " +
-            "cfg.margen_tolerancia_pct as regla_tolerancia_pct, " +
-            "dr.nombre as recolector_nombre, " +
-            "COALESCE(da.id, dar.id, dr.id) as declaracion_encontrada " +
-            "FROM declaracion_marca dm " +
-            "LEFT JOIN declaracion_armador da ON dm.declaracion_tipo = 'ARMADOR' AND dm.declaracion_id = da.id " +
-            "LEFT JOIN declaracion_area dar ON dm.declaracion_tipo = 'AREA' AND dm.declaracion_id = dar.id " +
-            "LEFT JOIN declaracion_recolector dr ON dm.declaracion_tipo = 'RECOLECTOR' AND dm.declaracion_id = dr.id " +
-            "LEFT JOIN embarcacion emb ON emb.id = COALESCE(da.embarcacion_id, dar.embarcacion_id) " +
-            "LEFT JOIN usuario u ON u.id = COALESCE(da.usuario_id, dar.usuario_id, dr.usuario_id) " +
-            "LEFT JOIN caleta cal ON cal.id = COALESCE(da.caleta_id, dar.caleta_id, dr.caleta_id) " +
-            "LEFT JOIN comuna c ON c.id = COALESCE(da.comuna_id, dr.comuna_id, cal.comuna_id) " +
-            "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id) " +
-            "LEFT JOIN limite_extraccion_diario_config cfg ON dm.regla_id = cfg.id " +
-            "WHERE dm.marca = 'LED_EXCEDIDO' " + filterBuilder.toString() + " " +
-            "ORDER BY dm.id DESC";
+                "dm.id as marca_id, " +
+                "dm.declaracion_tipo, " +
+                "dm.declaracion_id, " +
+                "dm.detalle, " +
+                "dm.regla_id, " +
+                "dm.resuelta, " +
+                "dm.created_at, " +
+                "COALESCE(da.folio_origen, dar.folio_origen, dr.folio_origen) as folio_origen, " +
+                "COALESCE(da.folio_desembarque_da, dar.folio_desembarque_amerb, dr.folio_desembarque_ro) as folio_desembarque, "
+                +
+                "COALESCE(da.fecha_declaracion, dar.fecha_declaracion, dr.fecha_declaracion) as fecha_declaracion, " +
+                "COALESCE(da.desembarque, dar.desembarque, dr.desembarque) as kg_desembarque, " +
+                "emb.id as emb_id, " +
+                "emb.nombre as emb_nombre, " +
+                "emb.codigo as emb_codigo, " +
+                "u.id as usr_id, " +
+                "u.rut as usr_rut, " +
+                "u.nombres as usr_nombres, " +
+                "u.apellidop as usr_apellidop, " +
+                "cal.id as cal_id, " +
+                "cal.nombre as cal_nombre, " +
+                "c.nombre as com_nombre, " +
+                "reg.id as reg_id, " +
+                "reg.nombre as reg_nombre, " +
+                "cfg.nombre_regla, " +
+                "cfg.limite_kg as regla_limite_kg, " +
+                "cfg.margen_tolerancia_pct as regla_tolerancia_pct, " +
+                "dr.nombre as recolector_nombre, " +
+                "COALESCE(da.id, dar.id, dr.id) as declaracion_encontrada " +
+                "FROM declaracion_marca dm " +
+                "LEFT JOIN declaracion_armador da ON dm.declaracion_tipo = 'ARMADOR' AND dm.declaracion_id = da.id " +
+                "LEFT JOIN declaracion_area dar ON dm.declaracion_tipo = 'AREA' AND dm.declaracion_id = dar.id " +
+                "LEFT JOIN declaracion_recolector dr ON dm.declaracion_tipo = 'RECOLECTOR' AND dm.declaracion_id = dr.id "
+                +
+                "LEFT JOIN embarcacion emb ON emb.id = COALESCE(da.embarcacion_id, dar.embarcacion_id) " +
+                "LEFT JOIN usuario u ON u.id = COALESCE(da.usuario_id, dar.usuario_id, dr.usuario_id) " +
+                "LEFT JOIN caleta cal ON cal.id = COALESCE(da.caleta_id, dar.caleta_id, dr.caleta_id) " +
+                "LEFT JOIN comuna c ON c.id = COALESCE(da.comuna_id, dr.comuna_id, cal.comuna_id) " +
+                "LEFT JOIN region reg ON reg.id = COALESCE(c.region_id, cal.region_id) " +
+                "LEFT JOIN limite_extraccion_diario_config cfg ON dm.regla_id = cfg.id " +
+                "WHERE dm.marca = 'LED_EXCEDIDO' " + filterBuilder.toString() + " " +
+                "ORDER BY dm.id DESC";
 
         Query query = entityManager.createNativeQuery(sql);
-        // Como DATE: un java.util.Date viaja como TIMESTAMP y deja fuera el primer día del período (NL.2)
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (regionId != null) query.setParameter("regionId", regionId);
-        if (embarcacionId != null) query.setParameter("embarcacionId", embarcacionId);
+        // Como DATE: un java.util.Date viaja como TIMESTAMP y deja fuera el primer día
+        // del período (NL.2)
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
+        if (embarcacionId != null)
+            query.setParameter("embarcacionId", embarcacionId);
 
         List<Object[]> rows = query.getResultList();
 
         java.util.regex.Pattern regexDetalle = java.util.regex.Pattern.compile(
-            "Embarcación\\s+([^—]+?)\\s+—\\s+armador\\s+([^—]+?)\\s+—\\s+([0-9-]+):\\s+([0-9.,]+)\\s+kg acumulados sobre límite de\\s+([0-9.,]+)\\s+kg\\s+\\(exceso\\s+([0-9.,]+)\\s+kg(?:,\\s+([0-9.,]+)%)?\\)",
-            java.util.regex.Pattern.CASE_INSENSITIVE
-        );
+                "Embarcación\\s+([^—]+?)\\s+—\\s+armador\\s+([^—]+?)\\s+—\\s+([0-9-]+):\\s+([0-9.,]+)\\s+kg acumulados sobre límite de\\s+([0-9.,]+)\\s+kg\\s+\\(exceso\\s+([0-9.,]+)\\s+kg(?:,\\s+([0-9.,]+)%)?\\)",
+                java.util.regex.Pattern.CASE_INSENSITIVE);
 
         List<java.util.Map<String, Object>> hallazgos = new java.util.ArrayList<>();
 
@@ -3363,18 +3813,25 @@ public class ReportRepository {
             Long decId = r[2] != null ? ((Number) r[2]).longValue() : null;
             String detalleStr = r[3] != null ? r[3].toString() : "";
             Long reglaId = r[4] != null ? ((Number) r[4]).longValue() : null;
-            Boolean resuelta = r[5] != null && (Boolean.TRUE.equals(r[5]) || (r[5] instanceof Number n && n.intValue() == 1));
+            Boolean resuelta = r[5] != null
+                    && (Boolean.TRUE.equals(r[5]) || (r[5] instanceof Number n && n.intValue() == 1));
             Date createdAt = null;
-            if (r[6] instanceof java.sql.Timestamp) createdAt = new Date(((java.sql.Timestamp) r[6]).getTime());
-            else if (r[6] instanceof Date) createdAt = (Date) r[6];
-            else if (r[6] instanceof java.time.LocalDateTime ldt) createdAt = Date.from(ldt.atZone(java.time.ZoneId.systemDefault()).toInstant());
+            if (r[6] instanceof java.sql.Timestamp)
+                createdAt = new Date(((java.sql.Timestamp) r[6]).getTime());
+            else if (r[6] instanceof Date)
+                createdAt = (Date) r[6];
+            else if (r[6] instanceof java.time.LocalDateTime ldt)
+                createdAt = Date.from(ldt.atZone(java.time.ZoneId.systemDefault()).toInstant());
 
             String folioOrigen = r[7] != null ? r[7].toString() : null;
             String folioDesembarque = r[8] != null ? r[8].toString() : null;
             Date decFecha = null;
-            if (r[9] instanceof java.sql.Timestamp) decFecha = new Date(((java.sql.Timestamp) r[9]).getTime());
-            else if (r[9] instanceof Date) decFecha = (Date) r[9];
-            else if (r[9] instanceof java.time.LocalDate ld) decFecha = java.sql.Date.valueOf(ld);
+            if (r[9] instanceof java.sql.Timestamp)
+                decFecha = new Date(((java.sql.Timestamp) r[9]).getTime());
+            else if (r[9] instanceof Date)
+                decFecha = (Date) r[9];
+            else if (r[9] instanceof java.time.LocalDate ld)
+                decFecha = java.sql.Date.valueOf(ld);
 
             Double decDesembarque = r[10] != null ? ((Number) r[10]).doubleValue() : null;
             Long embId = r[11] != null ? ((Number) r[11]).longValue() : null;
@@ -3395,15 +3852,20 @@ public class ReportRepository {
             boolean declaracionEncontrada = r[27] != null;
 
             // Qué se fiscaliza en la fila
-            String tipo = "AREA".equals(decTipo) ? "AMERB" : "RECOLECTOR".equals(decTipo) ? "RECOLECTOR" : "EMBARCACION";
+            String tipo = "AREA".equals(decTipo) ? "AMERB"
+                    : "RECOLECTOR".equals(decTipo) ? "RECOLECTOR" : "EMBARCACION";
 
-            // Folio: el de la declaración. Sin declaración (intento bloqueado) o sin folio, no se inventa uno
+            // Folio: el de la declaración. Sin declaración (intento bloqueado) o sin folio,
+            // no se inventa uno
             String folio = decId == null ? "BLOQUEADO (Intento)"
                     : folioOrigen != null ? folioOrigen : folioDesembarque;
             String embarcacion = embNom != null ? embNom : embCod;
             String matricula = embCod;
-            if (usuarioNomCompleto.isEmpty() && recolectorNombre != null) usuarioNomCompleto = recolectorNombre;
-            String armador = !usuarioNomCompleto.isEmpty() ? (usrRut != null ? usrRut + " - " + usuarioNomCompleto : usuarioNomCompleto) : usrRut;
+            if (usuarioNomCompleto.isEmpty() && recolectorNombre != null)
+                usuarioNomCompleto = recolectorNombre;
+            String armador = !usuarioNomCompleto.isEmpty()
+                    ? (usrRut != null ? usrRut + " - " + usuarioNomCompleto : usuarioNomCompleto)
+                    : usrRut;
             String rut = usrRut;
             Date fecha = decFecha != null ? decFecha : createdAt;
             Double kgDia = decDesembarque;
@@ -3411,7 +3873,8 @@ public class ReportRepository {
             Double exceso = null;
             Double excesoPct = null;
 
-            // El texto de la marca completa lo que la declaración no trae (sobre todo en intentos bloqueados)
+            // El texto de la marca completa lo que la declaración no trae (sobre todo en
+            // intentos bloqueados)
             if (detalleStr != null && !detalleStr.isEmpty()) {
                 java.util.regex.Matcher m = regexDetalle.matcher(detalleStr);
                 if (m.find()) {
@@ -3419,19 +3882,27 @@ public class ReportRepository {
                     String rutTexto = m.group(2).trim();
                     boolean hayEmbTexto = !embTexto.isEmpty() && !"N/A".equalsIgnoreCase(embTexto);
                     boolean hayRutTexto = !rutTexto.isEmpty() && !"N/A".equalsIgnoreCase(rutTexto);
-                    if (matricula == null && hayEmbTexto) matricula = embTexto;
-                    if (embarcacion == null && hayEmbTexto) embarcacion = embTexto;
-                    if (rut == null && hayRutTexto) rut = rutTexto;
-                    if (armador == null && hayRutTexto) armador = rutTexto;
-                    if (kgDia == null) kgDia = numeroDetalleLed(m.group(4));
-                    if (limite == null) limite = numeroDetalleLed(m.group(5));
+                    if (matricula == null && hayEmbTexto)
+                        matricula = embTexto;
+                    if (embarcacion == null && hayEmbTexto)
+                        embarcacion = embTexto;
+                    if (rut == null && hayRutTexto)
+                        rut = rutTexto;
+                    if (armador == null && hayRutTexto)
+                        armador = rutTexto;
+                    if (kgDia == null)
+                        kgDia = numeroDetalleLed(m.group(4));
+                    if (limite == null)
+                        limite = numeroDetalleLed(m.group(5));
                     exceso = numeroDetalleLed(m.group(6));
                     excesoPct = numeroDetalleLed(m.group(7));
                 }
             }
 
-            if (exceso == null && kgDia != null && limite != null) exceso = Math.max(0.0, kgDia - limite);
-            if (excesoPct == null && exceso != null && limite != null && limite > 0) excesoPct = (exceso / limite) * 100.0;
+            if (exceso == null && kgDia != null && limite != null)
+                exceso = Math.max(0.0, kgDia - limite);
+            if (excesoPct == null && exceso != null && limite != null && limite > 0)
+                excesoPct = (exceso / limite) * 100.0;
 
             java.util.Map<String, Object> h = new java.util.HashMap<>();
             h.put("marcaId", marcaId);
@@ -3461,17 +3932,18 @@ public class ReportRepository {
             hallazgos.add(h);
         }
 
-        // Ordenar por exceso descendente según criterio de aceptación de R4.2; los que no tienen dato, al final
+        // Ordenar por exceso descendente según criterio de aceptación de R4.2; los que
+        // no tienen dato, al final
         hallazgos.sort((a, b) -> Double.compare(
-            b.get("excesoKg") != null ? ((Number) b.get("excesoKg")).doubleValue() : -1.0,
-            a.get("excesoKg") != null ? ((Number) a.get("excesoKg")).doubleValue() : -1.0
-        ));
+                b.get("excesoKg") != null ? ((Number) b.get("excesoKg")).doubleValue() : -1.0,
+                a.get("excesoKg") != null ? ((Number) a.get("excesoKg")).doubleValue() : -1.0));
 
         return hallazgos;
     }
 
     /**
-     * Número del texto de una marca LED. El texto se escribe con el idioma del servidor: «2500,00» en es-CL
+     * Número del texto de una marca LED. El texto se escribe con el idioma del
+     * servidor: «2500,00» en es-CL
      * y «2500.00» en otros. Si trae coma y punto, el último es el decimal.
      */
     static Double numeroDetalleLed(String s) {
@@ -3509,8 +3981,10 @@ public class ReportRepository {
 
         String sql = sqlTrazabilidadLoteBase(startDate, endDate) + " ORDER BY orig.fecha_origen DESC";
         Query query = entityManager.createNativeQuery(sql);
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
 
         List<Object[]> results = query.getResultList();
         Date now = new Date();
@@ -3520,7 +3994,7 @@ public class ReportRepository {
 
         // Estructura de la Matriz 4x3 (Filas = Estados de Humedad, Columnas = Semáforo)
         java.util.Map<String, java.util.Map<String, Object>> matriz = new java.util.LinkedHashMap<>();
-        String[] estados = {"HUMEDO", "SEMI_HUMEDO", "SEMI_SECO", "SECO"};
+        String[] estados = { "HUMEDO", "SEMI_HUMEDO", "SEMI_SECO", "SECO" };
         for (String est : estados) {
             java.util.Map<String, Object> fila = new java.util.LinkedHashMap<>();
             fila.put("VERDE", 0L);
@@ -3572,8 +4046,7 @@ public class ReportRepository {
 
             java.time.LocalDateTime inicioTs = ReportService.parseTimestamp(
                     fechaInicioLote,
-                    horaOrigen != null ? horaOrigen : horaComercializador
-            );
+                    horaOrigen != null ? horaOrigen : horaComercializador);
             java.time.LocalDateTime finTs;
             if (destinado) {
                 if (fechaComercializador != null) {
@@ -3626,15 +4099,15 @@ public class ReportRepository {
             }
 
             // TH.1: Tramo esperado por edad y coherencia delegados a CoherenciaHumedad
-            com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia cohParams =
-                    com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia.builder()
-                            .edadMaxHumedoHoras(humedoMaxH)
-                            .edadMaxSemihumedoHoras(semihumedoMaxH)
-                            .edadMaxSemisecoHoras(semisecoMaxH)
-                            .build();
+            com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia cohParams = com.trazalga.api.services.indicadores.CoherenciaHumedad.ParametrosCoherencia
+                    .builder()
+                    .edadMaxHumedoHoras(humedoMaxH)
+                    .edadMaxSemihumedoHoras(semihumedoMaxH)
+                    .edadMaxSemisecoHoras(semisecoMaxH)
+                    .build();
             String tramoReal = com.trazalga.api.services.indicadores.CoherenciaHumedad.tramoPorEdad(horas, cohParams);
-            boolean inconsistenciaHumedad = com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(estadoDeclarado)
-                    < com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(tramoReal);
+            boolean inconsistenciaHumedad = com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(
+                    estadoDeclarado) < com.trazalga.api.services.indicadores.CoherenciaHumedad.ordenSequedad(tramoReal);
 
             double kgLote = kgComercializador != null ? kgComercializador : (kgPlanta != null ? kgPlanta : kgOrigen);
 
@@ -3651,9 +4124,12 @@ public class ReportRepository {
             }
             totalKgGeneral += kgLote;
 
-            if ("VERDE".equals(semaforo)) verdeTotal++;
-            else if ("AMARILLO".equals(semaforo)) amarilloTotal++;
-            else if ("ROJO".equals(semaforo)) rojoTotal++;
+            if ("VERDE".equals(semaforo))
+                verdeTotal++;
+            else if ("AMARILLO".equals(semaforo))
+                amarilloTotal++;
+            else if ("ROJO".equals(semaforo))
+                rojoTotal++;
 
             // Acumular en la Matriz 4x3
             java.util.Map<String, Object> filaMatriz = matriz.get(claveMatriz);
@@ -3683,7 +4159,8 @@ public class ReportRepository {
             loteMap.put("enBodegaVirtual", enBodega);
             loteMap.put("kg", Math.round(kgLote * 100.0) / 100.0);
             loteMap.put("kgOrigen", Math.round(kgOrigen * 100.0) / 100.0);
-            loteMap.put("kgComercializador", kgComercializador != null ? Math.round(kgComercializador * 100.0) / 100.0 : null);
+            loteMap.put("kgComercializador",
+                    kgComercializador != null ? Math.round(kgComercializador * 100.0) / 100.0 : null);
             loteMap.put("kgPlanta", kgPlanta != null ? Math.round(kgPlanta * 100.0) / 100.0 : null);
             loteMap.put("fechaOrigen", fechaInicioLote);
             loteMap.put("fechaDestino", fechaPlanta);
@@ -3744,10 +4221,14 @@ public class ReportRepository {
         for (java.util.Map<String, Object> r : retenidos) {
             totalKg += (Double) r.get("kgDestino");
             String sem = (String) r.get("semaforo");
-            if ("VERDE".equals(sem)) verde++;
-            else if ("AMARILLA".equals(sem)) amarillo++;
-            else if ("NARANJA".equals(sem)) naranja++;
-            else if ("ROJA".equals(sem)) rojo++;
+            if ("VERDE".equals(sem))
+                verde++;
+            else if ("AMARILLA".equals(sem))
+                amarillo++;
+            else if ("NARANJA".equals(sem))
+                naranja++;
+            else if ("ROJA".equals(sem))
+                rojo++;
         }
 
         java.util.Map<String, Object> out = new java.util.HashMap<>();
@@ -3813,7 +4294,8 @@ public class ReportRepository {
         sql.append("  WHERE ar.latitud IS NOT NULL AND ar.longitud IS NOT NULL ");
         sql.append("  UNION ALL ");
         sql.append("  SELECT dc.usuario_id, dc.fecha_declaracion, dc.hora, dc.latitud, dc.longitud, ");
-        sql.append("         'COMERCIALIZADOR' as tipo, dc.id, COALESCE(dc.folio_origen, CONCAT('DC-', dc.id)) as folio, ");
+        sql.append(
+                "         'COMERCIALIZADOR' as tipo, dc.id, COALESCE(dc.folio_origen, CONCAT('DC-', dc.id)) as folio, ");
         sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
         sql.append("         u.rut as usuario_rut, ");
         sql.append("         uc.region_id as region_id ");
@@ -3823,16 +4305,22 @@ public class ReportRepository {
         sql.append("  WHERE dc.latitud IS NOT NULL AND dc.longitud IS NOT NULL ");
         sql.append(") AS todas WHERE 1=1 ");
 
-        if (startDate != null) sql.append("AND todas.fecha_declaracion >= :startDate ");
-        if (endDate != null) sql.append("AND todas.fecha_declaracion <= :endDate ");
-        if (regionId != null) sql.append("AND todas.region_id = :regionId ");
+        if (startDate != null)
+            sql.append("AND todas.fecha_declaracion >= :startDate ");
+        if (endDate != null)
+            sql.append("AND todas.fecha_declaracion <= :endDate ");
+        if (regionId != null)
+            sql.append("AND todas.region_id = :regionId ");
 
         sql.append("ORDER BY todas.usuario_id, todas.fecha_declaracion ASC, todas.hora ASC, todas.id ASC");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (regionId != null) query.setParameter("regionId", regionId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
         List<java.util.Map<String, Object>> filas = new java.util.ArrayList<>();
@@ -3857,7 +4345,8 @@ public class ReportRepository {
     public long contarDeclaracionesSinGeo(Date startDate, Date endDate, Long regionId) {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT COUNT(*) FROM ( ");
-        sql.append("  SELECT r.id, r.fecha_declaracion, COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
+        sql.append(
+                "  SELECT r.id, r.fecha_declaracion, COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_recolector r ");
         sql.append("  JOIN usuario u ON u.id = r.usuario_id ");
         sql.append("  LEFT JOIN comuna c ON c.id = r.comuna_id ");
@@ -3872,7 +4361,8 @@ public class ReportRepository {
         sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
         sql.append("  WHERE a.latitud IS NULL OR a.longitud IS NULL ");
         sql.append("  UNION ALL ");
-        sql.append("  SELECT ar.id, ar.fecha_declaracion, COALESCE(cal.region_id, amc.region_id, uc.region_id) as region_id ");
+        sql.append(
+                "  SELECT ar.id, ar.fecha_declaracion, COALESCE(cal.region_id, amc.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_area ar ");
         sql.append("  JOIN usuario u ON u.id = ar.usuario_id ");
         sql.append("  LEFT JOIN caleta cal ON cal.id = ar.caleta_id ");
@@ -3888,34 +4378,49 @@ public class ReportRepository {
         sql.append("  WHERE dc.latitud IS NULL OR dc.longitud IS NULL ");
         sql.append(") AS sin_geo WHERE 1=1 ");
 
-        if (startDate != null) sql.append("AND sin_geo.fecha_declaracion >= :startDate ");
-        if (endDate != null) sql.append("AND sin_geo.fecha_declaracion <= :endDate ");
-        if (regionId != null) sql.append("AND sin_geo.region_id = :regionId ");
+        if (startDate != null)
+            sql.append("AND sin_geo.fecha_declaracion >= :startDate ");
+        if (endDate != null)
+            sql.append("AND sin_geo.fecha_declaracion <= :endDate ");
+        if (regionId != null)
+            sql.append("AND sin_geo.region_id = :regionId ");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (regionId != null) query.setParameter("regionId", regionId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
 
         Number count = (Number) query.getSingleResult();
         return count != null ? count.longValue() : 0L;
     }
 
     @SuppressWarnings("unchecked")
-    public List<java.util.Map<String, Object>> buscarAdyacentesConGeo(Long usuarioId, Long excluyendoId, String excluyendoTipo) {
-        if (usuarioId == null) return java.util.Collections.emptyList();
+    public List<java.util.Map<String, Object>> buscarAdyacentesConGeo(Long usuarioId, Long excluyendoId,
+            String excluyendoTipo) {
+        if (usuarioId == null)
+            return java.util.Collections.emptyList();
         String sql = "SELECT u_decls.usuario_id, u_decls.fecha_declaracion, u_decls.hora, " +
                 "u_decls.latitud, u_decls.longitud, u_decls.tipo, u_decls.id, u_decls.folio " +
                 "FROM ( " +
-                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'RECOLECTOR' as tipo, id, COALESCE(folio_origen, CONCAT('DR-', id)) as folio FROM declaracion_recolector WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'RECOLECTOR' as tipo, id, COALESCE(folio_origen, CONCAT('DR-', id)) as folio FROM declaracion_recolector WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL "
+                +
                 "  UNION ALL " +
-                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'ARMADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DA-', id)) as folio FROM declaracion_armador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'ARMADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DA-', id)) as folio FROM declaracion_armador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL "
+                +
                 "  UNION ALL " +
-                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'AREA' as tipo, id, COALESCE(folio_origen, CONCAT('DAM-', id)) as folio FROM declaracion_area WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'AREA' as tipo, id, COALESCE(folio_origen, CONCAT('DAM-', id)) as folio FROM declaracion_area WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL "
+                +
                 "  UNION ALL " +
-                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'COMERCIALIZADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DC-', id)) as folio FROM declaracion_comercializador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL " +
+                "  SELECT usuario_id, fecha_declaracion, hora, latitud, longitud, 'COMERCIALIZADOR' as tipo, id, COALESCE(folio_origen, CONCAT('DC-', id)) as folio FROM declaracion_comercializador WHERE usuario_id = :usuarioId AND latitud IS NOT NULL AND longitud IS NOT NULL "
+                +
                 ") AS u_decls " +
-                (excluyendoId != null && excluyendoTipo != null ? "WHERE NOT (u_decls.tipo = :excluyendoTipo AND u_decls.id = :excluyendoId) " : "") +
+                (excluyendoId != null && excluyendoTipo != null
+                        ? "WHERE NOT (u_decls.tipo = :excluyendoTipo AND u_decls.id = :excluyendoId) "
+                        : "")
+                +
                 "ORDER BY u_decls.fecha_declaracion ASC, u_decls.hora ASC, u_decls.id ASC";
 
         Query query = entityManager.createNativeQuery(sql);
@@ -3951,15 +4456,19 @@ public class ReportRepository {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT todas.tipo, todas.id, todas.folio, todas.fecha_declaracion, todas.hora, ");
         sql.append("todas.usuario_id, todas.usuario_rut, todas.usuario_nombre, ");
-        sql.append("todas.latitud, todas.longitud, todas.precision_gps_m, todas.gps_capturado_en, todas.envio_offline, ");
-        sql.append("todas.caleta_id, todas.amerb_id, todas.varadero_id, todas.varadero_texto, todas.comuna_id, todas.region_id ");
+        sql.append(
+                "todas.latitud, todas.longitud, todas.precision_gps_m, todas.gps_capturado_en, todas.envio_offline, ");
+        sql.append(
+                "todas.caleta_id, todas.amerb_id, todas.varadero_id, todas.varadero_texto, todas.comuna_id, todas.region_id ");
         sql.append("FROM ( ");
-        // 1. Recolector (TG.2: la referencia se resuelve en Java con ReferenciaOrigenService)
+        // 1. Recolector (TG.2: la referencia se resuelve en Java con
+        // ReferenciaOrigenService)
         sql.append("  SELECT 'RECOLECTOR' as tipo, r.id, COALESCE(r.folio_origen, CONCAT('DR-', r.id)) as folio, ");
         sql.append("         r.fecha_declaracion, r.hora, r.usuario_id, u.rut as usuario_rut, ");
         sql.append("         CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidop, '')) as usuario_nombre, ");
         sql.append("         r.latitud, r.longitud, r.precision_gps_m, r.gps_capturado_en, r.envio_offline, ");
-        sql.append("         r.caleta_id, NULL as amerb_id, r.varadero_id as varadero_id, r.varadero as varadero_texto, ");
+        sql.append(
+                "         r.caleta_id, NULL as amerb_id, r.varadero_id as varadero_id, r.varadero as varadero_texto, ");
         sql.append("         COALESCE(r.comuna_id, cal.comuna_id, u.comuna_id) as comuna_id, ");
         sql.append("         COALESCE(c.region_id, cal.region_id, uc.region_id) as region_id ");
         sql.append("  FROM declaracion_recolector r ");
@@ -3997,16 +4506,22 @@ public class ReportRepository {
         sql.append("  LEFT JOIN comuna uc ON uc.id = u.comuna_id ");
         sql.append(") AS todas WHERE 1=1 ");
 
-        if (startDate != null) sql.append("AND todas.fecha_declaracion >= :startDate ");
-        if (endDate != null) sql.append("AND todas.fecha_declaracion <= :endDate ");
-        if (regionId != null) sql.append("AND todas.region_id = :regionId ");
+        if (startDate != null)
+            sql.append("AND todas.fecha_declaracion >= :startDate ");
+        if (endDate != null)
+            sql.append("AND todas.fecha_declaracion <= :endDate ");
+        if (regionId != null)
+            sql.append("AND todas.region_id = :regionId ");
 
         sql.append("ORDER BY todas.fecha_declaracion DESC, todas.hora DESC, todas.id DESC");
 
         Query query = entityManager.createNativeQuery(sql.toString());
-        if (startDate != null) query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (regionId != null) query.setParameter("regionId", regionId);
+        if (startDate != null)
+            query.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            query.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (regionId != null)
+            query.setParameter("regionId", regionId);
 
         List<Object[]> results = query.getResultList();
         List<java.util.Map<String, Object>> filas = new java.util.ArrayList<>();
@@ -4024,7 +4539,11 @@ public class ReportRepository {
             map.put("longitud", r[9] != null ? ((Number) r[9]).doubleValue() : null);
             map.put("precisionGpsM", r[10] != null ? ((Number) r[10]).doubleValue() : null);
             map.put("gpsCapturadoEn", r[11] != null ? r[11].toString() : null);
-            map.put("envioOffline", r[12] != null ? (Boolean.TRUE.equals(r[12]) || "1".equals(r[12].toString()) || "true".equalsIgnoreCase(r[12].toString())) : false);
+            map.put("envioOffline",
+                    r[12] != null
+                            ? (Boolean.TRUE.equals(r[12]) || "1".equals(r[12].toString())
+                                    || "true".equalsIgnoreCase(r[12].toString()))
+                            : false);
             map.put("caletaId", r[13] != null ? ((Number) r[13]).longValue() : null);
             map.put("amerbId", r[14] != null ? ((Number) r[14]).longValue() : null);
             map.put("varaderoId", r[15] != null ? ((Number) r[15]).longValue() : null);
@@ -4037,7 +4556,8 @@ public class ReportRepository {
     }
 
     /**
-     * Consulta de control para detectar cadenas donde un comercializador es consumido
+     * Consulta de control para detectar cadenas donde un comercializador es
+     * consumido
      * por otro comercializador (multisalto). Si devuelve > 0, requiere resolución
      * profunda en Java mediante CadenaCustodiaService.
      */
@@ -4049,7 +4569,8 @@ public class ReportRepository {
     }
 
     /**
-     * Stock disponible en planta (NA.2): recepciones de abastecimiento no consumidas ni anuladas.
+     * Stock disponible en planta (NA.2): recepciones de abastecimiento no
+     * consumidas ni anuladas.
      */
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> getStockEnPlanta(Long plantaId) {
@@ -4127,7 +4648,7 @@ public class ReportRepository {
 
             totalKg += kgDisponible;
             String grupoAcopio = lugarAcopio != null ? lugarAcopio : "Sin especificar";
-            double[] acc = acumPorAcopio.computeIfAbsent(grupoAcopio, k -> new double[]{0.0, 0.0});
+            double[] acc = acumPorAcopio.computeIfAbsent(grupoAcopio, k -> new double[] { 0.0, 0.0 });
             acc[0] += 1.0;
             acc[1] += kgDisponible;
         }
@@ -4153,15 +4674,21 @@ public class ReportRepository {
      * Métricas y detalle de rendimiento en planta de proceso (NP.7 / QR.3 / QR.5).
      */
     @SuppressWarnings("unchecked")
-    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
-        boolean rendimientoActivo = configuracionGeneralService == null || configuracionGeneralService.getBoolean("rendimiento_activo", true);
-        double toleranciaPct = configuracionGeneralService != null ? configuracionGeneralService.getDouble("rendimiento_tolerancia_pct", 5.0) : 5.0;
+    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId,
+            Long especieId) {
+        boolean rendimientoActivo = configuracionGeneralService == null
+                || configuracionGeneralService.getBoolean("rendimiento_activo", true);
+        double toleranciaPct = configuracionGeneralService != null
+                ? configuracionGeneralService.getDouble("rendimiento_tolerancia_pct", 5.0)
+                : 5.0;
         String rendimientoBaseRaw = configuracionGeneralService != null
-                ? configuracionGeneralService.getValor("rendimiento_base", com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN)
+                ? configuracionGeneralService.getValor("rendimiento_base",
+                        com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN)
                 : com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN;
-        String rendimientoBase = com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA.equalsIgnoreCase(rendimientoBaseRaw)
-                ? com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA
-                : com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN;
+        String rendimientoBase = com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA
+                .equalsIgnoreCase(rendimientoBaseRaw)
+                        ? com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_MASA_RECIBIDA
+                        : com.trazalga.api.services.indicadores.RendimientoPlantaService.BASE_CAPTURA_ORIGEN;
 
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT d.id, d.usuario_id, ");
@@ -4171,10 +4698,12 @@ public class ReportRepository {
         sql.append("d.fecha_produccion, d.materia_prima_especie_id, COALESCE(e.nombre, ''), ");
         sql.append("d.producto_resultante_id, COALESCE(prod.codigo, ''), COALESCE(prod.nombre, ''), ");
         sql.append("d.cantidad_materia_prima, d.cantidad_producto, ");
-        sql.append("d.rendimiento_pct, d.rendimiento_max_teorico_pct, d.rendimiento_fuente, d.rendimiento_evaluado_en, ");
+        sql.append(
+                "d.rendimiento_pct, d.rendimiento_max_teorico_pct, d.rendimiento_fuente, d.rendimiento_evaluado_en, ");
         sql.append("d.captura_origen_kg, d.captura_origen_completa, d.rendimiento_final_pct, ");
         sql.append("COALESCE(d.estado, 'ENVIADA'), ");
-        sql.append("CASE WHEN EXISTS (SELECT 1 FROM declaracion_marca dm WHERE dm.declaracion_tipo = 'PLANTA_PRODUCCION' AND dm.declaracion_id = d.id AND dm.marca = 'RENDIMIENTO_ANOMALO' AND COALESCE(dm.resuelta, 0) = 0) THEN 1 ELSE 0 END AS tiene_marca_anomala ");
+        sql.append(
+                "CASE WHEN EXISTS (SELECT 1 FROM declaracion_marca dm WHERE dm.declaracion_tipo = 'PLANTA_PRODUCCION' AND dm.declaracion_id = d.id AND dm.marca = 'RENDIMIENTO_ANOMALO' AND COALESCE(dm.resuelta, 0) = 0) THEN 1 ELSE 0 END AS tiene_marca_anomala ");
         sql.append("FROM declaracion_planta_produccion d ");
         sql.append("INNER JOIN usuario u ON d.usuario_id = u.id ");
         sql.append("LEFT JOIN especie e ON d.materia_prima_especie_id = e.id ");
@@ -4250,7 +4779,8 @@ public class ReportRepository {
             String estado = r[21] != null ? r[21].toString() : "ENVIADA";
             boolean tieneMarca = r[22] != null && ((Number) r[22]).intValue() > 0;
 
-            boolean evaluadaPorOrigen = com.trazalga.api.services.indicadores.RendimientoPlantaService.esFuenteCapturaOrigen(fuente);
+            boolean evaluadaPorOrigen = com.trazalga.api.services.indicadores.RendimientoPlantaService
+                    .esFuenteCapturaOrigen(fuente);
             Double rendimientoEvaluado = evaluadaPorOrigen ? rendimientoFinalPct : rendimientoPct;
             if (Boolean.FALSE.equals(capturaOrigenCompleta)) {
                 cadenasIncompletas++;
@@ -4296,7 +4826,8 @@ public class ReportRepository {
             item.put("clasificacion", esAnomalo ? "ANOMALO" : (sinRef ? "SIN_REFERENCIA" : "NORMAL"));
             detalle.add(item);
 
-            String key = (pUsuarioId != null ? pUsuarioId : 0L) + "|" + (prodId != null ? prodId : 0L) + "|" + (espId != null ? espId : 0L);
+            String key = (pUsuarioId != null ? pUsuarioId : 0L) + "|" + (prodId != null ? prodId : 0L) + "|"
+                    + (espId != null ? espId : 0L);
             java.util.Map<String, Object> grp = porGrupo.computeIfAbsent(key, k -> {
                 java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
                 m.put("plantaId", pUsuarioId);
@@ -4316,12 +4847,16 @@ public class ReportRepository {
                 return m;
             });
             grp.put("producciones", ((Number) grp.get("producciones")).longValue() + 1L);
-            grp.put("masaEntradaKg", ((Number) grp.get("masaEntradaKg")).doubleValue() + (masaEntrada != null ? masaEntrada : 0.0));
-            grp.put("masaProductoKg", ((Number) grp.get("masaProductoKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
+            grp.put("masaEntradaKg",
+                    ((Number) grp.get("masaEntradaKg")).doubleValue() + (masaEntrada != null ? masaEntrada : 0.0));
+            grp.put("masaProductoKg",
+                    ((Number) grp.get("masaProductoKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
             if (Boolean.TRUE.equals(capturaOrigenCompleta) && capturaOrigenKg != null && capturaOrigenKg > 0.0) {
                 grp.put("capturaOrigenKg", ((Number) grp.get("capturaOrigenKg")).doubleValue() + capturaOrigenKg);
-                grp.put("capturaCompletaCapKg", ((Number) grp.get("capturaCompletaCapKg")).doubleValue() + capturaOrigenKg);
-                grp.put("capturaCompletaProdKg", ((Number) grp.get("capturaCompletaProdKg")).doubleValue() + (masaProducto != null ? masaProducto : 0.0));
+                grp.put("capturaCompletaCapKg",
+                        ((Number) grp.get("capturaCompletaCapKg")).doubleValue() + capturaOrigenKg);
+                grp.put("capturaCompletaProdKg", ((Number) grp.get("capturaCompletaProdKg")).doubleValue()
+                        + (masaProducto != null ? masaProducto : 0.0));
             } else {
                 grp.put("cadenasIncompletas", ((Number) grp.get("cadenasIncompletas")).longValue() + 1L);
             }
@@ -4371,7 +4906,8 @@ public class ReportRepository {
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> getConsultasCiudadanas(Date startDate, Date endDate) {
         String rawAnomalos = configuracionGeneralService != null
-                ? configuracionGeneralService.getValor("consulta_ciudadana_resultados_anomalos", "VENCIDO,SIN_REGISTROS,RETENIDO")
+                ? configuracionGeneralService.getValor("consulta_ciudadana_resultados_anomalos",
+                        "VENCIDO,SIN_REGISTROS,RETENIDO")
                 : "VENCIDO,SIN_REGISTROS,RETENIDO";
         if (rawAnomalos == null || rawAnomalos.isBlank()) {
             rawAnomalos = "VENCIDO,SIN_REGISTROS,RETENIDO";
@@ -4412,8 +4948,10 @@ public class ReportRepository {
         sqlTot.append("GROUP BY l.resultado ORDER BY l.resultado");
 
         Query qTot = entityManager.createNativeQuery(sqlTot.toString());
-        if (inicioTs != null) qTot.setParameter("inicioTs", inicioTs);
-        if (finExclusivoTs != null) qTot.setParameter("finExclusivoTs", finExclusivoTs);
+        if (inicioTs != null)
+            qTot.setParameter("inicioTs", inicioTs);
+        if (finExclusivoTs != null)
+            qTot.setParameter("finExclusivoTs", finExclusivoTs);
 
         long totalConsultas = 0L;
         long denunciasFono = 0L;
@@ -4481,8 +5019,10 @@ public class ReportRepository {
 
             Query qPat = entityManager.createNativeQuery(sqlPat.toString());
             qPat.setParameter("anomalos", resultadosAnomalos);
-            if (inicioTs != null) qPat.setParameter("inicioTs", inicioTs);
-            if (finExclusivoTs != null) qPat.setParameter("finExclusivoTs", finExclusivoTs);
+            if (inicioTs != null)
+                qPat.setParameter("inicioTs", inicioTs);
+            if (finExclusivoTs != null)
+                qPat.setParameter("finExclusivoTs", finExclusivoTs);
 
             for (Object[] row : (List<Object[]>) qPat.getResultList()) {
                 java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
@@ -4510,13 +5050,16 @@ public class ReportRepository {
         resp.put("resultadosAnomalosConfigurados", resultadosAnomalos);
         resp.put("totalesPorResultado", totalesPorResultado);
         resp.put("patentesAnomalas", patentesAnomalas);
-        resp.put("startDate", startDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(startDate).toString() : null);
-        resp.put("endDate", endDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(endDate).toString() : null);
+        resp.put("startDate",
+                startDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(startDate).toString() : null);
+        resp.put("endDate",
+                endDate != null ? com.trazalga.api.services.fechas.FechaSql.diaLocal(endDate).toString() : null);
         return resp;
     }
 
     private String toIsoTimestamp(Object o) {
-        if (o == null) return null;
+        if (o == null)
+            return null;
         java.time.Instant instant = null;
         if (o instanceof java.sql.Timestamp ts) {
             instant = ts.toInstant();
@@ -4545,8 +5088,10 @@ public class ReportRepository {
     }
 
     /**
-     * QM.3 / QE.1 · Obtiene las filas crudas de cadena completa (origen -> [comercializador] -> planta)
-     * para declaraciones de planta con peso de romana > 0 en el período, filtrando opcionalmente
+     * QM.3 / QE.1 · Obtiene las filas crudas de cadena completa (origen ->
+     * [comercializador] -> planta)
+     * para declaraciones de planta con peso de romana > 0 en el período, filtrando
+     * opcionalmente
      * por especie de la recepción y región de origen.
      */
     @SuppressWarnings("unchecked")
@@ -4560,26 +5105,34 @@ public class ReportRepository {
             Date startDate, Date endDate, Long especieId, Long regionId, Long regionDestinoId) {
         StringBuilder sqlPlanta = new StringBuilder(
                 "SELECT dpa.id, " +
-                "COALESCE(NULLIF(TRIM(dpa.folio_declaracion_a_pla), ''), NULLIF(TRIM(dpa.folio_origen), ''), CONCAT('DPA-', dpa.id)), " +
-                "dpa.fecha_ingreso_planta, dpa.peso_romana_kg, dpa.especie_id, e.nombre, " +
-                "dpa.codigo_sernapesca, dpa.nombre_planta, dpa.latitud, dpa.longitud, dpa.declaraciones_seleccionadas, " +
-                "up.rut, up.nombres, up.apellidop, up.apellidom, " +
-                "com_up.region_id, com_up.nombre, reg_up.nombre " +
-                "FROM declaracion_planta_abastecimiento dpa " +
-                "LEFT JOIN especie e ON dpa.especie_id = e.id " +
-                "LEFT JOIN usuario up ON dpa.usuario_id = up.id " +
-                "LEFT JOIN comuna com_up ON up.comuna_id = com_up.id " +
-                "LEFT JOIN region reg_up ON com_up.region_id = reg_up.id " +
-                "WHERE dpa.peso_romana_kg > 0");
-        if (startDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta >= :startDate");
-        if (endDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta <= :endDate");
-        if (especieId != null) sqlPlanta.append(" AND dpa.especie_id = :especieId");
+                        "COALESCE(NULLIF(TRIM(dpa.folio_declaracion_a_pla), ''), NULLIF(TRIM(dpa.folio_origen), ''), CONCAT('DPA-', dpa.id)), "
+                        +
+                        "dpa.fecha_ingreso_planta, dpa.peso_romana_kg, dpa.especie_id, e.nombre, " +
+                        "dpa.codigo_sernapesca, dpa.nombre_planta, dpa.latitud, dpa.longitud, dpa.declaraciones_seleccionadas, "
+                        +
+                        "up.rut, up.nombres, up.apellidop, up.apellidom, " +
+                        "com_up.region_id, com_up.nombre, reg_up.nombre " +
+                        "FROM declaracion_planta_abastecimiento dpa " +
+                        "LEFT JOIN especie e ON dpa.especie_id = e.id " +
+                        "LEFT JOIN usuario up ON dpa.usuario_id = up.id " +
+                        "LEFT JOIN comuna com_up ON up.comuna_id = com_up.id " +
+                        "LEFT JOIN region reg_up ON com_up.region_id = reg_up.id " +
+                        "WHERE dpa.peso_romana_kg > 0");
+        if (startDate != null)
+            sqlPlanta.append(" AND dpa.fecha_ingreso_planta >= :startDate");
+        if (endDate != null)
+            sqlPlanta.append(" AND dpa.fecha_ingreso_planta <= :endDate");
+        if (especieId != null)
+            sqlPlanta.append(" AND dpa.especie_id = :especieId");
         sqlPlanta.append(" ORDER BY dpa.fecha_ingreso_planta DESC, dpa.id DESC");
 
         Query qPlanta = entityManager.createNativeQuery(sqlPlanta.toString());
-        if (startDate != null) qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
-        if (endDate != null) qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
-        if (especieId != null) qPlanta.setParameter("especieId", especieId);
+        if (startDate != null)
+            qPlanta.setParameter("startDate", com.trazalga.api.services.fechas.FechaSql.dia(startDate));
+        if (endDate != null)
+            qPlanta.setParameter("endDate", com.trazalga.api.services.fechas.FechaSql.dia(endDate));
+        if (especieId != null)
+            qPlanta.setParameter("especieId", especieId);
 
         List<Object[]> pRows = qPlanta.getResultList();
         if (pRows == null || pRows.isEmpty()) {
@@ -4613,12 +5166,13 @@ public class ReportRepository {
         java.util.Map<String, DestinoGeoInfo> plantaGeoPorRut = new java.util.HashMap<>();
         List<Object[]> plGeoRows = entityManager.createNativeQuery(
                 "SELECT pl.codigo, pl.rut, com.nombre, com.region_id, reg.nombre " +
-                "FROM planta pl " +
-                "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
-                "LEFT JOIN region reg ON com.region_id = reg.id")
+                        "FROM planta pl " +
+                        "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
+                        "LEFT JOIN region reg ON com.region_id = reg.id")
                 .getResultList();
         for (Object[] pr : plGeoRows) {
-            if (pr[3] == null) continue;
+            if (pr[3] == null)
+                continue;
             DestinoGeoInfo info = new DestinoGeoInfo();
             info.comunaNombre = pr[2] != null ? pr[2].toString() : null;
             info.regionId = ((Number) pr[3]).longValue();
@@ -4642,6 +5196,7 @@ public class ReportRepository {
             String tipo;
             Long id;
             List<ComRow> comChain;
+
             LinkRef(String tipo, Long id, List<ComRow> comChain) {
                 this.tipo = tipo;
                 this.id = id;
@@ -4651,6 +5206,7 @@ public class ReportRepository {
         class BfsComNode {
             Long id;
             List<ComRow> pathBackwards;
+
             BfsComNode(Long id, List<ComRow> pathBackwards) {
                 this.id = id;
                 this.pathBackwards = pathBackwards;
@@ -4665,7 +5221,8 @@ public class ReportRepository {
             PlantaRow p = new PlantaRow();
             p.id = ((Number) r[0]).longValue();
             p.folio = r[1] != null ? r[1].toString() : "DPA-" + p.id;
-            p.fecha = r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString() : null;
+            p.fecha = r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString()
+                    : null;
             p.pesoRomanaKg = r[3] != null ? ((Number) r[3]).doubleValue() : 0.0;
             p.especieId = r[4] != null ? ((Number) r[4]).longValue() : null;
             p.especieNombre = r[5] != null ? r[5].toString() : null;
@@ -4673,7 +5230,8 @@ public class ReportRepository {
             p.nombrePlanta = r[7] != null ? r[7].toString() : null;
             p.lat = r[8] != null ? ((Number) r[8]).doubleValue() : null;
             p.lon = r[9] != null ? ((Number) r[9]).doubleValue() : null;
-            p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[10] != null ? r[10].toString() : null);
+            p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens
+                    .parse(r[10] != null ? r[10].toString() : null);
             p.plantaUsuarioRut = r[11] != null ? r[11].toString() : null;
             p.plantaUsuarioNombre = unirNombreUsuario(r[12], r[13], r[14]);
             DestinoGeoInfo geoPl = null;
@@ -4698,7 +5256,8 @@ public class ReportRepository {
             }
             plantas.add(p);
             dpaIds.add(p.id);
-            allCIds.addAll(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
+            allCIds.addAll(
+                    com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
         }
         if (plantas.isEmpty()) {
             return java.util.Collections.emptyList();
@@ -4721,8 +5280,9 @@ public class ReportRepository {
         String filtroCom = "UPPER(COALESCE(consumida_por_tipo, '')) = 'COMERCIALIZADOR'";
         while (!porExplorarC.isEmpty() && comById.size() < 2000) {
             List<Object[]> cRows = entityManager.createNativeQuery(
-                    "SELECT dc.id, COALESCE(NULLIF(TRIM(dc.folio_origen), ''), NULLIF(TRIM(dc.folio_desembarque_ac), ''), CONCAT('DC-', dc.id)), dc.declaraciones_seleccionadas, dc.latitud, dc.longitud " +
-                    "FROM declaracion_comercializador dc WHERE dc.id IN (:ids)")
+                    "SELECT dc.id, COALESCE(NULLIF(TRIM(dc.folio_origen), ''), NULLIF(TRIM(dc.folio_desembarque_ac), ''), CONCAT('DC-', dc.id)), dc.declaraciones_seleccionadas, dc.latitud, dc.longitud "
+                            +
+                            "FROM declaracion_comercializador dc WHERE dc.id IN (:ids)")
                     .setParameter("ids", porExplorarC)
                     .getResultList();
             java.util.Set<Long> encontradosLote = new java.util.LinkedHashSet<>();
@@ -4731,21 +5291,26 @@ public class ReportRepository {
                 ComRow c = new ComRow();
                 c.id = ((Number) r[0]).longValue();
                 c.folio = r[1] != null ? r[1].toString() : "DC-" + c.id;
-                c.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[2] != null ? r[2].toString() : null);
+                c.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens
+                        .parse(r[2] != null ? r[2].toString() : null);
                 c.lat = r[3] != null ? ((Number) r[3]).doubleValue() : null;
                 c.lon = r[4] != null ? ((Number) r[4]).doubleValue() : null;
                 comById.put(c.id, c);
                 encontradosLote.add(c.id);
-                for (Long subC : com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR")) {
-                    if (!comById.containsKey(subC)) siguientesC.add(subC);
+                for (Long subC : com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens,
+                        "COMERCIALIZADOR")) {
+                    if (!comById.containsKey(subC))
+                        siguientesC.add(subC);
                 }
             }
             if (!encontradosLote.isEmpty()) {
-                java.util.Map<Long, List<Long>> subFkC2C = cargarHijosPorFk("declaracion_comercializador", filtroCom, encontradosLote);
+                java.util.Map<Long, List<Long>> subFkC2C = cargarHijosPorFk("declaracion_comercializador", filtroCom,
+                        encontradosLote);
                 fkC2C.putAll(subFkC2C);
                 subFkC2C.values().forEach(l -> {
                     for (Long subC : l) {
-                        if (!comById.containsKey(subC)) siguientesC.add(subC);
+                        if (!comById.containsKey(subC))
+                            siguientesC.add(subC);
                     }
                 });
                 fkC2R.putAll(cargarHijosPorFk("declaracion_recolector", filtroCom, encontradosLote));
@@ -4769,12 +5334,18 @@ public class ReportRepository {
                     refs.add(new LinkRef(tipo, oId, null));
                 }
             };
-            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR").forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
-            fkP2R.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
-            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR").forEach(id -> registrarDirecto.accept("ARMADOR", id));
-            fkP2A.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("ARMADOR", id));
-            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA").forEach(id -> registrarDirecto.accept("AREA", id));
-            fkP2Ar.getOrDefault(p.id, java.util.Collections.emptyList()).forEach(id -> registrarDirecto.accept("AREA", id));
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "RECOLECTOR")
+                    .forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
+            fkP2R.getOrDefault(p.id, java.util.Collections.emptyList())
+                    .forEach(id -> registrarDirecto.accept("RECOLECTOR", id));
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "ARMADOR")
+                    .forEach(id -> registrarDirecto.accept("ARMADOR", id));
+            fkP2A.getOrDefault(p.id, java.util.Collections.emptyList())
+                    .forEach(id -> registrarDirecto.accept("ARMADOR", id));
+            com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "AREA")
+                    .forEach(id -> registrarDirecto.accept("AREA", id));
+            fkP2Ar.getOrDefault(p.id, java.util.Collections.emptyList())
+                    .forEach(id -> registrarDirecto.accept("AREA", id));
 
             java.util.Deque<BfsComNode> colaC = new java.util.ArrayDeque<>();
             java.util.Set<Long> visitadoC = new java.util.HashSet<>();
@@ -4786,9 +5357,11 @@ public class ReportRepository {
             while (!colaC.isEmpty() && visitadoC.size() < 500) {
                 BfsComNode nodo = colaC.poll();
                 Long cId = nodo != null ? nodo.id : null;
-                if (cId == null || !visitadoC.add(cId)) continue;
+                if (cId == null || !visitadoC.add(cId))
+                    continue;
                 ComRow c = comById.get(cId);
-                if (c == null) continue;
+                if (c == null)
+                    continue;
 
                 List<ComRow> pathDesdePlanta = new java.util.ArrayList<>(nodo.pathBackwards);
                 pathDesdePlanta.add(c);
@@ -4800,25 +5373,37 @@ public class ReportRepository {
                         refs.add(new LinkRef(tipo, oId, cadenaCronologica));
                     }
                 };
-                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "RECOLECTOR").forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
-                fkC2R.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
-                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "ARMADOR").forEach(id -> registrarViaCom.accept("ARMADOR", id));
-                fkC2A.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("ARMADOR", id));
-                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "AREA").forEach(id -> registrarViaCom.accept("AREA", id));
-                fkC2Ar.getOrDefault(cId, java.util.Collections.emptyList()).forEach(id -> registrarViaCom.accept("AREA", id));
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "RECOLECTOR")
+                        .forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
+                fkC2R.getOrDefault(cId, java.util.Collections.emptyList())
+                        .forEach(id -> registrarViaCom.accept("RECOLECTOR", id));
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "ARMADOR")
+                        .forEach(id -> registrarViaCom.accept("ARMADOR", id));
+                fkC2A.getOrDefault(cId, java.util.Collections.emptyList())
+                        .forEach(id -> registrarViaCom.accept("ARMADOR", id));
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "AREA")
+                        .forEach(id -> registrarViaCom.accept("AREA", id));
+                fkC2Ar.getOrDefault(cId, java.util.Collections.emptyList())
+                        .forEach(id -> registrarViaCom.accept("AREA", id));
 
-                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR").forEach(sub -> {
-                    if (!visitadoC.contains(sub)) colaC.add(new BfsComNode(sub, pathDesdePlanta));
-                });
+                com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(c.tokens, "COMERCIALIZADOR")
+                        .forEach(sub -> {
+                            if (!visitadoC.contains(sub))
+                                colaC.add(new BfsComNode(sub, pathDesdePlanta));
+                        });
                 fkC2C.getOrDefault(cId, java.util.Collections.emptyList()).forEach(sub -> {
-                    if (!visitadoC.contains(sub)) colaC.add(new BfsComNode(sub, pathDesdePlanta));
+                    if (!visitadoC.contains(sub))
+                        colaC.add(new BfsComNode(sub, pathDesdePlanta));
                 });
             }
 
             for (LinkRef lr : refs) {
-                if ("RECOLECTOR".equals(lr.tipo)) allRIds.add(lr.id);
-                else if ("ARMADOR".equals(lr.tipo)) allAIds.add(lr.id);
-                else if ("AREA".equals(lr.tipo)) allArIds.add(lr.id);
+                if ("RECOLECTOR".equals(lr.tipo))
+                    allRIds.add(lr.id);
+                else if ("ARMADOR".equals(lr.tipo))
+                    allAIds.add(lr.id);
+                else if ("AREA".equals(lr.tipo))
+                    allArIds.add(lr.id);
             }
             linksPorPlanta.put(p.id, refs);
         }
@@ -4833,12 +5418,14 @@ public class ReportRepository {
             List<LinkRef> refs = linksPorPlanta.getOrDefault(p.id, java.util.Collections.emptyList());
             for (LinkRef lr : refs) {
                 java.util.Map<String, Object> orig = origenesPorClave.get(lr.tipo + ":" + lr.id);
-                if (orig == null) continue; // filtrado por regionId o inexistente
+                if (orig == null)
+                    continue; // filtrado por regionId o inexistente
                 java.util.Map<String, Object> row = new java.util.LinkedHashMap<>(orig);
                 List<java.util.Map<String, Object>> hops = new java.util.ArrayList<>();
                 StringBuilder foliosCom = new StringBuilder();
                 for (ComRow cr : lr.comChain) {
-                    if (foliosCom.length() > 0) foliosCom.append(" → ");
+                    if (foliosCom.length() > 0)
+                        foliosCom.append(" → ");
                     foliosCom.append(cr.folio);
                     java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
                     h.put("id", cr.id);
@@ -4871,9 +5458,11 @@ public class ReportRepository {
     }
 
     @SuppressWarnings("unchecked")
-    private java.util.Map<Long, List<Long>> cargarHijosPorFk(String table, String tipoFiltroSql, java.util.Collection<Long> parentIds) {
+    private java.util.Map<Long, List<Long>> cargarHijosPorFk(String table, String tipoFiltroSql,
+            java.util.Collection<Long> parentIds) {
         java.util.Map<Long, List<Long>> out = new java.util.HashMap<>();
-        if (parentIds == null || parentIds.isEmpty()) return out;
+        if (parentIds == null || parentIds.isEmpty())
+            return out;
         String sql = "SELECT declaracion_destinatario_id, id FROM " + table +
                 " WHERE " + tipoFiltroSql + " AND declaracion_destinatario_id IN (:ids)";
         List<Object[]> rows = entityManager.createNativeQuery(sql)
@@ -4894,7 +5483,8 @@ public class ReportRepository {
             java.util.Collection<Long> ids,
             Long regionId,
             java.util.Map<String, java.util.Map<String, Object>> destino) {
-        if (ids == null || ids.isEmpty()) return;
+        if (ids == null || ids.isEmpty())
+            return;
         String table;
         String folioExpr;
         String extraSelect;
@@ -4931,13 +5521,13 @@ public class ReportRepository {
         }
         StringBuilder sql = new StringBuilder(
                 "SELECT o.id, " + folioExpr + ", o.fecha_declaracion, o.desembarque, o.captura, " +
-                "o.latitud, o.longitud, o.caleta_id, cal.nombre, " + extraSelect + ", " +
-                comunaIdExpr + ", " + regionIdExpr + ", reg.nombre, e.nombre " +
-                "FROM " + table + " o " +
-                extraJoins +
-                "LEFT JOIN region reg ON reg.id = " + regionIdExpr + " " +
-                "LEFT JOIN especie e ON o.especie_id = e.id " +
-                "WHERE o.id IN (:ids)");
+                        "o.latitud, o.longitud, o.caleta_id, cal.nombre, " + extraSelect + ", " +
+                        comunaIdExpr + ", " + regionIdExpr + ", reg.nombre, e.nombre " +
+                        "FROM " + table + " o " +
+                        extraJoins +
+                        "LEFT JOIN region reg ON reg.id = " + regionIdExpr + " " +
+                        "LEFT JOIN especie e ON o.especie_id = e.id " +
+                        "WHERE o.id IN (:ids)");
         if (regionId != null) {
             sql.append(" AND ").append(regionIdExpr).append(" = :regionId");
         }
@@ -4952,7 +5542,9 @@ public class ReportRepository {
             m.put("origenId", id);
             m.put("origenTipo", tipo);
             m.put("origenFolio", r[1] != null ? r[1].toString() : null);
-            m.put("origenFecha", r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString() : null);
+            m.put("origenFecha",
+                    r[2] instanceof Date ? com.trazalga.api.services.fechas.FechaSql.diaLocal((Date) r[2]).toString()
+                            : null);
             m.put("desembarqueKg", r[3] != null ? ((Number) r[3]).doubleValue() : 0.0);
             m.put("capturaKg", r[4] != null ? ((Number) r[4]).doubleValue() : 0.0);
             m.put("origenGpsLat", r[5] != null ? ((Number) r[5]).doubleValue() : null);
@@ -4980,15 +5572,16 @@ public class ReportRepository {
 
         StringBuilder sqlCal = new StringBuilder(
                 "SELECT cal.id, cal.nombre, com.nombre, COALESCE(cal.region_id, com.region_id), reg.nombre, " +
-                "cal.latitud, cal.longitud, cal.fuente_coordenada " +
-                "FROM caleta cal " +
-                "LEFT JOIN comuna com ON cal.comuna_id = com.id " +
-                "LEFT JOIN region reg ON reg.id = COALESCE(cal.region_id, com.region_id)");
+                        "cal.latitud, cal.longitud, cal.fuente_coordenada " +
+                        "FROM caleta cal " +
+                        "LEFT JOIN comuna com ON cal.comuna_id = com.id " +
+                        "LEFT JOIN region reg ON reg.id = COALESCE(cal.region_id, com.region_id)");
         if (regionId != null) {
             sqlCal.append(" WHERE COALESCE(cal.region_id, com.region_id) = :regionId");
         }
         Query qCal = entityManager.createNativeQuery(sqlCal.toString());
-        if (regionId != null) qCal.setParameter("regionId", regionId);
+        if (regionId != null)
+            qCal.setParameter("regionId", regionId);
         List<Object[]> calRows = qCal.getResultList();
         int calTotal = 0;
         int calConCoords = 0;
@@ -5013,15 +5606,16 @@ public class ReportRepository {
 
         StringBuilder sqlVar = new StringBuilder(
                 "SELECT v.id, v.nombre, com.nombre, com.region_id, reg.nombre, " +
-                "v.latitud, v.longitud, v.fuente_coordenada " +
-                "FROM varadero v " +
-                "LEFT JOIN comuna com ON v.comuna_id = com.id " +
-                "LEFT JOIN region reg ON com.region_id = reg.id");
+                        "v.latitud, v.longitud, v.fuente_coordenada " +
+                        "FROM varadero v " +
+                        "LEFT JOIN comuna com ON v.comuna_id = com.id " +
+                        "LEFT JOIN region reg ON com.region_id = reg.id");
         if (regionId != null) {
             sqlVar.append(" WHERE com.region_id = :regionId");
         }
         Query qVar = entityManager.createNativeQuery(sqlVar.toString());
-        if (regionId != null) qVar.setParameter("regionId", regionId);
+        if (regionId != null)
+            qVar.setParameter("regionId", regionId);
         List<Object[]> varRows = qVar.getResultList();
         int varTotal = 0;
         int varConCoords = 0;
@@ -5046,15 +5640,16 @@ public class ReportRepository {
 
         StringBuilder sqlPl = new StringBuilder(
                 "SELECT pl.id, pl.codigo, pl.nombre, pl.tipo, pl.latitud, pl.longitud, pl.fuente_coordenada, " +
-                "com.nombre, com.region_id, reg.nombre " +
-                "FROM planta pl " +
-                "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
-                "LEFT JOIN region reg ON com.region_id = reg.id");
+                        "com.nombre, com.region_id, reg.nombre " +
+                        "FROM planta pl " +
+                        "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
+                        "LEFT JOIN region reg ON com.region_id = reg.id");
         if (regionId != null) {
             sqlPl.append(" WHERE com.region_id = :regionId");
         }
         Query qPl = entityManager.createNativeQuery(sqlPl.toString());
-        if (regionId != null) qPl.setParameter("regionId", regionId);
+        if (regionId != null)
+            qPl.setParameter("regionId", regionId);
         List<Object[]> plRows = qPl.getResultList();
         int plTotal = 0;
         int plConCoords = 0;
@@ -5094,11 +5689,12 @@ public class ReportRepository {
 
     private static String unirNombreUsuario(Object nombres, Object apellidop, Object apellidom) {
         StringBuilder sb = new StringBuilder();
-        for (Object part : new Object[]{nombres, apellidop, apellidom}) {
+        for (Object part : new Object[] { nombres, apellidop, apellidom }) {
             if (part != null) {
                 String s = part.toString().trim();
                 if (!s.isEmpty()) {
-                    if (sb.length() > 0) sb.append(' ');
+                    if (sb.length() > 0)
+                        sb.append(' ');
                     sb.append(s);
                 }
             }
@@ -5106,4 +5702,3 @@ public class ReportRepository {
         return sb.length() > 0 ? sb.toString() : null;
     }
 }
-

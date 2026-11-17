@@ -40,10 +40,10 @@ import java.util.List;
  * `equals()`, así que aciertan en el caché.
  *
  * ⚠️ SI ALGUIEN CAMBIA ESE BINDING A TIMESTAMP, EL CACHÉ DEJA DE SERVIR
- *    SILENCIOSAMENTE: cada milisegundo distinto sería una clave nueva, el hit
- *    ratio caería a cero y nadie se enteraría porque todo seguiría
- *    funcionando, solo más lento. Vigilar el hit ratio en
- *    /actuator/metrics/cache.gets es la forma de detectarlo.
+ * SILENCIOSAMENTE: cada milisegundo distinto sería una clave nueva, el hit
+ * ratio caería a cero y nadie se enteraría porque todo seguiría
+ * funcionando, solo más lento. Vigilar el hit ratio en
+ * /actuator/metrics/cache.gets es la forma de detectarlo.
  *
  * QUÉ NO SE CACHEA Y POR QUÉ
  * `getReport(...)` recibe un `rut`, así que su clave incluye al usuario. No
@@ -62,7 +62,8 @@ public class ReportService {
     @Autowired(required = false)
     private com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService;
 
-    public void setReferenciaOrigenService(com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService) {
+    public void setReferenciaOrigenService(
+            com.trazalga.api.services.geo.ReferenciaOrigenService referenciaOrigenService) {
         this.referenciaOrigenService = referenciaOrigenService;
     }
 
@@ -92,16 +93,16 @@ public class ReportService {
     }
 
     public ReportService(ReportRepository reportRepository,
-                         ConfiguracionGeneralService configService,
-                         VariacionPesoService variacionPesoService) {
+            ConfiguracionGeneralService configService,
+            VariacionPesoService variacionPesoService) {
         this(reportRepository, configService, variacionPesoService, null);
     }
 
     @Autowired
     public ReportService(ReportRepository reportRepository,
-                         ConfiguracionGeneralService configService,
-                         @Autowired(required = false) VariacionPesoService variacionPesoService,
-                         @Autowired(required = false) com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
+            ConfiguracionGeneralService configService,
+            @Autowired(required = false) VariacionPesoService variacionPesoService,
+            @Autowired(required = false) com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
         this.reportRepository = reportRepository;
         this.configService = configService;
         this.variacionPesoService = variacionPesoService;
@@ -111,7 +112,8 @@ public class ReportService {
         }
     }
 
-    public void setRetencionCustodiaService(com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
+    public void setRetencionCustodiaService(
+            com.trazalga.api.services.retencion.RetencionCustodiaService retencionCustodiaService) {
         this.retencionCustodiaService = retencionCustodiaService;
     }
 
@@ -135,7 +137,8 @@ public class ReportService {
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
-    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public java.util.Map<String, Object> getExtraccionVedaMetrics(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         return reportRepository.getExtraccionVedaMetrics(startDate, endDate, especieId, regionId);
     }
 
@@ -145,7 +148,8 @@ public class ReportService {
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
-    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public List<java.util.Map<String, Object>> getExtraccionVedaDetalle(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         return reportRepository.getExtraccionVedaDetalle(startDate, endDate, especieId, regionId);
     }
 
@@ -191,14 +195,14 @@ public class ReportService {
             disabled.put("totalDeclaraciones", 0);
             disabled.put("totalHallazgos", 0);
             disabled.put("parametros", java.util.Map.of(
-                "distanciaMinKm", distanciaMinKm,
-                "velocidadMaxKmh", velocidadMaxKmh,
-                "ventanaMinMinutos", ventanaMinMinutos
-            ));
+                    "distanciaMinKm", distanciaMinKm,
+                    "velocidadMaxKmh", velocidadMaxKmh,
+                    "ventanaMinMinutos", ventanaMinMinutos));
             return disabled;
         }
 
-        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesConGeo(startDate, endDate, regionId);
+        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesConGeo(startDate, endDate,
+                regionId);
         long sinGeo = reportRepository.contarDeclaracionesSinGeo(startDate, endDate, regionId);
 
         // Agrupar por usuario_id preservando orden cronológico
@@ -216,7 +220,8 @@ public class ReportService {
             decls.sort((d1, d2) -> {
                 java.time.LocalDateTime t1 = parseTimestamp((Date) d1.get("fechaDeclaracion"), (String) d1.get("hora"));
                 java.time.LocalDateTime t2 = parseTimestamp((Date) d2.get("fechaDeclaracion"), (String) d2.get("hora"));
-                if (t1 == null || t2 == null) return 0;
+                if (t1 == null || t2 == null)
+                    return 0;
                 return t1.compareTo(t2);
             });
 
@@ -229,12 +234,14 @@ public class ReportService {
                 Double latB = (Double) b.get("latitud");
                 Double lonB = (Double) b.get("longitud");
 
-                if (latA == null || lonA == null || latB == null || lonB == null) continue;
+                if (latA == null || lonA == null || latB == null || lonB == null)
+                    continue;
 
                 java.time.LocalDateTime tsA = parseTimestamp((Date) a.get("fechaDeclaracion"), (String) a.get("hora"));
                 java.time.LocalDateTime tsB = parseTimestamp((Date) b.get("fechaDeclaracion"), (String) b.get("hora"));
 
-                if (tsA == null || tsB == null) continue;
+                if (tsA == null || tsB == null)
+                    continue;
 
                 double d = haversineKm(latA, lonA, latB, lonB);
                 double deltaMillis = Math.abs(java.time.Duration.between(tsA, tsB).toMillis());
@@ -278,10 +285,9 @@ public class ReportService {
         result.put("sinGeolocalizacion", sinGeo);
         result.put("totalDeclaraciones", filas.size());
         result.put("parametros", java.util.Map.of(
-            "distanciaMinKm", distanciaMinKm,
-            "velocidadMaxKmh", velocidadMaxKmh,
-            "ventanaMinMinutos", ventanaMinMinutos
-        ));
+                "distanciaMinKm", distanciaMinKm,
+                "velocidadMaxKmh", velocidadMaxKmh,
+                "ventanaMinMinutos", ventanaMinMinutos));
 
         return result;
     }
@@ -291,13 +297,14 @@ public class ReportService {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     public static java.time.LocalDateTime parseTimestamp(Date fecha, String horaStr) {
-        if (fecha == null) return null;
+        if (fecha == null)
+            return null;
         java.time.LocalDate localDate;
         if (fecha instanceof java.sql.Date) {
             localDate = ((java.sql.Date) fecha).toLocalDate();
@@ -343,8 +350,7 @@ public class ReportService {
                 "distanciaMaxKm", distanciaMaxKm,
                 "precisionMaxM", precisionMaxM,
                 "patronPct", patronPct,
-                "patronMinDecl", patronMinDecl
-        ));
+                "patronMinDecl", patronMinDecl));
 
         if (!activo) {
             response.put("totalDeclaracionesEvaluadas", 0);
@@ -359,7 +365,8 @@ public class ReportService {
             return response;
         }
 
-        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesOrigenGeo(startDate, endDate, regionId);
+        List<java.util.Map<String, Object>> filas = reportRepository.getDeclaracionesOrigenGeo(startDate, endDate,
+                regionId);
 
         long totalSinGps = 0;
         long totalSinReferencia = 0;
@@ -403,7 +410,8 @@ public class ReportService {
             String refNombre = fila.get("refNombre") != null ? fila.get("refNombre").toString() : null;
             String refFuente = fila.get("refFuente") != null ? fila.get("refFuente").toString() : null;
 
-            // TG.2: Resolución de referencia en Java mediante caché de ReferenciaOrigenService
+            // TG.2: Resolución de referencia en Java mediante caché de
+            // ReferenciaOrigenService
             if (referenciaOrigenService != null) {
                 String tipoDecl = fila.get("tipo") != null ? fila.get("tipo").toString() : "";
                 Long caletaId = fila.get("caletaId") != null ? ((Number) fila.get("caletaId")).longValue() : null;
@@ -412,8 +420,8 @@ public class ReportService {
                 String varaderoTexto = fila.get("varadero") != null ? fila.get("varadero").toString() : null;
                 Long comunaId = fila.get("comunaId") != null ? ((Number) fila.get("comunaId")).longValue() : null;
 
-                com.trazalga.api.dto.geo.PuntoReferencia puntoRef =
-                        referenciaOrigenService.resolverPorIds(tipoDecl, caletaId, amerbId, varaderoId, varaderoTexto, comunaId);
+                com.trazalga.api.dto.geo.PuntoReferencia puntoRef = referenciaOrigenService.resolverPorIds(tipoDecl,
+                        caletaId, amerbId, varaderoId, varaderoTexto, comunaId);
                 if (puntoRef != null) {
                     refLat = puntoRef.getLat();
                     refLon = puntoRef.getLon();
@@ -423,7 +431,8 @@ public class ReportService {
                 }
             }
 
-            Double precision = fila.get("precisionGpsM") != null ? ((Number) fila.get("precisionGpsM")).doubleValue() : null;
+            Double precision = fila.get("precisionGpsM") != null ? ((Number) fila.get("precisionGpsM")).doubleValue()
+                    : null;
             Boolean offline = Boolean.TRUE.equals(fila.get("envioOffline"));
 
             boolean tieneGps = (lat != null && lon != null);
@@ -504,7 +513,8 @@ public class ReportService {
             pctLejos = Math.round(pctLejos * 10.0) / 10.0;
 
             boolean sospechoso = (pctLejos >= patronPct) && (evaluadas >= patronMinDecl);
-            if (sospechoso) sospechososCount++;
+            if (sospechoso)
+                sospechososCount++;
 
             java.util.Map<String, Object> uMap = new java.util.LinkedHashMap<>();
             uMap.put("usuarioId", stat.usuarioId);
@@ -518,16 +528,21 @@ public class ReportService {
             uMap.put("sinReferencia", stat.sinRef);
             uMap.put("medianaDistanciaKm", medianaDist);
             uMap.put("patronSospechoso", sospechoso);
-            uMap.put("rotuloPatron", sospechoso ? "Patrón sospechoso — posible uso de clave por terceros" : "Comportamiento regular");
+            uMap.put("rotuloPatron",
+                    sospechoso ? "Patrón sospechoso — posible uso de clave por terceros" : "Comportamiento regular");
 
             rankingUsuarios.add(uMap);
         }
 
         rankingUsuarios.sort((a, b) -> {
-            int cmpSospechoso = Boolean.compare((Boolean) b.get("patronSospechoso"), (Boolean) a.get("patronSospechoso"));
-            if (cmpSospechoso != 0) return cmpSospechoso;
-            int cmpLejos = Integer.compare((Integer) b.get("declaracionesLejos"), (Integer) a.get("declaracionesLejos"));
-            if (cmpLejos != 0) return cmpLejos;
+            int cmpSospechoso = Boolean.compare((Boolean) b.get("patronSospechoso"),
+                    (Boolean) a.get("patronSospechoso"));
+            if (cmpSospechoso != 0)
+                return cmpSospechoso;
+            int cmpLejos = Integer.compare((Integer) b.get("declaracionesLejos"),
+                    (Integer) a.get("declaracionesLejos"));
+            if (cmpLejos != 0)
+                return cmpLejos;
             return Double.compare((Double) b.get("porcentajeLejos"), (Double) a.get("porcentajeLejos"));
         });
 
@@ -569,10 +584,12 @@ public class ReportService {
     /** El componente más caro de la cascada de resumen-global: 14,0 s medidos. */
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
     public java.util.Map<String, Object> getVariacionPesoMetrics(Date startDate, Date endDate, Double umbralPct) {
-        java.util.Map<String, Object> metrics = new java.util.LinkedHashMap<>(reportRepository.getVariacionPesoMetrics(startDate, endDate, umbralPct));
+        java.util.Map<String, Object> metrics = new java.util.LinkedHashMap<>(
+                reportRepository.getVariacionPesoMetrics(startDate, endDate, umbralPct));
         if (variacionPesoService != null) {
             try {
-                metrics.put("comercializadorPlanta", variacionPesoService.obtenerResumenComercializadorPlanta(startDate, endDate));
+                metrics.put("comercializadorPlanta",
+                        variacionPesoService.obtenerResumenComercializadorPlanta(startDate, endDate));
             } catch (Exception e) {
                 log.warn("Error calculando bloque comercializadorPlanta: {}", e.getMessage());
                 java.util.Map<String, Object> errBlock = new java.util.LinkedHashMap<>();
@@ -590,9 +607,11 @@ public class ReportService {
     }
 
     /**
-     * TV.3 · Lista paginada de recepciones comercializador -> planta evaluadas con la fórmula canónica.
+     * TV.3 · Lista paginada de recepciones comercializador -> planta evaluadas con
+     * la fórmula canónica.
      */
-    public PageDTO<ResultadoVariacionPesoDTO> getVariacionPesoRecepciones(FiltroRecepcionesVariacion filtro, Pageable pageable) {
+    public PageDTO<ResultadoVariacionPesoDTO> getVariacionPesoRecepciones(FiltroRecepcionesVariacion filtro,
+            Pageable pageable) {
         if (variacionPesoService == null) {
             return PageDTO.of(java.util.Collections.emptyList(), 0, 20, 0);
         }
@@ -600,7 +619,8 @@ public class ReportService {
     }
 
     /**
-     * TV.3 · Lista de orígenes biológicos que alimentaron a la planta (informativo bajo demanda).
+     * TV.3 · Lista de orígenes biológicos que alimentaron a la planta (informativo
+     * bajo demanda).
      */
     public List<OrigenInformativoDTO> getOrigenesRecepcionPlanta(Long plantaId) {
         if (variacionPesoService == null) {
@@ -620,7 +640,8 @@ public class ReportService {
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
-    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId, Long regionId) {
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlanta(Date startDate, Date endDate, Long especieId,
+            Long regionId) {
         return reportRepository.getCadenaOrigenPlanta(startDate, endDate, especieId, regionId);
     }
 
@@ -630,10 +651,10 @@ public class ReportService {
      * cadena, no con el volumen de la tabla.
      *
      * ⚠️ Sigue SIN MEDIRSE bajo carga: el escenario k6 enviaba el `tipo` como
-     *    texto cuando el controller espera un Integer, así que las peticiones
-     *    morían en el binding de Spring. Corregido en el script, pendiente de
-     *    ejecutar. El caché aquí es preventivo, no está justificado por una
-     *    medición.
+     * texto cuando el controller espera un Integer, así que las peticiones
+     * morían en el binding de Spring. Corregido en el script, pendiente de
+     * ejecutar. El caché aquí es preventivo, no está justificado por una
+     * medición.
      */
     @Cacheable(cacheNames = CacheConfig.CACHE_TRAZABILIDAD)
     public com.trazalga.api.dto.TrazabilidadResponseDTO getTrazabilidad(Integer tipo, Long id) {
@@ -645,20 +666,32 @@ public class ReportService {
     // =========================================================================
 
     @Cacheable(cacheNames = CacheConfig.CACHE_METRICAS)
-    public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate, Double umbralVariacion) {
+    public java.util.Map<String, Object> getTrazabilidadLoteMetrics(Date startDate, Date endDate,
+            Double umbralVariacion) {
         com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
         com.trazalga.api.services.parametros.ParametrosVariacion pVar = ps != null ? ps.variacion() : null;
         boolean bioPerdidaActivo = pVar != null ? pVar.bioPerdidaActivo() : true;
-        double umbral = umbralVariacion != null ? umbralVariacion : (pVar != null ? pVar.variacionPesoUmbralGeneralPct() : 5.0);
+        double umbral = umbralVariacion != null ? umbralVariacion
+                : (pVar != null ? pVar.variacionPesoUmbralGeneralPct() : 5.0);
         double mermaMinHumedo = pVar != null ? pVar.bioHumedoMermaMinimaPct() : 5.0;
         double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
         int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
-        int diasAmarilla = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3) : 3;
-        int diasNaranja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5) : 5;
-        int diasRoja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7) : 7;
+        int diasAmarilla = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3)
+                : 3;
+        int diasNaranja = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5)
+                : 5;
+        int diasRoja = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7)
+                : 7;
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : null;
+                ? retencionCustodiaService.getParametros()
+                : null;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
@@ -666,7 +699,9 @@ public class ReportService {
             diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
             diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
         }
-        String estadosSujetos = configService != null ? configService.getValor(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO") : "HUMEDO";
+        String estadosSujetos = configService != null ? configService.getValor(
+                com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO")
+                : "HUMEDO";
 
         java.util.Map<String, Object> res = reportRepository.getTrazabilidadLoteMetrics(
                 startDate, endDate, umbral, mermaMinHumedo, mermaMaxSeco,
@@ -676,7 +711,8 @@ public class ReportService {
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
-    public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(Date startDate, Date endDate, String semaforo) {
+    public List<java.util.Map<String, Object>> getTrazabilidadLoteDetalle(Date startDate, Date endDate,
+            String semaforo) {
         com.trazalga.api.services.parametros.ParametrosService ps = getParametrosService();
         com.trazalga.api.services.parametros.ParametrosVariacion pVar = ps != null ? ps.variacion() : null;
         boolean bioPerdidaActivo = pVar != null ? pVar.bioPerdidaActivo() : true;
@@ -685,11 +721,21 @@ public class ReportService {
         double mermaMaxSeco = pVar != null ? pVar.bioSecoMermaMaximaPct() : 3.0;
         int diasMinHumedo = pVar != null ? pVar.bioHumedoDiasMinimosTransito() : 3;
 
-        int diasAmarilla = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3) : 3;
-        int diasNaranja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5) : 5;
-        int diasRoja = configService != null ? configService.getInt(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7) : 7;
+        int diasAmarilla = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_AMARILLA, 3)
+                : 3;
+        int diasNaranja = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_NARANJA, 5)
+                : 5;
+        int diasRoja = configService != null
+                ? configService.getInt(
+                        com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_DIAS_ROJA, 7)
+                : 7;
         com.trazalga.api.services.parametros.ParametrosRetencion retParams = retencionCustodiaService != null
-                ? retencionCustodiaService.getParametros() : null;
+                ? retencionCustodiaService.getParametros()
+                : null;
         if (retParams != null) {
             int horasHumedo = retParams.humedoMaxHoras();
             double preavisoPct = retParams.semaforoPreavisoPct();
@@ -697,7 +743,9 @@ public class ReportService {
             diasNaranja = Math.max(diasAmarilla, (int) Math.round(horasHumedo / 24.0));
             diasRoja = Math.max(diasNaranja + 1, (int) Math.round((horasHumedo * 1.5) / 24.0));
         }
-        String estadosSujetos = configService != null ? configService.getValor(com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO") : "HUMEDO";
+        String estadosSujetos = configService != null ? configService.getValor(
+                com.trazalga.api.services.parametros.ParametrosService.PARAM_RETENCION_BODEGA_ESTADOS_SUJETOS, "HUMEDO")
+                : "HUMEDO";
 
         return reportRepository.getTrazabilidadLoteDetalle(
                 startDate, endDate, semaforo, umbral, mermaMinHumedo, mermaMaxSeco,
@@ -760,7 +808,8 @@ public class ReportService {
     }
 
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
-    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId, Long embarcacionId) {
+    public List<java.util.Map<String, Object>> getLedHallazgos(Date startDate, Date endDate, Long regionId,
+            Long embarcacionId) {
         return reportRepository.getLedHallazgos(startDate, endDate, regionId, embarcacionId);
     }
 
@@ -812,14 +861,16 @@ public class ReportService {
     }
 
     /**
-     * Consulta de control para detectar cadenas con mas de un salto de comercializador (T2.5).
+     * Consulta de control para detectar cadenas con mas de un salto de
+     * comercializador (T2.5).
      */
     public long contarComercializadoresMultisalto() {
         return reportRepository.contarComercializadoresMultisalto();
     }
 
     /**
-     * Stock disponible en planta: recepciones de abastecimiento aún no consumidas por producción ni destino (NA.2).
+     * Stock disponible en planta: recepciones de abastecimiento aún no consumidas
+     * por producción ni destino (NA.2).
      */
     public java.util.Map<String, Object> getStockEnPlanta(Long plantaId) {
         return reportRepository.getStockEnPlanta(plantaId);
@@ -828,13 +879,15 @@ public class ReportService {
     /**
      * Rendimiento de producción en planta de proceso (NP.7).
      */
-    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId, Long especieId) {
+    public java.util.Map<String, Object> getRendimientoPlanta(Date startDate, Date endDate, Long plantaId,
+            Long especieId) {
         return reportRepository.getRendimientoPlanta(startDate, endDate, plantaId, especieId);
     }
 
     /**
      * Resumen y bandeja de consultas ciudadanas de patentes (QC.4 / D39).
-     * Respeta exclusivamente los resultados anómalos configurados, nunca expone ip_hash y no crea marcas.
+     * Respeta exclusivamente los resultados anómalos configurados, nunca expone
+     * ip_hash y no crea marcas.
      */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public java.util.Map<String, Object> getConsultasCiudadanas(Date startDate, Date endDate) {
@@ -842,7 +895,8 @@ public class ReportService {
     }
 
     /**
-     * QM.3 / QE.1 · Mapa regional de flujos origen -> planta y detalle plano por declaración para exportación.
+     * QM.3 / QE.1 · Mapa regional de flujos origen -> planta y detalle plano por
+     * declaración para exportación.
      */
     @Cacheable(cacheNames = CacheConfig.CACHE_DETALLE)
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -853,8 +907,8 @@ public class ReportService {
 
     public java.util.Map<String, Object> getFlujosOrigenDestino(
             Date startDate, Date endDate, Long especieId, Long regionId, Long regionDestinoId) {
-        List<java.util.Map<String, Object>> filas =
-                reportRepository.getCadenaOrigenPlantaFlujosRaw(startDate, endDate, especieId, regionId, regionDestinoId);
+        List<java.util.Map<String, Object>> filas = reportRepository.getCadenaOrigenPlantaFlujosRaw(startDate, endDate,
+                especieId, regionId, regionDestinoId);
 
         List<java.util.Map<String, Object>> declaraciones = new java.util.ArrayList<>();
         java.util.Map<Long, Double> pesoRomanaPorRecepcion = new java.util.HashMap<>();
@@ -948,15 +1002,15 @@ public class ReportService {
                 origNombre = firstNonBlank(catalogoNombre, "Punto GPS (" + origenTipoDecl + ")");
                 String baseId = caletaId != null ? "C" + caletaId
                         : amerbId != null ? "A" + amerbId
-                        : varaderoId != null ? "V" + varaderoId
-                        : normalizarClave(origNombre);
+                                : varaderoId != null ? "V" + varaderoId
+                                        : normalizarClave(origNombre);
                 origGroupKey = "GPS|" + origenTipoDecl + "|" + baseId;
             } else {
                 origNombre = firstNonBlank(catalogoNombre, "Sin ubicación (" + origenTipoDecl + ")");
                 String baseId = caletaId != null ? "C" + caletaId
                         : amerbId != null ? "A" + amerbId
-                        : varaderoId != null ? "V" + varaderoId
-                        : normalizarClave(origNombre);
+                                : varaderoId != null ? "V" + varaderoId
+                                        : normalizarClave(origNombre);
                 origGroupKey = "NONE|" + origenTipoDecl + "|" + baseId;
             }
 
@@ -1027,7 +1081,8 @@ public class ReportService {
                 comFuentePrincipal = "SIN_COORDENADAS";
             }
 
-            String especie = firstNonBlank(strOrNull(fila.get("origenEspecieNombre")), strOrNull(fila.get("recepcionEspecieNombre")));
+            String especie = firstNonBlank(strOrNull(fila.get("origenEspecieNombre")),
+                    strOrNull(fila.get("recepcionEspecieNombre")));
             double desembarqueKg = doubleOrZero(fila.get("desembarqueKg"));
             double capturaKg = doubleOrZero(fila.get("capturaKg"));
             double pesoRomanaKg = doubleOrZero(fila.get("pesoRomanaKg"));
@@ -1112,7 +1167,8 @@ public class ReportService {
                 acc.origFuente = origFuente;
                 acc.origFuenteDetalle = origFuenteDetalle;
             }
-            if ("SIN_COORDENADAS".equals(acc.plantaFuente) || ("GPS".equals(acc.plantaFuente) && "REFERENCIA".equals(plFuente))) {
+            if ("SIN_COORDENADAS".equals(acc.plantaFuente)
+                    || ("GPS".equals(acc.plantaFuente) && "REFERENCIA".equals(plFuente))) {
                 if (plLat != null && plLon != null) {
                     acc.plantaLat = plLat;
                     acc.plantaLon = plLon;
@@ -1254,7 +1310,8 @@ public class ReportService {
     }
 
     private static String firstNonBlank(String... candidates) {
-        if (candidates == null) return null;
+        if (candidates == null)
+            return null;
         for (String c : candidates) {
             if (c != null && !c.trim().isEmpty()) {
                 return c.trim();

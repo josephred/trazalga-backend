@@ -31,7 +31,8 @@ public class DeclaracionArmadorController {
     @Autowired
     private IDeclaracionArmadorRepository declaracionArmadorRepository;
 
-    // Refinamiento 30-10 · punto 3: alertas en las respuestas, congelamiento, sesión y dueño
+    // Refinamiento 30-10 · punto 3: alertas en las respuestas, congelamiento,
+    // sesión y dueño
     @Autowired
     private com.trazalga.api.services.declaraciones.PoliticaEdicionDeclaracion politicaEdicion;
 
@@ -69,14 +70,16 @@ public class DeclaracionArmadorController {
         respuesta.put("hasNext", hayMas);
         return ResponseEntity.ok(respuesta);
     }
-    
+
     /**
      * Obtener todas las declaraciones de armador por ID de usuario
      */
     @GetMapping(path = "/usuario/{idUsuario}")
-    public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(@PathVariable("idUsuario") Long idUsuario){
+    public ArrayList<DeclaracionArmadorModel> getDeclaracionesArmadorIdUsuario(
+            @PathVariable("idUsuario") Long idUsuario) {
         politicaLectura.verificarUsuario(idUsuario);
-        return politicaEdicion.anotarLote("ARMADOR", this.declaracionArmadorService.getDeclaracionesArmadorIdUsuario(idUsuario));
+        return politicaEdicion.anotarLote("ARMADOR",
+                this.declaracionArmadorService.getDeclaracionesArmadorIdUsuario(idUsuario));
     }
 
     /**
@@ -89,7 +92,7 @@ public class DeclaracionArmadorController {
         }
         return politicaEdicion.anotar(this.declaracionArmadorService.saveDeclaracionArmador(declaracionArmador));
     }
-    
+
     /**
      * Obtener una declaración de armador por ID
      */
@@ -102,16 +105,15 @@ public class DeclaracionArmadorController {
     /**
      * Obtener declaraciones de armador donde usuarioDestinatario es NULL
      */
-    @Operation(summary = "Obtener declaraciones pendientes para un destinatario",
-               description = "Devuelve una lista de declaraciones de armador que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
+    @Operation(summary = "Obtener declaraciones pendientes para un destinatario", description = "Devuelve una lista de declaraciones de armador que han sido asignadas a un usuario destinatario pero que aún no han sido procesadas por él (declaracion_destinatario_id es nulo).")
     @ApiResponse(responseCode = "200", description = "Lista de declaraciones pendientes")
     @GetMapping("/usuariosdestinatarios/{usuarioDestinatarioId}")
     public ResponseEntity<List<DeclaracionArmadorModel>> getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(
             @Parameter(description = "ID del usuario destinatario") @PathVariable Long usuarioDestinatarioId,
-            @Parameter(description = "Al editar un documento consumidor ya guardado, incluye también las declaraciones que ese documento ya consumió")
-            @RequestParam(required = false) Long consumidasPorId) {
+            @Parameter(description = "Al editar un documento consumidor ya guardado, incluye también las declaraciones que ese documento ya consumió") @RequestParam(required = false) Long consumidasPorId) {
         politicaLectura.verificarDestinatario(usuarioDestinatarioId);
-        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService.getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
+        List<DeclaracionArmadorModel> declaraciones = declaracionArmadorService
+                .getDeclaracionesByUsuarioDestinatarioConDeclaracionNula(usuarioDestinatarioId, consumidasPorId);
         return ResponseEntity.ok(declaraciones);
     }
 
@@ -119,7 +121,8 @@ public class DeclaracionArmadorController {
      * Actualizar una declaración de armador por ID
      */
     @PutMapping(path = "{id}")
-    public DeclaracionArmadorModel updateDeclaracionArmadorById(@RequestBody DeclaracionArmadorModel request, @PathVariable("id") Long id) {
+    public DeclaracionArmadorModel updateDeclaracionArmadorById(@RequestBody DeclaracionArmadorModel request,
+            @PathVariable("id") Long id) {
         politicaEdicion.verificarSesionYDueno("ARMADOR", id);
         return politicaEdicion.anotar(this.declaracionArmadorService.updateById(request, id));
     }
@@ -128,10 +131,10 @@ public class DeclaracionArmadorController {
      * Eliminar una declaración de armador por ID
      */
     @DeleteMapping(path = "/{id}")
-    public String deleteById(@PathVariable("id") Long id ){
+    public String deleteById(@PathVariable("id") Long id) {
         politicaEdicion.verificarSesionYDueno("ARMADOR", id);
         boolean ok = this.declaracionArmadorService.deleteDeclaracionArmador(id);
-        if(ok){
+        if (ok) {
             return "Declaración " + id + " eliminada correctamente.";
         } else {
             return "ERROR al eliminar la declaración.";

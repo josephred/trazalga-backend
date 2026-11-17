@@ -97,9 +97,12 @@ public class DeclaracionRecolectorModel {
     private ExtraccionTipoModel extraccionTipo;
 
     /**
-     * Método cuya cuota recibe la captura cuando hay imputación cruzada por veda (refinamiento 23-10):
-     * p. ej. varado para un barreteado declarado en veda sin cuota de barreteado. Nulo = consume con el
-     * método declarado. Lo calcula el servidor; el método declarado (extraccionTipo) no se modifica.
+     * Método cuya cuota recibe la captura cuando hay imputación cruzada por veda
+     * (refinamiento 23-10):
+     * p. ej. varado para un barreteado declarado en veda sin cuota de barreteado.
+     * Nulo = consume con el
+     * método declarado. Lo calcula el servidor; el método declarado
+     * (extraccionTipo) no se modifica.
      */
     @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     @Column(name = "extraccion_tipo_imputacion_id", nullable = true)
@@ -150,7 +153,8 @@ public class DeclaracionRecolectorModel {
     private String consumidaPorTipo;
 
     // Peso verificado por el receptor al recibir esta declaración (kg).
-    // Permite conciliar contra lo declarado en origen (indicador variación de peso).
+    // Permite conciliar contra lo declarado en origen (indicador variación de
+    // peso).
     @Column(name = "peso_recepcionado", nullable = true)
     private Double pesoRecepcionado;
 
@@ -165,10 +169,11 @@ public class DeclaracionRecolectorModel {
 
     /**
      * Estado del ciclo de negociación de la declaración:
-     *  ENVIADA (default) -> NEGOCIACION (al primer mensaje de gestión)
-     *  -> RECHAZADA (el destinatario la rechaza; sale de sus seleccionables)
-     *  -> NEGOCIACION (el emisor la corrige y la re-envía).
-     * El estado "consumida/procesada" NO vive aquí: se deriva de declaracionDestinatario.
+     * ENVIADA (default) -> NEGOCIACION (al primer mensaje de gestión)
+     * -> RECHAZADA (el destinatario la rechaza; sale de sus seleccionables)
+     * -> NEGOCIACION (el emisor la corrige y la re-envía).
+     * El estado "consumida/procesada" NO vive aquí: se deriva de
+     * declaracionDestinatario.
      */
     @Column(nullable = true, length = 20)
     private String estado;
@@ -176,21 +181,27 @@ public class DeclaracionRecolectorModel {
     @Transient
     private List<BuzoModel> buzos;
 
-    // Retenida por un hallazgo (bodega virtual o declaración de origen congelada). Modificador Java
-    // `transient` y no @Transient: Hibernate6Module omite en el JSON los campos con @Transient y la app
+    // Retenida por un hallazgo (bodega virtual o declaración de origen congelada).
+    // Modificador Java
+    // `transient` y no @Transient: Hibernate6Module omite en el JSON los campos con
+    // @Transient y la app
     // nunca recibía estos datos para deshabilitar la carga en su selector.
     private transient Boolean bloqueada;
 
     private transient String motivoBloqueo;
 
-    // Refinamiento 30-10, punto 3. Campos no persistentes con el modificador Java «transient» y no con
-    // @Transient de JPA: el módulo Hibernate de Jackson omite los campos @Transient al serializar, y la app
+    // Refinamiento 30-10, punto 3. Campos no persistentes con el modificador Java
+    // «transient» y no con
+    // @Transient de JPA: el módulo Hibernate de Jackson omite los campos @Transient
+    // al serializar, y la app
     // necesita recibir estos tres.
     /** Alertas de fiscalización de la declaración, para la app. */
     private transient List<com.trazalga.api.dto.AlertaDeclaracionDTO> alertas;
 
-    /** Tiene una alerta que la congela: su dueño no puede modificarla ni eliminarla. */
+    /**
+     * Tiene una alerta que la congela: su dueño no puede modificarla ni eliminarla.
+     */
     private transient Boolean edicionBloqueada;
 
     private transient String motivoEdicionBloqueada;
-}
+}

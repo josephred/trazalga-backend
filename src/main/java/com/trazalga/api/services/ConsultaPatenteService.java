@@ -48,8 +48,10 @@ import com.trazalga.api.services.EstadoTrasladoPatente.EvaluacionPatente;
 /**
  * TN.1, TN.2 y TN.4 · Servicio de consulta de patentes en dos niveles:
  * <ul>
- *   <li>Ciudadano ({@code consultarPublica} / {@code consultar}): respuesta mínima con lista blanca.</li>
- *   <li>Fiscalizador ({@code consultarFiscalizador}): traza exhaustiva y registro en {@code consulta_folio_log}.</li>
+ * <li>Ciudadano ({@code consultarPublica} / {@code consultar}): respuesta
+ * mínima con lista blanca.</li>
+ * <li>Fiscalizador ({@code consultarFiscalizador}): traza exhaustiva y registro
+ * en {@code consulta_folio_log}.</li>
  * </ul>
  */
 @Service
@@ -118,11 +120,11 @@ public class ConsultaPatenteService {
         this.ipHashSecretProp = ipHashSecret != null ? ipHashSecret : "";
     }
 
-    public static final java.util.regex.Pattern PATENTE_VALIDA =
-            java.util.regex.Pattern.compile("^[A-Z0-9]{5,8}$");
+    public static final java.util.regex.Pattern PATENTE_VALIDA = java.util.regex.Pattern.compile("^[A-Z0-9]{5,8}$");
 
     public static String normalizarPatente(String patente) {
-        if (patente == null) return "";
+        if (patente == null)
+            return "";
         return patente.toUpperCase().replaceAll("[\\s-]", "").trim();
     }
 
@@ -134,7 +136,8 @@ public class ConsultaPatenteService {
      * TN.2 · Consulta pública ciudadana en formato DTO de lista blanca.
      */
     @Transactional
-    public ConsultaPatentePublicaDTO consultarPublica(String patenteInput, HttpServletRequest request, LocalDateTime ahoraOverride) {
+    public ConsultaPatentePublicaDTO consultarPublica(String patenteInput, HttpServletRequest request,
+            LocalDateTime ahoraOverride) {
         String patente = normalizarPatente(patenteInput);
         LocalDateTime ahora = ahoraOverride != null ? ahoraOverride : LocalDateTime.now();
 
@@ -175,8 +178,8 @@ public class ConsultaPatenteService {
                 }
             }
             builder.fechaHoraAutorizacion(ev.getFechaHoraAutorizacion() != null
-                            ? ev.getFechaHoraAutorizacion().format(ISO_SEC)
-                            : null)
+                    ? ev.getFechaHoraAutorizacion().format(ISO_SEC)
+                    : null)
                     .tipoAlga(ev.getTipoAlga() != null ? ev.getTipoAlga() : "Alga parda");
             if (muestraComuna && ev.getComunaDestino() != null) {
                 builder.comunaDestino(ev.getComunaDestino());
@@ -201,8 +204,10 @@ public class ConsultaPatenteService {
     }
 
     /**
-     * ZC.5 (D54): Registra intención anónima de denuncia (FONO o WHATSAPP) en consulta_patente_log
-     * cuando consulta_publica_registra_denuncia está activo. Sin datos del ciudadano.
+     * ZC.5 (D54): Registra intención anónima de denuncia (FONO o WHATSAPP) en
+     * consulta_patente_log
+     * cuando consulta_publica_registra_denuncia está activo. Sin datos del
+     * ciudadano.
      */
     @Transactional(readOnly = false)
     public boolean registrarIntencionDenuncia(String patenteNorm, String canal, HttpServletRequest request) {
@@ -254,7 +259,8 @@ public class ConsultaPatenteService {
     }
 
     /**
-     * TN.2 · Devuelve exactamente el mapa de lista blanca de {@link ConsultaPatentePublicaDTO}.
+     * TN.2 · Devuelve exactamente el mapa de lista blanca de
+     * {@link ConsultaPatentePublicaDTO}.
      */
     @Transactional
     public Map<String, Object> consultar(String patenteInput, HttpServletRequest request) {
@@ -326,7 +332,8 @@ public class ConsultaPatenteService {
                 .build();
     }
 
-    private List<MovimientoPatenteDTO> construirMovimientosFiscalizador(String patente, LocalDate desde, LocalDate hasta) {
+    private List<MovimientoPatenteDTO> construirMovimientosFiscalizador(String patente, LocalDate desde,
+            LocalDate hasta) {
         if (patente.isEmpty()) {
             return Collections.emptyList();
         }
@@ -334,7 +341,8 @@ public class ConsultaPatenteService {
 
         // 1. Despachos de comercializador con esa patente
         if (comercializadorRepository != null) {
-            List<DeclaracionComercializadorModel> despachos = comercializadorRepository.findCandidatosPorPatente(patente);
+            List<DeclaracionComercializadorModel> despachos = comercializadorRepository
+                    .findCandidatosPorPatente(patente);
             if (despachos != null) {
                 for (DeclaracionComercializadorModel dc : despachos) {
                     Date fBase = dc.getFechaTraslado() != null ? dc.getFechaTraslado() : dc.getFechaDeclaracion();
@@ -346,7 +354,8 @@ public class ConsultaPatenteService {
             }
         }
 
-        // 2. Recepciones directas en planta con esa patente que no provengan de un despacho ya listado
+        // 2. Recepciones directas en planta con esa patente que no provengan de un
+        // despacho ya listado
         if (plantaRepository != null) {
             Set<Long> plantasYaListadas = new HashSet<>();
             for (MovimientoPatenteDTO m : lista) {
@@ -387,7 +396,8 @@ public class ConsultaPatenteService {
                 for (DeclaracionPlantaDestinoModel dpd : destinos) {
                     Date fBase = dpd.getFechaTrasladoDestino() != null
                             ? dpd.getFechaTrasladoDestino()
-                            : (dpd.getFechaTraslado() != null ? dpd.getFechaTraslado() : dpd.getFechaDeclaracionDestino());
+                            : (dpd.getFechaTraslado() != null ? dpd.getFechaTraslado()
+                                    : dpd.getFechaDeclaracionDestino());
                     if (!enRango(fBase, desde, hasta) && !enRango(dpd.getFechaDeclaracionDestino(), desde, hasta)) {
                         continue;
                     }
@@ -444,7 +454,8 @@ public class ConsultaPatenteService {
                             || !enRango(ar.getFechaDeclaracion(), desde, hasta)) {
                         continue;
                     }
-                    String folio = ar.getFolioDesembarqueAmerb() != null ? ar.getFolioDesembarqueAmerb() : ar.getFolioOrigen();
+                    String folio = ar.getFolioDesembarqueAmerb() != null ? ar.getFolioDesembarqueAmerb()
+                            : ar.getFolioOrigen();
                     BigDecimal kilos = ar.getDesembarque() != null ? BigDecimal.valueOf(ar.getDesembarque()) : null;
                     lista.add(construirMovimientoOrigenDirecto(
                             "AREA", ar.getId(), ar.getFolioOrigen(), folio,
@@ -487,13 +498,15 @@ public class ConsultaPatenteService {
         String estadoMov = "EN_TRANSITO";
         String motivoRet = null;
         if (bloqueoCargaService != null && dc.getId() != null) {
-            Map<Long, MotivoBloqueoDTO> bloq = bloqueoCargaService.bloqueosPorTipoEIds("COMERCIALIZADOR", List.of(dc.getId()));
+            Map<Long, MotivoBloqueoDTO> bloq = bloqueoCargaService.bloqueosPorTipoEIds("COMERCIALIZADOR",
+                    List.of(dc.getId()));
             if (bloq != null && bloq.containsKey(dc.getId())) {
                 estadoMov = "RETENIDO";
                 MotivoBloqueoDTO b = bloq.get(dc.getId());
                 motivoRet = "Retenido por " + b.getMarca() + " (hallazgo #" + b.getMarcaId() + ")";
             } else if (dc.getDeclaracionesSeleccionadas() != null && !dc.getDeclaracionesSeleccionadas().isBlank()) {
-                Map<String, MotivoBloqueoDTO> bCargas = bloqueoCargaService.bloqueosPara(dc.getDeclaracionesSeleccionadas());
+                Map<String, MotivoBloqueoDTO> bCargas = bloqueoCargaService
+                        .bloqueosPara(dc.getDeclaracionesSeleccionadas());
                 if (bCargas != null && !bCargas.isEmpty()) {
                     estadoMov = "RETENIDO";
                     MotivoBloqueoDTO b = bCargas.values().iterator().next();
@@ -512,9 +525,11 @@ public class ConsultaPatenteService {
         String recLugarAcopio = null;
 
         if (dc.getDeclaracionDestinatario() != null
-                && (dc.getConsumidaPorTipo() == null || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(dc.getConsumidaPorTipo()))
+                && (dc.getConsumidaPorTipo() == null
+                        || "PLANTA_ABASTECIMIENTO".equalsIgnoreCase(dc.getConsumidaPorTipo()))
                 && plantaRepository != null) {
-            Optional<DeclaracionPlantaAbastecimientoModel> optP = plantaRepository.findById(dc.getDeclaracionDestinatario());
+            Optional<DeclaracionPlantaAbastecimientoModel> optP = plantaRepository
+                    .findById(dc.getDeclaracionDestinatario());
             if (optP.isPresent()) {
                 DeclaracionPlantaAbastecimientoModel p = optP.get();
                 if (!"RETENIDO".equals(estadoMov)) {
@@ -607,9 +622,12 @@ public class ConsultaPatenteService {
                 .patenteCamion(patCamion)
                 .patenteCarro(patCarro.isEmpty() ? null : patCarro)
                 .tipoVehiculo(dpa.getVehiculoTransporte())
-                .docTipo(dpa.getDocumentoTributarioOrigenTipo() != null ? dpa.getDocumentoTributarioOrigenTipo() : dpa.getDocumentoTributarioTipo())
-                .docNumero(dpa.getDocumentoTributarioOrigenNumero() != null ? dpa.getDocumentoTributarioOrigenNumero() : dpa.getDocumentoTributarioNumero())
-                .docFecha(dpa.getDocumentoTributarioOrigenFecha() != null ? dpa.getDocumentoTributarioOrigenFecha() : dpa.getDocumentoTributarioFecha())
+                .docTipo(dpa.getDocumentoTributarioOrigenTipo() != null ? dpa.getDocumentoTributarioOrigenTipo()
+                        : dpa.getDocumentoTributarioTipo())
+                .docNumero(dpa.getDocumentoTributarioOrigenNumero() != null ? dpa.getDocumentoTributarioOrigenNumero()
+                        : dpa.getDocumentoTributarioNumero())
+                .docFecha(dpa.getDocumentoTributarioOrigenFecha() != null ? dpa.getDocumentoTributarioOrigenFecha()
+                        : dpa.getDocumentoTributarioFecha())
                 .destinoNombre(plantaNom)
                 .destinoRut(plantaRut)
                 .destinoComuna(plantaComuna)
@@ -645,7 +663,8 @@ public class ConsultaPatenteService {
         String motivoRet = null;
         if (bloqueoCargaService != null && dpd.getDeclaracionesSeleccionadas() != null
                 && !dpd.getDeclaracionesSeleccionadas().isBlank()) {
-            Map<String, MotivoBloqueoDTO> bProds = bloqueoCargaService.bloqueosPara(dpd.getDeclaracionesSeleccionadas());
+            Map<String, MotivoBloqueoDTO> bProds = bloqueoCargaService
+                    .bloqueosPara(dpd.getDeclaracionesSeleccionadas());
             if (bProds != null && !bProds.isEmpty()) {
                 estadoMov = "RETENIDO";
                 MotivoBloqueoDTO b = bProds.values().iterator().next();
@@ -670,7 +689,8 @@ public class ConsultaPatenteService {
                 .choferRut(dpd.getRutChofer())
                 .patenteCamion(normalizarPatente(dpd.getPlacaPatente()))
                 .patenteCarro(dpd.getPlacaPatenteCarro() != null && !dpd.getPlacaPatenteCarro().isBlank()
-                        ? normalizarPatente(dpd.getPlacaPatenteCarro()) : null)
+                        ? normalizarPatente(dpd.getPlacaPatenteCarro())
+                        : null)
                 .tipoVehiculo(dpd.getVehiculoTransporte())
                 .docTipo(dpd.getDocumentoTributarioTipo())
                 .docNumero(dpd.getDocumentoTributarioNumero())
@@ -703,8 +723,10 @@ public class ConsultaPatenteService {
         String destRut = destRutFallback;
         String destComuna = "Comuna no informada";
         if (destinatario != null) {
-            if (destNom == null || destNom.isBlank()) destNom = destinatario.getNombreCompleto();
-            if (destRut == null || destRut.isBlank()) destRut = destinatario.getRut();
+            if (destNom == null || destNom.isBlank())
+                destNom = destinatario.getNombreCompleto();
+            if (destRut == null || destRut.isBlank())
+                destRut = destinatario.getRut();
             if (destinatario.getComuna() != null && destinatario.getComuna().getNombre() != null) {
                 destComuna = destinatario.getComuna().getNombre();
             }
@@ -731,7 +753,8 @@ public class ConsultaPatenteService {
             Optional<DeclaracionPlantaAbastecimientoModel> optP = plantaRepository.findById(declaracionDestinatario);
             if (optP.isPresent()) {
                 DeclaracionPlantaAbastecimientoModel p = optP.get();
-                if (!"RETENIDO".equals(estadoMov)) estadoMov = "RECIBIDO";
+                if (!"RETENIDO".equals(estadoMov))
+                    estadoMov = "RECIBIDO";
                 recPlantaId = p.getId();
                 recFecha = p.getFechaIngresoPlanta();
                 recHora = p.getHora();
@@ -753,7 +776,8 @@ public class ConsultaPatenteService {
                 .comercializadorNombre(emisorNom)
                 .patenteCamion(normalizarPatente(placaPatente))
                 .patenteCarro(placaPatenteCarro != null && !placaPatenteCarro.isBlank()
-                        ? normalizarPatente(placaPatenteCarro) : null)
+                        ? normalizarPatente(placaPatenteCarro)
+                        : null)
                 .destinoNombre(destNom)
                 .destinoRut(destRut)
                 .destinoComuna(destComuna)
@@ -795,7 +819,8 @@ public class ConsultaPatenteService {
     }
 
     private boolean enRango(Date fecha, LocalDate desde, LocalDate hasta) {
-        if (fecha == null) return false;
+        if (fecha == null)
+            return false;
         LocalDate ld;
         if (fecha instanceof java.sql.Date sqlDate) {
             ld = sqlDate.toLocalDate();
@@ -804,8 +829,10 @@ public class ConsultaPatenteService {
         } else {
             ld = fecha.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         }
-        if (desde != null && ld.isBefore(desde)) return false;
-        if (hasta != null && ld.isAfter(hasta)) return false;
+        if (desde != null && ld.isBefore(desde))
+            return false;
+        if (hasta != null && ld.isAfter(hasta))
+            return false;
         return true;
     }
 
@@ -826,7 +853,8 @@ public class ConsultaPatenteService {
     }
 
     private void registrarFolioLogPatente(String userRut, String patente, int totalResultados) {
-        if (folioLogRepository == null) return;
+        if (folioLogRepository == null)
+            return;
         try {
             ConsultaFolioLogModel log = ConsultaFolioLogModel.builder()
                     .usuarioRut(userRut != null && !userRut.isBlank() ? userRut : "ANONIMO")
@@ -840,7 +868,8 @@ public class ConsultaPatenteService {
     }
 
     private void registrarLog(String patente, HttpServletRequest request, String resultado) {
-        if (logRepository == null) return;
+        if (logRepository == null)
+            return;
         try {
             String ip = getClientIp(request);
             String ipHash = hashIp(ip);
@@ -861,7 +890,8 @@ public class ConsultaPatenteService {
     }
 
     public String hashIp(String ip) {
-        if (ip == null || ip.isBlank()) return "ANONYMOUS";
+        if (ip == null || ip.isBlank())
+            return "ANONYMOUS";
         try {
             byte[] keyBytes = (ipHashSecretProp != null && !ipHashSecretProp.isBlank())
                     ? ipHashSecretProp.getBytes(StandardCharsets.UTF_8)
