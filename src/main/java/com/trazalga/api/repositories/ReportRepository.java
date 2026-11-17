@@ -4552,15 +4552,24 @@ public class ReportRepository {
     @SuppressWarnings("unchecked")
     public List<java.util.Map<String, Object>> getCadenaOrigenPlantaFlujosRaw(
             Date startDate, Date endDate, Long especieId, Long regionId) {
+        return getCadenaOrigenPlantaFlujosRaw(startDate, endDate, especieId, regionId, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> getCadenaOrigenPlantaFlujosRaw(
+            Date startDate, Date endDate, Long especieId, Long regionId, Long regionDestinoId) {
         StringBuilder sqlPlanta = new StringBuilder(
                 "SELECT dpa.id, " +
                 "COALESCE(NULLIF(TRIM(dpa.folio_declaracion_a_pla), ''), NULLIF(TRIM(dpa.folio_origen), ''), CONCAT('DPA-', dpa.id)), " +
                 "dpa.fecha_ingreso_planta, dpa.peso_romana_kg, dpa.especie_id, e.nombre, " +
                 "dpa.codigo_sernapesca, dpa.nombre_planta, dpa.latitud, dpa.longitud, dpa.declaraciones_seleccionadas, " +
-                "up.rut, up.nombres, up.apellidop, up.apellidom " +
+                "up.rut, up.nombres, up.apellidop, up.apellidom, " +
+                "com_up.region_id, com_up.nombre, reg_up.nombre " +
                 "FROM declaracion_planta_abastecimiento dpa " +
                 "LEFT JOIN especie e ON dpa.especie_id = e.id " +
                 "LEFT JOIN usuario up ON dpa.usuario_id = up.id " +
+                "LEFT JOIN comuna com_up ON up.comuna_id = com_up.id " +
+                "LEFT JOIN region reg_up ON com_up.region_id = reg_up.id " +
                 "WHERE dpa.peso_romana_kg > 0");
         if (startDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta >= :startDate");
         if (endDate != null) sqlPlanta.append(" AND dpa.fecha_ingreso_planta <= :endDate");
@@ -4590,7 +4599,37 @@ public class ReportRepository {
             Double lon;
             String plantaUsuarioRut;
             String plantaUsuarioNombre;
+            Long regionDestinoId;
+            String regionDestinoNombre;
+            String comunaDestinoNombre;
             java.util.Map<String, List<Long>> tokens;
+        }
+        class DestinoGeoInfo {
+            String comunaNombre;
+            Long regionId;
+            String regionNombre;
+        }
+        java.util.Map<String, DestinoGeoInfo> plantaGeoPorCodigo = new java.util.HashMap<>();
+        java.util.Map<String, DestinoGeoInfo> plantaGeoPorRut = new java.util.HashMap<>();
+        List<Object[]> plGeoRows = entityManager.createNativeQuery(
+                "SELECT pl.codigo, pl.rut, com.nombre, com.region_id, reg.nombre " +
+                "FROM planta pl " +
+                "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
+                "LEFT JOIN region reg ON com.region_id = reg.id")
+                .getResultList();
+        for (Object[] pr : plGeoRows) {
+            if (pr[3] == null) continue;
+            DestinoGeoInfo info = new DestinoGeoInfo();
+            info.comunaNombre = pr[2] != null ? pr[2].toString() : null;
+            info.regionId = ((Number) pr[3]).longValue();
+            info.regionNombre = pr[4] != null ? pr[4].toString() : null;
+            if (pr[0] != null && !pr[0].toString().isBlank()) {
+                plantaGeoPorCodigo.putIfAbsent(pr[0].toString().trim(), info);
+            }
+            if (pr[1] != null && !pr[1].toString().isBlank()) {
+                String normRut = pr[1].toString().replaceAll("[.\\-\\s]", "").toUpperCase(java.util.Locale.ROOT);
+                plantaGeoPorRut.putIfAbsent(normRut, info);
+            }
         }
         class ComRow {
             Long id;
@@ -4637,9 +4676,32 @@ public class ReportRepository {
             p.tokens = com.trazalga.api.services.trazabilidad.SeleccionTokens.parse(r[10] != null ? r[10].toString() : null);
             p.plantaUsuarioRut = r[11] != null ? r[11].toString() : null;
             p.plantaUsuarioNombre = unirNombreUsuario(r[12], r[13], r[14]);
+            DestinoGeoInfo geoPl = null;
+            if (p.codigoSernapesca != null && !p.codigoSernapesca.isBlank()) {
+                geoPl = plantaGeoPorCodigo.get(p.codigoSernapesca.trim());
+            }
+            if (geoPl == null && p.plantaUsuarioRut != null && !p.plantaUsuarioRut.isBlank()) {
+                String normRut = p.plantaUsuarioRut.replaceAll("[.\\-\\s]", "").toUpperCase(java.util.Locale.ROOT);
+                geoPl = plantaGeoPorRut.get(normRut);
+            }
+            if (geoPl != null) {
+                p.regionDestinoId = geoPl.regionId;
+                p.comunaDestinoNombre = geoPl.comunaNombre;
+                p.regionDestinoNombre = geoPl.regionNombre;
+            } else {
+                p.regionDestinoId = r[15] != null ? ((Number) r[15]).longValue() : null;
+                p.comunaDestinoNombre = r[16] != null ? r[16].toString() : null;
+                p.regionDestinoNombre = r[17] != null ? r[17].toString() : null;
+            }
+            if (regionDestinoId != null && !regionDestinoId.equals(p.regionDestinoId)) {
+                continue;
+            }
             plantas.add(p);
             dpaIds.add(p.id);
             allCIds.addAll(com.trazalga.api.services.trazabilidad.SeleccionTokens.idsParaTipo(p.tokens, "COMERCIALIZADOR"));
+        }
+        if (plantas.isEmpty()) {
+            return java.util.Collections.emptyList();
         }
 
         String filtroPlanta = "UPPER(COALESCE(consumida_por_tipo, '')) IN ('PLANTA', 'PLANTA_ABASTECIMIENTO')";
@@ -4799,6 +4861,9 @@ public class ReportRepository {
                 row.put("plantaGpsLon", p.lon);
                 row.put("plantaUsuarioRut", p.plantaUsuarioRut);
                 row.put("plantaUsuarioNombre", p.plantaUsuarioNombre);
+                row.put("plantaRegionId", p.regionDestinoId);
+                row.put("plantaRegionNombre", p.regionDestinoNombre);
+                row.put("plantaComunaNombre", p.comunaDestinoNombre);
                 resultado.add(row);
             }
         }
@@ -4979,9 +5044,18 @@ public class ReportRepository {
             }
         }
 
-        List<Object[]> plRows = entityManager.createNativeQuery(
-                "SELECT pl.id, pl.codigo, pl.nombre, pl.tipo, pl.latitud, pl.longitud, pl.fuente_coordenada FROM planta pl")
-                .getResultList();
+        StringBuilder sqlPl = new StringBuilder(
+                "SELECT pl.id, pl.codigo, pl.nombre, pl.tipo, pl.latitud, pl.longitud, pl.fuente_coordenada, " +
+                "com.nombre, com.region_id, reg.nombre " +
+                "FROM planta pl " +
+                "LEFT JOIN comuna com ON pl.comuna_id = com.id " +
+                "LEFT JOIN region reg ON com.region_id = reg.id");
+        if (regionId != null) {
+            sqlPl.append(" WHERE com.region_id = :regionId");
+        }
+        Query qPl = entityManager.createNativeQuery(sqlPl.toString());
+        if (regionId != null) qPl.setParameter("regionId", regionId);
+        List<Object[]> plRows = qPl.getResultList();
         int plTotal = 0;
         int plConCoords = 0;
         for (Object[] r : plRows) {
@@ -4998,6 +5072,9 @@ public class ReportRepository {
                 item.put("latitud", lat);
                 item.put("longitud", lon);
                 item.put("fuente", r[6] != null ? r[6].toString() : null);
+                item.put("comuna", r[7] != null ? r[7].toString() : null);
+                item.put("regionId", r[8] != null ? ((Number) r[8]).longValue() : null);
+                item.put("region", r[9] != null ? r[9].toString() : null);
                 plantas.add(item);
             }
         }

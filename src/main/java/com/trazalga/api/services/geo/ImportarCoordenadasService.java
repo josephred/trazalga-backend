@@ -31,6 +31,9 @@ public class ImportarCoordenadasService {
     private final ICoordenadaCambioLogRepository cambioLogRepository;
     private final ReferenciaOrigenService referenciaOrigenService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private IComunaRepository comunaRepository;
+
     private static final double TOLERANCIA_DIFERENCIA_COORD = 0.0001; // ~11 metros
     private static final Set<String> TIPOS_PLANTA_VALIDOS = Set.of("SECADO", "PROCESO", "OTRA");
 
@@ -453,6 +456,9 @@ public class ImportarCoordenadasService {
     private void vincularRegistroPlanta(FilaResultadoImportacionDto filaRes, PlantaModel planta) {
         filaRes.setEntidadId(planta.getId());
         filaRes.setEntidadNombre(planta.getNombre());
+        filaRes.setEntidadComuna(planta.getComuna() != null ? planta.getComuna().getNombre() : null);
+        filaRes.setEntidadRegion(planta.getComuna() != null && planta.getComuna().getRegion() != null
+                ? planta.getComuna().getRegion().getNombre() : null);
         filaRes.setLatitudActual(planta.getLatitud());
         filaRes.setLongitudActual(planta.getLongitud());
         filaRes.setFuenteActual(planta.getFuenteCoordenada());
@@ -628,8 +634,36 @@ public class ImportarCoordenadasService {
                         if (filaRes.getTipoPlanta() != null && !filaRes.getTipoPlanta().isBlank()) {
                             p.setTipo(filaRes.getTipoPlanta());
                         }
+                        if (filaRes.getComuna() != null && !filaRes.getComuna().isBlank() && comunaRepository != null) {
+                            ComunaModel comMatch = resolverComunaPorNombre(filaRes.getComuna(), filaRes.getRegion());
+                            if (comMatch != null) {
+                                p.setComuna(comMatch);
+                            }
+                        }
                     });
         }
+    }
+
+    private ComunaModel resolverComunaPorNombre(String comunaNombre, String regionNombre) {
+        if (comunaRepository == null || comunaNombre == null || comunaNombre.isBlank()) return null;
+        String comNorm = CoordenadaNormalizer.normalizarTexto(comunaNombre);
+        String regNorm = CoordenadaNormalizer.normalizarTexto(regionNombre);
+        List<ComunaModel> candidatas = comunaRepository.findAll().stream()
+                .filter(c -> CoordenadaNormalizer.normalizarTexto(c.getNombre()).equals(comNorm))
+                .collect(Collectors.toList());
+        if (candidatas.size() == 1) {
+            return candidatas.get(0);
+        }
+        if (candidatas.size() > 1 && !regNorm.isEmpty()) {
+            List<ComunaModel> porReg = candidatas.stream()
+                    .filter(c -> c.getRegion() != null
+                            && CoordenadaNormalizer.normalizarTexto(c.getRegion().getNombre()).equals(regNorm))
+                    .collect(Collectors.toList());
+            if (porReg.size() == 1) {
+                return porReg.get(0);
+            }
+        }
+        return null;
     }
 
     /**

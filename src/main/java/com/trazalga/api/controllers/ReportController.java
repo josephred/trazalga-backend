@@ -1208,8 +1208,10 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate,
             @RequestParam(required = false) Long especieId,
-            @RequestParam(required = false) Long regionId) {
-        return ResponseEntity.ok(reportService.getFlujosOrigenDestino(startDate, endDate, especieId, regionId));
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long regionDestinoId) {
+        return ResponseEntity.ok(
+                reportService.getFlujosOrigenDestino(startDate, endDate, especieId, regionId, regionDestinoId));
     }
 
     @GetMapping("/capas-georreferencia")

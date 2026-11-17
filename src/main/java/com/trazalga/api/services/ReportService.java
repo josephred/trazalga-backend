@@ -848,8 +848,13 @@ public class ReportService {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public java.util.Map<String, Object> getFlujosOrigenDestino(
             Date startDate, Date endDate, Long especieId, Long regionId) {
+        return getFlujosOrigenDestino(startDate, endDate, especieId, regionId, null);
+    }
+
+    public java.util.Map<String, Object> getFlujosOrigenDestino(
+            Date startDate, Date endDate, Long especieId, Long regionId, Long regionDestinoId) {
         List<java.util.Map<String, Object>> filas =
-                reportRepository.getCadenaOrigenPlantaFlujosRaw(startDate, endDate, especieId, regionId);
+                reportRepository.getCadenaOrigenPlantaFlujosRaw(startDate, endDate, especieId, regionId, regionDestinoId);
 
         List<java.util.Map<String, Object>> declaraciones = new java.util.ArrayList<>();
         java.util.Map<Long, Double> pesoRomanaPorRecepcion = new java.util.HashMap<>();
@@ -870,6 +875,9 @@ public class ReportService {
             String plantaCodigo;
             String plantaNombre;
             String plantaRut;
+            Long plantaRegionId;
+            String plantaRegionNombre;
+            String plantaComunaNombre;
             Double plantaLat;
             Double plantaLon;
             String plantaFuente = "SIN_COORDENADAS";
@@ -1050,8 +1058,14 @@ public class ReportService {
             declRow.put("comercializadorLongitud", comLonPrincipal);
             declRow.put("comercializadorFuente", comFuentePrincipal);
             declRow.put("comercializadores", comercializadoresDecl);
+            Long plantaRegionId = longOrNull(fila.get("plantaRegionId"));
+            String plantaRegionNombre = strOrNull(fila.get("plantaRegionNombre"));
+            String plantaComunaNombre = strOrNull(fila.get("plantaComunaNombre"));
             declRow.put("plantaNombre", plNombre);
             declRow.put("plantaCodigo", plantaCodigo);
+            declRow.put("plantaComuna", plantaComunaNombre);
+            declRow.put("plantaRegionId", plantaRegionId);
+            declRow.put("plantaRegionNombre", plantaRegionNombre);
             declRow.put("plantaLatitud", plLat);
             declRow.put("plantaLongitud", plLon);
             declRow.put("plantaFuente", plFuente);
@@ -1086,6 +1100,9 @@ public class ReportService {
                 p.plantaCodigo = fPlCodigo;
                 p.plantaNombre = fPlNombre;
                 p.plantaRut = fPlRut;
+                p.plantaRegionId = plantaRegionId;
+                p.plantaRegionNombre = plantaRegionNombre;
+                p.plantaComunaNombre = plantaComunaNombre;
                 return p;
             });
 
@@ -1175,6 +1192,9 @@ public class ReportService {
             java.util.Map<String, Object> plantaMap = new java.util.LinkedHashMap<>();
             plantaMap.put("codigo", acc.plantaCodigo);
             plantaMap.put("nombre", acc.plantaNombre);
+            plantaMap.put("comuna", acc.plantaComunaNombre);
+            plantaMap.put("regionId", acc.plantaRegionId);
+            plantaMap.put("regionNombre", acc.plantaRegionNombre);
             plantaMap.put("latitud", acc.plantaLat);
             plantaMap.put("longitud", acc.plantaLon);
             plantaMap.put("fuente", acc.plantaFuente);
