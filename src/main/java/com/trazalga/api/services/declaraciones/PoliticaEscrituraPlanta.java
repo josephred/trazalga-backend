@@ -108,6 +108,9 @@ public class PoliticaEscrituraPlanta {
     public void verificarLotesDeProduccion(Long plantaUsuarioId, String seleccion, Long produccionId) {
         List<Long> ids = ids(seleccion, ABASTECIMIENTO);
         if (ids.isEmpty()) {
+            if (configService == null || configService.getBoolean("produccion_exige_lotes", true)) {
+                throw new ValidacionPlantaException("Debe seleccionar al menos un lote de abastecimiento.");
+            }
             return;
         }
         Map<Long, DeclaracionPlantaAbastecimientoModel> porId = new java.util.HashMap<>();

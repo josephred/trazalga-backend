@@ -1,12 +1,14 @@
 package com.trazalga.api.controllers;
 
 import com.trazalga.api.IntegracionBase;
+import com.trazalga.api.models.DeclaracionPlantaAbastecimientoModel;
 import com.trazalga.api.models.DeclaracionPlantaDestinoModel;
 import com.trazalga.api.models.DeclaracionPlantaProduccionModel;
 import com.trazalga.api.models.EspecieModel;
 import com.trazalga.api.models.HumedadEstadoModel;
 import com.trazalga.api.models.ProductoModel;
 import com.trazalga.api.models.UsuarioModel;
+import com.trazalga.api.repositories.IDeclaracionPlantaAbastecimientoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaDestinoRepository;
 import com.trazalga.api.repositories.IDeclaracionPlantaProduccionRepository;
 import com.trazalga.api.repositories.IEspecieRepository;
@@ -43,6 +45,7 @@ class ProductoFormatoIT extends IntegracionBase {
     @Autowired private IHumedadEstadoRepository humedadRepo;
     @Autowired private IEspecieRepository especieRepo;
     @Autowired private IUsuarioRepository usuarioRepo;
+    @Autowired private IDeclaracionPlantaAbastecimientoRepository abastRepo;
     @Autowired private IDeclaracionPlantaProduccionRepository produccionRepo;
     @Autowired private IDeclaracionPlantaDestinoRepository destinoRepo;
     @Autowired private ConfiguracionGeneralService configService;
@@ -62,6 +65,7 @@ class ProductoFormatoIT extends IntegracionBase {
 
         destinoRepo.deleteAll();
         produccionRepo.deleteAll();
+        abastRepo.deleteAll();
         productoRepo.deleteAll();
 
         humSeco = humedadRepo.findAll().stream().filter(h -> "Seco".equalsIgnoreCase(h.getNombre())).findFirst()
@@ -204,11 +208,21 @@ class ProductoFormatoIT extends IntegracionBase {
     void exigeFormatoOficial_rechazaInactivoOSinCodigo() throws Exception {
         configService.updateConfig("produccion_exige_formato_oficial", "true");
 
+        DeclaracionPlantaAbastecimientoModel lote = abastRepo.save(DeclaracionPlantaAbastecimientoModel.builder()
+                .folioOrigen("F-2").folioDeclaracionAPla("A-PLA-FMT-1")
+                .fechaIngresoPlanta(Date.valueOf("2026-11-12")).fechaTraslado(Date.valueOf("2026-11-12"))
+                .hora("08:30").nombrePlanta("Planta Formatos").codigoSernapesca("PL-FMT")
+                .usuario(planta).usuarioDestinatario(planta)
+                .especie(especiePelillo).humedadEstado(humSeco)
+                .cantidad(new BigDecimal("100"))
+                .build());
+
         String baseProd = "{\"folioOrigen\":\"F-2\",\"fechaProduccion\":\"2026-11-12\",\"hora\":\"09:00\","
                 + "\"nombrePlanta\":\"Planta Formatos\",\"codigoSernapesca\":\"PL-FMT\","
                 + "\"usuario\":{\"id\":" + planta.getId() + "},"
                 + "\"materiaPrimaEspecie\":{\"id\":" + especiePelillo.getId() + "},"
                 + "\"humedadEstado\":{\"id\":" + humSeco.getId() + "},"
+                + "\"declaracionesSeleccionadas\":\"PLANTA_ABASTECIMIENTO:" + lote.getId() + "\","
                 + "\"cantidadMateriaPrima\":100,\"cantidadProducto\":40,";
 
         // Formato inactivo -> 422

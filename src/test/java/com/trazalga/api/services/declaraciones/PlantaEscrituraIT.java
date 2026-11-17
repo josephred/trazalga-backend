@@ -163,7 +163,9 @@ class PlantaEscrituraIT extends IntegracionBase {
     @Test
     @DisplayName("Destino con una producción de otra planta: 409")
     void destino_produccionDeOtraPlanta_409() {
-        DeclaracionPlantaProduccionModel ajena = produccionService.save(produccion(plantaB, null));
+        DeclaracionPlantaAbastecimientoModel loteB = abastecimiento(plantaB, "DAPLA-NP0-OTRA-B");
+        DeclaracionPlantaProduccionModel ajena = produccionService.save(
+                produccion(plantaB, "PLANTA_ABASTECIMIENTO:" + loteB.getId()));
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> destinoService.save(destino(plantaA, "PLANTA_PRODUCCION:" + ajena.getId())));
@@ -176,7 +178,9 @@ class PlantaEscrituraIT extends IntegracionBase {
     @Test
     @DisplayName("PUT y DELETE de producción con la sesión de otra planta: 403; la producción no cambia")
     void produccion_sesionDeOtraPlanta_403() throws Exception {
-        DeclaracionPlantaProduccionModel p = produccionService.save(produccion(plantaA, null));
+        DeclaracionPlantaAbastecimientoModel loteA1 = abastecimiento(plantaA, "DAPLA-NP0-403-A1");
+        DeclaracionPlantaProduccionModel p = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + loteA1.getId()));
 
         mockMvc.perform(put("/api/declaracion-planta-produccion/" + p.getId()).with(user(RUT_PLANTA_B).roles("USER"))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -217,7 +221,9 @@ class PlantaEscrituraIT extends IntegracionBase {
     @Test
     @DisplayName("Sin sesión: con declaracion_escritura_exige_sesion encendido, 401; apagado, se permite como hasta ahora")
     void sinSesion_segunParametro() throws Exception {
-        DeclaracionPlantaProduccionModel p = produccionService.save(produccion(plantaA, null));
+        DeclaracionPlantaAbastecimientoModel loteA2 = abastecimiento(plantaA, "DAPLA-NP0-SES-A2");
+        DeclaracionPlantaProduccionModel p = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + loteA2.getId()));
 
         configuracionGeneralService.updateConfig("declaracion_escritura_exige_sesion", "true");
         mockMvc.perform(delete("/api/declaracion-planta-produccion/" + p.getId()).with(anonymous()))
@@ -233,7 +239,9 @@ class PlantaEscrituraIT extends IntegracionBase {
     @Test
     @DisplayName("El dueño, con su sesión, elimina su producción")
     void dueno_elimina() throws Exception {
-        DeclaracionPlantaProduccionModel p = produccionService.save(produccion(plantaA, null));
+        DeclaracionPlantaAbastecimientoModel loteA3 = abastecimiento(plantaA, "DAPLA-NP0-DEL-A3");
+        DeclaracionPlantaProduccionModel p = produccionService.save(
+                produccion(plantaA, "PLANTA_ABASTECIMIENTO:" + loteA3.getId()));
 
         mockMvc.perform(delete("/api/declaracion-planta-produccion/" + p.getId()).with(user(RUT_PLANTA_A).roles("USER")))
                 .andExpect(status().isOk());

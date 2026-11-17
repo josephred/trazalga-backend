@@ -100,13 +100,15 @@ class AbastecimientoPlantaIT extends IntegracionBase {
         DeclaracionPlantaAbastecimientoModel editadaA = abastecimientoService.updateById(cambioA, guardadaA.getId());
         assertEquals(plantaA.getId(), editadaA.getUsuarioDestinatario().getId());
 
-        DeclaracionPlantaProduccionModel entradaP = produccion(plantaA, null);
+        DeclaracionPlantaProduccionModel entradaP = produccion(
+                plantaA, "PLANTA_ABASTECIMIENTO:" + guardadaA.getId());
         entradaP.setUsuarioDestinatario(plantaB);
         DeclaracionPlantaProduccionModel guardadaP = produccionService.save(entradaP);
         assertNotNull(guardadaP.getUsuarioDestinatario());
         assertEquals(plantaA.getId(), guardadaP.getUsuarioDestinatario().getId());
 
-        DeclaracionPlantaProduccionModel cambioP = produccion(plantaA, null);
+        DeclaracionPlantaProduccionModel cambioP = produccion(
+                plantaA, "PLANTA_ABASTECIMIENTO:" + guardadaA.getId());
         cambioP.setUsuarioDestinatario(plantaB);
         cambioP.setCantidadProducto(new BigDecimal("420.00"));
         DeclaracionPlantaProduccionModel editadaP = produccionService.updateById(cambioP, guardadaP.getId());
