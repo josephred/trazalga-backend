@@ -11,11 +11,15 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +61,12 @@ import com.trazalga.api.services.EstadoTrasladoPatente.EvaluacionPatente;
 @Service
 public class ConsultaPatenteService {
 
+    private static final Logger log = LoggerFactory.getLogger(ConsultaPatenteService.class);
+
     private static final DateTimeFormatter ISO_SEC = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+    @Autowired(required = false)
+    private Environment environment;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -118,6 +127,34 @@ public class ConsultaPatenteService {
 
     public void setIpHashSecret(String ipHashSecret) {
         this.ipHashSecretProp = ipHashSecret != null ? ipHashSecret : "";
+    }
+
+    /**
+     * YC.1: Advierte al arrancar si falta {@code trazalga.consulta.ip-hash-secret}
+     * ({@code TRAZALGA_IP_HASH_SECRET}), y en perfil {@code prod} impide el arranque.
+     */
+    @PostConstruct
+    public void validarConfiguracionIpHashSecret() {
+        if (ipHashSecretProp == null || ipHashSecretProp.isBlank()) {
+            String mensaje = "trazalga.consulta.ip-hash-secret (TRAZALGA_IP_HASH_SECRET) no configurado: "
+                    + "la huella de IP cambia en cada reinicio.";
+            if (esPerfilProd()) {
+                throw new IllegalStateException(mensaje);
+            }
+            log.warn(mensaje);
+        }
+    }
+
+    private boolean esPerfilProd() {
+        if (environment == null) {
+            return false;
+        }
+        for (String perfil : environment.getActiveProfiles()) {
+            if ("prod".equalsIgnoreCase(perfil)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static final java.util.regex.Pattern PATENTE_VALIDA = java.util.regex.Pattern.compile("^[A-Z0-9]{5,8}$");
