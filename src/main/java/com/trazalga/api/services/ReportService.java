@@ -925,6 +925,7 @@ public class ReportService {
             Double origLon;
             String origFuente = "SIN_COORDENADAS";
             String origFuenteDetalle;
+            String origReferenciaFuente = "SIN_COORD";
 
             String plantaCodigo;
             String plantaNombre;
@@ -979,6 +980,7 @@ public class ReportService {
             Double origLon = null;
             String origFuente = "SIN_COORDENADAS";
             String origFuenteDetalle = null;
+            String origReferenciaFuente = "SIN_COORD";
             String origTipoPunto = origenTipoDecl;
             Long origPointId = null;
             String origNombre;
@@ -990,6 +992,7 @@ public class ReportService {
                 origFuente = "REFERENCIA";
                 origFuenteDetalle = puntoRefOrigen.getFuente();
                 origTipoPunto = firstNonBlank(puntoRefOrigen.getTipo(), origenTipoDecl);
+                origReferenciaFuente = normalizarFuenteReferenciaOrigen(origTipoPunto, origFuenteDetalle);
                 origPointId = puntoRefOrigen.getId();
                 origNombre = firstNonBlank(puntoRefOrigen.getNombre(), catalogoNombre, origenTipoDecl);
                 origGroupKey = "REF|" + origTipoPunto + "|" +
@@ -999,6 +1002,7 @@ public class ReportService {
                 origLon = origGpsLon;
                 origFuente = "GPS";
                 origFuenteDetalle = "GPS_DECLARACION";
+                origReferenciaFuente = "GPS";
                 origNombre = firstNonBlank(catalogoNombre, "Punto GPS (" + origenTipoDecl + ")");
                 String baseId = caletaId != null ? "C" + caletaId
                         : amerbId != null ? "A" + amerbId
@@ -1106,6 +1110,7 @@ public class ReportService {
             declRow.put("origenLongitud", origLon);
             declRow.put("origenFuente", origFuente);
             declRow.put("origenFuenteDetalle", origFuenteDetalle);
+            declRow.put("origenReferenciaFuente", origReferenciaFuente);
             declRow.put("regionId", rowRegionId);
             declRow.put("regionNombre", rowRegionNombre);
             declRow.put("comercializadorFolio", strOrNull(fila.get("comercializadorFolio")));
@@ -1166,6 +1171,7 @@ public class ReportService {
                 acc.origLon = origLon;
                 acc.origFuente = origFuente;
                 acc.origFuenteDetalle = origFuenteDetalle;
+                acc.origReferenciaFuente = origReferenciaFuente;
             }
             if ("SIN_COORDENADAS".equals(acc.plantaFuente)
                     || ("GPS".equals(acc.plantaFuente) && "REFERENCIA".equals(plFuente))) {
@@ -1244,6 +1250,7 @@ public class ReportService {
             origMap.put("longitud", acc.origLon);
             origMap.put("fuente", acc.origFuente);
             origMap.put("fuenteDetalle", acc.origFuenteDetalle);
+            origMap.put("fuenteReferencia", acc.origReferenciaFuente);
 
             java.util.Map<String, Object> plantaMap = new java.util.LinkedHashMap<>();
             plantaMap.put("codigo", acc.plantaCodigo);
@@ -1375,6 +1382,28 @@ public class ReportService {
 
     public static boolean esCoordenadaChileValida(Double lat, Double lon) {
         return com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(lat, lon);
+    }
+
+    /**
+     * YR.3: Etiqueta compacta (<= 10 caracteres) de la fuente geográfica de origen
+     * para reportes, mapa de flujos y campo SIG {@code REF_ORI}.
+     */
+    public static String normalizarFuenteReferenciaOrigen(String tipoPunto, String fuenteDetalle) {
+        String t = tipoPunto != null ? tipoPunto.trim().toUpperCase(java.util.Locale.ROOT) : "";
+        String d = fuenteDetalle != null ? fuenteDetalle.trim().toUpperCase(java.util.Locale.ROOT) : "";
+        if ("VARADERO".equals(t) || d.contains("VARADERO")) {
+            return "VARADERO";
+        }
+        if ("CALETA".equals(t) || "CALETA".equals(d)) {
+            return "CALETA";
+        }
+        if ("AMERB".equals(t) || "AREA".equals(t) || "AMERB".equals(d)) {
+            return "AMERB";
+        }
+        if ("GPS".equals(t) || d.contains("GPS")) {
+            return "GPS";
+        }
+        return "SIN_COORD";
     }
 
     private static double redondearDosDec(double v) {

@@ -34,7 +34,7 @@ public final class FlujosSigExporter {
             "NOM_ORI", "LAT_ORI", "LON_ORI", "FTE_ORI",
             "FOLIO_COM", "LAT_COM", "LON_COM", "FTE_COM",
             "NOM_PLA", "COD_PLA", "COM_PLA", "LAT_PLA", "LON_PLA", "FTE_PLA",
-            "FOLIO_REC", "FECHA_REC", "ROMANA_KG"
+            "FOLIO_REC", "FECHA_REC", "ROMANA_KG", "REF_ORI"
     };
 
     public static final String[] HEADERS_TRAMOS = {
@@ -126,6 +126,7 @@ public final class FlujosSigExporter {
                 String fRec = strOrNull(d.get("recepcionFolio"));
                 String fechaRec = formatearFechaIso(d.get("recepcionFecha"));
                 Double romanaKg = toDoubleOrNull(d.get("pesoRomanaKg"));
+                String refOri = resolverRefOri(d);
 
                 setTextCell(row, 0, fOri);
                 setTextCell(row, 1, tipoOri);
@@ -150,6 +151,7 @@ public final class FlujosSigExporter {
                 setTextCell(row, 20, fRec);
                 setTextCell(row, 21, fechaRec);
                 setNumericCell(row, 22, romanaKg);
+                setTextCell(row, 23, refOri);
             }
             configurarAnchos(shDecl, HEADERS_DECLARACIONES.length);
 
@@ -236,7 +238,8 @@ public final class FlujosSigExporter {
                     strOrNull(d.get("plantaFuente")),
                     strOrNull(d.get("recepcionFolio")),
                     formatearFechaIso(d.get("recepcionFecha")),
-                    formatearNumero(toDoubleOrNull(d.get("pesoRomanaKg")), 2)
+                    formatearNumero(toDoubleOrNull(d.get("pesoRomanaKg")), 2),
+                    resolverRefOri(d)
             };
             for (int i = 0; i < cols.length; i++) {
                 if (i > 0) sb.append(';');
@@ -446,6 +449,7 @@ public final class FlujosSigExporter {
                 {"DECLARACIONES", "FOLIO_REC", "Texto", "Folio de recepcion en planta (A-PLA)"},
                 {"DECLARACIONES", "FECHA_REC", "Texto", "Fecha de ingreso a planta en formato AAAA-MM-DD"},
                 {"DECLARACIONES", "ROMANA_KG", "Numero", "Peso verificado en romana en kilogramos"},
+                {"DECLARACIONES", "REF_ORI", "Texto", "Fuente especifica del punto de origen (VARADERO, CALETA, AMERB, GPS, SIN_COORD)"},
                 {"TRAMOS", "ID_TRAMO", "Numero", "Identificador correlativo del segmento"},
                 {"TRAMOS", "FOLIO_ORI", "Texto", "Folio de declaracion origen asociada"},
                 {"TRAMOS", "FECHA_ORI", "Texto", "Fecha de declaracion origen AAAA-MM-DD"},
@@ -476,6 +480,26 @@ public final class FlujosSigExporter {
         row.createCell(0).setCellValue(label);
         row.createCell(1).setCellValue(val != null ? val : "");
         return rowNum + 1;
+    }
+
+    /**
+     * YR.3: Resuelve el valor compacto (<= 10 caracteres) para {@code REF_ORI}.
+     */
+    private static String resolverRefOri(Map<String, Object> d) {
+        String explicita = strOrNull(d.get("origenReferenciaFuente"));
+        if (explicita != null) {
+            String up = explicita.trim().toUpperCase(Locale.ROOT);
+            return up.length() > 10 ? up.substring(0, 10) : up;
+        }
+        String detalle = strOrNull(d.get("origenFuenteDetalle"));
+        String fte = strOrNull(d.get("origenFuente"));
+        if ("GPS".equalsIgnoreCase(fte)) {
+            return "GPS";
+        }
+        if (detalle != null) {
+            return ReportService.normalizarFuenteReferenciaOrigen(null, detalle);
+        }
+        return "SIN_COORD";
     }
 
     private static void setTextCell(Row row, int col, String value) {

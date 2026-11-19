@@ -118,37 +118,49 @@ public class FichaTrazabilidadService {
             if (entidad instanceof DeclaracionArmadorModel da) return referenciaOrigenService.resolverArmador(da);
             if (entidad instanceof DeclaracionAreaModel dam) return referenciaOrigenService.resolverArea(dam);
         }
-        // Fallback directo desde relaciones cargadas en la entidad (útil en tests sin ReferenciaOrigenService)
+        // Fallback directo desde relaciones cargadas en la entidad (útil en tests sin ReferenciaOrigenService; YR.3/YV.3: sólo rango Chile)
         if (entidad instanceof DeclaracionRecolectorModel dr) {
-            if (dr.getVaraderoRelacion() != null && dr.getVaraderoRelacion().getLatitud() != null && dr.getVaraderoRelacion().getLongitud() != null) {
+            if (dr.getVaraderoRelacion() != null
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            dr.getVaraderoRelacion().getLatitud(), dr.getVaraderoRelacion().getLongitud())) {
                 VaraderoModel v = dr.getVaraderoRelacion();
                 return new PuntoReferencia("VARADERO", v.getId(), v.getNombre(), v.getLatitud(), v.getLongitud(), "VARADERO_DECLARADO");
             }
-            if (dr.getCaleta() != null && dr.getCaleta().getLatitud() != null && dr.getCaleta().getLongitud() != null) {
+            if (dr.getCaleta() != null
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            dr.getCaleta().getLatitud(), dr.getCaleta().getLongitud())) {
                 CaletaModel c = dr.getCaleta();
                 return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
             }
             if (dr.getCaleta() != null && dr.getCaleta().getVaradero() != null
-                    && dr.getCaleta().getVaradero().getLatitud() != null && dr.getCaleta().getVaradero().getLongitud() != null) {
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            dr.getCaleta().getVaradero().getLatitud(), dr.getCaleta().getVaradero().getLongitud())) {
                 VaraderoModel vc = dr.getCaleta().getVaradero();
                 return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
             }
         } else if (entidad instanceof DeclaracionArmadorModel da) {
-            if (da.getCaleta() != null && da.getCaleta().getLatitud() != null && da.getCaleta().getLongitud() != null) {
+            if (da.getCaleta() != null
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            da.getCaleta().getLatitud(), da.getCaleta().getLongitud())) {
                 CaletaModel c = da.getCaleta();
                 return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
             }
             if (da.getCaleta() != null && da.getCaleta().getVaradero() != null
-                    && da.getCaleta().getVaradero().getLatitud() != null && da.getCaleta().getVaradero().getLongitud() != null) {
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            da.getCaleta().getVaradero().getLatitud(), da.getCaleta().getVaradero().getLongitud())) {
                 VaraderoModel vc = da.getCaleta().getVaradero();
                 return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
             }
         } else if (entidad instanceof DeclaracionAreaModel dam) {
-            if (dam.getAmerb() != null && dam.getAmerb().getLatitud() != null && dam.getAmerb().getLongitud() != null) {
+            if (dam.getAmerb() != null
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            dam.getAmerb().getLatitud(), dam.getAmerb().getLongitud())) {
                 AmerbModel am = dam.getAmerb();
                 return new PuntoReferencia("AMERB", am.getId(), am.getNombre(), am.getLatitud(), am.getLongitud(), "AMERB");
             }
-            if (dam.getCaleta() != null && dam.getCaleta().getLatitud() != null && dam.getCaleta().getLongitud() != null) {
+            if (dam.getCaleta() != null
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            dam.getCaleta().getLatitud(), dam.getCaleta().getLongitud())) {
                 CaletaModel c = dam.getCaleta();
                 return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
             }
