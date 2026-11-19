@@ -2,6 +2,7 @@ package com.trazalga.api.controllers;
 
 import com.trazalga.api.dto.geo.CoberturaCoordenadasDto;
 import com.trazalga.api.dto.geo.ResumenImportacionDto;
+import com.trazalga.api.services.geo.CorregirCoordenadasVaraderosService;
 import com.trazalga.api.services.geo.ImportarCoordenadasService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,9 +18,10 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.Map;
 
 /**
- * Controlador administrativo para carga masiva y auditoría de coordenadas GPS (TG.1).
+ * Controlador administrativo para carga masiva y auditoría de coordenadas GPS (TG.1 / YV.2).
  */
 @RestController
 @RequestMapping("/api/admin/coordenadas")
@@ -29,6 +31,7 @@ import java.security.Principal;
 public class CoordenadasAdminController {
 
     private final ImportarCoordenadasService importarCoordenadasService;
+    private final CorregirCoordenadasVaraderosService corregirCoordenadasVaraderosService;
 
     @PostMapping(value = "/importar", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.TEXT_PLAIN_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE, "*/*"})
     @PreAuthorize("hasRole('ADMIN')")
@@ -65,5 +68,17 @@ public class CoordenadasAdminController {
     @Operation(summary = "Obtiene estadísticas de cobertura georreferencial por región y global (TG.1)")
     public ResponseEntity<CoberturaCoordenadasDto> getCobertura() {
         return ResponseEntity.ok(importarCoordenadasService.obtenerCobertura());
+    }
+
+    @PostMapping("/varaderos/corregir")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Simula o aplica la corrección de coordenadas fuera de Chile en varaderos y caletas heredadas (YV.2 / YV.4)")
+    public ResponseEntity<Map<String, Object>> corregirCoordenadasVaraderos(
+            @RequestParam(value = "aplicar", defaultValue = "false") boolean aplicar,
+            Principal principal) {
+        String usuario = (principal != null) ? principal.getName() : "ADMIN";
+        return ResponseEntity.ok(aplicar
+                ? corregirCoordenadasVaraderosService.aplicar(usuario)
+                : corregirCoordenadasVaraderosService.simular(usuario));
     }
 }
