@@ -584,7 +584,12 @@ public class ValidacionDeclaracionService {
     private com.trazalga.api.dto.geo.PuntoReferencia resolverReferenciaConServicioORespaldo(
             String tipo, Long caletaId, Long amerbId, Long varaderoId, String textoVaradero, Long comunaId) {
         if (referenciaOrigenService != null) {
-            return referenciaOrigenService.resolverPorIds(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
+            com.trazalga.api.dto.geo.PuntoReferencia ref =
+                    referenciaOrigenService.resolverPorIds(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
+            if (ref != null && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                    ref.getLat(), ref.getLon())) {
+                return ref;
+            }
         }
         // Respaldo para pruebas unitarias sin ReferenciaOrigenService inyectado (YV.3: sólo en rango Chile)
         if (amerbId != null && amerbRepository != null) {
