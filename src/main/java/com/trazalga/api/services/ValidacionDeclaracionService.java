@@ -584,16 +584,13 @@ public class ValidacionDeclaracionService {
     private com.trazalga.api.dto.geo.PuntoReferencia resolverReferenciaConServicioORespaldo(
             String tipo, Long caletaId, Long amerbId, Long varaderoId, String textoVaradero, Long comunaId) {
         if (referenciaOrigenService != null) {
-            com.trazalga.api.dto.geo.PuntoReferencia ref =
-                    referenciaOrigenService.resolverPorIds(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
-            if (ref != null) {
-                return ref;
-            }
+            return referenciaOrigenService.resolverPorIds(tipo, caletaId, amerbId, varaderoId, textoVaradero, comunaId);
         }
-        // Respaldo para pruebas unitarias sin ReferenciaOrigenService inyectado
+        // Respaldo para pruebas unitarias sin ReferenciaOrigenService inyectado (YV.3: sólo en rango Chile)
         if (amerbId != null && amerbRepository != null) {
             com.trazalga.api.models.AmerbModel amerb = amerbRepository.findById(amerbId).orElse(null);
-            if (amerb != null && amerb.getLatitud() != null && amerb.getLongitud() != null) {
+            if (amerb != null && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                    amerb.getLatitud(), amerb.getLongitud())) {
                 String fuente = amerb.getFuenteCoordenada() != null ? amerb.getFuenteCoordenada() : "AMERB";
                 return new com.trazalga.api.dto.geo.PuntoReferencia(
                         "AMERB", amerb.getId(), amerb.getNombre(), amerb.getLatitud(), amerb.getLongitud(), fuente);
@@ -601,13 +598,15 @@ public class ValidacionDeclaracionService {
         }
         if (caletaId != null && caletaRepository != null) {
             com.trazalga.api.models.CaletaModel caleta = caletaRepository.findById(caletaId).orElse(null);
-            if (caleta != null && caleta.getLatitud() != null && caleta.getLongitud() != null) {
+            if (caleta != null && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                    caleta.getLatitud(), caleta.getLongitud())) {
                 String fuente = caleta.getFuenteCoordenada() != null ? caleta.getFuenteCoordenada() : "CALETA";
                 return new com.trazalga.api.dto.geo.PuntoReferencia(
                         "CALETA", caleta.getId(), caleta.getNombre(), caleta.getLatitud(), caleta.getLongitud(), fuente);
             }
             if (caleta != null && caleta.getVaradero() != null
-                    && caleta.getVaradero().getLatitud() != null && caleta.getVaradero().getLongitud() != null) {
+                    && com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(
+                            caleta.getVaradero().getLatitud(), caleta.getVaradero().getLongitud())) {
                 String fuente = caleta.getVaradero().getFuenteCoordenada() != null
                         ? caleta.getVaradero().getFuenteCoordenada() : "VARADERO_CALETA";
                 return new com.trazalga.api.dto.geo.PuntoReferencia(

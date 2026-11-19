@@ -160,8 +160,12 @@ public class ReferenciaOrigenService {
     }
 
     // -------------------------------------------------------------
-    // Métodos de resolución por tipo de entidad
+    // Métodos de resolución por tipo de entidad (YV.3: sólo en rango Chile)
     // -------------------------------------------------------------
+    private static boolean coordValidaChile(Double lat, Double lon) {
+        return CoordenadaNormalizer.estaEnRangoChile(lat, lon);
+    }
+
     public PuntoReferencia resolverRecolector(DeclaracionRecolectorModel dr) {
         if (dr == null) return null;
 
@@ -169,7 +173,7 @@ public class ReferenciaOrigenService {
         if (dr.getVaraderoRelacion() != null && dr.getVaraderoRelacion().getId() != null) {
             VaraderoModel v = cacheVaradero.get(dr.getVaraderoRelacion().getId());
             if (v == null) v = dr.getVaraderoRelacion();
-            if (v != null && v.getLatitud() != null && v.getLongitud() != null) {
+            if (v != null && coordValidaChile(v.getLatitud(), v.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("VARADERO")
                         .id(v.getId())
@@ -182,7 +186,7 @@ public class ReferenciaOrigenService {
         } else if (dr.getVaradero() != null && !dr.getVaradero().trim().isEmpty()) {
             Long comunaId = dr.getComuna() != null ? dr.getComuna().getId() : (dr.getCaleta() != null && dr.getCaleta().getComuna() != null ? dr.getCaleta().getComuna().getId() : null);
             VaraderoModel vCalzado = calzarVaradero(dr.getVaradero(), comunaId);
-            if (vCalzado != null && vCalzado.getLatitud() != null && vCalzado.getLongitud() != null) {
+            if (vCalzado != null && coordValidaChile(vCalzado.getLatitud(), vCalzado.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("VARADERO")
                         .id(vCalzado.getId())
@@ -199,7 +203,7 @@ public class ReferenciaOrigenService {
         if (caletaId != null) {
             CaletaModel c = cacheCaleta.get(caletaId);
             if (c == null) c = dr.getCaleta();
-            if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+            if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("CALETA")
                         .id(c.getId())
@@ -213,7 +217,7 @@ public class ReferenciaOrigenService {
             if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                 VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
                 if (vc == null) vc = c.getVaradero();
-                if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                     return PuntoReferencia.builder()
                             .tipo("VARADERO")
                             .id(vc.getId())
@@ -236,7 +240,7 @@ public class ReferenciaOrigenService {
             // 1. Caleta de desembarque
             CaletaModel c = cacheCaleta.get(caletaId);
             if (c == null) c = da.getCaleta();
-            if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+            if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("CALETA")
                         .id(c.getId())
@@ -250,7 +254,7 @@ public class ReferenciaOrigenService {
             if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                 VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
                 if (vc == null) vc = c.getVaradero();
-                if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                     return PuntoReferencia.builder()
                             .tipo("VARADERO")
                             .id(vc.getId())
@@ -273,7 +277,7 @@ public class ReferenciaOrigenService {
         if (amerbId != null) {
             AmerbModel am = cacheAmerb.get(amerbId);
             if (am == null) am = dam.getAmerb();
-            if (am != null && am.getLatitud() != null && am.getLongitud() != null) {
+            if (am != null && coordValidaChile(am.getLatitud(), am.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("AMERB")
                         .id(am.getId())
@@ -290,7 +294,7 @@ public class ReferenciaOrigenService {
         if (caletaId != null) {
             CaletaModel c = cacheCaleta.get(caletaId);
             if (c == null) c = dam.getCaleta();
-            if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+            if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                 return PuntoReferencia.builder()
                         .tipo("CALETA")
                         .id(c.getId())
@@ -304,7 +308,7 @@ public class ReferenciaOrigenService {
             if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                 VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
                 if (vc == null) vc = c.getVaradero();
-                if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                     return PuntoReferencia.builder()
                             .tipo("VARADERO")
                             .id(vc.getId())
@@ -321,7 +325,7 @@ public class ReferenciaOrigenService {
 
     public PuntoReferencia resolverComercializador(DeclaracionComercializadorModel dc) {
         if (dc == null) return null;
-        if (dc.getLatitud() != null && dc.getLongitud() != null) {
+        if (coordValidaChile(dc.getLatitud(), dc.getLongitud())) {
             return PuntoReferencia.builder()
                     .tipo("LUGAR_DECLARACION")
                     .id(dc.getId())
@@ -413,7 +417,7 @@ public class ReferenciaOrigenService {
     }
 
     private static PuntoReferencia aPuntoReferenciaPlanta(PlantaModel p) {
-        if (p == null || p.getLatitud() == null || p.getLongitud() == null) {
+        if (p == null || !coordValidaChile(p.getLatitud(), p.getLongitud())) {
             return null;
         }
         String fuente = (p.getFuenteCoordenada() != null && !p.getFuenteCoordenada().isBlank())
@@ -439,7 +443,7 @@ public class ReferenciaOrigenService {
         if (oficial != null) {
             return oficial;
         }
-        if (dp.getLatitud() != null && dp.getLongitud() != null) {
+        if (coordValidaChile(dp.getLatitud(), dp.getLongitud())) {
             return PuntoReferencia.builder()
                     .tipo("PLANTA_RECEPCION")
                     .id(dp.getId())
@@ -503,24 +507,24 @@ public class ReferenciaOrigenService {
             // 1. Varadero
             if (varaderoId != null) {
                 VaraderoModel v = cacheVaradero.get(varaderoId);
-                if (v != null && v.getLatitud() != null && v.getLongitud() != null) {
+                if (v != null && coordValidaChile(v.getLatitud(), v.getLongitud())) {
                     return new PuntoReferencia("VARADERO", v.getId(), v.getNombre(), v.getLatitud(), v.getLongitud(), "VARADERO_DECLARADO");
                 }
             } else if (textoVaradero != null && comunaId != null) {
                 VaraderoModel v = calzarVaradero(textoVaradero, comunaId);
-                if (v != null && v.getLatitud() != null && v.getLongitud() != null) {
+                if (v != null && coordValidaChile(v.getLatitud(), v.getLongitud())) {
                     return new PuntoReferencia("VARADERO", v.getId(), v.getNombre(), v.getLatitud(), v.getLongitud(), "VARADERO_DECLARADO");
                 }
             }
             // 2. Caleta
             if (caletaId != null) {
                 CaletaModel c = cacheCaleta.get(caletaId);
-                if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+                if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                     return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
                 }
                 if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                     VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
-                    if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                    if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                         return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
                     }
                 }
@@ -528,12 +532,12 @@ public class ReferenciaOrigenService {
         } else if ("ARMADOR".equals(tipoNorm)) {
             if (caletaId != null) {
                 CaletaModel c = cacheCaleta.get(caletaId);
-                if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+                if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                     return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
                 }
                 if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                     VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
-                    if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                    if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                         return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
                     }
                 }
@@ -541,18 +545,18 @@ public class ReferenciaOrigenService {
         } else if ("AREA".equals(tipoNorm) || "AMERB".equals(tipoNorm)) {
             if (amerbId != null) {
                 AmerbModel am = cacheAmerb.get(amerbId);
-                if (am != null && am.getLatitud() != null && am.getLongitud() != null) {
+                if (am != null && coordValidaChile(am.getLatitud(), am.getLongitud())) {
                     return new PuntoReferencia("AMERB", am.getId(), am.getNombre(), am.getLatitud(), am.getLongitud(), "AMERB");
                 }
             }
             if (caletaId != null) {
                 CaletaModel c = cacheCaleta.get(caletaId);
-                if (c != null && c.getLatitud() != null && c.getLongitud() != null) {
+                if (c != null && coordValidaChile(c.getLatitud(), c.getLongitud())) {
                     return new PuntoReferencia("CALETA", c.getId(), c.getNombre(), c.getLatitud(), c.getLongitud(), "CALETA");
                 }
                 if (c != null && c.getVaradero() != null && c.getVaradero().getId() != null) {
                     VaraderoModel vc = cacheVaradero.get(c.getVaradero().getId());
-                    if (vc != null && vc.getLatitud() != null && vc.getLongitud() != null) {
+                    if (vc != null && coordValidaChile(vc.getLatitud(), vc.getLongitud())) {
                         return new PuntoReferencia("VARADERO", vc.getId(), vc.getNombre(), vc.getLatitud(), vc.getLongitud(), "VARADERO_CALETA");
                     }
                 }

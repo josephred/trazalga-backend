@@ -1374,13 +1374,7 @@ public class ReportService {
     }
 
     public static boolean esCoordenadaChileValida(Double lat, Double lon) {
-        if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
-            return false;
-        }
-        if (lat == 0.0 && lon == 0.0) {
-            return false;
-        }
-        return lat >= -56.0 && lat <= -17.0 && lon >= -76.0 && lon <= -66.0;
+        return com.trazalga.api.services.geo.CoordenadaNormalizer.estaEnRangoChile(lat, lon);
     }
 
     private static double redondearDosDec(double v) {

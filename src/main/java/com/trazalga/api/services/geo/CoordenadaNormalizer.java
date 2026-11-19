@@ -115,10 +115,13 @@ public class CoordenadaNormalizer {
     }
 
     /**
-     * Valida si las coordenadas están dentro del rango geográfico continental de Chile.
+     * Valida si las coordenadas están dentro del rango geográfico continental de Chile (criterio único YV.3).
      */
     public static boolean estaEnRangoChile(Double lat, Double lon) {
-        if (lat == null || lon == null) {
+        if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
+            return false;
+        }
+        if (lat == 0.0 && lon == 0.0) {
             return false;
         }
         return lat >= LAT_MIN && lat <= LAT_MAX && lon >= LON_MIN && lon <= LON_MAX;
