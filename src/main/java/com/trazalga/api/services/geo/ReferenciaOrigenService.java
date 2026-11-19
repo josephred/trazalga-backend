@@ -107,18 +107,32 @@ public class ReferenciaOrigenService {
     }
 
     // -------------------------------------------------------------
-    // Calce de varadero por texto y comuna
+    // Calce de varadero por texto y comuna (TG.2 / YR.1)
     // -------------------------------------------------------------
-    public VaraderoModel calzarVaradero(String textoVaradero, Long comunaId) {
+    public enum EstadoCalceVaradero {
+        UNICO,
+        AMBIGUO,
+        SIN_CALCE
+    }
+
+    public record ResultadoCalceVaradero(
+            EstadoCalceVaradero estado,
+            VaraderoModel varadero,
+            int candidatos) {
+    }
+
+    public ResultadoCalceVaradero evaluarCalceVaradero(String textoVaradero, Long comunaId) {
         if (textoVaradero == null || textoVaradero.trim().isEmpty() || comunaId == null) {
-            return null;
+            return new ResultadoCalceVaradero(EstadoCalceVaradero.SIN_CALCE, null, 0);
         }
         String textoNorm = CoordenadaNormalizer.normalizarTexto(textoVaradero);
-        if (textoNorm.isEmpty()) return null;
+        if (textoNorm.isEmpty()) {
+            return new ResultadoCalceVaradero(EstadoCalceVaradero.SIN_CALCE, null, 0);
+        }
 
         List<VaraderoModel> varaderosComuna = varaderosPorComuna.get(comunaId);
         if (varaderosComuna == null || varaderosComuna.isEmpty()) {
-            return null;
+            return new ResultadoCalceVaradero(EstadoCalceVaradero.SIN_CALCE, null, 0);
         }
 
         List<VaraderoModel> calzados = varaderosComuna.stream()
@@ -126,11 +140,20 @@ public class ReferenciaOrigenService {
                 .collect(Collectors.toList());
 
         if (calzados.size() == 1) {
-            return calzados.get(0);
+            return new ResultadoCalceVaradero(EstadoCalceVaradero.UNICO, calzados.get(0), 1);
         } else if (calzados.size() > 1) {
+            return new ResultadoCalceVaradero(EstadoCalceVaradero.AMBIGUO, null, calzados.size());
+        }
+        return new ResultadoCalceVaradero(EstadoCalceVaradero.SIN_CALCE, null, 0);
+    }
+
+    public VaraderoModel calzarVaradero(String textoVaradero, Long comunaId) {
+        ResultadoCalceVaradero res = evaluarCalceVaradero(textoVaradero, comunaId);
+        if (res.estado() == EstadoCalceVaradero.UNICO) {
+            return res.varadero();
+        } else if (res.estado() == EstadoCalceVaradero.AMBIGUO) {
             log.warn("Ambigüedad de varadero en comuna {}: texto '{}' calza con {} varaderos",
-                    comunaId, textoVaradero, calzados.size());
-            return null;
+                    comunaId, textoVaradero, res.candidatos());
         }
         return null;
     }

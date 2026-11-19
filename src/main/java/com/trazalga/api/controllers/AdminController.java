@@ -35,6 +35,9 @@ public class AdminController {
     @Autowired
     private com.trazalga.api.services.declaraciones.CorregirFechasDeclaracionesService corregirFechasDeclaracionesService;
 
+    @Autowired
+    private com.trazalga.api.services.declaraciones.VincularVaraderoRecolectorService vincularVaraderoRecolectorService;
+
     @GetMapping("/tareas-programadas")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Obtiene el estado de la última ejecución de cada tarea programada (TA.6)")
@@ -73,5 +76,17 @@ public class AdminController {
         return ResponseEntity.ok(aplicar
                 ? corregirFechasDeclaracionesService.aplicarCorreccion()
                 : corregirFechasDeclaracionesService.simularCorreccion());
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/declaraciones/recolector/vincular-varadero")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Simulación y vinculación histórica de declaraciones de recolector a varadero_id (YR.1 / YR.2 / D61)")
+    public ResponseEntity<java.util.Map<String, Object>> vincularVaraderoRecolector(
+            @org.springframework.web.bind.annotation.RequestParam(value = "aplicar", defaultValue = "false") boolean aplicar,
+            java.security.Principal principal) {
+        String usuario = principal != null ? principal.getName() : "ADMIN";
+        return ResponseEntity.ok(aplicar
+                ? vincularVaraderoRecolectorService.aplicar(usuario)
+                : vincularVaraderoRecolectorService.simular(usuario));
     }
 }
