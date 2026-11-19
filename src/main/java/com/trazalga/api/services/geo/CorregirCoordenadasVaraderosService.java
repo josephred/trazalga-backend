@@ -481,8 +481,8 @@ public class CorregirCoordenadasVaraderosService {
         int lonM = Math.abs(v.getLongGra());
         int lonS = Math.abs(v.getLongMin());
         return latG >= 17 && latG <= 56
-                && latM < 60 && latS < 60.0
-                && lonM < 60 && lonS < 60;
+                && latM < 60 && latS <= 60.0
+                && lonM < 60 && lonS <= 60;
     }
 
     private static boolean tieneDmsOrdenNormalValido(VaraderoModel v) {
@@ -501,8 +501,8 @@ public class CorregirCoordenadasVaraderosService {
         double lonS = Math.abs(v.getLongSeg());
         return latG >= 17 && latG <= 56
                 && lonG >= 66 && lonG <= 76
-                && latM < 60 && latS < 60.0
-                && lonM < 60 && lonS < 60.0;
+                && latM < 60 && latS <= 60.0
+                && lonM < 60 && lonS <= 60.0;
     }
 
     private static Double calcularDiferenciaDmsNormalMetros(Double lat, Double lon, VaraderoModel v) {

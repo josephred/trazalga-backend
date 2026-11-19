@@ -56,6 +56,14 @@ class CorregirCoordenadasVaraderosReglaTest {
                 .latitud(71.0).longitud(-71.29148)
                 .build();
 
+        // id=106 LOS CABALLITOS (long_min=60 por redondeo entero de 59.78")
+        VaraderoModel losCaballitos = VaraderoModel.builder()
+                .id(106L).nombre("LOS CABALLITOS")
+                .latGra(30).latMin(56).latSeg(18.919)
+                .longGra(39).longMin(60).longSeg(-30.938589)
+                .latitud(71.0).longitud(-71.666606)
+                .build();
+
         PropuestaVaradero p1 = CorregirCoordenadasVaraderosService.evaluarVaradero(lenguaDeVaca);
         assertEquals(CorregirCoordenadasVaraderosService.REGLA_DESPLAZAMIENTO_DMS, p1.regla());
         assertTrue(p1.dentroDeChile());
@@ -75,7 +83,7 @@ class CorregirCoordenadasVaraderosReglaTest {
         assertEquals(-71.695781, p76.lonPropuesta(), 1e-6);
         assertTrue(p76.diferenciaDmsMetros() < 50.0);
 
-        for (VaraderoModel v : List.of(losRipios, caletaHornos)) {
+        for (VaraderoModel v : List.of(losRipios, caletaHornos, losCaballitos)) {
             PropuestaVaradero p = CorregirCoordenadasVaraderosService.evaluarVaradero(v);
             assertEquals(CorregirCoordenadasVaraderosService.REGLA_DESPLAZAMIENTO_DMS, p.regla());
             assertTrue(p.dentroDeChile());
